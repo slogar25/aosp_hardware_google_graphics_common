@@ -501,7 +501,6 @@ void ExynosDisplay::doPreProcessing() {
     bool skipStaticLayers = true;
 
     for (size_t i=0; i < mLayers.size(); i++) {
-        mLayers[i]->checkFps();
         private_handle_t *handle = mLayers[i]->mLayerBuffer;
         /* TODO: This should be checked **/
         if ((handle != NULL) &&
@@ -587,7 +586,7 @@ int ExynosDisplay::checkLayerFps() {
 
     for (size_t i=0; i < mLayers.size(); i++) {
          if ((mLayers[i]->mOverlayPriority < ePriorityHigh) &&
-             (mLayers[i]->checkFps() < LOW_FPS_THRESHOLD)) {
+             (mLayers[i]->getFps() < LOW_FPS_THRESHOLD)) {
              mLowFpsLayerInfo.addLowFpsLayer(i);
          } else {
              if (mLowFpsLayerInfo.mHasLowFpsLayer == true)
@@ -686,7 +685,7 @@ int ExynosDisplay::checkDynamicReCompMode() {
         updateFps = HWC_FPS_TH;
     } else {
         for (uint32_t i = 0; i < mLayers.size(); i++) {
-            layerFps = mLayers[i]->checkFps();
+            layerFps = mLayers[i]->getFps();
             if (maxFps < layerFps)
                 maxFps = layerFps;
         }

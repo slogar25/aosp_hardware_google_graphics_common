@@ -412,6 +412,9 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
             mLayerBuffer, mDataSpace, mAcquireFence, mCompressed,
             internal_format);
 
+    /* Update fps */
+    checkFps();
+
     return 0;
 }
 
