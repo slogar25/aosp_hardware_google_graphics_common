@@ -1932,6 +1932,11 @@ int32_t ExynosResourceManager::updateResourceState()
     return NO_ERROR;
 }
 
+void ExynosResourceManager::setFrameRateForPerformance(ExynosMPP __unused &mpp,
+        AcrylicPerformanceRequestFrame __unused *frame)
+{
+}
+
 int32_t ExynosResourceManager::deliverPerformanceInfo()
 {
     int ret = NO_ERROR;
@@ -1994,6 +1999,8 @@ int32_t ExynosResourceManager::deliverPerformanceInfo()
                     HWC_LOGE(NULL,"%d frame reset fail (%zu)", assignedInstanceIndex, mpp->mAssignedSources.size());
                     break;
                 }
+                setFrameRateForPerformance(*mpp, frame);
+
                 for (uint32_t j = 0; j < mpp->mAssignedSources.size(); j++) {
                     ExynosMPPSource* mppSource = mpp->mAssignedSources[j];
                     frame->setSourceDimension(j,

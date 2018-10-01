@@ -146,6 +146,7 @@ class ExynosResourceManager {
         DstBufMgrThread mDstBufMgrThread;
 
     protected:
+        virtual void setFrameRateForPerformance(ExynosMPP &mpp, AcrylicPerformanceRequestFrame *frame);
         static ExynosMPPVector mOtfMPPs;
         static ExynosMPPVector mM2mMPPs;
         uint32_t mResourceReserved; /* Set MPP logical type for bit operation */
