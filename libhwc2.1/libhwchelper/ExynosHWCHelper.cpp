@@ -217,11 +217,19 @@ bool isFormat10BitYUV420(int format)
     return false;
 }
 
-bool isFormatYUV422(int __unused format)
+bool isFormatYUV422(int format)
 {
-    // Might add support later
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].halFormat == format) {
+            if (exynos_format_desc[i].type & YUV422)
+                return true;
+            else
+                return false;
+        }
+    }
     return false;
 }
+
 bool isFormatYCrCb(int format)
 {
     return format == HAL_PIXEL_FORMAT_EXYNOS_YV12_M;

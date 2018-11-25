@@ -29,6 +29,7 @@
 #include <utils/Vector.h>
 #include <map>
 #include <hardware/exynos/acryl.h>
+#include <map>
 #include "ExynosHWCModule.h"
 #include "ExynosHWCHelper.h"
 #include "GrallocWrapper.h"
@@ -86,6 +87,10 @@ class Allocator;
 #define G2D_CLOCK   711000
 #endif
 
+#ifndef MSC_CLOCK
+#define MSC_CLOCK   534000
+#endif
+
 #ifndef VPP_CLOCK
 #define VPP_CLOCK       400000000
 #endif
@@ -110,6 +115,9 @@ class Allocator;
 
 #ifndef MPP_G2D_CAPACITY
 #define MPP_G2D_CAPACITY    8
+#endif
+#ifndef MPP_MSC_CAPACITY
+#define MPP_MSC_CAPACITY    8
 #endif
 
 #ifndef MPP_G2D_SRC_SCALED_WEIGHT
@@ -235,11 +243,14 @@ typedef enum {
     PPC_SCALE_UP_4_,    /* x4 ~ */
     PPC_SCALE_MAX
 } scaling_index_t;
+
 typedef enum {
-    PPC_FORMAT_YUV2P   =   0,
+    PPC_FORMAT_YUV420   =   0,
+    PPC_FORMAT_YUV422,
     PPC_FORMAT_RGB32,
     PPC_FORMAT_YUV8_2,
     PPC_FORMAT_SBWC,
+    PPC_FORMAT_P010,
     PPC_FORMAT_FORMAT_MAX
 } format_index_t;
 
@@ -249,9 +260,11 @@ typedef enum {
     PPC_ROT_MAX
 } rot_index_t;
 
-typedef struct g2d_ppc_list_for_scaling {
+typedef struct ppc_list_for_scaling {
     float ppcList[PPC_SCALE_MAX];
-} g2d_ppc_list_for_scaling_t;
+} ppc_list_for_scaling_t;
+
+typedef std::map<uint32_t, ppc_list_for_scaling> ppc_table;
 
 typedef struct dstMetaInfo {
     uint16_t minLuminance = 0;
@@ -327,19 +340,9 @@ typedef struct restriction_table_element
 } restriction_table_element_t;
 /* */
 
-static struct g2d_ppc_list_for_scaling ppc_yuv2p_no_rot = {{2.9, 2.6, 3.4, 5.1, 11.9, 2.6, 3.0}};
-static struct g2d_ppc_list_for_scaling ppc_yuv2p_rot = {{2.0, 1.9, 3.3, 5.2, 7.0, 1.9, 3.2}};
-static struct g2d_ppc_list_for_scaling ppc_rgb32_no_rot = {{3.1, 2.2, 3.6, 5.1, 7.0, 2.2, 3.4}};
-static struct g2d_ppc_list_for_scaling ppc_rgb32_rot = {{2.7, 2.0, 3.0, 5.2, 6.5, 2.0, 3.3}};
-static struct g2d_ppc_list_for_scaling ppc_yuv8_2_no_rot = {{1.9, 1.9, 2.7, 3.1, 4.1, 1.4, 2.4}};
-static struct g2d_ppc_list_for_scaling ppc_yuv8_2_rot = {{0.9, 0.9, 2.2, 2.0, 3.7, 0.9, 2.5}};
-
-static struct g2d_ppc_list_for_scaling G2D_PPCs[PPC_FORMAT_FORMAT_MAX][PPC_ROT_MAX] =
-{
-    {ppc_yuv2p_no_rot, ppc_yuv2p_rot},
-    {ppc_rgb32_no_rot, ppc_rgb32_rot},
-    {ppc_yuv8_2_no_rot, ppc_yuv8_2_rot}
-};
+#define FORMAT_SHIFT   10
+#define ROT_SHIFT   20
+#define PPC_IDX(x,y,z) (x|(y<<FORMAT_SHIFT)|(z<<ROT_SHIFT))
 
 typedef struct dataspace_standard_mapper {
     int32_t supported_hwc_attr;
@@ -679,17 +682,16 @@ protected:
 
     uint32_t getRestrictionClassification(struct exynos_image &img);
 
-    /* getPPC for src, dst referencing mppSources in mAssignedSources */
-    virtual float getPPC(struct exynos_image &src, struct exynos_image &dst);
-
     /*
      * getPPC for src, dst referencing mppSources in mAssignedSources and
      * assignCheckSrc, assignCheckDst that are likely to be added to the mAssignedSources
      */
-    virtual float getPPC(struct exynos_image &src, struct exynos_image &dst,
-            struct exynos_image &assignCheckSrc, struct exynos_image &assignCheckDst);
-    void getPPCIndex(struct exynos_image &src, struct exynos_image &dst,
-            uint32_t &formatIndex, uint32_t &rotIndex, uint32_t &scaleIndex);
+    float getPPC(struct exynos_image &src, struct exynos_image &dst, struct exynos_image &criteria,
+            struct exynos_image *assignCheckSrc = NULL, struct exynos_image *assignCheckDst = NULL);
+
+    /* format and rotation index are defined by indexImage */
+    void getPPCIndex(struct exynos_image &indexImage, struct exynos_image &refImage,
+            uint32_t &formatIndex, uint32_t &rotIndex, uint32_t &scaleIndex, struct exynos_image &criteria);
 
     float getRequiredBaseCycles(struct exynos_image &src, struct exynos_image &dst);
     bool addCapacity(ExynosMPPSource* mppSource);
