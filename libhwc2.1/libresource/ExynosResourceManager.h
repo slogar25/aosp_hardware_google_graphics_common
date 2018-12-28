@@ -102,13 +102,13 @@ class ExynosResourceManager {
         void preAssignWindows();
         int32_t preProcessLayer(ExynosDisplay *display);
         int32_t resetAssignedResources(ExynosDisplay *display, bool forceReset = false);
-        int32_t assignCompositionTarget(ExynosDisplay *display, uint32_t targetType);
+        virtual int32_t assignCompositionTarget(ExynosDisplay *display, uint32_t targetType);
         int32_t validateLayer(uint32_t index, ExynosDisplay *display, ExynosLayer *layer);
         int32_t assignLayers(ExynosDisplay *display, uint32_t priority);
-        int32_t assignLayer(ExynosDisplay *display, ExynosLayer *layer, uint32_t layer_index,
+        virtual int32_t assignLayer(ExynosDisplay *display, ExynosLayer *layer, uint32_t layer_index,
                 exynos_image &m2m_out_img, ExynosMPP **m2mMPP, ExynosMPP **otfMPP, uint32_t &overlayInfo);
         virtual int32_t checkScenario(ExynosDisplay *display);
-        int32_t assignWindow(ExynosDisplay *display);
+        virtual int32_t assignWindow(ExynosDisplay *display);
         int32_t updateResourceState();
         static float getResourceUsedCapa(ExynosMPP &mpp);
         void printDebugInfo(ExynosDisplay *display);
