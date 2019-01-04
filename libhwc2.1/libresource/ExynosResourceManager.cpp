@@ -580,6 +580,24 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
     int retry_count = 0;
 
     Mutex::Autolock lock(mDstBufMgrThread.mStateMutex);
+
+    /*
+     * First add layers that SF requested HWC2_COMPOSITION_CLIENT type
+     * to client composition
+     */
+    for (uint32_t i = 0; i < display->mLayers.size(); i++) {
+        ExynosLayer *layer = display->mLayers[i];
+        if (layer->mCompositionType == HWC2_COMPOSITION_CLIENT) {
+            layer->mOverlayInfo |= eSkipLayer;
+            layer->mValidateCompositionType = HWC2_COMPOSITION_CLIENT;
+            if (((ret = display->addClientCompositionLayer(i)) != NO_ERROR) &&
+                 (ret != EXYNOS_ERROR_CHANGED)) {
+                HWC_LOGE(display, "Handle HWC2_COMPOSITION_CLIENT type layers, but addClientCompositionLayer failed (%d)", ret);
+                return ret;
+            }
+        }
+    }
+
     do {
         HDEBUGLOGD(eDebugResourceManager, "%s:: retry_count(%d)", __func__, retry_count);
         if ((ret = resetAssignedResources(display)) != NO_ERROR)
