@@ -1294,7 +1294,13 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     if (isFormatYUV(src_img.format) && !hasHdrInfo(src_img)) {
         /* Check RGB format */
         dst_img.format = DEFAULT_MPP_DST_FORMAT;
-        dst_img.dataSpace = colorModeToDataspace(display->mColorMode);
+        if (display->mColorMode == HAL_COLOR_MODE_NATIVE) {
+            /* Bypass dataSpace */
+            dst_img.dataSpace = src_img.dataSpace;
+        } else {
+            /* Covert data space */
+            dst_img.dataSpace = colorModeToDataspace(display->mColorMode);
+        }
         image_lists[index++] = dst_img;
     }
 
