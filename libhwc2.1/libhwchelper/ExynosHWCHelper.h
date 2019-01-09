@@ -284,7 +284,7 @@ typedef struct exynos_image {
      * frameworks/native/include/media/hardware/HardwareAPI.h */
     ExynosHdrStaticInfo hdrStaticInfo;
     ExynosHdrDynamicInfo hdrDynamicInfo;
-    ExynosVideoInfoType metaType;
+    ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
     bool needDegamma = false;
 } exynos_image_t;
 
