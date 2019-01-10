@@ -314,6 +314,8 @@ bool ExynosMPP::isSupportedHDR10Plus(struct exynos_image &src, struct exynos_ima
             return true;
         else if ((srcStandard == dstStandard) && (srcTransfer == dstTransfer))
             return true;
+        else if ((mLogicalType == MPP_LOGICAL_G2D_COMBO) && (mPreAssignDisplayInfo & HWC_DISPLAY_VIRTUAL_BIT))
+            return true;
         else
             return false;
     }
