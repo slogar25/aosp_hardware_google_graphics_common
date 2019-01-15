@@ -1860,7 +1860,7 @@ int32_t ExynosResourceManager::preProcessLayer(ExynosDisplay * display)
 
     /* Check to need degamma */
     if ((display->mDisplayId == HWC_DISPLAY_EXTERNAL) &&
-        (display->mHdrTypes[0] == HAL_HDR_HDR10) && (hasHdrLayer)) {
+            (((ExynosExternalDisplay *)display)->mExternalHdrSupported) && (hasHdrLayer)) {
         for (uint32_t i = 0; i < display->mLayers.size(); i++) {
             ExynosLayer *layer = display->mLayers[i];
             if(!layer->mIsHdrLayer)
