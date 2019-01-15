@@ -72,7 +72,7 @@ feature_support_t feature_table[] =
 
     {MPP_G2D,
         MPP_ATTR_AFBC | MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V | MPP_ATTR_ROT_90 | MPP_ATTR_ROT_180 | MPP_ATTR_ROT_270 |
-        MPP_ATTR_HDR10 | MPP_ATTR_USE_CAPA | MPP_ATTR_DEGAMMA
+        MPP_ATTR_HDR10 | MPP_ATTR_USE_CAPA
     }
 };
 
