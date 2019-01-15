@@ -572,11 +572,17 @@ uint32_t ExynosMPP::getSrcHeightAlign(struct exynos_image &src)
 }
 uint32_t ExynosMPP::getSrcMaxWidth(struct exynos_image &src)
 {
+    if (isFormatYUV(src.format))
+        return 4096;
+
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].maxFullWidth;
 }
 uint32_t ExynosMPP::getSrcMaxHeight(struct exynos_image &src)
 {
+    if (isFormatYUV(src.format))
+        return 4096;
+
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].maxFullHeight;
 }
@@ -610,9 +616,6 @@ uint32_t ExynosMPP::getSrcMinHeight(uint32_t idx)
 }
 uint32_t ExynosMPP::getSrcMaxCropWidth(struct exynos_image &src)
 {
-    if (mPhysicalType == MPP_MSC)
-        return 4096;
-
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].maxCropWidth;
 }
@@ -621,9 +624,6 @@ uint32_t ExynosMPP::getSrcMaxCropHeight(struct exynos_image &src)
     if ((mMPPType == MPP_TYPE_OTF) &&
         (src.transform & HAL_TRANSFORM_ROT_90))
         return 2160;
-
-    if (mPhysicalType == MPP_MSC)
-        return 4096;
 
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].maxCropHeight;
