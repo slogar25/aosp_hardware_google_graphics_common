@@ -200,9 +200,19 @@ int32_t ExynosLayer::doPreProcess()
                                         mMetaParcel->sHdrStaticInfo.sType1.mMaxDisplayLuminance);
                             }
                             if (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC) {
-                                /* Reserved field for dynamic meta data */
-                                /* Currently It's not be used not only HWC but also OMX */
-                                HDEBUGLOGD(eDebugLayer, "HWC2: Layer has dynamic metadata");
+                                 /* Resources for dynamic metadata are limited,
+                                    so primary display only supports dynamic metadata. */
+                                if (mDisplay->mType == HWC_DISPLAY_PRIMARY) {
+                                    /* Reserved field for dynamic meta data */
+                                    /* Currently It's not be used not only HWC but also OMX */
+                                    HDEBUGLOGD(eDebugLayer, "HWC2: Layer has dynamic metadata");
+                                } else {
+                                    /* reset dynamic metadata info */
+                                    mMetaParcel->eType = (ExynosVideoInfoType)(mMetaParcel->eType & (~VIDEO_INFO_TYPE_HDR_DYNAMIC));
+                                    memcpy(&(metaData->eType), &(mMetaParcel->eType), sizeof(metaData->eType));
+                                    memset(&(mMetaParcel->sHdrDynamicInfo), 0, sizeof(mMetaParcel->sHdrDynamicInfo));
+                                    memset(&(metaData->sHdrDynamicInfo), 0, sizeof(metaData->sHdrDynamicInfo));
+                                }
                             }
                         }
                     }
