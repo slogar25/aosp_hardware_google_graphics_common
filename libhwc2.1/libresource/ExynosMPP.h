@@ -58,6 +58,8 @@ class Allocator;
 #define G2D_MAX_SRC_NUM 15
 #endif
 
+#define G2D_JUSTIFIED_DST_ALIGN     16
+
 #define NUM_MPP_SRC_BUFS G2D_MAX_SRC_NUM
 
 #ifndef G2D_RESTRICTIVE_SRC_NUM

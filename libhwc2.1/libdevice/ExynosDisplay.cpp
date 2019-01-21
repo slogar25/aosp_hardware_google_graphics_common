@@ -1590,8 +1590,13 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
     config[windowIndex].dst.f_w = mXres;
     config[windowIndex].dst.f_h = mYres;
     config[windowIndex].format = halFormatToS3CFormat(handle->format);
-    config[windowIndex].src.f_w = handle->stride;
-    config[windowIndex].src.f_h = handle->vstride;
+    if (compositionInfo.mType == COMPOSITION_EXYNOS) {
+        config[windowIndex].src.f_w = pixel_align(mXres, G2D_JUSTIFIED_DST_ALIGN);
+        config[windowIndex].src.f_h = pixel_align(mYres, G2D_JUSTIFIED_DST_ALIGN);
+    } else {
+        config[windowIndex].src.f_w = handle->stride;
+        config[windowIndex].src.f_h = handle->vstride;
+    }
     config[windowIndex].compression = compositionInfo.mCompressed;
     if (compositionInfo.mCompressed) {
         if (compositionInfo.mType == COMPOSITION_EXYNOS)
