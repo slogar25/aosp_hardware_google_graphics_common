@@ -18,14 +18,43 @@ LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
 
+LOCAL_SHARED_LIBRARIES := libcutils libdrm liblog libutils libhardware
+
+LOCAL_PROPRIETARY_MODULE := true
+
+LOCAL_SRC_FILES := \
+	libdrmresource/worker.cpp \
+	libdrmresource/resourcemanager.cpp \
+	libdrmresource/drmdevice.cpp \
+	libdrmresource/drmconnector.cpp \
+	libdrmresource/drmcrtc.cpp \
+	libdrmresource/drmencoder.cpp \
+	libdrmresource/drmmode.cpp \
+	libdrmresource/drmplane.cpp \
+	libdrmresource/drmproperty.cpp \
+	libdrmresource/drmeventlistener.cpp \
+	libdrmresource/vsyncworker.cpp
+
+LOCAL_CFLAGS := -DHLOG_CODE=0
+LOCAL_CFLAGS += -Wno-unused-parameter
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
+
+LOCAL_MODULE := libdrmresource
+LOCAL_MODULE_TAGS := optional
+
+include $(TOP)/hardware/google/graphics/common/BoardConfigCFlags.mk
+include $(BUILD_SHARED_LIBRARY)
+
+################################################################################
+include $(CLEAR_VARS)
+
 LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
-	libGrallocWrapper libhardware_legacy libutils  libsync libacryl libui libion_google
+	libGrallocWrapper libhardware_legacy libutils \
+	libsync libacryl libui libion_google libdrmresource
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
-LOCAL_CFLAGS := -DHLOG_CODE=0
-LOCAL_CFLAGS += -DLOG_TAG=\"hwcomposer\"
 LOCAL_PROPRIETARY_MODULE := true
 
 LOCAL_C_INCLUDES += \
@@ -44,7 +73,8 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource
 
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
@@ -61,7 +91,7 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
 	libdisplayinterface/ExynosDisplayFbInterface.cpp
 
-LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm
 
 include $(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/Android.mk
 
@@ -105,7 +135,11 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource
+
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libdrm
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_C_INCLUDES)
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwcservice\"
