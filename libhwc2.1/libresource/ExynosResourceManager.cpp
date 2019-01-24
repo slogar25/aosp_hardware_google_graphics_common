@@ -553,6 +553,8 @@ int32_t ExynosResourceManager::setResourcePriority(ExynosDisplay *display)
                 uint32_t firstIndex = (uint32_t)display->mExynosCompositionInfo.mFirstIndex;
                 uint32_t lastIndex = (uint32_t)display->mExynosCompositionInfo.mLastIndex;
                 for (uint32_t i = firstIndex; i <= lastIndex; i++) {
+                    if (display->mExynosCompositionInfo.mFirstIndex == -1)
+                        break;
                     ExynosLayer *layer = display->mLayers[i];
                     layer->resetAssignedResource();
                     layer->mOverlayInfo |= eResourcePendingWork;
