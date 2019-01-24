@@ -18,7 +18,7 @@
 #define RESOURCEMANAGER_H
 
 #include "drmdevice.h"
-#include "platform.h"
+#include <vector>
 
 #include <string.h>
 
@@ -31,8 +31,6 @@ class ResourceManager {
   ResourceManager &operator=(const ResourceManager &) = delete;
   int Init();
   DrmDevice *GetDrmDevice(int display);
-  std::shared_ptr<Importer> GetImporter(int display);
-  const gralloc_module_t *gralloc();
   DrmConnector *AvailableWritebackConnector(int display);
 
  private:
@@ -40,8 +38,6 @@ class ResourceManager {
 
   int num_displays_;
   std::vector<std::unique_ptr<DrmDevice>> drms_;
-  std::vector<std::shared_ptr<Importer>> importers_;
-  const gralloc_module_t *gralloc_;
 };
 }  // namespace android
 

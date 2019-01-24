@@ -25,7 +25,7 @@
 
 namespace android {
 
-ResourceManager::ResourceManager() : num_displays_(0), gralloc_(NULL) {
+ResourceManager::ResourceManager() : num_displays_(0) {
 }
 
 int ResourceManager::Init() {
@@ -49,9 +49,7 @@ int ResourceManager::Init() {
     ALOGE("Failed to initialize any displays");
     return ret ? -EINVAL : ret;
   }
-
-  return hw_get_module(GRALLOC_HARDWARE_MODULE_ID,
-                       (const hw_module_t **)&gralloc_);
+  return ret;
 }
 
 int ResourceManager::AddDrmDevice(std::string path) {
@@ -60,13 +58,6 @@ int ResourceManager::AddDrmDevice(std::string path) {
   std::tie(ret, displays_added) = drm->Init(path.c_str(), num_displays_);
   if (ret)
     return ret;
-  std::shared_ptr<Importer> importer;
-  importer.reset(Importer::CreateInstance(drm.get()));
-  if (!importer) {
-    ALOGE("Failed to create importer instance");
-    return -ENODEV;
-  }
-  importers_.push_back(importer);
   drms_.push_back(std::move(drm));
   num_displays_ += displays_added;
   return ret;
@@ -96,17 +87,5 @@ DrmDevice *ResourceManager::GetDrmDevice(int display) {
       return drm.get();
   }
   return NULL;
-}
-
-std::shared_ptr<Importer> ResourceManager::GetImporter(int display) {
-  for (unsigned int i = 0; i < drms_.size(); i++) {
-    if (drms_[i]->HandlesDisplay(display))
-      return importers_[i];
-  }
-  return NULL;
-}
-
-const gralloc_module_t *ResourceManager::gralloc() {
-  return gralloc_;
 }
 }  // namespace android

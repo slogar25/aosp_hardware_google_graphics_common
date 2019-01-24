@@ -22,8 +22,8 @@
 #include "drmencoder.h"
 #include "drmeventlistener.h"
 #include "drmplane.h"
-#include "platform.h"
 
+#include <map>
 #include <stdint.h>
 #include <tuple>
 
