@@ -600,7 +600,7 @@ public:
     uint32_t getSrcCropWidthAlign(uint32_t idx);
     uint32_t getSrcCropHeightAlign(struct exynos_image &src);
     uint32_t getSrcCropHeightAlign(uint32_t idx);
-    bool isSrcFormatSupported(struct exynos_image &src);
+    virtual bool isSrcFormatSupported(struct exynos_image &src);
     virtual bool isDimLayerSupported();
     int32_t isSupportThis(uint32_t mSupportAttr);
 
@@ -611,7 +611,7 @@ public:
     virtual uint32_t getDstWidthAlign(struct exynos_image &dst);
     uint32_t getDstHeightAlign(struct exynos_image &dst);
     uint32_t getOutBufAlign();
-    bool isDstFormatSupported(struct exynos_image &src);
+    virtual bool isDstFormatSupported(struct exynos_image &dst);
     uint32_t getSrcMaxBlendingNum(struct exynos_image &src, struct exynos_image &dst);
     uint32_t getAssignedSourceNum();
 
