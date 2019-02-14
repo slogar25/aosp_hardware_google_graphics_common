@@ -136,7 +136,6 @@ ExynosResourceManager::ExynosResourceManager(ExynosDevice *device)
     mDevice(device),
     hasHdrLayer(false),
     hasDrmLayer(false),
-    mUseQuery(false),
     mFormatRestrictionCnt(0),
     mDstBufMgrThread(this),
     mResourceReserved(0x0)
@@ -2164,100 +2163,6 @@ void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table, int 
     mFormatRestrictionCnt++;
 }
 
-bool ExynosResourceManager::makeDPURestrictions(int fd) {
-
-    int i, j, cnt = 0;
-
-    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
-
-    if (ioctl(fd, EXYNOS_DISP_RESTRICTIONS, dpuInfo) == -1) {
-        ALOGE("EXYNOS_DISP_RESTRICTIONS ioctl failed: %s", strerror(errno));
-        goto err;
-    }
-
-    HDEBUGLOGD(eDebugDefault, "DPP ver : %d, cnt : %d", dpuInfo->ver, dpuInfo->dpp_cnt);
-
-    /* format resctriction */
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
-        HDEBUGLOGD(eDebugDefault, "id : %d, format count : %d", i, r.format_cnt);
-    }
-
-    restriction_key_t queried_format_table[1024];
-
-    /* Check attribute overlap */
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        for (j = 0; j < dpuInfo->dpp_cnt; j++){
-            if (i >= j) continue;
-            dpp_ch_restriction r1 = dpuInfo->dpp_ch[i];
-            dpp_ch_restriction r2 = dpuInfo->dpp_ch[j];
-            /* If attribute is same, will not be added to table */
-            if (r1.attr == r2.attr) {
-                mDPUInfo.overlap[j] = true;
-            }
-        }
-        HDEBUGLOGD(eDebugDefault, "Index : %d, overlap %d", i, mDPUInfo.overlap[i]);
-    }
-
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        if (mDPUInfo.overlap[i]) continue;
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
-        for (j = 0; j < r.format_cnt; j++){
-            if (S3CFormatToHalFormat(r.format[j]) != HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED) {
-                queried_format_table[cnt].hwType = getPhysicalType(i);
-                queried_format_table[cnt].nodeType = NODE_NONE;
-                queried_format_table[cnt].format = S3CFormatToHalFormat(r.format[j]);
-                queried_format_table[cnt].reserved = 0;
-                makeFormatRestrictions(queried_format_table[cnt], r.format[j]);
-                cnt++;
-            }
-            HDEBUGLOGD(eDebugDefault, "%s : %d", getMPPStr(getPhysicalType(i)).string(), r.format[j]);
-        }
-    }
-
-    /* Size restriction */
-    restriction_size rSize;
-
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        if (mDPUInfo.overlap[i]) continue;
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
-
-        /* RGB size restrictions */
-        rSize.maxDownScale = r.scale_down;
-        rSize.maxUpScale = r.scale_up;
-        rSize.maxFullWidth = r.dst_f_w.max;
-        rSize.maxFullHeight = r.dst_f_h.max;
-        rSize.minFullWidth = r.dst_f_w.min;
-        rSize.minFullHeight = r.dst_f_h.min;;
-        rSize.fullWidthAlign = r.dst_x_align;
-        rSize.fullHeightAlign = r.dst_y_align;;
-        rSize.maxCropWidth = r.src_w.max;
-        rSize.maxCropHeight = r.src_h.max;
-        rSize.minCropWidth = r.src_w.min;
-        rSize.minCropHeight = r.src_h.min;
-        rSize.cropXAlign = r.src_x_align;
-        rSize.cropYAlign = r.src_y_align;
-        rSize.cropWidthAlign = r.blk_x_align;
-        rSize.cropHeightAlign = r.blk_y_align;
-
-        makeSizeRestrictions(getPhysicalType(i), rSize, RESTRICTION_RGB);
-
-        /* YUV size restrictions */
-        rSize.fullWidthAlign = max(r.dst_x_align, YUV_CHROMA_H_SUBSAMPLE);
-        rSize.fullHeightAlign = max(r.dst_y_align, YUV_CHROMA_V_SUBSAMPLE);
-        rSize.cropXAlign = max(r.src_x_align, YUV_CHROMA_H_SUBSAMPLE);
-        rSize.cropYAlign = max(r.src_y_align, YUV_CHROMA_V_SUBSAMPLE);
-        rSize.cropWidthAlign = max(r.blk_x_align, YUV_CHROMA_H_SUBSAMPLE);
-        rSize.cropHeightAlign = max(r.blk_y_align, YUV_CHROMA_V_SUBSAMPLE);
-
-        makeSizeRestrictions(getPhysicalType(i), rSize, RESTRICTION_YUV);
-    }
-    return true;
-
-err:
-    return false;
-}
-
 void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
 
     Acrylic *arc = NULL;
@@ -2341,52 +2246,11 @@ mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) {
     return MPP_P_TYPE_MAX;
 }
 
-void ExynosResourceManager::updateFeatureTable() {
+void ExynosResourceManager::updateRestrictions() {
 
-    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
-    int featureTableCnt =  sizeof(feature_table)/sizeof(feature_support_t);
-    int attrMapCnt = sizeof(dpu_attr_map_table)/sizeof(dpu_attr_map_t);
-    int dpp_cnt = dpuInfo->dpp_cnt;
-
-    HDEBUGLOGD(eDebugDefault, "Before");
-    for (int j = 0; j < featureTableCnt; j++){
-        HDEBUGLOGD(eDebugDefault, "type : %d, feature : 0x%lx",
-            feature_table[j].hwType,
-            (unsigned long)feature_table[j].attr);
-    }
-
-    // dpp count
-    for (int i = 0; i < dpp_cnt; i++){
-        dpp_ch_restriction c_r = dpuInfo->dpp_ch[i];
-        if (mDPUInfo.overlap[i]) continue;
-        HDEBUGLOGD(eDebugDefault, "DPU attr : (ch:%d), 0x%lx", i, (unsigned long)c_r.attr);
-        // feature table count
-        for (int j = 0; j < featureTableCnt; j++){
-            if (feature_table[j].hwType == getPhysicalType(i)) {
-                // dpp attr count
-                for (int k = 0; k < attrMapCnt; k++) {
-                    if (c_r.attr & (1 << dpu_attr_map_table[k].dpp_attr)) {
-                        feature_table[j].attr |= dpu_attr_map_table[k].hwc_attr;
-                    }
-                }
-            }
-        }
-    }
-
-    HDEBUGLOGD(eDebugDefault, "After");
-    for (int j = 0; j < featureTableCnt; j++){
-        HDEBUGLOGD(eDebugDefault, "type : %d, feature : 0x%lx",
-            feature_table[j].hwType,
-            (unsigned long)feature_table[j].attr);
-    }
-}
-
-void ExynosResourceManager::updateRestrictions(int displayFd) {
-
-    if ((mUseQuery = makeDPURestrictions(displayFd)) == true) {
+    if (mDevice->mDeviceInterface->getUseQuery() == true) {
         makeAcrylRestrictions(MPP_MSC);
         makeAcrylRestrictions(MPP_G2D);
-        updateFeatureTable();
     } else {
         mFormatRestrictionCnt = sizeof(restriction_format_table)/sizeof(restriction_key);
         for (uint32_t i = 0 ; i < mFormatRestrictionCnt; i++) {
@@ -2418,4 +2282,9 @@ void ExynosResourceManager::updateRestrictions(int displayFd) {
         mM2mMPPs[i]->updateAttr();
         mM2mMPPs[i]->setupRestriction();
     }
+}
+
+uint32_t ExynosResourceManager::getFeatureTableSize()
+{
+    return sizeof(feature_table)/sizeof(feature_support_t);
 }

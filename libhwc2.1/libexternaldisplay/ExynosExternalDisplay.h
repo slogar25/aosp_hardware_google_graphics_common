@@ -89,23 +89,18 @@ class ExynosExternalDisplay : public ExynosDisplay {
         virtual int32_t validateDisplay(uint32_t* outNumTypes, uint32_t* outNumRequests);
         virtual int32_t canSkipValidate();
         virtual int32_t presentDisplay(int32_t* outRetireFence);
-        virtual void startConnection();
         virtual int openExternalDisplay();
         virtual void closeExternalDisplay();
-        virtual int32_t getDisplayAttribute(hwc2_config_t config, int32_t /*hwc2_attribute_t*/ attribute, int32_t* outValue);
         virtual int32_t getActiveConfig(hwc2_config_t* outconfig);
-        virtual int32_t setActiveConfig(hwc2_config_t config);
         virtual int32_t setVsyncEnabled(int32_t /*hwc2_vsync_t*/ enabled);
         virtual int32_t startPostProcessing();
         virtual int32_t setClientTarget(
                 buffer_handle_t target,
                 int32_t acquireFence, int32_t /*android_dataspace_t*/ dataspace);
         virtual int32_t setPowerMode(int32_t /*hwc2_power_mode_t*/ mode);
-        virtual int32_t getHdrCapabilities(uint32_t* outNumTypes, int32_t* /*android_hdr_t*/ outTypes, float* outMaxLuminance,
-                float* outMaxAverageLuminance, float* outMinLuminance);
+        virtual void initDisplayInterface(uint32_t interfaceType);
         bool checkRotate();
         bool handleRotate();
-        int32_t calVsyncPeriod(v4l2_dv_timings dv_timing);
         virtual void handleHotplugEvent();
 
         bool mEnabled;
@@ -116,15 +111,32 @@ class ExynosExternalDisplay : public ExynosDisplay {
         bool mHpdStatus;
         Mutex mExternalMutex;
 
-        android::Vector< unsigned int > mConfigurations;
-        struct v4l2_dv_timings dv_timings[SUPPORTED_DV_TIMINGS_NUM];
-
         int mSkipFrameCount;
         int mSkipStartFrame;
-        void dumpConfigurations();
     protected:
+        class ExynosExternalDisplayFbInterface: public ExynosDisplayFbInterface {
+            public:
+                ExynosExternalDisplayFbInterface(ExynosDisplay *exynosDisplay);
+                virtual void init(ExynosDisplay *exynosDisplay);
+                virtual int32_t getDisplayConfigs(
+                        uint32_t* outNumConfigs,
+                        hwc2_config_t* outConfigs);
+                virtual void dumpDisplayConfigs();
+                virtual int32_t getDisplayAttribute(
+                        hwc2_config_t config,
+                        int32_t attribute, int32_t* outValue);
+                virtual int32_t getHdrCapabilities(uint32_t* outNumTypes,
+                        int32_t* outTypes, float* outMaxLuminance,
+                        float* outMaxAverageLuminance, float* outMinLuminance);
+            protected:
+                int32_t calVsyncPeriod(v4l2_dv_timings dv_timing);
+                void cleanConfigurations();
+            protected:
+                ExynosExternalDisplay *mExternalDisplay;
+                struct v4l2_dv_timings dv_timings[SUPPORTED_DV_TIMINGS_NUM];
+                android::Vector< unsigned int > mConfigurations;
+        };
         int getDVTimingsIndex(int preset);
-        void cleanConfigurations();
         virtual bool getHDRException(ExynosLayer *layer);
     private:
 };

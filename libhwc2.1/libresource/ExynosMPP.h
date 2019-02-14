@@ -250,12 +250,6 @@ typedef struct g2d_ppc_list_for_scaling {
     float ppcList[PPC_SCALE_MAX];
 } g2d_ppc_list_for_scaling_t;
 
-/* for restriction query */
-typedef struct dpu_dpp_info {
-    struct dpp_restrictions_info dpuInfo;
-    bool overlap[16] = {false, };
-} dpu_dpp_info_t;
-
 enum
 {
     NODE_NONE,

@@ -26,10 +26,6 @@ extern struct exynos_hwc_control exynosHWCControl;
 ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice *device)
     :   ExynosDisplay(HWC_DISPLAY_PRIMARY, device)
 {
-    /* TODO: Need this one here? */
-    //this->mHwc = pdev;
-    //mInternalDMAs.add(IDMA_G1);
-
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
 
@@ -55,24 +51,13 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice 
     mResolutionInfo.nDSCYSliceSize[2] = 74;
     mResolutionInfo.nDSCXSliceSize[2] = 720;
     mResolutionInfo.nPanelType[2] = PANEL_LEGACY;
-
-    mDisplayFd = open(DECON_PRIMARY_DEV_NAME, O_RDWR);
-    if (mDisplayFd < 0) {
-        ALOGE("failed to open framebuffer id : %d", mDisplayId);
-        goto err_open_fb;
-    }
-
-    this->getDisplayHWInfo();
-
-err_open_fb:
-    return;
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
 {
 }
 
-void ExynosPrimaryDisplay::getDisplayHWInfo() {
+void ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
 
     int refreshRate = 0;
 
@@ -110,22 +95,22 @@ void ExynosPrimaryDisplay::getDisplayHWInfo() {
         ALOGI("HWC2: %d, psr_mode : %d", disp_info.ver, disp_info.psr_mode);
     }
 
-    mXres = info.reserved[0];
-    mYres = info.reserved[1];
+    mPrimaryDisplay->mXres = info.reserved[0];
+    mPrimaryDisplay->mYres = info.reserved[1];
 
     /* Support Multi-resolution scheme */
     {
-        mDeviceXres = mXres;
-        mDeviceYres = mYres;
-        mNewScaledWidth = mXres;
-        mNewScaledHeight = mYres;
+        mPrimaryDisplay->mDeviceXres = mPrimaryDisplay->mXres;
+        mPrimaryDisplay->mDeviceYres = mPrimaryDisplay->mYres;
+        mPrimaryDisplay->mNewScaledWidth = mPrimaryDisplay->mXres;
+        mPrimaryDisplay->mNewScaledHeight = mPrimaryDisplay->mYres;
 
-        mResolutionInfo.nNum = 1;
-        mResolutionInfo.nResolution[0].w = 1440;
-        mResolutionInfo.nResolution[0].h = 2960;
+        mPrimaryDisplay->mResolutionInfo.nNum = 1;
+        mPrimaryDisplay->mResolutionInfo.nResolution[0].w = 1440;
+        mPrimaryDisplay->mResolutionInfo.nResolution[0].h = 2960;
     }
-    refreshCalcFactor = uint64_t( info.upper_margin + info.lower_margin + mYres + info.vsync_len )
-                        * ( info.left_margin  + info.right_margin + mXres + info.hsync_len )
+    refreshCalcFactor = uint64_t( info.upper_margin + info.lower_margin + mPrimaryDisplay->mYres + info.vsync_len )
+                        * ( info.left_margin  + info.right_margin + mPrimaryDisplay->mXres + info.hsync_len )
                         * info.pixclock;
 
     if (refreshCalcFactor)
@@ -136,9 +121,9 @@ void ExynosPrimaryDisplay::getDisplayHWInfo() {
         refreshRate = 60;
     }
 
-    mXdpi = 1000 * (mXres * 25.4f) / info.width;
-    mYdpi = 1000 * (mYres * 25.4f) / info.height;
-    mVsyncPeriod = 1000000000 / refreshRate;
+    mPrimaryDisplay->mXdpi = 1000 * (mPrimaryDisplay->mXres * 25.4f) / info.width;
+    mPrimaryDisplay->mYdpi = 1000 * (mPrimaryDisplay->mYres * 25.4f) / info.height;
+    mPrimaryDisplay->mVsyncPeriod = 1000000000 / refreshRate;
 
     ALOGD("using\n"
             "xres         = %d px\n"
@@ -146,12 +131,13 @@ void ExynosPrimaryDisplay::getDisplayHWInfo() {
             "width        = %d mm (%f dpi)\n"
             "height       = %d mm (%f dpi)\n"
             "refresh rate = %d Hz\n",
-            mXres, mYres, info.width, mXdpi / 1000.0,
-            info.height, mYdpi / 1000.0, refreshRate);
+            mPrimaryDisplay->mXres, mPrimaryDisplay->mYres, info.width,
+            mPrimaryDisplay->mXdpi / 1000.0,
+            info.height, mPrimaryDisplay->mYdpi / 1000.0, refreshRate);
 
     /* get PSR info */
     psrInfoFd = NULL;
-    mPsrMode = psrMode = PSR_MAX;
+    mPrimaryDisplay->mPsrMode = psrMode = PSR_MAX;
     panelType = PANEL_LEGACY;
 
     char devname[MAX_DEV_NAME + 1];
@@ -181,7 +167,7 @@ void ExynosPrimaryDisplay::getDisplayHWInfo() {
     if (psrInfoFd != NULL) {
         char val[4];
         if (fread(&val, 1, 1, psrInfoFd) == 1) {
-            mPsrMode = psrMode = (0x03 & atoi(val));
+            mPrimaryDisplay->mPsrMode = psrMode = (0x03 & atoi(val));
         }
     } else {
         ALOGW("HWC needs to know whether LCD driver is using PSR mode or not (2nd try)\n");
@@ -194,54 +180,59 @@ void ExynosPrimaryDisplay::getDisplayHWInfo() {
         /* get DSC info */
         if (exynosHWCControl.multiResolution == true) {
             uint32_t panelModeCnt = 1;
-            uint32_t sliceXSize = mXres;
-            uint32_t sliceYSize = mYres;
-            uint32_t xSize = mXres;
-            uint32_t ySize = mYres;
+            uint32_t sliceXSize = mPrimaryDisplay->mXres;
+            uint32_t sliceYSize = mPrimaryDisplay->mYres;
+            uint32_t xSize = mPrimaryDisplay->mXres;
+            uint32_t ySize = mPrimaryDisplay->mYres;
             uint32_t panelType = PANEL_LEGACY;
             const int mode_limit = 3;
+            ResolutionInfo &resolutionInfo = mPrimaryDisplay->mResolutionInfo;
 
             if (fscanf(psrInfoFd, "%u\n", &panelModeCnt) != 1) {
                 ALOGE("Fail to read panel mode count");
             } else {
                 ALOGI("res count : %u", panelModeCnt);
                 if (panelModeCnt <= mode_limit) {
-                    mResolutionInfo.nNum = panelModeCnt;
+                    resolutionInfo.nNum = panelModeCnt;
                     for(uint32_t i = 0; i < panelModeCnt; i++) {
                         if (fscanf(psrInfoFd, "%d\n%d\n%d\n%d\n%d\n", &xSize, &ySize, &sliceXSize, &sliceYSize, &panelType) < 0) {
                             ALOGE("Fail to read slice information");
                         } else {
-                            mResolutionInfo.nResolution[i].w = xSize;
-                            mResolutionInfo.nResolution[i].h = ySize;
-                            mResolutionInfo.nDSCXSliceSize[i] = sliceXSize;
-                            mResolutionInfo.nDSCYSliceSize[i] = sliceYSize;
-                            mResolutionInfo.nPanelType[i] = panelType;
+                            resolutionInfo.nResolution[i].w = xSize;
+                            resolutionInfo.nResolution[i].h = ySize;
+                            resolutionInfo.nDSCXSliceSize[i] = sliceXSize;
+                            resolutionInfo.nDSCYSliceSize[i] = sliceYSize;
+                            resolutionInfo.nPanelType[i] = panelType;
                             ALOGI("mode no. : %d, Width : %d, Height : %d, X_Slice_Size : %d, Y_Slice_Size : %d, Panel type : %d\n", i,
-                                    mResolutionInfo.nResolution[i].w, mResolutionInfo.nResolution[i].h,
-                                    mResolutionInfo.nDSCXSliceSize[i], mResolutionInfo.nDSCYSliceSize[i], mResolutionInfo.nPanelType[i]);
+                                    resolutionInfo.nResolution[i].w,
+                                    resolutionInfo.nResolution[i].h,
+                                    resolutionInfo.nDSCXSliceSize[i],
+                                    resolutionInfo.nDSCYSliceSize[i],
+                                    resolutionInfo.nPanelType[i]);
                         }
                     }
                 }
-                mDSCHSliceNum = mXres / mResolutionInfo.nDSCXSliceSize[0];
-                mDSCYSliceSize = mResolutionInfo.nDSCYSliceSize[0];
+                mPrimaryDisplay->mDSCHSliceNum = mPrimaryDisplay->mXres / resolutionInfo.nDSCXSliceSize[0];
+                mPrimaryDisplay->mDSCYSliceSize = resolutionInfo.nDSCYSliceSize[0];
             }
         } else {
             uint32_t sliceNum = 1;
-            uint32_t sliceSize = mYres;
+            uint32_t sliceSize = mPrimaryDisplay->mYres;
             if (fscanf(psrInfoFd, "\n%d\n%d\n", &sliceNum, &sliceSize) < 0) {
                 ALOGE("Fail to read slice information");
             } else {
-                mDSCHSliceNum = sliceNum;
-                mDSCYSliceSize = sliceSize;
+                mPrimaryDisplay->mDSCHSliceNum = sliceNum;
+                mPrimaryDisplay->mDSCYSliceSize = sliceSize;
             }
         }
         fclose(psrInfoFd);
     }
 
-    mDRDefault = (mPsrMode == PSR_NONE);
-    mDREnable = mDRDefault;
+    mPrimaryDisplay->mDRDefault = (mPrimaryDisplay->mPsrMode == PSR_NONE);
+    mPrimaryDisplay->mDREnable = mPrimaryDisplay->mDRDefault;
 
-    ALOGI("DSC H_Slice_Num: %d, Y_Slice_Size: %d (for window partial update)", mDSCHSliceNum, mDSCYSliceSize);
+    ALOGI("DSC H_Slice_Num: %d, Y_Slice_Size: %d (for window partial update)",
+            mPrimaryDisplay->mDSCHSliceNum, mPrimaryDisplay->mDSCYSliceSize);
 
     struct decon_hdr_capabilities_info outInfo;
     memset(&outInfo, 0, sizeof(outInfo));
@@ -253,23 +244,25 @@ void ExynosPrimaryDisplay::getDisplayHWInfo() {
 
 
     // Save to member variables
-    mHdrTypeNum = outInfo.out_num;
-    mMaxLuminance = (float)outInfo.max_luminance / (float)10000;
-    mMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
-    mMinLuminance = (float)outInfo.min_luminance / (float)10000;
+    mPrimaryDisplay->mHdrTypeNum = outInfo.out_num;
+    mPrimaryDisplay->mMaxLuminance = (float)outInfo.max_luminance / (float)10000;
+    mPrimaryDisplay->mMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
+    mPrimaryDisplay->mMinLuminance = (float)outInfo.min_luminance / (float)10000;
 
     ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
-            mDisplayName.string(), mHdrTypeNum, mMaxLuminance, mMaxAverageLuminance, mMinLuminance);
+            mPrimaryDisplay->mDisplayName.string(), mPrimaryDisplay->mHdrTypeNum,
+            mPrimaryDisplay->mMaxLuminance, mPrimaryDisplay->mMaxAverageLuminance,
+            mPrimaryDisplay->mMinLuminance);
 
     struct decon_hdr_capabilities outData;
 
-    for (int i = 0; i < mHdrTypeNum; i += SET_HDR_CAPABILITIES_NUM) {
+    for (int i = 0; i < mPrimaryDisplay->mHdrTypeNum; i += SET_HDR_CAPABILITIES_NUM) {
         if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
             ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
             goto err_ioctl;
         }
-        mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
-        ALOGE("HWC2: Type(%d)",  mHdrTypes[i]);
+        mPrimaryDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
+        ALOGE("HWC2: Type(%d)",  mPrimaryDisplay->mHdrTypes[i]);
     }
 
     //TODO : shuld be set by valid number
@@ -278,7 +271,7 @@ void ExynosPrimaryDisplay::getDisplayHWInfo() {
     return;
 
 err_ioctl:
-    mDisplayFd = hwcFdClose(mDisplayFd);
+    return;
 }
 
 void ExynosPrimaryDisplay::setDDIScalerEnable(int width, int height) {
@@ -311,14 +304,13 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
     Mutex::Autolock lock(mDisplayMutex);
 
     /* TODO state check routine should be added */
-
     int fb_blank = -1;
 
     if (mode == HWC_POWER_MODE_DOZE ||
-            mode == HWC_POWER_MODE_DOZE_SUSPEND) {
+        mode == HWC_POWER_MODE_DOZE_SUSPEND) {
         if (this->mPowerModeState != HWC_POWER_MODE_DOZE &&
-                this->mPowerModeState != HWC_POWER_MODE_OFF &&
-                this->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
+            this->mPowerModeState != HWC_POWER_MODE_OFF &&
+            this->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
             fb_blank = FB_BLANK_POWERDOWN;
             clearDisplay();
         } else {
@@ -332,13 +324,6 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
         fb_blank = FB_BLANK_UNBLANK;
     }
 
-    if (fb_blank >= 0) {
-        if (ioctl(mDisplayFd, FBIOBLANK, fb_blank) == -1) {
-            ALOGE("FB BLANK ioctl failed errno : %d", errno);
-            return HWC2_ERROR_UNSUPPORTED;
-        }
-    }
-
     ALOGD("%s:: FBIOBLANK mode(%d), blank(%d)", __func__, mode, fb_blank);
 
     if (fb_blank == FB_BLANK_POWERDOWN)
@@ -349,11 +334,9 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
     // check the dynamic recomposition thread by following display
     mDevice->checkDynamicRecompositionThread();
 
+    mDisplayInterface->setPowerMode(mode);
     this->mPowerModeState = (hwc2_power_mode_t)mode;
 
-    if (ioctl(mDisplayFd, S3CFB_POWER_MODE, &mode) == -1) {
-        ALOGE("Need to check S3CFB power mode ioctl : %d", errno);
-    }
     ALOGD("%s:: S3CFB_POWER_MODE mode(%d), blank(%d)", __func__, mode, fb_blank);
 
     if (mode == HWC_POWER_MODE_OFF) {
@@ -371,6 +354,38 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::setPowerMode(int32_t mode)
+{
+    int32_t ret = NO_ERROR;
+    int fb_blank = -1;
+    if (mode == HWC_POWER_MODE_DOZE ||
+        mode == HWC_POWER_MODE_DOZE_SUSPEND) {
+        if (mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_DOZE &&
+            mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_OFF &&
+            mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
+            fb_blank = FB_BLANK_POWERDOWN;
+        }
+    } else if (mode == HWC_POWER_MODE_OFF) {
+        fb_blank = FB_BLANK_POWERDOWN;
+    } else {
+        fb_blank = FB_BLANK_UNBLANK;
+    }
+
+    if (fb_blank >= 0) {
+        if ((ret = ioctl(mDisplayFd, FBIOBLANK, fb_blank)) < 0) {
+            ALOGE("FB BLANK ioctl failed errno : %d", errno);
+            return ret;
+        }
+    }
+
+    if ((ret = ioctl(mDisplayFd, S3CFB_POWER_MODE, &mode)) < 0) {
+        ALOGE("Need to check S3CFB power mode ioctl : %d", errno);
+        return ret;
+    }
+
+    return ret;
+}
+
 ExynosMPP* ExynosPrimaryDisplay::getExynosMPPForDma(decon_idma_type idma) {
     return ExynosDisplay::getExynosMPPForDma(idma);
 }
@@ -381,4 +396,27 @@ decon_idma_type ExynosPrimaryDisplay::getDeconDMAType(ExynosMPP *otfMPP) {
 bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
 {
     return false;
+}
+
+void ExynosPrimaryDisplay::initDisplayInterface(uint32_t __unused interfaceType)
+{
+    mDisplayInterface = new ExynosPrimaryDisplayFbInterface((ExynosDisplay *)this);
+    mDisplayInterface->init(this);
+}
+
+ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::ExynosPrimaryDisplayFbInterface(ExynosDisplay *exynosDisplay)
+    : ExynosDisplayFbInterface(exynosDisplay)
+{
+}
+
+void ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::init(ExynosDisplay *exynosDisplay)
+{
+    mDisplayFd = open(DECON_PRIMARY_DEV_NAME, O_RDWR);
+    if (mDisplayFd < 0)
+        ALOGE("%s:: failed to open framebuffer", __func__);
+
+    mExynosDisplay = exynosDisplay;
+    mPrimaryDisplay = (ExynosPrimaryDisplay *)exynosDisplay;
+
+    getDisplayHWInfo();
 }

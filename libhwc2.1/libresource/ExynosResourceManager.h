@@ -78,9 +78,6 @@ class ExynosResourceManager {
         bool hasDrmLayer;
         bool isHdrExternal;
 
-        // Gathered DPU resctrictions
-        dpu_dpp_info_t mDPUInfo;
-        bool mUseQuery;
         uint32_t mFormatRestrictionCnt;
         uint32_t mSizeRestrictionCnt[RESTRICTION_MAX];
         restriction_key_t mFormatRestrictions[RESTRICTION_CNT_MAX];
@@ -135,11 +132,10 @@ class ExynosResourceManager {
         void makeSizeRestrictions(uint32_t mppId, restriction_size_t size, restriction_classification_t format);
         void makeFormatRestrictions(restriction_key_t table, int deviceFormat);
 
-        virtual bool makeDPURestrictions(int fd);
-        void updateFeatureTable();
-        void updateRestrictions(int fd);
+        void updateRestrictions();
 
         mpp_phycal_type_t getPhysicalType(int ch);
+        uint32_t getFeatureTableSize();
 
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,

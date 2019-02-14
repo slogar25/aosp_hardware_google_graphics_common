@@ -62,14 +62,6 @@ public:
     int getPresentationMode(void);
     int setVDSGlesFormat(int format);
 
-    /* getDisplayAttribute(..., config, attribute, outValue)
-     * Descriptor: HWC2_FUNCTION_GET_DISPLAY_ATTRIBUTE
-     * HWC2_PFN_GET_DISPLAY_ATTRIBUTE
-     */
-    virtual int32_t getDisplayAttribute(
-            hwc2_config_t config,
-            int32_t /*hwc2_attribute_t*/ attribute, int32_t* outValue);
-
     /* setOutputBuffer(..., buffer, releaseFence)
      * Descriptor: HWC2_FUNCTION_SET_OUTPUT_BUFFER
      * HWC2_PFN_SET_OUTPUT_BUFFER
@@ -132,6 +124,10 @@ public:
      * And function handle fence of DEVICE composition Layer.
      */
     virtual bool checkFrameValidation();
+
+    virtual int32_t getHdrCapabilities(uint32_t* outNumTypes,
+            int32_t* outTypes, float* outMaxLuminance,
+            float* outMaxAverageLuminance, float* outMinLuminance);
 
     /**
      * If mIsWFDState is true, VirtualDisplaySurface use HWC

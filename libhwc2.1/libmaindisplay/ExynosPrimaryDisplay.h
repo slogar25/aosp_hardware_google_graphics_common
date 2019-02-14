@@ -21,9 +21,6 @@
 class ExynosMPPModule;
 
 class ExynosPrimaryDisplay : public ExynosDisplay {
-
-    void getDisplayHWInfo();
-
     // Prepare multi resolution
     ResolutionInfo mResolutionInfo;
 
@@ -36,7 +33,17 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         virtual ExynosMPP* getExynosMPPForDma(decon_idma_type idma);
         virtual decon_idma_type getDeconDMAType(ExynosMPP *otfMPP);
+        virtual void initDisplayInterface(uint32_t interfaceType);
     protected:
+        class ExynosPrimaryDisplayFbInterface: public ExynosDisplayFbInterface {
+            public:
+                ExynosPrimaryDisplayFbInterface(ExynosDisplay *exynosDisplay);
+                virtual void init(ExynosDisplay *exynosDisplay);
+                virtual int32_t setPowerMode(int32_t mode);
+                void getDisplayHWInfo();
+            protected:
+                ExynosPrimaryDisplay *mPrimaryDisplay;
+        };
         virtual int32_t setPowerMode(
                 int32_t /*hwc2_power_mode_t*/ mode);
         virtual bool getHDRException(ExynosLayer* __unused layer);

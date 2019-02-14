@@ -182,6 +182,38 @@ struct DisplayControl {
     bool cursorSupport;
 };
 
+class ExynosDisplayInterface {
+    protected:
+        ExynosDisplay *mExynosDisplay;
+    public:
+        virtual ~ExynosDisplayInterface();
+        virtual void init(ExynosDisplay* __unused exynosDisplay) {};
+        virtual int32_t setPowerMode(int32_t __unused mode) {return NO_ERROR;};
+        virtual int32_t setVsyncEnabled(uint32_t __unused enabled) {return NO_ERROR;};
+        virtual int32_t getDisplayAttribute(
+                hwc2_config_t __unused config,
+                int32_t __unused attribute, int32_t* __unused outValue) {return NO_ERROR;};
+        virtual int32_t getDisplayConfigs(
+                uint32_t* outNumConfigs,
+                hwc2_config_t* outConfigs);
+        virtual void dumpDisplayConfigs() {};
+        virtual int32_t getColorModes(
+                uint32_t* outNumModes,
+                int32_t* outModes);
+        virtual int32_t setColorMode(int32_t __unused mode) {return NO_ERROR;};
+        virtual int32_t setActiveConfig(hwc2_config_t __unused config) {return NO_ERROR;};
+        virtual int32_t setCursorPositionAsync(uint32_t __unused x_pos,
+                uint32_t __unused y_pos) {return NO_ERROR;};
+        virtual int32_t getHdrCapabilities(uint32_t* outNumTypes,
+                int32_t* outTypes, float* outMaxLuminance,
+                float* outMaxAverageLuminance, float* outMinLuminance);
+        virtual int32_t deliverWinConfigData() {return NO_ERROR;};
+        virtual int32_t clearDisplay() {return NO_ERROR;};
+        virtual int32_t disableSelfRefresh(uint32_t __unused disable) {return NO_ERROR;};
+        virtual int32_t setForcePanic() {return NO_ERROR;};
+        virtual int getDisplayFd() {return -1;};
+};
+
 class ExynosDisplay {
     public:
 
@@ -294,11 +326,6 @@ class ExynosDisplay {
          * Restore release fenc from DECON.
          */
         int mLastRetireFence;
-
-        /**
-         * LCD device member variables
-         */
-        int mDisplayFd;
 
         bool mUseDecon;
 
@@ -631,8 +658,51 @@ class ExynosDisplay {
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
         void increaseMPPDstBufIndex();
+        virtual void initDisplayInterface(uint32_t interfaceType);
     protected:
+        class ExynosDisplayFbInterface : public ExynosDisplayInterface {
+            public:
+                ExynosDisplayFbInterface(ExynosDisplay *exynosDisplay);
+                ~ExynosDisplayFbInterface();
+                virtual void init(ExynosDisplay *exynosDisplay);
+                virtual int32_t setPowerMode(int32_t mode);
+                virtual int32_t setVsyncEnabled(uint32_t enabled);
+                virtual int32_t getDisplayAttribute(
+                        hwc2_config_t config,
+                        int32_t attribute, int32_t* outValue);
+                virtual int32_t getDisplayConfigs(
+                        uint32_t* outNumConfigs,
+                        hwc2_config_t* outConfigs);
+                virtual void dumpDisplayConfigs();
+                virtual int32_t getColorModes(
+                        uint32_t* outNumModes,
+                        int32_t* outModes);
+                virtual int32_t setColorMode(int32_t mode);
+                virtual int32_t setActiveConfig(hwc2_config_t config);
+                virtual int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
+                virtual int32_t getHdrCapabilities(uint32_t* outNumTypes,
+                        int32_t* outTypes, float* outMaxLuminance,
+                        float* outMaxAverageLuminance, float* outMinLuminance);
+                virtual int32_t deliverWinConfigData();
+                virtual int32_t clearDisplay();
+                virtual int32_t disableSelfRefresh(uint32_t disable);
+                virtual int32_t setForcePanic();
+                virtual int getDisplayFd() { return mDisplayFd; };
+            protected:
+                /**
+                 * LCD device member variables
+                 */
+                int mDisplayFd;
+        };
         virtual bool getHDRException(ExynosLayer *layer);
+
+    public:
+        /**
+         * This will be initialized with differnt class
+         * that inherits ExynosDisplayInterface according to
+         * interface type.
+         */
+        ExynosDisplayInterface *mDisplayInterface;
 
     private:
         void clearWinConfigData(decon_win_config_data *config);

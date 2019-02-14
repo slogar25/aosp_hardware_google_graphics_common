@@ -33,6 +33,7 @@ class ExynosDevice;
 extern void vsync_callback(hwc2_callback_data_t callbackData,
         hwc2_display_t displayId, int64_t timestamp);
 extern uint32_t mFenceLogSize;
+extern feature_support_t feature_table[];
 
 int hwcDebug;
 int hwcFenceDebug[FENCE_IP_ALL];
@@ -237,7 +238,8 @@ ExynosDevice::ExynosDevice()
     mExtVsyncFd(-1),
     mVsyncDisplay(HWC_DISPLAY_PRIMARY),
     mTimestamp(0),
-    mDisplayMode(0)
+    mDisplayMode(0),
+    mInterfaceType(INTERFACE_TYPE_FB)
 {
     exynosHWCControl.forceGpu = false;
     exynosHWCControl.windowUpdate = true;
@@ -256,8 +258,6 @@ ExynosDevice::ExynosDevice()
     exynosHWCControl.sysFenceLogging = false;
 
     ALOGD("HWC2 : %s : %d ", __func__, __LINE__);
-    int ret = 0;
-
     mResourceManager = new ExynosResourceManagerModule(this);
 
     ExynosPrimaryDisplayModule *primary_display = new ExynosPrimaryDisplayModule(HWC_DISPLAY_PRIMARY, this);
@@ -273,10 +273,9 @@ ExynosDevice::ExynosDevice()
     }
 
     ExynosExternalDisplayModule *external_display = new ExynosExternalDisplayModule(HWC_DISPLAY_EXTERNAL, this);
+
     ExynosVirtualDisplayModule *virtual_display = new ExynosVirtualDisplayModule(HWC_DISPLAY_VIRTUAL, this);
     mNumVirtualDisplay = 0;
-
-    mResourceManager->updateRestrictions(primary_display->mDisplayFd);
 
     mDisplays.add((ExynosDisplay*) primary_display);
     mDisplays.add((ExynosDisplay*) external_display);
@@ -292,14 +291,6 @@ ExynosDevice::ExynosDevice()
 
     dynamicRecompositionThreadCreate();
 
-    /** Event handler thread creation **/
-    /* TODO : Check last argument */
-    ret = pthread_create(&mEventHandlerThread, NULL, hwc_eventHndler_thread, this);
-    if (ret) {
-        ALOGE("failed to start vsync thread: %s", strerror(ret));
-        ret = -ret;
-    }
-
     hwcDebug = 0;
     for (uint32_t i = 0; i < FENCE_IP_ALL; i++)
         hwcFenceDebug[i] = 0;
@@ -313,6 +304,29 @@ ExynosDevice::ExynosDevice()
     saveString.appendFormat("ExynosDevice is initialized");
     uint32_t errFileSize = saveErrorLog(saveString);
     ALOGI("Initial errlog size: %d bytes\n", errFileSize);
+
+    /*
+     * This order should not be changed
+     * new ExynosResourceManager ->
+     * create displays and add them to the list ->
+     * initDeviceInterface() ->
+     * ExynosResourceManager::updateRestrictions()
+     */
+    initDeviceInterface(mInterfaceType);
+    mResourceManager->updateRestrictions();
+}
+
+void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
+{
+    mDeviceInterface = new ExynosDeviceFbInterface(this);
+    /*
+     * This order should not be changed
+     * initDisplayInterface() of each display ->
+     * ExynosDeviceInterface::init()
+     */
+    for (uint32_t i = 0; i < mDisplays.size(); i++)
+        mDisplays[i]->initDisplayInterface(interfaceType);
+    mDeviceInterface->init(this);
 }
 
 ExynosDevice::~ExynosDevice() {
@@ -320,8 +334,6 @@ ExynosDevice::~ExynosDevice() {
     ExynosDisplay *primary_display = getDisplay(HWC_DISPLAY_PRIMARY);
 
     /* TODO kill threads here */
-    pthread_kill(mEventHandlerThread, SIGTERM);
-    pthread_join(mEventHandlerThread, NULL);
     pthread_kill(mDRThread, SIGTERM);
     pthread_join(mDRThread, NULL);
 
@@ -329,6 +341,9 @@ ExynosDevice::~ExynosDevice() {
         delete mMapper;
     if (mAllocator != NULL)
         delete mAllocator;
+
+    if (mDeviceInterface != NULL)
+        delete mDeviceInterface;
 
     delete primary_display;
 }
@@ -789,7 +804,7 @@ uint32_t ExynosDevice::checkConnection(uint32_t display)
         case HWC_DISPLAY_PRIMARY:
             return 1;
         case HWC_DISPLAY_EXTERNAL:
-            if (external_display->mDisplayFd > 0)
+            if (external_display->mPlugState)
                 return 1;
             else
                 return 0;
@@ -927,6 +942,200 @@ void ExynosDevice::compareVsyncPeriod() {
         mVsyncDisplay = HWC_DISPLAY_EXTERNAL;
         return;
     }
+
+    return;
+}
+
+ExynosDeviceInterface::~ExynosDeviceInterface()
+{
+}
+
+ExynosDevice::ExynosDeviceFbInterface::ExynosDeviceFbInterface(ExynosDevice *exynosDevice)
+{
+    mUseQuery = false;
+    mExynosDevice = exynosDevice;
+}
+
+ExynosDevice::ExynosDeviceFbInterface::~ExynosDeviceFbInterface()
+{
+    /* TODO kill threads here */
+    pthread_kill(mEventHandlerThread, SIGTERM);
+    pthread_join(mEventHandlerThread, NULL);
+}
+
+void ExynosDevice::ExynosDeviceFbInterface::init(ExynosDevice *exynosDevice)
+{
+    int ret = 0;
+    mExynosDevice = exynosDevice;
+
+    ExynosDisplay *primaryDisplay = (ExynosDisplay*)mExynosDevice->getDisplay(HWC_DISPLAY_PRIMARY);
+    ExynosDisplayInterface *displayInterface = primaryDisplay->mDisplayInterface;
+    mDisplayFd = displayInterface->getDisplayFd();
+    updateRestrictions();
+
+    /** Event handler thread creation **/
+    ret = pthread_create(&mEventHandlerThread, NULL, hwc_eventHndler_thread, mExynosDevice);
+    if (ret) {
+        ALOGE("failed to start vsync thread: %s", strerror(ret));
+        ret = -ret;
+    }
+}
+
+int32_t ExynosDevice::ExynosDeviceFbInterface::makeDPURestrictions() {
+    int i, j, cnt = 0;
+    int32_t ret = 0;
+
+    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
+    HDEBUGLOGD(eDebugDefault, "DPP ver : %d, cnt : %d", dpuInfo->ver, dpuInfo->dpp_cnt);
+    ExynosResourceManager *resourceManager = mExynosDevice->mResourceManager;
+
+    /* format resctriction */
+    for (i = 0; i < dpuInfo->dpp_cnt; i++){
+        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
+        HDEBUGLOGD(eDebugDefault, "id : %d, format count : %d", i, r.format_cnt);
+    }
+
+    restriction_key_t queried_format_table[1024];
+
+    /* Check attribute overlap */
+    for (i = 0; i < dpuInfo->dpp_cnt; i++){
+        for (j = 0; j < dpuInfo->dpp_cnt; j++){
+            if (i >= j) continue;
+            dpp_ch_restriction r1 = dpuInfo->dpp_ch[i];
+            dpp_ch_restriction r2 = dpuInfo->dpp_ch[j];
+            /* If attribute is same, will not be added to table */
+            if (r1.attr == r2.attr) {
+                mDPUInfo.overlap[j] = true;
+            }
+        }
+        HDEBUGLOGD(eDebugDefault, "Index : %d, overlap %d", i, mDPUInfo.overlap[i]);
+    }
+
+    for (i = 0; i < dpuInfo->dpp_cnt; i++){
+        if (mDPUInfo.overlap[i]) continue;
+        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
+        mpp_phycal_type_t hwType = resourceManager->getPhysicalType(i);
+        for (j = 0; j < r.format_cnt; j++){
+            if (S3CFormatToHalFormat(r.format[j]) != HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED) {
+                queried_format_table[cnt].hwType = hwType;
+                queried_format_table[cnt].nodeType = NODE_NONE;
+                queried_format_table[cnt].format = S3CFormatToHalFormat(r.format[j]);
+                queried_format_table[cnt].reserved = 0;
+                resourceManager->makeFormatRestrictions(queried_format_table[cnt], r.format[j]);
+                cnt++;
+            }
+            HDEBUGLOGD(eDebugDefault, "%s : %d", getMPPStr(hwType).string(), r.format[j]);
+        }
+    }
+
+    /* Size restriction */
+    restriction_size rSize;
+
+    for (i = 0; i < dpuInfo->dpp_cnt; i++){
+        if (mDPUInfo.overlap[i]) continue;
+        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
+
+        /* RGB size restrictions */
+        rSize.maxDownScale = r.scale_down;
+        rSize.maxUpScale = r.scale_up;
+        rSize.maxFullWidth = r.dst_f_w.max;
+        rSize.maxFullHeight = r.dst_f_h.max;
+        rSize.minFullWidth = r.dst_f_w.min;
+        rSize.minFullHeight = r.dst_f_h.min;;
+        rSize.fullWidthAlign = r.dst_x_align;
+        rSize.fullHeightAlign = r.dst_y_align;;
+        rSize.maxCropWidth = r.src_w.max;
+        rSize.maxCropHeight = r.src_h.max;
+        rSize.minCropWidth = r.src_w.min;
+        rSize.minCropHeight = r.src_h.min;
+        rSize.cropXAlign = r.src_x_align;
+        rSize.cropYAlign = r.src_y_align;
+        rSize.cropWidthAlign = r.blk_x_align;
+        rSize.cropHeightAlign = r.blk_y_align;
+
+        mpp_phycal_type_t hwType = resourceManager->getPhysicalType(i);
+        resourceManager->makeSizeRestrictions(hwType, rSize, RESTRICTION_RGB);
+
+        /* YUV size restrictions */
+        rSize.minCropWidth = 32; //r.src_w.min;
+        rSize.minCropHeight = 32; //r.src_h.min;
+        rSize.fullWidthAlign = max(r.dst_x_align, YUV_CHROMA_H_SUBSAMPLE);
+        rSize.fullHeightAlign = max(r.dst_y_align, YUV_CHROMA_V_SUBSAMPLE);
+        rSize.cropXAlign = max(r.src_x_align, YUV_CHROMA_H_SUBSAMPLE);
+        rSize.cropYAlign = max(r.src_y_align, YUV_CHROMA_V_SUBSAMPLE);
+        rSize.cropWidthAlign = max(r.blk_x_align, YUV_CHROMA_H_SUBSAMPLE);
+        rSize.cropHeightAlign = max(r.blk_y_align, YUV_CHROMA_V_SUBSAMPLE);
+
+        resourceManager->makeSizeRestrictions(hwType, rSize, RESTRICTION_YUV);
+    }
+    return ret;
+}
+
+int32_t ExynosDevice::ExynosDeviceFbInterface::updateFeatureTable() {
+
+    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
+    ExynosResourceManager *resourceManager = mExynosDevice->mResourceManager;
+    uint32_t featureTableCnt = resourceManager->getFeatureTableSize();
+    int attrMapCnt = sizeof(dpu_attr_map_table)/sizeof(dpu_attr_map_t);
+    int dpp_cnt = dpuInfo->dpp_cnt;
+    int32_t ret = 0;
+
+    HDEBUGLOGD(eDebugDefault, "Before");
+    for (uint32_t j = 0; j < featureTableCnt; j++){
+        HDEBUGLOGD(eDebugDefault, "type : %d, feature : 0x%lx",
+            feature_table[j].hwType,
+            (unsigned long)feature_table[j].attr);
+    }
+
+    // dpp count
+    for (int i = 0; i < dpp_cnt; i++){
+        dpp_ch_restriction c_r = dpuInfo->dpp_ch[i];
+        if (mDPUInfo.overlap[i]) continue;
+        HDEBUGLOGD(eDebugDefault, "DPU attr : (ch:%d), 0x%lx", i, (unsigned long)c_r.attr);
+        mpp_phycal_type_t hwType = resourceManager->getPhysicalType(i);
+        // feature table count
+        for (uint32_t j = 0; j < featureTableCnt; j++){
+            if (feature_table[j].hwType == hwType) {
+                // dpp attr count
+                for (int k = 0; k < attrMapCnt; k++) {
+                    if (c_r.attr & (1 << dpu_attr_map_table[k].dpp_attr)) {
+                        feature_table[j].attr |= dpu_attr_map_table[k].hwc_attr;
+                    }
+                }
+            }
+        }
+    }
+
+    HDEBUGLOGD(eDebugDefault, "After");
+    for (uint32_t j = 0; j < featureTableCnt; j++){
+        HDEBUGLOGD(eDebugDefault, "type : %d, feature : 0x%lx",
+            feature_table[j].hwType,
+            (unsigned long)feature_table[j].attr);
+    }
+    return ret;
+}
+
+
+void ExynosDevice::ExynosDeviceFbInterface::updateRestrictions()
+{
+    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
+    int32_t ret = 0;
+
+    if ((ret = ioctl(mDisplayFd, EXYNOS_DISP_RESTRICTIONS, dpuInfo)) < 0) {
+        ALOGI("EXYNOS_DISP_RESTRICTIONS ioctl failed: %s", strerror(errno));
+        mUseQuery = false;
+        return;
+    }
+    if ((ret = makeDPURestrictions()) != NO_ERROR) {
+        ALOGE("makeDPURestrictions fail");
+    } else if ((ret = updateFeatureTable()) != NO_ERROR) {
+        ALOGE("updateFeatureTable fail");
+    }
+
+    if (ret == NO_ERROR)
+        mUseQuery = true;
+    else
+        mUseQuery = false;
 
     return;
 }

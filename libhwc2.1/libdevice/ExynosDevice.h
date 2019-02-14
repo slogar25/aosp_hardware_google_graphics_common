@@ -142,8 +142,27 @@ enum {
     GEOMETRY_ERROR_CASE                     = 1ULL << 63,
 };
 
+/* for restriction query */
+typedef struct dpu_dpp_info {
+    struct dpp_restrictions_info dpuInfo;
+    bool overlap[16] = {false, };
+} dpu_dpp_info_t;
+
+
+class ExynosDevice;
 class ExynosDisplay;
 class ExynosResourceManager;
+
+class ExynosDeviceInterface {
+    protected:
+        ExynosDevice *mExynosDevice;
+        bool mUseQuery;
+    public:
+        virtual ~ExynosDeviceInterface();
+        virtual void init(ExynosDevice *exynosDevice) = 0;
+        virtual void updateRestrictions() = 0;
+        virtual bool getUseQuery() { return mUseQuery; };
+};
 
 class ExynosDevice {
     public:
@@ -170,18 +189,12 @@ class ExynosDevice {
         uint64_t mGeometryChanged;
 
         /**
-         * Kernel event handling thread (e.g.) Vsync, hotplug, TUI enable events.
-         */
-        pthread_t mEventHandlerThread;
-
-        /**
          * If Panel has not self-refresh feature, dynamic recomposition will be enabled.
          */
         pthread_t mDRThread;
         volatile int32_t mDRThreadStatus;
         bool mDRLoopStatus;
         bool mPrimaryBlank;
-
 
         /**
          * Callback informations those are used by SurfaceFlinger.
@@ -207,6 +220,13 @@ class ExynosDevice {
 
         // Variable for fence tracer
         hwc_fence_info mFenceInfo[MAX_FD_NUM];
+
+        /**
+         * This will be initialized with differnt class
+         * that inherits ExynosDeviceInterface according to
+         * interface type.
+         */
+        ExynosDeviceInterface *mDeviceInterface;
 
         // Con/Destructors
         ExynosDevice();
@@ -286,6 +306,33 @@ class ExynosDevice {
         void compareVsyncPeriod();
         bool isDynamicRecompositionThreadAlive();
         void checkDynamicRecompositionThread();
+
+    protected:
+        void initDeviceInterface(uint32_t interfaceType);
+        class ExynosDeviceFbInterface : public ExynosDeviceInterface {
+            public:
+                ExynosDeviceFbInterface(ExynosDevice *exynosDevice);
+                virtual ~ExynosDeviceFbInterface();
+                virtual void init(ExynosDevice *exynosDevice) override;
+                virtual void updateRestrictions() override;
+            protected:
+                int32_t makeDPURestrictions();
+                int32_t updateFeatureTable();
+            protected:
+                /**
+                 * Kernel event handling thread (e.g.) Vsync, hotplug, TUI enable events.
+                 */
+                pthread_t mEventHandlerThread;
+                // Gathered DPU resctrictions
+                dpu_dpp_info_t mDPUInfo;
+                /* framebuffer fd for main display */
+                int mDisplayFd;
+        };
+    protected:
+        enum {
+            INTERFACE_TYPE_FB = 0,
+        };
+        uint32_t mInterfaceType;
 };
 
 #endif //_EXYNOSDEVICE_H
