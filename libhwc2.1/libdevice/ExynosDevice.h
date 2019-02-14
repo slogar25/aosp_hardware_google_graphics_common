@@ -18,9 +18,6 @@
 #define _EXYNOSDEVICE_H
 
 #include <unistd.h>
-#include <pthread.h>
-#include <poll.h>
-
 #include <hardware_legacy/uevent.h>
 
 #include <utils/Vector.h>
@@ -142,27 +139,11 @@ enum {
     GEOMETRY_ERROR_CASE                     = 1ULL << 63,
 };
 
-/* for restriction query */
-typedef struct dpu_dpp_info {
-    struct dpp_restrictions_info dpuInfo;
-    bool overlap[16] = {false, };
-} dpu_dpp_info_t;
-
 
 class ExynosDevice;
 class ExynosDisplay;
 class ExynosResourceManager;
-
-class ExynosDeviceInterface {
-    protected:
-        ExynosDevice *mExynosDevice;
-        bool mUseQuery;
-    public:
-        virtual ~ExynosDeviceInterface();
-        virtual void init(ExynosDevice *exynosDevice) = 0;
-        virtual void updateRestrictions() = 0;
-        virtual bool getUseQuery() { return mUseQuery; };
-};
+class ExynosDeviceInterface;
 
 class ExynosDevice {
     public:
@@ -309,25 +290,6 @@ class ExynosDevice {
 
     protected:
         void initDeviceInterface(uint32_t interfaceType);
-        class ExynosDeviceFbInterface : public ExynosDeviceInterface {
-            public:
-                ExynosDeviceFbInterface(ExynosDevice *exynosDevice);
-                virtual ~ExynosDeviceFbInterface();
-                virtual void init(ExynosDevice *exynosDevice) override;
-                virtual void updateRestrictions() override;
-            protected:
-                int32_t makeDPURestrictions();
-                int32_t updateFeatureTable();
-            protected:
-                /**
-                 * Kernel event handling thread (e.g.) Vsync, hotplug, TUI enable events.
-                 */
-                pthread_t mEventHandlerThread;
-                // Gathered DPU resctrictions
-                dpu_dpp_info_t mDPUInfo;
-                /* framebuffer fd for main display */
-                int mDisplayFd;
-        };
     protected:
         enum {
             INTERFACE_TYPE_FB = 0,

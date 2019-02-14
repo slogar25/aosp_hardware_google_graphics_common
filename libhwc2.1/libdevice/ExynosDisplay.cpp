@@ -2463,101 +2463,16 @@ int32_t ExynosDisplay::getColorModes(
     return mDisplayInterface->getColorModes(outNumModes, outModes);
 }
 
-int32_t ExynosDisplay::ExynosDisplayFbInterface::getColorModes(
-        uint32_t* outNumModes,
-        int32_t* outModes)
-{
-    uint32_t colorModeNum = 0;
-    int32_t ret = 0;
-    if ((ret = ioctl(mDisplayFd, EXYNOS_GET_COLOR_MODE_NUM, &colorModeNum )) < 0) {
-        *outNumModes = 1;
-
-        ALOGI("%s:: is not supported", __func__);
-        if (outModes != NULL) {
-            outModes[0] = HAL_COLOR_MODE_NATIVE;
-        }
-        return HWC2_ERROR_NONE;
-    }
-
-    if (outModes == NULL) {
-        ALOGI("%s:: Supported color modes (%d)", __func__, colorModeNum);
-        *outNumModes = colorModeNum;
-        return HWC2_ERROR_NONE;
-    }
-
-    if (*outNumModes != colorModeNum) {
-        ALOGE("%s:: invalid outNumModes(%d), should be(%d)", __func__, *outNumModes, colorModeNum);
-        return -EINVAL;
-    }
-
-    for (uint32_t i= 0 ; i < colorModeNum; i++) {
-        struct decon_color_mode_info colorMode;
-        colorMode.index = i;
-        if ((ret = ioctl(mDisplayFd, EXYNOS_GET_COLOR_MODE, &colorMode )) < 0) {
-            return HWC2_ERROR_UNSUPPORTED;
-        }
-        ALOGI("\t[%d] mode %d", i, colorMode.color_mode);
-        outModes[i] = colorMode.color_mode;
-    }
-
-    return HWC2_ERROR_NONE;
-}
-
 int32_t ExynosDisplay::getDisplayAttribute(
         hwc2_config_t config,
         int32_t /*hwc2_attribute_t*/ attribute, int32_t* outValue) {
     return mDisplayInterface->getDisplayAttribute(config, attribute, outValue);
 }
 
-int32_t ExynosDisplay::ExynosDisplayFbInterface::getDisplayAttribute(
-        hwc2_config_t __unused config,
-        int32_t attribute, int32_t* outValue)
-{
-    switch (attribute) {
-    case HWC2_ATTRIBUTE_VSYNC_PERIOD:
-        *outValue = mExynosDisplay->mVsyncPeriod;
-        break;
-
-    case HWC2_ATTRIBUTE_WIDTH:
-        *outValue = mExynosDisplay->mXres;
-        break;
-
-    case HWC2_ATTRIBUTE_HEIGHT:
-        *outValue = mExynosDisplay->mYres;
-        break;
-
-    case HWC2_ATTRIBUTE_DPI_X:
-        *outValue = mExynosDisplay->mXdpi;
-        break;
-
-    case HWC2_ATTRIBUTE_DPI_Y:
-        *outValue = mExynosDisplay->mYdpi;
-        break;
-    default:
-        ALOGE("unknown display attribute %u", attribute);
-        return HWC2_ERROR_BAD_CONFIG;
-    }
-
-    return HWC2_ERROR_NONE;
-}
-
 int32_t ExynosDisplay::getDisplayConfigs(
         uint32_t* outNumConfigs,
         hwc2_config_t* outConfigs) {
     return mDisplayInterface->getDisplayConfigs(outNumConfigs, outConfigs);
-}
-
-int32_t ExynosDisplay::ExynosDisplayFbInterface::getDisplayConfigs(
-        uint32_t* outNumConfigs,
-        hwc2_config_t* outConfigs)
-{
-    if (outConfigs == NULL)
-        *outNumConfigs = 1;
-    else if (*outNumConfigs >= 1)
-        outConfigs[0] = 0;
-
-    *outNumConfigs = 1;
-    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::getDisplayName(uint32_t* outSize, char* outName)
@@ -3009,12 +2924,6 @@ int32_t ExynosDisplay::setActiveConfig(
     return mDisplayInterface->setActiveConfig(config);
 }
 
-int32_t ExynosDisplay::ExynosDisplayFbInterface::setActiveConfig(hwc2_config_t __unused config)
-{
-    int32_t ret = NO_ERROR;
-    return ret;
-}
-
 int32_t ExynosDisplay::setClientTarget(
         buffer_handle_t target,
         int32_t acquireFence, int32_t /*android_dataspace_t*/ dataspace) {
@@ -3103,11 +3012,6 @@ int32_t ExynosDisplay::setColorMode(
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::ExynosDisplayFbInterface::setColorMode(int32_t mode)
-{
-    return ioctl(mDisplayFd, EXYNOS_SET_COLOR_MODE, &mode);
-}
-
 int32_t ExynosDisplay::setOutputBuffer(
         buffer_handle_t __unused buffer,
         int32_t __unused releaseFence) {
@@ -3131,49 +3035,6 @@ int ExynosDisplay::clearDisplay() {
     /* Update last retire fence */
     mLastRetireFence = fence_close(mLastRetireFence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
 
-    return ret;
-}
-
-int32_t ExynosDisplay::ExynosDisplayFbInterface::clearDisplay()
-{
-    int ret = 0;
-
-    struct decon_win_config_data win_data;
-    memset(&win_data, 0, sizeof(win_data));
-    win_data.retire_fence = -1;
-    struct decon_win_config *config = win_data.config;
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        config[i].acq_fence = -1;
-        config[i].rel_fence = -1;
-    }
-
-#if defined(HWC_CLEARDISPLAY_WITH_COLORMAP)
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        if (i == mExynosDisplay->mBaseWindowIndex) {
-            config[i].state = config[i].DECON_WIN_STATE_COLOR;
-            config[i].idma_type = mExynosDisplay->mDefaultDMA;
-            config[i].color = 0x0;
-            config[i].dst.x = 0;
-            config[i].dst.y = 0;
-            config[i].dst.w = mExynosDisplay->mXres;
-            config[i].dst.h = mExynosDisplay->mYres;
-            config[i].dst.f_w = mExynosDisplay->mXres;
-            config[i].dst.f_h = mExynosDisplay->mYres;
-        }
-        else
-            config[i].state = config[i].DECON_WIN_STATE_DISABLED;
-    }
-#endif
-
-    win_data.retire_fence = -1;
-
-    ret = ioctl(mDisplayFd, S3CFB_WIN_CONFIG, &win_data);
-    if (ret < 0)
-        HWC_LOGE(mExynosDisplay, "ioctl S3CFB_WIN_CONFIG failed to clear screen: %s",
-                strerror(errno));
-
-    if (win_data.retire_fence > 0)
-        fence_close(win_data.retire_fence, mExynosDisplay, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
     return ret;
 }
 
@@ -3220,24 +3081,6 @@ int32_t ExynosDisplay::setPowerMode(
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::ExynosDisplayFbInterface::setPowerMode(int32_t mode)
-{
-    int32_t ret = NO_ERROR;
-    int fb_blank = 0;
-    if (mode == HWC_POWER_MODE_OFF) {
-        fb_blank = FB_BLANK_POWERDOWN;
-    } else {
-        fb_blank = FB_BLANK_UNBLANK;
-    }
-
-    if ((ret = ioctl(mDisplayFd, FBIOBLANK, fb_blank)) != NO_ERROR) {
-        HWC_LOGE(mExynosDisplay, "set powermode ioctl failed errno : %d", errno);
-    }
-
-    ALOGD("%s:: mode(%d), blank(%d)", __func__, mode, fb_blank);
-    return ret;
-}
-
 int32_t ExynosDisplay::setVsyncEnabled(
         int32_t /*hwc2_vsync_t*/ enabled) {
 
@@ -3264,11 +3107,6 @@ int32_t ExynosDisplay::setVsyncEnabled(
     mVsyncState = (hwc2_vsync_t)enabled;
 
     return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosDisplay::ExynosDisplayFbInterface::setVsyncEnabled(uint32_t enabled)
-{
-    return ioctl(mDisplayFd, S3CFB_SET_VSYNC_INT, &enabled);
 }
 
 int32_t ExynosDisplay::validateDisplay(
@@ -3433,13 +3271,6 @@ err:
 int32_t ExynosDisplay::setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos) {
     mDisplayInterface->setCursorPositionAsync(x_pos, y_pos);
     return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosDisplay::ExynosDisplayFbInterface::setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos) {
-    struct decon_user_window win_pos;
-    win_pos.x = x_pos;
-    win_pos.y = y_pos;
-    return ioctl(this->mDisplayFd, S3CFB_WIN_POSITION, &win_pos);
 }
 
 void ExynosDisplay::dumpConfig(decon_win_config &c)
@@ -4458,52 +4289,6 @@ int32_t ExynosDisplay::getHdrCapabilities(uint32_t* outNumTypes,
                     outMaxLuminance, outMaxAverageLuminance, outMinLuminance);
 }
 
-int32_t ExynosDisplay::ExynosDisplayFbInterface::getHdrCapabilities(uint32_t* outNumTypes,
-        int32_t* outTypes, float* outMaxLuminance,
-        float* outMaxAverageLuminance, float* outMinLuminance)
-{
-
-    if (outTypes == NULL) {
-        struct decon_hdr_capabilities_info outInfo;
-        memset(&outInfo, 0, sizeof(outInfo));
-        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
-            return -1;
-        }
-
-        *outMaxLuminance = (float)outInfo.max_luminance / (float)10000;
-        *outMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
-        *outMinLuminance = (float)outInfo.min_luminance / (float)10000;
-        *outNumTypes = outInfo.out_num;
-        // Save to member variables
-        mExynosDisplay->mHdrTypeNum = *outNumTypes;
-        mExynosDisplay->mMaxLuminance = *outMaxLuminance;
-        mExynosDisplay->mMaxAverageLuminance = *outMaxAverageLuminance;
-        mExynosDisplay->mMinLuminance = *outMinLuminance;
-        ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
-                mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypeNum, mExynosDisplay->mMaxLuminance,
-                mExynosDisplay->mMaxAverageLuminance, mExynosDisplay->mMinLuminance);
-        return 0;
-    }
-
-    struct decon_hdr_capabilities outData;
-    memset(&outData, 0, sizeof(outData));
-
-    for (uint32_t i = 0; i < *outNumTypes; i += SET_HDR_CAPABILITIES_NUM) {
-        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
-            return -1;
-        }
-        for (uint32_t j = 0; j < *outNumTypes - i; j++)
-            outTypes[i+j] = outData.out_types[j];
-        // Save to member variables
-        mExynosDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
-        HDEBUGLOGD(eDebugHWC, "%s HWC2: Types : %d",
-                mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypes[i]);
-    }
-    return 0;
-}
-
 // Support DDI scalser
 void ExynosDisplay::setDDIScalerEnable(int __unused width, int __unused height) {
 }
@@ -4543,87 +4328,8 @@ void ExynosDisplay::clearWinConfigData(decon_win_config_data *winConfigData)
     }
 }
 
-int32_t ExynosDisplayInterface::getDisplayConfigs(
-        uint32_t* outNumConfigs,
-        hwc2_config_t* outConfigs)
-{
-    *outNumConfigs = 1;
-
-    if (outConfigs != NULL)
-        outConfigs[0] = 0;
-
-    return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosDisplayInterface::getColorModes(
-        uint32_t* outNumModes,
-        int32_t* outModes)
-{
-    *outNumModes = 1;
-
-    if (outModes != NULL) {
-        outModes[0] = HAL_COLOR_MODE_NATIVE;
-    }
-    return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosDisplayInterface::getHdrCapabilities(uint32_t* outNumTypes,
-        int32_t* outTypes, float* outMaxLuminance,
-        float* outMaxAverageLuminance, float* outMinLuminance)
-{
-    *outNumTypes = 0;
-    return 0;
-}
-
 void ExynosDisplay::initDisplayInterface(uint32_t __unused interfaceType)
 {
     mDisplayInterface = new ExynosDisplayInterface();
     mDisplayInterface->init(this);
-}
-
-ExynosDisplayInterface::~ExynosDisplayInterface()
-{
-}
-
-ExynosDisplay::ExynosDisplayFbInterface::ExynosDisplayFbInterface(ExynosDisplay *exynosDisplay)
-: mDisplayFd(-1)
-{
-    mExynosDisplay = exynosDisplay;
-}
-
-ExynosDisplay::ExynosDisplayFbInterface::~ExynosDisplayFbInterface()
-{
-    if (mDisplayFd >= 0)
-        fence_close(mDisplayFd, mExynosDisplay, FENCE_TYPE_UNDEFINED, FENCE_IP_UNDEFINED);
-    mDisplayFd = -1;
-}
-
-void ExynosDisplay::ExynosDisplayFbInterface::init(ExynosDisplay *exynosDisplay)
-{
-    mDisplayFd = -1;
-    mExynosDisplay = exynosDisplay;
-}
-
-void ExynosDisplay::ExynosDisplayFbInterface::dumpDisplayConfigs()
-{
-}
-
-int32_t ExynosDisplay::ExynosDisplayFbInterface::deliverWinConfigData()
-{
-    ATRACE_CALL();
-    return ioctl(mDisplayFd, S3CFB_WIN_CONFIG, mExynosDisplay->mWinConfigData);
-}
-
-int32_t ExynosDisplay::ExynosDisplayFbInterface::disableSelfRefresh(uint32_t disable)
-{
-    return ioctl(mDisplayFd, S3CFB_DECON_SELF_REFRESH, &disable);
-}
-
-int32_t ExynosDisplay::ExynosDisplayFbInterface::setForcePanic()
-{
-    if (exynosHWCControl.forcePanic == 0)
-        return NO_ERROR;
-
-    usleep(20000);
-    return ioctl(mDisplayFd, S3CFB_FORCE_PANIC, 0);
 }

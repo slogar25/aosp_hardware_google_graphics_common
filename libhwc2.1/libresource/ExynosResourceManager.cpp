@@ -31,6 +31,7 @@
 #include "ExynosPrimaryDisplayModule.h"
 #include "ExynosVirtualDisplay.h"
 #include "ExynosExternalDisplay.h"
+#include "ExynosDeviceInterface.h"
 
 /* Basic supported features */
 feature_support_t feature_table[] =

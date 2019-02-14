@@ -43,10 +43,12 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface
 
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
+	ExynosHWCDebug.cpp \
 	libdevice/ExynosDisplay.cpp \
 	libdevice/ExynosDevice.cpp \
 	libdevice/ExynosLayer.cpp \
@@ -55,7 +57,9 @@ LOCAL_SRC_FILES := \
 	libresource/ExynosResourceManager.cpp \
 	libexternaldisplay/ExynosExternalDisplay.cpp \
 	libvirtualdisplay/ExynosVirtualDisplay.cpp \
-	ExynosHWCDebug.cpp
+	libdisplayinterface/ExynosDeviceFbInterface.cpp \
+	libdisplayinterface/ExynosDisplayInterface.cpp \
+	libdisplayinterface/ExynosDisplayFbInterface.cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl
 
@@ -100,7 +104,8 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwcservice\"
@@ -154,7 +159,8 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface
 
 LOCAL_SRC_FILES := \
 	ExynosHWC.cpp

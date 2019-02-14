@@ -22,6 +22,7 @@
 #include <linux/videodev2.h>
 #include "videodev2_exynos_displayport.h"
 #include <cutils/properties.h>
+#include "ExynosDisplayFbInterface.h"
 
 #define SUPPORTED_DV_TIMINGS_NUM        100
 

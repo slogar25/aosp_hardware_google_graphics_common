@@ -57,6 +57,153 @@ ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
 {
 }
 
+void ExynosPrimaryDisplay::setDDIScalerEnable(int width, int height) {
+
+    if (exynosHWCControl.setDDIScaler == false) return;
+
+    ALOGI("DDISCALER Info : setDDIScalerEnable(w=%d,h=%d)", width, height);
+    mNewScaledWidth = width;
+    mNewScaledHeight = height;
+    mXres = width;
+    mYres = height;
+}
+
+int ExynosPrimaryDisplay::getDDIScalerMode(int width, int height) {
+
+    if (exynosHWCControl.setDDIScaler == false) return 1;
+
+    // Check if panel support support resolution or not.
+    for (uint32_t i=0; i < mResolutionInfo.nNum; i++) {
+        if (mResolutionInfo.nResolution[i].w * mResolutionInfo.nResolution[i].h ==
+                static_cast<uint32_t>(width * height))
+            return i + 1;
+    }
+
+    return 1; // WQHD
+}
+
+int32_t ExynosPrimaryDisplay::setPowerMode(
+        int32_t /*hwc2_power_mode_t*/ mode) {
+    Mutex::Autolock lock(mDisplayMutex);
+
+    /* TODO state check routine should be added */
+    int fb_blank = -1;
+
+    if (mode == HWC_POWER_MODE_DOZE ||
+        mode == HWC_POWER_MODE_DOZE_SUSPEND) {
+        if (this->mPowerModeState != HWC_POWER_MODE_DOZE &&
+            this->mPowerModeState != HWC_POWER_MODE_OFF &&
+            this->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
+            fb_blank = FB_BLANK_POWERDOWN;
+            clearDisplay();
+        } else {
+            ALOGE("DOZE or Power off called twice, mPowerModeState : %d", this->mPowerModeState);
+        }
+    } else if (mode == HWC_POWER_MODE_OFF) {
+        fb_blank = FB_BLANK_POWERDOWN;
+        clearDisplay();
+        ALOGV("HWC2: Clear display (power off)");
+    } else {
+        fb_blank = FB_BLANK_UNBLANK;
+    }
+
+    ALOGD("%s:: FBIOBLANK mode(%d), blank(%d)", __func__, mode, fb_blank);
+
+    if (fb_blank == FB_BLANK_POWERDOWN)
+        mDREnable = false;
+    else if (fb_blank == FB_BLANK_UNBLANK)
+        mDREnable = mDRDefault;
+
+    // check the dynamic recomposition thread by following display
+    mDevice->checkDynamicRecompositionThread();
+
+    mDisplayInterface->setPowerMode(mode);
+    this->mPowerModeState = (hwc2_power_mode_t)mode;
+
+    ALOGD("%s:: S3CFB_POWER_MODE mode(%d), blank(%d)", __func__, mode, fb_blank);
+
+    if (mode == HWC_POWER_MODE_OFF) {
+        /* It should be called from validate() when the screen is on */
+        mSkipFrame = true;
+        setGeometryChanged(GEOMETRY_DISPLAY_POWER_OFF);
+        if ((mRenderingState >= RENDERING_STATE_VALIDATED) &&
+            (mRenderingState < RENDERING_STATE_PRESENTED))
+            closeFencesForSkipFrame(RENDERING_STATE_VALIDATED);
+        mRenderingState = RENDERING_STATE_NONE;
+    } else {
+        setGeometryChanged(GEOMETRY_DISPLAY_POWER_ON);
+    }
+
+    return HWC2_ERROR_NONE;
+}
+
+ExynosMPP* ExynosPrimaryDisplay::getExynosMPPForDma(decon_idma_type idma) {
+    return ExynosDisplay::getExynosMPPForDma(idma);
+}
+decon_idma_type ExynosPrimaryDisplay::getDeconDMAType(ExynosMPP *otfMPP) {
+    return ExynosDisplay::getDeconDMAType(otfMPP);
+}
+
+bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
+{
+    return false;
+}
+
+void ExynosPrimaryDisplay::initDisplayInterface(uint32_t __unused interfaceType)
+{
+    mDisplayInterface = new ExynosPrimaryDisplayFbInterface((ExynosDisplay *)this);
+    mDisplayInterface->init(this);
+}
+
+ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::ExynosPrimaryDisplayFbInterface(ExynosDisplay *exynosDisplay)
+    : ExynosDisplayFbInterface(exynosDisplay)
+{
+}
+
+void ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::init(ExynosDisplay *exynosDisplay)
+{
+    mDisplayFd = open(DECON_PRIMARY_DEV_NAME, O_RDWR);
+    if (mDisplayFd < 0)
+        ALOGE("%s:: failed to open framebuffer", __func__);
+
+    mExynosDisplay = exynosDisplay;
+    mPrimaryDisplay = (ExynosPrimaryDisplay *)exynosDisplay;
+
+    getDisplayHWInfo();
+}
+
+int32_t ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::setPowerMode(int32_t mode)
+{
+    int32_t ret = NO_ERROR;
+    int fb_blank = -1;
+    if (mode == HWC_POWER_MODE_DOZE ||
+        mode == HWC_POWER_MODE_DOZE_SUSPEND) {
+        if (mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_DOZE &&
+            mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_OFF &&
+            mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
+            fb_blank = FB_BLANK_POWERDOWN;
+        }
+    } else if (mode == HWC_POWER_MODE_OFF) {
+        fb_blank = FB_BLANK_POWERDOWN;
+    } else {
+        fb_blank = FB_BLANK_UNBLANK;
+    }
+
+    if (fb_blank >= 0) {
+        if ((ret = ioctl(mDisplayFd, FBIOBLANK, fb_blank)) < 0) {
+            ALOGE("FB BLANK ioctl failed errno : %d", errno);
+            return ret;
+        }
+    }
+
+    if ((ret = ioctl(mDisplayFd, S3CFB_POWER_MODE, &mode)) < 0) {
+        ALOGE("Need to check S3CFB power mode ioctl : %d", errno);
+        return ret;
+    }
+
+    return ret;
+}
+
 void ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
 
     int refreshRate = 0;
@@ -272,151 +419,4 @@ void ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
 
 err_ioctl:
     return;
-}
-
-void ExynosPrimaryDisplay::setDDIScalerEnable(int width, int height) {
-
-    if (exynosHWCControl.setDDIScaler == false) return;
-
-    ALOGI("DDISCALER Info : setDDIScalerEnable(w=%d,h=%d)", width, height);
-    mNewScaledWidth = width;
-    mNewScaledHeight = height;
-    mXres = width;
-    mYres = height;
-}
-
-int ExynosPrimaryDisplay::getDDIScalerMode(int width, int height) {
-
-    if (exynosHWCControl.setDDIScaler == false) return 1;
-
-    // Check if panel support support resolution or not.
-    for (uint32_t i=0; i < mResolutionInfo.nNum; i++) {
-        if (mResolutionInfo.nResolution[i].w * mResolutionInfo.nResolution[i].h ==
-                static_cast<uint32_t>(width * height))
-            return i + 1;
-    }
-
-    return 1; // WQHD
-}
-
-int32_t ExynosPrimaryDisplay::setPowerMode(
-        int32_t /*hwc2_power_mode_t*/ mode) {
-    Mutex::Autolock lock(mDisplayMutex);
-
-    /* TODO state check routine should be added */
-    int fb_blank = -1;
-
-    if (mode == HWC_POWER_MODE_DOZE ||
-        mode == HWC_POWER_MODE_DOZE_SUSPEND) {
-        if (this->mPowerModeState != HWC_POWER_MODE_DOZE &&
-            this->mPowerModeState != HWC_POWER_MODE_OFF &&
-            this->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
-            fb_blank = FB_BLANK_POWERDOWN;
-            clearDisplay();
-        } else {
-            ALOGE("DOZE or Power off called twice, mPowerModeState : %d", this->mPowerModeState);
-        }
-    } else if (mode == HWC_POWER_MODE_OFF) {
-        fb_blank = FB_BLANK_POWERDOWN;
-        clearDisplay();
-        ALOGV("HWC2: Clear display (power off)");
-    } else {
-        fb_blank = FB_BLANK_UNBLANK;
-    }
-
-    ALOGD("%s:: FBIOBLANK mode(%d), blank(%d)", __func__, mode, fb_blank);
-
-    if (fb_blank == FB_BLANK_POWERDOWN)
-        mDREnable = false;
-    else if (fb_blank == FB_BLANK_UNBLANK)
-        mDREnable = mDRDefault;
-
-    // check the dynamic recomposition thread by following display
-    mDevice->checkDynamicRecompositionThread();
-
-    mDisplayInterface->setPowerMode(mode);
-    this->mPowerModeState = (hwc2_power_mode_t)mode;
-
-    ALOGD("%s:: S3CFB_POWER_MODE mode(%d), blank(%d)", __func__, mode, fb_blank);
-
-    if (mode == HWC_POWER_MODE_OFF) {
-        /* It should be called from validate() when the screen is on */
-        mSkipFrame = true;
-        setGeometryChanged(GEOMETRY_DISPLAY_POWER_OFF);
-        if ((mRenderingState >= RENDERING_STATE_VALIDATED) &&
-            (mRenderingState < RENDERING_STATE_PRESENTED))
-            closeFencesForSkipFrame(RENDERING_STATE_VALIDATED);
-        mRenderingState = RENDERING_STATE_NONE;
-    } else {
-        setGeometryChanged(GEOMETRY_DISPLAY_POWER_ON);
-    }
-
-    return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::setPowerMode(int32_t mode)
-{
-    int32_t ret = NO_ERROR;
-    int fb_blank = -1;
-    if (mode == HWC_POWER_MODE_DOZE ||
-        mode == HWC_POWER_MODE_DOZE_SUSPEND) {
-        if (mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_DOZE &&
-            mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_OFF &&
-            mPrimaryDisplay->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
-            fb_blank = FB_BLANK_POWERDOWN;
-        }
-    } else if (mode == HWC_POWER_MODE_OFF) {
-        fb_blank = FB_BLANK_POWERDOWN;
-    } else {
-        fb_blank = FB_BLANK_UNBLANK;
-    }
-
-    if (fb_blank >= 0) {
-        if ((ret = ioctl(mDisplayFd, FBIOBLANK, fb_blank)) < 0) {
-            ALOGE("FB BLANK ioctl failed errno : %d", errno);
-            return ret;
-        }
-    }
-
-    if ((ret = ioctl(mDisplayFd, S3CFB_POWER_MODE, &mode)) < 0) {
-        ALOGE("Need to check S3CFB power mode ioctl : %d", errno);
-        return ret;
-    }
-
-    return ret;
-}
-
-ExynosMPP* ExynosPrimaryDisplay::getExynosMPPForDma(decon_idma_type idma) {
-    return ExynosDisplay::getExynosMPPForDma(idma);
-}
-decon_idma_type ExynosPrimaryDisplay::getDeconDMAType(ExynosMPP *otfMPP) {
-    return ExynosDisplay::getDeconDMAType(otfMPP);
-}
-
-bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
-{
-    return false;
-}
-
-void ExynosPrimaryDisplay::initDisplayInterface(uint32_t __unused interfaceType)
-{
-    mDisplayInterface = new ExynosPrimaryDisplayFbInterface((ExynosDisplay *)this);
-    mDisplayInterface->init(this);
-}
-
-ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::ExynosPrimaryDisplayFbInterface(ExynosDisplay *exynosDisplay)
-    : ExynosDisplayFbInterface(exynosDisplay)
-{
-}
-
-void ExynosPrimaryDisplay::ExynosPrimaryDisplayFbInterface::init(ExynosDisplay *exynosDisplay)
-{
-    mDisplayFd = open(DECON_PRIMARY_DEV_NAME, O_RDWR);
-    if (mDisplayFd < 0)
-        ALOGE("%s:: failed to open framebuffer", __func__);
-
-    mExynosDisplay = exynosDisplay;
-    mPrimaryDisplay = (ExynosPrimaryDisplay *)exynosDisplay;
-
-    getDisplayHWInfo();
 }

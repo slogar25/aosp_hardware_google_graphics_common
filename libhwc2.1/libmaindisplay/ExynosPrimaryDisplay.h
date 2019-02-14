@@ -17,6 +17,7 @@
 #define EXYNOS_PRIMARY_DISPLAY_H
 
 #include "../libdevice/ExynosDisplay.h"
+#include "ExynosDisplayFbInterface.h"
 
 class ExynosMPPModule;
 

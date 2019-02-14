@@ -161,90 +161,6 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
     return mDisplayInterface->getDisplayConfigs(outNumConfigs, outConfigs);
 }
 
-int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::getDisplayConfigs(
-        uint32_t* outNumConfigs,
-        hwc2_config_t* outConfigs)
-{
-    int ret = 0;
-    exynos_displayport_data dp_data;
-    size_t index = 0;
-
-    if (outConfigs != NULL) {
-        while (index < *outNumConfigs) {
-            outConfigs[index] = mConfigurations[index];
-            index++;
-        }
-
-        dp_data.timings = dv_timings[outConfigs[0]];
-        dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_PRESET;
-        if(ioctl(this->mDisplayFd, EXYNOS_SET_DISPLAYPORT_CONFIG, &dp_data) <0) {
-            HWC_LOGE(mExternalDisplay, "%s fail to send selected config data, %d",
-                    mExternalDisplay->mDisplayName.string(), errno);
-            return -1;
-        }
-
-        mExternalDisplay->mXres = dv_timings[outConfigs[0]].bt.width;
-        mExternalDisplay->mYres = dv_timings[outConfigs[0]].bt.height;
-        mExternalDisplay->mVsyncPeriod = calVsyncPeriod(dv_timings[outConfigs[0]]);
-        HDEBUGLOGD(eDebugExternalDisplay, "ExternalDisplay is connected to (%d x %d, %d fps) sink",
-                mExternalDisplay->mXres, mExternalDisplay->mYres, mExternalDisplay->mVsyncPeriod);
-
-        dumpDisplayConfigs();
-
-        return HWC2_ERROR_NONE;
-    }
-
-    memset(&dv_timings, 0, sizeof(dv_timings));
-    cleanConfigurations();
-
-    /* configs store the index of mConfigurations */
-    dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_ENUM_PRESET;
-    while (index < SUPPORTED_DV_TIMINGS_NUM) {
-        dp_data.etimings.index = index;
-        ret = ioctl(this->mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
-        if (ret < 0) {
-            if (errno == EINVAL) {
-                HDEBUGLOGD(eDebugExternalDisplay, "%s:: Unmatched config index %zu", __func__, index);
-                index++;
-                continue;
-            }
-            else if (errno == E2BIG) {
-                HDEBUGLOGD(eDebugExternalDisplay, "%s:: Total configurations %zu", __func__, index);
-                break;
-            }
-            HWC_LOGE(mExternalDisplay, "%s: enum_dv_timings error, %d", __func__, errno);
-            return -1;
-        }
-
-        dv_timings[index] = dp_data.etimings.timings;
-        mConfigurations.push_back(index);
-        index++;
-    }
-
-    if (mConfigurations.size() == 0){
-        HWC_LOGE(mExternalDisplay, "%s do not receivce any configuration info",
-                mExternalDisplay->mDisplayName.string());
-        mExternalDisplay->closeExternalDisplay();
-        return -1;
-    }
-
-    int config = 0;
-    v4l2_dv_timings temp_dv_timings = dv_timings[mConfigurations[mConfigurations.size()-1]];
-    for (config = 0; config < (int)mConfigurations[mConfigurations.size()-1]; config++) {
-        if (dv_timings[config].bt.width != 0) {
-            dv_timings[mConfigurations[mConfigurations.size()-1]] = dv_timings[config];
-            break;
-        }
-    }
-
-    dv_timings[config] = temp_dv_timings;
-    mExternalDisplay->mActiveConfigIndex = config;
-
-    *outNumConfigs = mConfigurations.size();
-
-    return 0;
-}
-
 int32_t ExynosExternalDisplay::getActiveConfig(
         hwc2_config_t* outConfig) {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
@@ -499,81 +415,6 @@ int32_t ExynosExternalDisplay::setClientTarget(
     return ExynosDisplay::setClientTarget(target, acquireFence, dataspace);
 }
 
-void ExynosExternalDisplay::ExynosExternalDisplayFbInterface::cleanConfigurations()
-{
-    mConfigurations.clear();
-}
-
-void ExynosExternalDisplay::ExynosExternalDisplayFbInterface::dumpDisplayConfigs()
-{
-    HDEBUGLOGD(eDebugExternalDisplay, "External display configurations:: total(%zu), active configuration(%d)",
-            mConfigurations.size(), mExternalDisplay->mActiveConfigIndex);
-
-    for (size_t i = 0; i <  mConfigurations.size(); i++ ) {
-        unsigned int dv_timings_index = mConfigurations[i];
-        v4l2_dv_timings configuration = dv_timings[dv_timings_index];
-        float refresh_rate = (float)((float)configuration.bt.pixelclock /
-                ((configuration.bt.width + configuration.bt.hfrontporch + configuration.bt.hsync + configuration.bt.hbackporch) *
-                 (configuration.bt.height + configuration.bt.vfrontporch + configuration.bt.vsync + configuration.bt.vbackporch)));
-        uint32_t vsyncPeriod = 1000000000 / refresh_rate;
-        HDEBUGLOGD(eDebugExternalDisplay, "%zu : index(%d) type(%d), %d x %d, fps(%f), vsyncPeriod(%d)", i, dv_timings_index, configuration.type, configuration.bt.width,
-                configuration.bt.height,
-                refresh_rate, vsyncPeriod);
-    }
-}
-
-int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::calVsyncPeriod(v4l2_dv_timings dv_timing)
-{
-    int32_t result;
-    float refreshRate = (float)((float)dv_timing.bt.pixelclock /
-            ((dv_timing.bt.width + dv_timing.bt.hfrontporch + dv_timing.bt.hsync + dv_timing.bt.hbackporch) *
-             (dv_timing.bt.height + dv_timing.bt.vfrontporch + dv_timing.bt.vsync + dv_timing.bt.vbackporch)));
-
-    result = (1000000000/refreshRate);
-    return result;
-}
-
-int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::getDisplayAttribute(
-        hwc2_config_t config,
-        int32_t attribute, int32_t* outValue)
-{
-    if (config >= SUPPORTED_DV_TIMINGS_NUM) {
-        HWC_LOGE(mExternalDisplay, "%s:: Invalid config(%d), mConfigurations(%zu)", __func__, config, mConfigurations.size());
-        return -EINVAL;
-    }
-
-    v4l2_dv_timings dv_timing = dv_timings[config];
-    switch(attribute) {
-    case HWC2_ATTRIBUTE_VSYNC_PERIOD:
-        {
-            *outValue = calVsyncPeriod(dv_timing);
-            break;
-        }
-    case HWC2_ATTRIBUTE_WIDTH:
-        *outValue = dv_timing.bt.width;
-        break;
-
-    case HWC2_ATTRIBUTE_HEIGHT:
-        *outValue = dv_timing.bt.height;
-        break;
-
-    case HWC2_ATTRIBUTE_DPI_X:
-        *outValue = mExternalDisplay->mXdpi;
-        break;
-
-    case HWC2_ATTRIBUTE_DPI_Y:
-        *outValue = mExternalDisplay->mYdpi;
-        break;
-
-    default:
-        HWC_LOGE(mExternalDisplay, "%s unknown display attribute %u",
-                mExternalDisplay->mDisplayName.string(), attribute);
-        return HWC2_ERROR_BAD_CONFIG;
-    }
-
-    return HWC2_ERROR_NONE;
-}
-
 int ExynosExternalDisplay::enable()
 {
     ALOGI("[ExternalDisplay] %s +", __func__);
@@ -701,74 +542,6 @@ int32_t ExynosExternalDisplay::startPostProcessing() {
     return ExynosDisplay::startPostProcessing();
 }
 
-int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::getHdrCapabilities(
-        uint32_t* outNumTypes, int32_t* outTypes, float* outMaxLuminance,
-        float* outMaxAverageLuminance, float* outMinLuminance)
-{
-    HDEBUGLOGD(eDebugExternalDisplay, "HWC2: %s, %d", __func__, __LINE__);
-    if (outTypes == NULL) {
-        struct decon_hdr_capabilities_info outInfo;
-        memset(&outInfo, 0, sizeof(outInfo));
-
-        exynos_displayport_data dp_data;
-        memset(&dp_data, 0, sizeof(dp_data));
-        dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_HDR_INFO;
-        int ret = ioctl(mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
-        if (ret < 0) {
-            ALOGE("%s: EXYNOS_DISPLAYPORT_STATE_HDR_INFO ioctl error, %d", __func__, errno);
-        }
-
-        mExternalDisplay->mExternalHdrSupported = dp_data.hdr_support;
-        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
-            return -1;
-        }
-
-        if (mExternalDisplay->mExternalHdrSupported) {
-            *outMaxLuminance = 50 * pow(2.0 ,(double)outInfo.max_luminance / 32);
-            *outMaxAverageLuminance = 50 * pow(2.0 ,(double)outInfo.max_average_luminance / 32);
-            *outMinLuminance = *outMaxLuminance * (float)pow(outInfo.min_luminance, 2.0) / pow(255.0, 2.0) / (float)100;
-        }
-        else {
-            *outMaxLuminance = (float)outInfo.max_luminance / (float)10000;
-            *outMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
-            *outMinLuminance = (float)outInfo.min_luminance / (float)10000;
-        }
-
-#ifndef USES_HDR_GLES_CONVERSION
-        mExternalDisplay->mExternalHdrSupported = 0;
-#endif
-
-        *outNumTypes = outInfo.out_num;
-        // Save to member variables
-        mExternalDisplay->mHdrTypeNum = *outNumTypes;
-        mExternalDisplay->mMaxLuminance = *outMaxLuminance;
-        mExternalDisplay->mMaxAverageLuminance = *outMaxAverageLuminance;
-        mExternalDisplay->mMinLuminance = *outMinLuminance;
-        ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f), externalHdrSupported(%d)",
-                mExternalDisplay->mDisplayName.string(), mExternalDisplay->mHdrTypeNum,
-                mExternalDisplay->mMaxLuminance, mExternalDisplay->mMaxAverageLuminance,
-                mExternalDisplay->mMinLuminance, mExternalDisplay->mExternalHdrSupported);
-        return 0;
-    }
-
-    struct decon_hdr_capabilities outData;
-    memset(&outData, 0, sizeof(outData));
-
-    for (uint32_t i = 0; i < *outNumTypes; i += SET_HDR_CAPABILITIES_NUM) {
-        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
-            return -1;
-        }
-        for (uint32_t j = 0; j < *outNumTypes - i; j++)
-            outTypes[i+j] = outData.out_types[j];
-        // Save to member variables
-        mExternalDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
-        HDEBUGLOGD(eDebugExternalDisplay, "HWC2: Types : %d", mExternalDisplay->mHdrTypes[i]);
-    }
-    return 0;
-}
-
 bool ExynosExternalDisplay::getHDRException(ExynosLayer* __unused layer)
 {
     bool ret = false;
@@ -848,4 +621,232 @@ void ExynosExternalDisplay::ExynosExternalDisplayFbInterface::init(ExynosDisplay
     mExternalDisplay = (ExynosExternalDisplay *)exynosDisplay;
 
     memset(&dv_timings, 0, sizeof(dv_timings));
+}
+
+int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::getDisplayAttribute(
+        hwc2_config_t config,
+        int32_t attribute, int32_t* outValue)
+{
+    if (config >= SUPPORTED_DV_TIMINGS_NUM) {
+        HWC_LOGE(mExternalDisplay, "%s:: Invalid config(%d), mConfigurations(%zu)", __func__, config, mConfigurations.size());
+        return -EINVAL;
+    }
+
+    v4l2_dv_timings dv_timing = dv_timings[config];
+    switch(attribute) {
+    case HWC2_ATTRIBUTE_VSYNC_PERIOD:
+        {
+            *outValue = calVsyncPeriod(dv_timing);
+            break;
+        }
+    case HWC2_ATTRIBUTE_WIDTH:
+        *outValue = dv_timing.bt.width;
+        break;
+
+    case HWC2_ATTRIBUTE_HEIGHT:
+        *outValue = dv_timing.bt.height;
+        break;
+
+    case HWC2_ATTRIBUTE_DPI_X:
+        *outValue = mExternalDisplay->mXdpi;
+        break;
+
+    case HWC2_ATTRIBUTE_DPI_Y:
+        *outValue = mExternalDisplay->mYdpi;
+        break;
+
+    default:
+        HWC_LOGE(mExternalDisplay, "%s unknown display attribute %u",
+                mExternalDisplay->mDisplayName.string(), attribute);
+        return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    return HWC2_ERROR_NONE;
+}
+
+
+int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::getDisplayConfigs(
+        uint32_t* outNumConfigs,
+        hwc2_config_t* outConfigs)
+{
+    int ret = 0;
+    exynos_displayport_data dp_data;
+    size_t index = 0;
+
+    if (outConfigs != NULL) {
+        while (index < *outNumConfigs) {
+            outConfigs[index] = mConfigurations[index];
+            index++;
+        }
+
+        dp_data.timings = dv_timings[outConfigs[0]];
+        dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_PRESET;
+        if(ioctl(this->mDisplayFd, EXYNOS_SET_DISPLAYPORT_CONFIG, &dp_data) <0) {
+            HWC_LOGE(mExternalDisplay, "%s fail to send selected config data, %d",
+                    mExternalDisplay->mDisplayName.string(), errno);
+            return -1;
+        }
+
+        mExternalDisplay->mXres = dv_timings[outConfigs[0]].bt.width;
+        mExternalDisplay->mYres = dv_timings[outConfigs[0]].bt.height;
+        mExternalDisplay->mVsyncPeriod = calVsyncPeriod(dv_timings[outConfigs[0]]);
+        HDEBUGLOGD(eDebugExternalDisplay, "ExternalDisplay is connected to (%d x %d, %d fps) sink",
+                mExternalDisplay->mXres, mExternalDisplay->mYres, mExternalDisplay->mVsyncPeriod);
+
+        dumpDisplayConfigs();
+
+        return HWC2_ERROR_NONE;
+    }
+
+    memset(&dv_timings, 0, sizeof(dv_timings));
+    cleanConfigurations();
+
+    /* configs store the index of mConfigurations */
+    dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_ENUM_PRESET;
+    while (index < SUPPORTED_DV_TIMINGS_NUM) {
+        dp_data.etimings.index = index;
+        ret = ioctl(this->mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
+        if (ret < 0) {
+            if (errno == EINVAL) {
+                HDEBUGLOGD(eDebugExternalDisplay, "%s:: Unmatched config index %zu", __func__, index);
+                index++;
+                continue;
+            }
+            else if (errno == E2BIG) {
+                HDEBUGLOGD(eDebugExternalDisplay, "%s:: Total configurations %zu", __func__, index);
+                break;
+            }
+            HWC_LOGE(mExternalDisplay, "%s: enum_dv_timings error, %d", __func__, errno);
+            return -1;
+        }
+
+        dv_timings[index] = dp_data.etimings.timings;
+        mConfigurations.push_back(index);
+        index++;
+    }
+
+    if (mConfigurations.size() == 0){
+        HWC_LOGE(mExternalDisplay, "%s do not receivce any configuration info",
+                mExternalDisplay->mDisplayName.string());
+        mExternalDisplay->closeExternalDisplay();
+        return -1;
+    }
+
+    int config = 0;
+    v4l2_dv_timings temp_dv_timings = dv_timings[mConfigurations[mConfigurations.size()-1]];
+    for (config = 0; config < (int)mConfigurations[mConfigurations.size()-1]; config++) {
+        if (dv_timings[config].bt.width != 0) {
+            dv_timings[mConfigurations[mConfigurations.size()-1]] = dv_timings[config];
+            break;
+        }
+    }
+
+    dv_timings[config] = temp_dv_timings;
+    mExternalDisplay->mActiveConfigIndex = config;
+
+    *outNumConfigs = mConfigurations.size();
+
+    return 0;
+}
+
+void ExynosExternalDisplay::ExynosExternalDisplayFbInterface::cleanConfigurations()
+{
+    mConfigurations.clear();
+}
+
+void ExynosExternalDisplay::ExynosExternalDisplayFbInterface::dumpDisplayConfigs()
+{
+    HDEBUGLOGD(eDebugExternalDisplay, "External display configurations:: total(%zu), active configuration(%d)",
+            mConfigurations.size(), mExternalDisplay->mActiveConfigIndex);
+
+    for (size_t i = 0; i <  mConfigurations.size(); i++ ) {
+        unsigned int dv_timings_index = mConfigurations[i];
+        v4l2_dv_timings configuration = dv_timings[dv_timings_index];
+        float refresh_rate = (float)((float)configuration.bt.pixelclock /
+                ((configuration.bt.width + configuration.bt.hfrontporch + configuration.bt.hsync + configuration.bt.hbackporch) *
+                 (configuration.bt.height + configuration.bt.vfrontporch + configuration.bt.vsync + configuration.bt.vbackporch)));
+        uint32_t vsyncPeriod = 1000000000 / refresh_rate;
+        HDEBUGLOGD(eDebugExternalDisplay, "%zu : index(%d) type(%d), %d x %d, fps(%f), vsyncPeriod(%d)", i, dv_timings_index, configuration.type, configuration.bt.width,
+                configuration.bt.height,
+                refresh_rate, vsyncPeriod);
+    }
+}
+
+int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::calVsyncPeriod(v4l2_dv_timings dv_timing)
+{
+    int32_t result;
+    float refreshRate = (float)((float)dv_timing.bt.pixelclock /
+            ((dv_timing.bt.width + dv_timing.bt.hfrontporch + dv_timing.bt.hsync + dv_timing.bt.hbackporch) *
+             (dv_timing.bt.height + dv_timing.bt.vfrontporch + dv_timing.bt.vsync + dv_timing.bt.vbackporch)));
+
+    result = (1000000000/refreshRate);
+    return result;
+}
+
+int32_t ExynosExternalDisplay::ExynosExternalDisplayFbInterface::getHdrCapabilities(
+        uint32_t* outNumTypes, int32_t* outTypes, float* outMaxLuminance,
+        float* outMaxAverageLuminance, float* outMinLuminance)
+{
+    HDEBUGLOGD(eDebugExternalDisplay, "HWC2: %s, %d", __func__, __LINE__);
+    if (outTypes == NULL) {
+        struct decon_hdr_capabilities_info outInfo;
+        memset(&outInfo, 0, sizeof(outInfo));
+
+        exynos_displayport_data dp_data;
+        memset(&dp_data, 0, sizeof(dp_data));
+        dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_HDR_INFO;
+        int ret = ioctl(mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
+        if (ret < 0) {
+            ALOGE("%s: EXYNOS_DISPLAYPORT_STATE_HDR_INFO ioctl error, %d", __func__, errno);
+        }
+
+        mExternalDisplay->mExternalHdrSupported = dp_data.hdr_support;
+        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
+            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
+            return -1;
+        }
+
+        if (mExternalDisplay->mExternalHdrSupported) {
+            *outMaxLuminance = 50 * pow(2.0 ,(double)outInfo.max_luminance / 32);
+            *outMaxAverageLuminance = 50 * pow(2.0 ,(double)outInfo.max_average_luminance / 32);
+            *outMinLuminance = *outMaxLuminance * (float)pow(outInfo.min_luminance, 2.0) / pow(255.0, 2.0) / (float)100;
+        }
+        else {
+            *outMaxLuminance = (float)outInfo.max_luminance / (float)10000;
+            *outMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
+            *outMinLuminance = (float)outInfo.min_luminance / (float)10000;
+        }
+
+#ifndef USES_HDR_GLES_CONVERSION
+        mExternalDisplay->mExternalHdrSupported = 0;
+#endif
+
+        *outNumTypes = outInfo.out_num;
+        // Save to member variables
+        mExternalDisplay->mHdrTypeNum = *outNumTypes;
+        mExternalDisplay->mMaxLuminance = *outMaxLuminance;
+        mExternalDisplay->mMaxAverageLuminance = *outMaxAverageLuminance;
+        mExternalDisplay->mMinLuminance = *outMinLuminance;
+        ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f), externalHdrSupported(%d)",
+                mExternalDisplay->mDisplayName.string(), mExternalDisplay->mHdrTypeNum,
+                mExternalDisplay->mMaxLuminance, mExternalDisplay->mMaxAverageLuminance,
+                mExternalDisplay->mMinLuminance, mExternalDisplay->mExternalHdrSupported);
+        return 0;
+    }
+
+    struct decon_hdr_capabilities outData;
+    memset(&outData, 0, sizeof(outData));
+
+    for (uint32_t i = 0; i < *outNumTypes; i += SET_HDR_CAPABILITIES_NUM) {
+        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
+            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
+            return -1;
+        }
+        for (uint32_t j = 0; j < *outNumTypes - i; j++)
+            outTypes[i+j] = outData.out_types[j];
+        // Save to member variables
+        mExternalDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
+        HDEBUGLOGD(eDebugExternalDisplay, "HWC2: Types : %d", mExternalDisplay->mHdrTypes[i]);
+    }
+    return 0;
 }
