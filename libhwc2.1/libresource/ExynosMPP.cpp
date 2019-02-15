@@ -1308,8 +1308,10 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
     if (dstImgInfo->bufferType == MPP_BUFFER_SECURE_DRM)
         attribute |= AcrylicCanvas::ATTR_PROTECTED;
 
-    mAcrylicHandle->setCanvasDimension(pixel_align(mAssignedDisplay->mXres, G2D_JUSTIFIED_DST_ALIGN),
-            pixel_align(mAssignedDisplay->mYres, G2D_JUSTIFIED_DST_ALIGN));
+    if (mAssignedDisplay != NULL)
+        mAcrylicHandle->setCanvasDimension(pixel_align(mAssignedDisplay->mXres, G2D_JUSTIFIED_DST_ALIGN),
+                pixel_align(mAssignedDisplay->mYres, G2D_JUSTIFIED_DST_ALIGN));
+
     /* setup dst */
     if (isComposition && mNeedCompressedTarget)
         attribute |= AcrylicCanvas::ATTR_COMPRESSED;
