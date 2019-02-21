@@ -135,6 +135,7 @@ class ExynosResourceManager {
         void updateRestrictions();
 
         mpp_phycal_type_t getPhysicalType(int ch);
+        ExynosMPP* getOtfMPPWithChannel(int ch);
         uint32_t getFeatureTableSize();
 
     private:

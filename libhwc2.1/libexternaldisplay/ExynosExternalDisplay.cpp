@@ -22,6 +22,7 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosDisplayFbInterface.h"
+#include "ExynosDisplayDrmInterface.h"
 #include <linux/fb.h>
 
 #define SKIP_FRAME_COUNT 3
@@ -572,6 +573,9 @@ void ExynosExternalDisplay::handleHotplugEvent()
 
 void ExynosExternalDisplay::initDisplayInterface(uint32_t __unused interfaceType)
 {
-    mDisplayInterface = new ExynosExternalDisplayFbInterface((ExynosDisplay *)this);
+    if (interfaceType == INTERFACE_TYPE_DRM)
+        mDisplayInterface = new ExynosDisplayDrmInterface((ExynosDisplay *)this);
+    else
+        mDisplayInterface = new ExynosExternalDisplayFbInterface((ExynosDisplay *)this);
     mDisplayInterface->init(this);
 }

@@ -2247,6 +2247,19 @@ mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) {
     return MPP_P_TYPE_MAX;
 }
 
+ExynosMPP* ExynosResourceManager::getOtfMPPWithChannel(int ch)
+{
+    ExynosMPP *otfMPP = NULL;
+
+    for (int i=0; i < MAX_DECON_DMA_TYPE; i++){
+        if(IDMA_CHANNEL_MAP[i].channel == ch) {
+            otfMPP = getExynosMPP(IDMA_CHANNEL_MAP[i].type, IDMA_CHANNEL_MAP[i].index);
+            break;
+        }
+    }
+    return otfMPP;
+}
+
 void ExynosResourceManager::updateRestrictions() {
 
     if (mDevice->mDeviceInterface->getUseQuery() == true) {

@@ -21,6 +21,7 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosExternalDisplay.h"
 #include "ExynosDisplayFbInterface.h"
+#include "ExynosDisplayDrmInterface.h"
 
 extern struct exynos_hwc_control exynosHWCControl;
 
@@ -150,8 +151,11 @@ bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
     return false;
 }
 
-void ExynosPrimaryDisplay::initDisplayInterface(uint32_t __unused interfaceType)
+void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
 {
-    mDisplayInterface = new ExynosPrimaryDisplayFbInterface((ExynosDisplay *)this);
+    if (interfaceType == INTERFACE_TYPE_DRM)
+        mDisplayInterface = new ExynosDisplayDrmInterface((ExynosDisplay *)this);
+    else
+        mDisplayInterface = new ExynosPrimaryDisplayFbInterface((ExynosDisplay *)this);
     mDisplayInterface->init(this);
 }

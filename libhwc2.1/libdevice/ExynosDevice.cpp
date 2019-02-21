@@ -24,6 +24,8 @@
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosDeviceFbInterface.h"
+#include "ExynosDeviceDrmInterface.h"
+#include <unistd.h>
 
 /**
  * ExynosDevice implementation
@@ -43,6 +45,14 @@ char fence_names[FENCE_MAX][32];
 
 GrallocWrapper::Mapper* ExynosDevice::mMapper = NULL;
 GrallocWrapper::Allocator* ExynosDevice::mAllocator = NULL;
+
+uint32_t getDeviceInterfaceType()
+{
+    if (access(DRM_DEVICE_PATH, F_OK) == NO_ERROR)
+        return INTERFACE_TYPE_DRM;
+    else
+        return INTERFACE_TYPE_FB;
+}
 
 ExynosDevice::ExynosDevice()
     : mGeometryChanged(0),
@@ -70,7 +80,9 @@ ExynosDevice::ExynosDevice()
     exynosHWCControl.fenceTracer = 0;
     exynosHWCControl.sysFenceLogging = false;
 
-    ALOGD("HWC2 : %s : %d ", __func__, __LINE__);
+    mInterfaceType = getDeviceInterfaceType();
+
+    ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
     mResourceManager = new ExynosResourceManagerModule(this);
 
     ExynosPrimaryDisplayModule *primary_display = new ExynosPrimaryDisplayModule(HWC_DISPLAY_PRIMARY, this);
@@ -131,7 +143,10 @@ ExynosDevice::ExynosDevice()
 
 void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
 {
-    mDeviceInterface = new ExynosDeviceFbInterface(this);
+    if (interfaceType == INTERFACE_TYPE_DRM)
+        mDeviceInterface = new ExynosDeviceDrmInterface(this);
+    else
+        mDeviceInterface = new ExynosDeviceFbInterface(this);
     /*
      * This order should not be changed
      * initDisplayInterface() of each display ->

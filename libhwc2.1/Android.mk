@@ -52,7 +52,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
 	libGrallocWrapper libhardware_legacy libutils \
-	libsync libacryl libui libion_google libdrmresource
+	libsync libacryl libui libion_google libdrmresource libdrm
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
 LOCAL_PROPRIETARY_MODULE := true
@@ -89,7 +89,9 @@ LOCAL_SRC_FILES := \
 	libvirtualdisplay/ExynosVirtualDisplay.cpp \
 	libdisplayinterface/ExynosDeviceFbInterface.cpp \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
-	libdisplayinterface/ExynosDisplayFbInterface.cpp
+	libdisplayinterface/ExynosDisplayFbInterface.cpp \
+	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
+	libdisplayinterface/ExynosDisplayDrmInterface.cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm
 

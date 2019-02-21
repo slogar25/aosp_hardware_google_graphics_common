@@ -51,6 +51,10 @@
 #define DOZE_VSYNC_PERIOD 33333333 // 30fps
 #endif
 
+#ifndef DRM_DEVICE_PATH
+#define DRM_DEVICE_PATH "/dev/dri/card0"
+#endif
+
 namespace android {
 namespace GrallocWrapper {
 class Mapper;
@@ -92,6 +96,11 @@ typedef struct update_time_info {
     struct timeval lastValidateTime;
     struct timeval lastPresentTime;
 } update_time_info_t;
+
+enum {
+    INTERFACE_TYPE_FB  = 0,
+    INTERFACE_TYPE_DRM = 1,
+};
 
 enum {
     GEOMETRY_LAYER_TYPE_CHANGED             = 1ULL << 0,
@@ -291,9 +300,6 @@ class ExynosDevice {
     protected:
         void initDeviceInterface(uint32_t interfaceType);
     protected:
-        enum {
-            INTERFACE_TYPE_FB = 0,
-        };
         uint32_t mInterfaceType;
 };
 
