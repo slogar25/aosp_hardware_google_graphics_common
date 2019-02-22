@@ -101,19 +101,25 @@ void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif, debu
         m_szMake = strlen(m_pExif->maker);
         if (m_szMake > 0) {
             m_n0thIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szMake + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szMake > 3)
+                    applen += m_szMake + 1;
         }
 
         m_szSoftware = strlen(m_pExif->software);
         if (m_szSoftware > 0) {
             m_n0thIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szSoftware + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szSoftware > 3)
+                    applen += m_szSoftware + 1;
         }
 
         m_szModel = strlen(m_pExif->model);
         if (m_szModel > 0) {
             m_n0thIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szModel + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szModel > 3)
+                applen += m_szModel + 1;
         }
 
         if (m_pExif->enableGps) {
@@ -157,17 +163,23 @@ void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif, debu
         m_szUniqueID = strlen(m_pExif->unique_id); // len should be 32!
         if (m_szUniqueID > 0) {
             m_nExifIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szUniqueID + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szUniqueID > 3)
+                applen += m_szUniqueID + 1;
         }
 
         if (m_pExif->maker_note_size > 0) {
             m_nExifIFDFields++;
-            applen += IFD_FIELD_SIZE + m_pExif->maker_note_size;
+            applen += IFD_FIELD_SIZE;
+            if (m_pExif->maker_note_size > 4)
+                applen += m_pExif->maker_note_size;
         }
 
         if (m_pExif->user_comment_size > 0) {
             m_nExifIFDFields++;
-            applen += IFD_FIELD_SIZE + m_pExif->user_comment_size;
+            applen += IFD_FIELD_SIZE;
+            if (m_pExif->user_comment_size > 4)
+                applen += m_pExif->user_comment_size;
         }
 
         // Interoperability SubIFD
