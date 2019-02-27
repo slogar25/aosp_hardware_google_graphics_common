@@ -26,7 +26,8 @@ class ExynosDisplay;
 using namespace android;
 class ExynosDisplayInterface {
     protected:
-        ExynosDisplay *mExynosDisplay;
+        ExynosDisplay *mExynosDisplay = NULL;
+        uint32_t mActiveConfig = 0;
     public:
         virtual ~ExynosDisplayInterface();
         virtual void init(ExynosDisplay* __unused exynosDisplay) {};
@@ -44,6 +45,7 @@ class ExynosDisplayInterface {
                 int32_t* outModes);
         virtual int32_t setColorMode(int32_t __unused mode) {return NO_ERROR;};
         virtual int32_t setActiveConfig(hwc2_config_t __unused config) {return NO_ERROR;};
+        virtual int32_t getActiveConfig(hwc2_config_t* outConfig);
         virtual int32_t setCursorPositionAsync(uint32_t __unused x_pos,
                 uint32_t __unused y_pos) {return NO_ERROR;};
         virtual int32_t getHdrCapabilities(uint32_t* outNumTypes,

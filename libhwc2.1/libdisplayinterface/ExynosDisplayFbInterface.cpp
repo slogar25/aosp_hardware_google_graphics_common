@@ -113,9 +113,11 @@ int32_t ExynosDisplayFbInterface::getDisplayConfigs(
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplayFbInterface::setActiveConfig(hwc2_config_t __unused config)
+int32_t ExynosDisplayFbInterface::setActiveConfig(hwc2_config_t config)
 {
     int32_t ret = NO_ERROR;
+    if (config != 0)
+        ret = HWC2_ERROR_BAD_CONFIG;
     return ret;
 }
 

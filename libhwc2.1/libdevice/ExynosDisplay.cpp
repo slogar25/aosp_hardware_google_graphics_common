@@ -2360,9 +2360,7 @@ int32_t ExynosDisplay::createLayer(hwc2_layer_t* outLayer) {
 
 int32_t ExynosDisplay::getActiveConfig(
         hwc2_config_t* outConfig) {
-    *outConfig = 0;
-
-    return HWC2_ERROR_NONE;
+    return mDisplayInterface->getActiveConfig(outConfig);
 }
 
 int32_t ExynosDisplay::getLayerCompositionTypeForValidationType(uint32_t layerIndex)
