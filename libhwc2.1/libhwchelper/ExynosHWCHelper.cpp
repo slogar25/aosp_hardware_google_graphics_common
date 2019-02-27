@@ -292,6 +292,15 @@ uint32_t S3CFormatToHalFormat(int format)
     return HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED;
 }
 
+int S3CFormatToDrmFormat(int format)
+{
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].s3cFormat == static_cast<decon_pixel_format>(format))
+            return exynos_format_desc[i].drmFormat;
+    }
+    return DRM_FORMAT_UNDEFINED;
+}
+
 android_dataspace colorModeToDataspace(android_color_mode_t mode)
 {
     android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
