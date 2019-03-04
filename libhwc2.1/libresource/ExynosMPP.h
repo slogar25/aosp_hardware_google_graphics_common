@@ -618,7 +618,7 @@ public:
     /* Based on multi-resolution support */
     void setDstAllocSize(uint32_t width, uint32_t height);
     dst_alloc_buf_size_t getDstAllocSize();
-    bool needPreAllocation();
+    virtual bool needPreAllocation();
 
     int32_t resetMPP();
     int32_t resetAssignedState();
