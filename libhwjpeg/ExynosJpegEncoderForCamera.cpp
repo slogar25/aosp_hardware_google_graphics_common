@@ -103,6 +103,8 @@ ExynosJpegEncoderForCamera::ExynosJpegEncoderForCamera(bool bBTBComp)
     if (IsBTBCompressionSupported())
         SetState(STATE_THUMBSIZE_CHANGED);
 
+    m_extraInfo.appInfo = m_appInfo;
+
     ALOGD("ExynosJpegEncoderForCamera Created: %p, ION %d", this, m_fdIONClient);
 }
 
@@ -219,7 +221,7 @@ void *ExynosJpegEncoderForCamera::tCompressThumbnail(void *p)
 
 bool ExynosJpegEncoderForCamera::ProcessExif(char *base, size_t limit,
                                              exif_attribute_t *exifInfo,
-                                             debug_attribute_t *debuginfo)
+                                             extra_appinfo_t *extra)
 {
     // PREREQUISITES: The main and the thumbnail image size should be configured before.
 
@@ -252,7 +254,7 @@ bool ExynosJpegEncoderForCamera::ProcessExif(char *base, size_t limit,
     if (!!(GetDeviceCapabilities() & V4L2_CAP_EXYNOS_JPEG_NO_STREAMBASE_ALIGN))
         align = 1;
 
-    m_pAppWriter->PrepareAppWriter(base + JPEG_MARKER_SIZE, exifInfo, debuginfo);
+    m_pAppWriter->PrepareAppWriter(base + JPEG_MARKER_SIZE, exifInfo, extra);
 
     if (limit <= (m_pAppWriter->CalculateAPPSize(0) + NECESSARY_JPEG_LENGTH)) {
         ALOGE("Too small JPEG stream buffer size, %zu bytes", limit);
@@ -332,6 +334,23 @@ int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
                                        int fdJpegBuffer, char** pcJpegBuffer,
                                        debug_attribute_t *debugInfo)
 {
+    if ((!debugInfo) || (debugInfo->num_of_appmarker == 0)) {
+        extra_appinfo_t *extra = NULL;
+        return encode(size, exifInfo, fdJpegBuffer, pcJpegBuffer, extra);
+    }
+
+    m_extraInfo.num_of_appmarker = 0;
+    memset(m_appInfo, 0, sizeof(m_appInfo));
+
+    ExtractDebugAttributeInfo(debugInfo, &m_extraInfo);
+
+    return encode(size, exifInfo, fdJpegBuffer, pcJpegBuffer, &m_extraInfo);
+}
+
+int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
+                                       int fdJpegBuffer, char** pcJpegBuffer,
+                                       extra_appinfo_t *appInfo)
+{
     if (!(*pcJpegBuffer)) {
         ALOGE("Target stream buffer is not specified");
         return -1;
@@ -348,13 +367,13 @@ int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
     char *jpeg_base = m_pStreamBase;
 
     ALOGI_IF(!exifInfo, "Exif is not specified. Skipping writing APP1 marker");
-    ALOGI_IF(!debugInfo,
+    ALOGI_IF(!appInfo,
             "Debugging information is not specified. Skipping writing APP4 marker");
     ALOGD("Given stream buffer size: %d bytes", *size);
 
     CStopWatch stopwatch(true);
 
-    if (!ProcessExif(jpeg_base, m_nStreamSize, exifInfo, debugInfo))
+    if (!ProcessExif(jpeg_base, m_nStreamSize, exifInfo, appInfo))
         return -1;
 
     int offset = PTR_DIFF(m_pStreamBase, m_pAppWriter->GetMainStreamBase());

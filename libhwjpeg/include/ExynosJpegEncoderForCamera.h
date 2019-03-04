@@ -20,9 +20,10 @@
 
 #include <pthread.h>
 
-#include "ExynosExif.h"
+#include <ExynosExif.h>
 #include "ExynosJpegApi.h"
 #include "LibScalerForJpeg.h"
+#include <hardware/exynos/ExynosExif.h>
 
 class CAppMarkerWriter; // defined in libhwjpeg/AppMarkerWriter.h
 
@@ -69,6 +70,9 @@ class ExynosJpegEncoderForCamera: public ExynosJpegEncoder {
 
     pthread_t m_threadWorker;
 
+    extra_appinfo_t m_extraInfo;
+    app_info_t m_appInfo[15];
+
     bool AllocThumbBuffer(int v4l2Format); /* For single compression */
     bool AllocThumbJpegBuffer(); /* For BTB compression */
     bool GenerateThumbnailImage();
@@ -76,7 +80,7 @@ class ExynosJpegEncoderForCamera: public ExynosJpegEncoder {
     size_t CompressThumbnailOnly(size_t limit, int quality, unsigned int v4l2Format, int src_buftype);
     size_t RemoveTrailingDummies(char *base, size_t len);
     ssize_t FinishCompression(size_t mainlen, size_t thumblen);
-    bool ProcessExif(char *base, size_t limit, exif_attribute_t *exifInfo, debug_attribute_t *debuginfo);
+    bool ProcessExif(char *base, size_t limit, exif_attribute_t *exifInfo, extra_appinfo_t *extra);
     static void *tCompressThumbnail(void *p);
     bool PrepareCompression(bool thumbnail);
 
@@ -98,6 +102,7 @@ public:
 
     int encode(int *size, exif_attribute_t *exifInfo, char** pcJpegBuffer, debug_attribute_t *debugInfo = 0);
     int encode(int *size, exif_attribute_t *exifInfo, int fdJpegBuffer, char** pcJpegBuffer, debug_attribute_t *debugInfo = 0);
+    int encode(int *size, exif_attribute_t *exifInfo, int fdJpegBuffer, char** pcJpegBuffer, extra_appinfo_t *appInfo = 0);
     int setInBuf2(int *piBuf, int *iSize);
     int setInBuf2(char **pcBuf, int *iSize);
     int setThumbnailSize(int w, int h);
