@@ -2281,19 +2281,20 @@ int ExynosDisplay::setReleaseFences() {
                     i, mLayers[i]->mReleaseFence);
         }
         mExynosCompositionInfo.mM2mMPP->resetSrcReleaseFence();
+        if(mUseDecon) {
 #ifdef DISABLE_FENCE
-        mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
-#else
-        if (mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence > 0) {
-            setFenceName(mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence,
-                    this, FENCE_TYPE_DST_ACQUIRE, FENCE_IP_DPP, FENCE_FROM, true);
-            mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence);
-        }
-        else
             mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
+#else
+            if (mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence > 0) {
+                setFenceName(mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence,
+                        this, FENCE_TYPE_DST_ACQUIRE, FENCE_IP_DPP, FENCE_FROM, true);
+                mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence);
+            }
+            else
+                mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
 #endif
+        }
     }
-
     return 0;
 
 err:
