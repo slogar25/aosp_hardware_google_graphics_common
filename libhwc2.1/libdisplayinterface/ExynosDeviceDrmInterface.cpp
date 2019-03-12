@@ -86,12 +86,12 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
     mExynosDrmEventHandler.init(mExynosDevice);
     mDrmDevice->event_listener()->RegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
 
-    ExynosDisplay *primaryDisplay = mExynosDevice->getDisplay(HWC_DISPLAY_PRIMARY);
+    ExynosDisplay *primaryDisplay = mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     if (primaryDisplay != NULL) {
         ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(primaryDisplay->mDisplayInterface.get());
         displayInterface->initDrmDevice(mDrmDevice);
     }
-    ExynosDisplay *externalDisplay = mExynosDevice->getDisplay(HWC_DISPLAY_EXTERNAL);
+    ExynosDisplay *externalDisplay = mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
     if (externalDisplay != NULL) {
         ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(externalDisplay->mDisplayInterface.get());
         displayInterface->initDrmDevice(mDrmDevice);
@@ -199,7 +199,8 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::init(ExynosDevice *exynosD
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleEvent(uint64_t timestamp_us)
 {
     /* TODO: Check plug status hear or ExynosExternalDisplay::handleHotplugEvent() */
-    ExynosExternalDisplayModule *display = static_cast<ExynosExternalDisplayModule*>(mExynosDevice->getDisplay(HWC_DISPLAY_EXTERNAL));
+    ExynosExternalDisplayModule *display =
+        static_cast<ExynosExternalDisplayModule*>(mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0)));
     if (display != NULL)
         display->handleHotplugEvent();
 }

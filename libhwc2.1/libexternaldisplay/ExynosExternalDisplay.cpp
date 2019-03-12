@@ -28,10 +28,14 @@
 #define SKIP_FRAME_COUNT 3
 extern struct exynos_hwc_control exynosHWCControl;
 
-ExynosExternalDisplay::ExynosExternalDisplay(uint32_t __unused type, ExynosDevice *device)
-    :   ExynosDisplay(HWC_DISPLAY_EXTERNAL, device)
+ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice *device)
+    :   ExynosDisplay(index, device)
 {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
+
+    mType = HWC_DISPLAY_EXTERNAL;
+    mIndex = index;
+    mDisplayId = getDisplayId(mType, mIndex);
 
     mDisplayControl.cursorSupport = true;
 
@@ -43,7 +47,6 @@ ExynosExternalDisplay::ExynosExternalDisplay(uint32_t __unused type, ExynosDevic
     mXdpi = 0;
     mYdpi = 0;
     mVsyncPeriod = 0;
-    mDisplayId = HWC_DISPLAY_EXTERNAL;
     mSkipStartFrame = 0;
     mSkipFrameCount = -1;
     mIsSkipFrame = false;
@@ -151,7 +154,7 @@ void ExynosExternalDisplay::hotplug(){
     HWC2_PFN_HOTPLUG callbackFunc =
         (HWC2_PFN_HOTPLUG)mDevice->mCallbackInfos[HWC2_CALLBACK_HOTPLUG].funcPointer;
     if (callbackData != NULL && callbackFunc != NULL)
-        callbackFunc(callbackData, HWC_DISPLAY_EXTERNAL, mHpdStatus ? HWC2_CONNECTION_CONNECTED : HWC2_CONNECTION_DISCONNECTED);
+        callbackFunc(callbackData, mDisplayId, mHpdStatus ? HWC2_CONNECTION_CONNECTED : HWC2_CONNECTION_DISCONNECTED);
 }
 
 bool ExynosExternalDisplay::handleRotate()

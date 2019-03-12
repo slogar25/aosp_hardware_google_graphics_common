@@ -60,7 +60,7 @@ ExynosDevice::ExynosDevice()
     : mGeometryChanged(0),
     mVsyncFd(-1),
     mExtVsyncFd(-1),
-    mVsyncDisplay(HWC_DISPLAY_PRIMARY),
+    mVsyncDisplayId(getDisplayId(HWC_DISPLAY_PRIMARY, 0)),
     mTimestamp(0),
     mDisplayMode(0),
     mInterfaceType(INTERFACE_TYPE_FB)
@@ -86,7 +86,7 @@ ExynosDevice::ExynosDevice()
     ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
     mResourceManager = new ExynosResourceManagerModule(this);
 
-    ExynosPrimaryDisplayModule *primary_display = new ExynosPrimaryDisplayModule(HWC_DISPLAY_PRIMARY, this);
+    ExynosPrimaryDisplayModule *primary_display = new ExynosPrimaryDisplayModule(0, this);
 
     primary_display->mPlugState = true;
     ExynosMPP::mainDisplayWidth = primary_display->mXres;
@@ -98,9 +98,10 @@ ExynosDevice::ExynosDevice()
         ExynosMPP::mainDisplayHeight = 2560;
     }
 
-    ExynosExternalDisplayModule *external_display = new ExynosExternalDisplayModule(HWC_DISPLAY_EXTERNAL, this);
+    ExynosExternalDisplayModule *external_display = new ExynosExternalDisplayModule(0, this);
 
-    ExynosVirtualDisplayModule *virtual_display = new ExynosVirtualDisplayModule(HWC_DISPLAY_VIRTUAL, this);
+    ExynosVirtualDisplayModule *virtual_display = new ExynosVirtualDisplayModule(0, this);
+
     mNumVirtualDisplay = 0;
 
     mDisplays.add((ExynosDisplay*) primary_display);
@@ -177,7 +178,7 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
 
 ExynosDevice::~ExynosDevice() {
 
-    ExynosDisplay *primary_display = getDisplay(HWC_DISPLAY_PRIMARY);
+    ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY,0));
 
     mDRLoopStatus = false;
     mDRThread.join();
@@ -188,7 +189,7 @@ ExynosDevice::~ExynosDevice() {
 bool ExynosDevice::isFirstValidate()
 {
     for (uint32_t i = 0; i < mDisplays.size(); i++) {
-        if ((mDisplays[i]->mDisplayId != HWC_DISPLAY_VIRTUAL) &&
+        if ((mDisplays[i]->mType != HWC_DISPLAY_VIRTUAL) &&
             (mDisplays[i]->mPowerModeState == (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
             continue;
         if ((mDisplays[i]->mPlugState == true) &&
@@ -205,7 +206,7 @@ bool ExynosDevice::isLastValidate(ExynosDisplay *display)
     for (uint32_t i = 0; i < mDisplays.size(); i++) {
         if (mDisplays[i] == display)
             continue;
-        if ((mDisplays[i]->mDisplayId != HWC_DISPLAY_VIRTUAL) &&
+        if ((mDisplays[i]->mType != HWC_DISPLAY_VIRTUAL) &&
             (mDisplays[i]->mPowerModeState == (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
             continue;
         if ((mDisplays[i]->mPlugState == true) &&
@@ -254,18 +255,18 @@ void ExynosDevice::dynamicRecompositionThreadCreate()
 void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
 {
     ExynosDevice *dev = (ExynosDevice *)data;
-    ExynosDisplay *display[HWC_NUM_DISPLAY_TYPES];
-    uint64_t event_cnt[HWC_NUM_DISPLAY_TYPES];
+    ExynosDisplay *display[dev->mDisplays.size()];
+    uint64_t event_cnt[dev->mDisplays.size()];
 
-    for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
-        display[i] = (ExynosDisplay *)dev->getDisplay(i);
+    for (uint32_t i = 0; i < dev->mDisplays.size(); i++) {
+        display[i] = dev->mDisplays[i];
         event_cnt[i] = 0;
     }
     android_atomic_inc(&(dev->mDRThreadStatus));
 
     while (dev->mDRLoopStatus) {
         uint32_t result = 0;
-        for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++)
+        for (uint32_t i = 0; i < dev->mDisplays.size(); i++)
             event_cnt[i] = display[i]->mUpdateEventCnt;
 
         /*
@@ -273,7 +274,7 @@ void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
          * If all other conditions are met, mode will be switched to 3D composition.
          */
         usleep(100000);
-        for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        for (uint32_t i = 0; i < dev->mDisplays.size(); i++) {
             if (display[i]->mDREnable &&
                 display[i]->mPlugState == true &&
                 event_cnt[i] == display[i]->mUpdateEventCnt) {
@@ -297,26 +298,20 @@ void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
  * @return ExynosDisplay
  */
 ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
-    uint32_t physical_display_num = HWC_NUM_DISPLAY_TYPES - 1;
-
     if (mDisplays.isEmpty()) {
         ALOGE("mDisplays.size(%zu), requested display(%d)",
                 mDisplays.size(), display);
         return NULL;
     }
 
-    if ((display <= physical_display_num) && (mDisplays[display]->mDisplayId == display)) {
-        return (ExynosDisplay*)mDisplays[display];
-    } else  {
-        for (size_t i = (physical_display_num + 1); i < mDisplays.size(); i++) {
-            if (mDisplays[i]->mDisplayId == display) {
-                return (ExynosDisplay*)mDisplays[i];
-            }
-        }
+    for (size_t i = 0;i < mDisplays.size(); i++) {
+        if (mDisplays[i]->mDisplayId == display)
+            return (ExynosDisplay*)mDisplays[i];
     }
 
     ALOGE("mDisplays.size(%zu), requested display(%d)",
             mDisplays.size(), display);
+
     return NULL;
 }
 
@@ -340,16 +335,10 @@ int32_t ExynosDevice::destroyVirtualDisplay(ExynosDisplay* display) {
 }
 
 void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
-    /* TODO : Dump here */
-
     if (outSize == NULL) {
         ALOGE("%s:: outSize is null", __func__);
         return;
     }
-
-    ExynosDisplay *display = mDisplays[HWC_DISPLAY_PRIMARY];
-    ExynosDisplay *external_display = mDisplays[HWC_DISPLAY_EXTERNAL];
-    ExynosDisplay *virtual_display = mDisplays[HWC_DISPLAY_VIRTUAL];
 
     android::String8 result;
     result.append("\n\n");
@@ -382,14 +371,10 @@ void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
     result.appendFormat("\n");
     mResourceManager->dump(result);
 
-    display->dump(result);
-
-    if (external_display->mPlugState == true) {
-        external_display->dump(result);
-    }
-
-    if (virtual_display->mPlugState == true) {
-        virtual_display->dump(result);
+    for (size_t i = 0;i < mDisplays.size(); i++) {
+        ExynosDisplay *display = mDisplays[i];
+        if (display->mPlugState == true)
+            display->dump(result);
     }
 
     if (outBuffer == NULL) {
@@ -431,7 +416,7 @@ int32_t ExynosDevice::registerCallback (
         HWC2_PFN_HOTPLUG callbackFunc =
             (HWC2_PFN_HOTPLUG)mCallbackInfos[descriptor].funcPointer;
         if (callbackFunc != NULL)
-            callbackFunc(callbackData, HWC_DISPLAY_PRIMARY, HWC2_CONNECTION_CONNECTED);
+            callbackFunc(callbackData, getDisplayId(HWC_DISPLAY_PRIMARY, 0), HWC2_CONNECTION_CONNECTED);
     }
 
     if (descriptor == HWC2_CALLBACK_VSYNC)
@@ -446,7 +431,7 @@ void ExynosDevice::invalidate()
         (HWC2_PFN_REFRESH)mCallbackInfos[HWC2_CALLBACK_REFRESH].funcPointer;
     if (callbackFunc != NULL)
         callbackFunc(mCallbackInfos[HWC2_CALLBACK_REFRESH].callbackData,
-                HWC_DISPLAY_PRIMARY);
+                getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     else
         ALOGE("%s:: refresh callback is not registered", __func__);
 
@@ -633,31 +618,34 @@ void ExynosDevice::setDynamicRecomposition(unsigned int on)
     exynosHWCControl.useDynamicRecomp = on;
 }
 
-uint32_t ExynosDevice::checkConnection(uint32_t display)
+bool ExynosDevice::checkDisplayConnection(uint32_t displayId)
 {
-    int ret = 0;
-	ExynosExternalDisplay *external_display = (ExynosExternalDisplay *)mDisplays[HWC_DISPLAY_EXTERNAL];
-	ExynosVirtualDisplay *virtual_display = NULL;
-	virtual_display = (ExynosVirtualDisplay *)mDisplays[HWC_DISPLAY_VIRTUAL];
+	ExynosDisplay *display = getDisplay(displayId);
 
-    switch(display) {
-        case HWC_DISPLAY_PRIMARY:
-            return 1;
-        case HWC_DISPLAY_EXTERNAL:
-            if (external_display->mPlugState)
-                return 1;
-            else
-                return 0;
-        case HWC_DISPLAY_VIRTUAL:
-            if (virtual_display->mPlugState)
-                return 1;
-            else
-                return 0;
-        default:
-            return 0;
-    }
-    return ret;
+    if (!display)
+        return false;
+    else
+        return display->mPlugState;
 }
+
+bool ExynosDevice::checkAdditionalConnection()
+{
+    for (uint32_t i = 0; i < mDisplays.size(); i++) {
+        switch(mDisplays[i]->mType) {
+            case HWC_DISPLAY_PRIMARY:
+                break;
+            case HWC_DISPLAY_EXTERNAL:
+            case HWC_DISPLAY_VIRTUAL:
+                if (mDisplays[i]->mPlugState)
+                    return true;
+                break;
+            default:
+                break;
+        }
+    }
+    return false;
+}
+
 void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t* outCapabilities)
 {
     uint32_t capabilityNum = 0;
@@ -721,12 +709,12 @@ bool ExynosDevice::canSkipValidate()
 
             if ((ret = mDisplays[i]->canSkipValidate()) != NO_ERROR) {
                 HDEBUGLOGD(eDebugSkipValidate, "Display[%d] can't skip validate (%d), renderingState(%d), geometryChanged(0x%" PRIx64 ")",
-                        mDisplays[i]->mType, ret,
+                        mDisplays[i]->mDisplayId, ret,
                         mDisplays[i]->mRenderingState, mGeometryChanged);
                 return false;
             } else {
                 HDEBUGLOGD(eDebugSkipValidate, "Display[%d] can skip validate (%d), renderingState(%d), geometryChanged(0x%" PRIx64 ")",
-                        mDisplays[i]->mType, ret,
+                        mDisplays[i]->mDisplayId, ret,
                         mDisplays[i]->mRenderingState, mGeometryChanged);
             }
         }
@@ -765,24 +753,23 @@ bool ExynosDevice::validateFences(ExynosDisplay *display) {
 }
 
 void ExynosDevice::compareVsyncPeriod() {
+    ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    ExynosDisplay *external_display = getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
 
-    ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
-    ExynosDisplay *external_display = mDisplays[HWC_DISPLAY_EXTERNAL];
-
-    mVsyncDisplay = HWC_DISPLAY_PRIMARY;
+    mVsyncDisplayId = getDisplayId(HWC_DISPLAY_PRIMARY, 0);
 
     if (external_display->mPowerModeState == HWC2_POWER_MODE_OFF) {
         return;
     } else if (primary_display->mPowerModeState == HWC2_POWER_MODE_OFF) {
-        mVsyncDisplay = HWC_DISPLAY_EXTERNAL;
+        mVsyncDisplayId = getDisplayId(HWC_DISPLAY_EXTERNAL, 0);
         return;
     } else if (((primary_display->mPowerModeState == HWC2_POWER_MODE_DOZE) ||
             (primary_display->mPowerModeState == HWC2_POWER_MODE_DOZE_SUSPEND)) &&
             (external_display->mVsyncPeriod >= DOZE_VSYNC_PERIOD)) { /*30fps*/
-        mVsyncDisplay = HWC_DISPLAY_EXTERNAL;
+        mVsyncDisplayId = getDisplayId(HWC_DISPLAY_EXTERNAL, 0);
         return;
     } else if (primary_display->mVsyncPeriod <= external_display->mVsyncPeriod) {
-        mVsyncDisplay = HWC_DISPLAY_EXTERNAL;
+        mVsyncDisplayId = getDisplayId(HWC_DISPLAY_EXTERNAL, 0);
         return;
     }
 

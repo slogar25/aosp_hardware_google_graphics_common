@@ -353,8 +353,9 @@ typedef struct brightnessState {
 
 class ExynosDisplay {
     public:
-
+        uint32_t mDisplayId;
         uint32_t mType;
+        uint32_t mIndex;
         uint32_t mXres;
         uint32_t mYres;
         uint32_t mXdpi;
@@ -365,7 +366,7 @@ class ExynosDisplay {
         int                     mPsrMode;
 
         /* Constructor */
-        ExynosDisplay(uint32_t type, ExynosDevice *device);
+        ExynosDisplay(uint32_t index, ExynosDevice *device);
         /* Destructor */
         virtual ~ExynosDisplay();
 
@@ -388,7 +389,6 @@ class ExynosDisplay {
 
         ExynosDevice *mDevice;
 
-        uint32_t mDisplayId;
         String8 mDisplayName;
 
         Mutex mDisplayMutex;
@@ -534,7 +534,7 @@ class ExynosDisplay {
 
         void initDisplay();
 
-        int getDisplayId();
+        int getId();
         Mutex& getDisplayMutex() {return mDisplayMutex; };
 
         int32_t setCompositionTargetExynosImage(uint32_t targetType, exynos_image *src_img, exynos_image *dst_img);

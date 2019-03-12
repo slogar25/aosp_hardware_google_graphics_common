@@ -501,7 +501,7 @@ void ExynosDisplayDrmInterface::Callback(
 
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
     exynosDevice->compareVsyncPeriod();
-    if (exynosDevice->mVsyncDisplay == (int)mExynosDisplay->mDisplayId) {
+    if (exynosDevice->mVsyncDisplayId == mExynosDisplay->mDisplayId) {
         auto vsync_2_4CallbackInfo =
             exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
         if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {

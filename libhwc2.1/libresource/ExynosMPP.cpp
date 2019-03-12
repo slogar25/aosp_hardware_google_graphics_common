@@ -2212,10 +2212,10 @@ int32_t ExynosMPP::resetAssignedState(ExynosMPPSource *mppSource)
     return NO_ERROR;
 }
 
-int32_t ExynosMPP::reserveMPP(int32_t displayType)
+int32_t ExynosMPP::reserveMPP(int32_t displayId)
 {
     mAssignedState |= MPP_ASSIGN_STATE_RESERVED;
-    mReservedDisplay = displayType;
+    mReservedDisplay = displayId;
 
     return NO_ERROR;
 }
@@ -2319,7 +2319,7 @@ bool ExynosMPP::isAssignableState(ExynosDisplay *display, struct exynos_image &s
 
     if ((mAssignedState & MPP_ASSIGN_STATE_ASSIGNED) && (mAssignedState & MPP_ASSIGN_STATE_RESERVED))
     {
-        if (mReservedDisplay == (int32_t)display->mType) {
+        if (mReservedDisplay == (int32_t)display->getId()) {
             if (mAssignedSources.size() < getSrcMaxBlendingNum(src, dst))
                 isAssignable = true;
             else
@@ -2333,7 +2333,7 @@ bool ExynosMPP::isAssignableState(ExynosDisplay *display, struct exynos_image &s
         else
             isAssignable = false;
     } else if (mAssignedState & MPP_ASSIGN_STATE_RESERVED) {
-        if (mReservedDisplay == (int32_t)display->mType)
+        if (mReservedDisplay == (int32_t)display->getId())
             isAssignable = true;
         else
             isAssignable = false;

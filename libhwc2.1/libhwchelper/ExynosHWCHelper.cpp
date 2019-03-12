@@ -1253,3 +1253,7 @@ int32_t writeIntToFile(const char* file, uint32_t value) {
     fclose(fd);
     return 0;
 }
+
+uint32_t getDisplayId(int32_t displayType, int32_t displayIndex) {
+    return (displayType << DISPLAYID_MASK_LEN) | displayIndex;
+}

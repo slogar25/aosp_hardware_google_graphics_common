@@ -452,7 +452,7 @@ int32_t ExynosLayer::setLayerCompositionType(int32_t /*hwc2_composition_t*/ type
     // FIXME: HWC2_COMPOSITION_SCREENSHOT is not defined in AOSP
     //        HWC guys should fix this.
 #if 0
-    if (mDisplay->mDisplayId == HWC_DISPLAY_PRIMARY)
+    if (mDisplay->mType == HWC_DISPLAY_PRIMARY)
         if (type == HWC2_COMPOSITION_SCREENSHOT)
             type = HWC2_COMPOSITION_DEVICE;
 #endif
