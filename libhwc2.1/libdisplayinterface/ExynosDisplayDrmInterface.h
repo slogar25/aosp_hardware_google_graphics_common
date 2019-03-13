@@ -24,6 +24,7 @@
 #include "vsyncworker.h"
 #include "ExynosMPP.h"
 #include <unordered_map>
+#include <xf86drmMode.h>
 
 /* Max plane number of buffer object */
 #define HWC_DRM_BO_MAX_PLANES 4
@@ -74,6 +75,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         virtual void initDrmDevice(DrmDevice *drmDevice);
     protected:
         int32_t applyDisplayMode();
+        String8& dumpAtomicCommitInfo(String8 &result, drmModeAtomicReqPtr pset, bool debugPrint = false);
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -85,14 +87,17 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         class DrmModeAtomicReq {
             public:
                 DrmModeAtomicReq() { mPset = drmModeAtomicAlloc(); };
-                ~DrmModeAtomicReq() { if (mPset) drmModeAtomicFree(mPset); };
+                ~DrmModeAtomicReq();
 
                 DrmModeAtomicReq(const DrmModeAtomicReq&) = delete;
                 DrmModeAtomicReq& operator=(const DrmModeAtomicReq&) = delete;
 
                 drmModeAtomicReqPtr pset() { return mPset; };
+                void setError(int err, ExynosDisplayDrmInterface *drmDisplayInterface) { mError = err; };
             private:
                 drmModeAtomicReqPtr mPset;
+                int mError = 0;
+                ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
         };
         DrmDevice *mDrmDevice;
         DrmCrtc *mDrmCrtc;
