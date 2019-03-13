@@ -47,6 +47,10 @@ class DrmCrtc {
   const DrmProperty &mode_property() const;
   const DrmProperty &out_fence_ptr_property() const;
 
+  const std::vector<DrmProperty *> &properties() const {
+      return properties_;
+  }
+
  private:
   DrmDevice *drm_;
 
@@ -59,6 +63,7 @@ class DrmCrtc {
   DrmProperty active_property_;
   DrmProperty mode_property_;
   DrmProperty out_fence_ptr_property_;
+  std::vector<DrmProperty *> properties_;
 };
 }  // namespace android
 

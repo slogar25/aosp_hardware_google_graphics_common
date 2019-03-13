@@ -72,6 +72,15 @@ int DrmConnector::Init() {
       return ret;
     }
   }
+
+  properties_.push_back(&dpms_property_);
+  properties_.push_back(&crtc_id_property_);
+  if (writeback()) {
+      properties_.push_back(&writeback_pixel_formats_);
+      properties_.push_back(&writeback_fb_id_);
+      properties_.push_back(&writeback_out_fence_);
+  }
+
   return 0;
 }
 

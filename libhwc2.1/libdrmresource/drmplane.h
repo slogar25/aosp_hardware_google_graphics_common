@@ -57,6 +57,10 @@ class DrmPlane {
   const DrmProperty &blend_property() const;
   const DrmProperty &in_fence_fd_property() const;
 
+  const std::vector<DrmProperty *> &properties() const {
+      return properties_;
+  }
+
  private:
   DrmDevice *drm_;
   uint32_t id_;
@@ -79,6 +83,7 @@ class DrmPlane {
   DrmProperty alpha_property_;
   DrmProperty blend_property_;
   DrmProperty in_fence_fd_property_;
+  std::vector<DrmProperty *> properties_;
 };
 }  // namespace android
 

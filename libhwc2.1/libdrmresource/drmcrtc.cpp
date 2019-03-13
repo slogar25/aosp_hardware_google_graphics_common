@@ -48,6 +48,11 @@ int DrmCrtc::Init() {
     ALOGE("Failed to get OUT_FENCE_PTR property");
     return ret;
   }
+
+  properties_.push_back(&active_property_);
+  properties_.push_back(&mode_property_);
+  properties_.push_back(&out_fence_ptr_property_);
+
   return 0;
 }
 

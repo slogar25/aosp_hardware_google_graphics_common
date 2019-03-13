@@ -63,6 +63,10 @@ class DrmConnector {
   const DrmProperty &writeback_fb_id() const;
   const DrmProperty &writeback_out_fence() const;
 
+  const std::vector<DrmProperty *> &properties() const {
+      return properties_;
+  }
+
   const std::vector<DrmEncoder *> &possible_encoders() const {
     return possible_encoders_;
   }
@@ -95,6 +99,7 @@ class DrmConnector {
   DrmProperty writeback_pixel_formats_;
   DrmProperty writeback_fb_id_;
   DrmProperty writeback_out_fence_;
+  std::vector<DrmProperty *> properties_;
 
   std::vector<DrmEncoder *> possible_encoders_;
 };

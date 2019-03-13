@@ -134,6 +134,21 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get IN_FENCE_FD property");
 
+  properties_.push_back(&crtc_property_);
+  properties_.push_back(&fb_property_);
+  properties_.push_back(&crtc_x_property_);
+  properties_.push_back(&crtc_y_property_);
+  properties_.push_back(&crtc_w_property_);
+  properties_.push_back(&crtc_h_property_);
+  properties_.push_back(&src_x_property_);
+  properties_.push_back(&src_y_property_);
+  properties_.push_back(&src_w_property_);
+  properties_.push_back(&src_h_property_);
+  properties_.push_back(&rotation_property_);
+  properties_.push_back(&alpha_property_);
+  properties_.push_back(&blend_property_);
+  properties_.push_back(&in_fence_fd_property_);
+
   return 0;
 }
 
