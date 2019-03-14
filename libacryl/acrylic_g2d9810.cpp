@@ -338,14 +338,21 @@ AcrylicCompositorG2D9810::AcrylicCompositorG2D9810(const HW2DCapability &capabil
 {
     memset(&mTask, 0, sizeof(mTask));
 
+    mVersion = 0;
+    if (mDev.ioctl(G2D_IOC_VERSION, &mVersion) < 0)
+        ALOGERR("Failed to get G2D command version");
+    ALOGI("G2D API Version %d", mVersion);
+
     halfmt_to_g2dfmt_tbl = newcolormode ? __halfmt_to_g2dfmt_9820 : __halfmt_to_g2dfmt_9810;
     len_halfmt_to_g2dfmt_tbl = newcolormode ? ARRSIZE(__halfmt_to_g2dfmt_9820) : ARRSIZE(__halfmt_to_g2dfmt_9810);
+
     ALOGD_TEST("Created a new Acrylic for G2D 9810 on %p", this);
 }
 
 AcrylicCompositorG2D9810::~AcrylicCompositorG2D9810()
 {
     delete [] mTask.source;
+    delete [] mTask.commands.target;
     for (unsigned int i = 0; i < mMaxSourceCount; i++)
         delete [] mTask.commands.source[i];
 
@@ -569,6 +576,16 @@ bool AcrylicCompositorG2D9810::reallocLayer(unsigned int layercount)
     if (mMaxSourceCount >= layercount)
         return true;
 
+    if (!mTask.commands.target) {
+        mTask.commands.target = new uint32_t[G2DSFR_DST_FIELD_COUNT];
+        if (!mTask.commands.target) {
+            ALOGE("Failed to allocate command buffer for target image");
+            return false;
+        }
+
+	memset(mTask.commands.target, 0, sizeof(uint32_t) * G2DSFR_DST_FIELD_COUNT);
+    }
+
     delete [] mTask.source;
     for (unsigned int i = 0; i < mMaxSourceCount; i++)
         delete [] mTask.commands.source[i];
@@ -593,11 +610,42 @@ bool AcrylicCompositorG2D9810::reallocLayer(unsigned int layercount)
 
             return false;
         }
+
+	memset(mTask.commands.source[i], 0, sizeof(uint32_t) * G2DSFR_SRC_FIELD_COUNT);
     }
 
     mMaxSourceCount = layercount;
 
     return true;
+}
+
+int AcrylicCompositorG2D9810::ioctlG2D(void)
+{
+    if (mVersion == 1) {
+        if (mDev.ioctl(G2D_IOC_PROCESS, &mTask) < 0)
+            return -errno;
+    } else {
+        struct g2d_compat_task task;
+
+        memcpy(&task, &mTask, sizeof(mTask) - sizeof(mTask.commands));
+        memcpy(task.commands.target, mTask.commands.target, sizeof(task.commands.target));
+
+        for (unsigned int i = 0; i < mMaxSourceCount; i++)
+            task.commands.source[i] = mTask.commands.source[i];
+
+        task.commands.extra = mTask.commands.extra;
+        task.commands.num_extra_regs = mTask.commands.num_extra_regs;
+
+        if (mDev.ioctl(G2D_IOC_COMPAT_PROCESS, &task) < 0)
+            return -errno;
+
+        mTask.flags = task.flags;
+
+        for (unsigned int i = 0; i < mTask.num_release_fences; i++)
+            mTask.release_fence[i] = task.release_fence[i];
+    }
+
+    return 0;
 }
 
 bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, bool nonblocking)
@@ -699,7 +747,7 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
 
     debug_show_g2d_task(mTask);
 
-    if (mDev.ioctl(G2D_IOC_PROCESS, &mTask) < 0) {
+    if (ioctlG2D() < 0) {
         ALOGERR("Failed to process a task");
         show_g2d_task(mTask);
         return false;

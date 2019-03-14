@@ -145,6 +145,10 @@ enum g2dsfr_img_register {
     G2DSFR_IMG_FIELD_COUNT,
 };
 
+/*
+ * The order of command list should be fixed.
+ * The new command item must be added from the bottom.
+ */
 enum g2dsfr_src_register {
     G2DSFR_SRC_COMMAND = G2DSFR_IMG_FIELD_COUNT,
     G2DSFR_SRC_SELECT,
@@ -163,12 +167,23 @@ enum g2dsfr_src_register {
     G2DSFR_SRC_BLEND,
     G2DSFR_SRC_YCBCRMODE,
     G2DSFR_SRC_HDRMODE,
+    G2DSFR_SRC_Y_HEADER_STRIDE,
+    G2DSFR_SRC_Y_PAYLOAD_STRIDE,
+    G2DSFR_SRC_C_HEADER_STRIDE,
+    G2DSFR_SRC_C_PAYLOAD_STRIDE,
 
     G2DSFR_SRC_FIELD_COUNT
 };
 
 enum g2dsfr_dst_register {
     G2DSFR_DST_YCBCRMODE = G2DSFR_IMG_FIELD_COUNT,
+
+    G2DSFR_DST_COMPAT_FIELD_COUNT,
+
+    G2DSFR_DST_Y_HEADER_STRIDE = G2DSFR_DST_COMPAT_FIELD_COUNT,
+    G2DSFR_DST_C_HEADER_STRIDE,
+    G2DSFR_DST_Y_PAYLOAD_STRIDE,
+    G2DSFR_DST_C_PAYLOAD_STRIDE,
 
     G2DSFR_DST_FIELD_COUNT,
 };
@@ -180,8 +195,8 @@ enum g2dsfr_dst_register {
 #define G2D_MAX_PRIORITY       3
 #define G2D_MAX_RELEASE_FENCES (G2D_MAX_IMAGES + 1)
 
-struct g2d_commands {
-    uint32_t       target[G2DSFR_DST_FIELD_COUNT];
+struct g2d_compat_commands {
+    uint32_t       target[G2DSFR_DST_COMPAT_FIELD_COUNT];
     uint32_t       *source[G2D_MAX_IMAGES];
     struct g2d_reg *extra;
     uint32_t       num_extra_regs;
@@ -225,6 +240,30 @@ struct g2d_layer {
 #define G2D_FLAG_HWFC     (1 << 3)
 #define G2D_FLAG_APB      (1 << 4)
 #define G2D_FLAG_ERROR    (1 << 5)
+
+struct g2d_compat_task {
+    uint32_t            version;
+    uint32_t            flags;
+    uint32_t            laptime_in_usec;
+    uint32_t            priority;
+    uint32_t            num_source;
+    uint32_t            num_release_fences;
+    int32_t             *release_fence;
+    struct g2d_layer    target;
+    struct g2d_layer    *source;
+    struct g2d_compat_commands commands;
+};
+
+/*
+ * Commands must be flexible because it may change according to H/W changes.
+ * The commands must be written in the promised order as version.
+ */
+struct g2d_commands {
+    uint32_t       *target;
+    uint32_t       *source[G2D_MAX_IMAGES];
+    struct g2d_reg *extra;
+    uint32_t       num_extra_regs;
+};
 
 struct g2d_task {
     uint32_t            version;
@@ -282,9 +321,11 @@ enum g2d_priority {
     G2D_PRIORITY_END
 };
 
-#define G2D_IOC_PROCESS        _IOWR('M', 4, struct g2d_task)
+#define G2D_IOC_PROCESS        _IOWR('M', 3, struct g2d_task)
+#define G2D_IOC_COMPAT_PROCESS _IOWR('M', 4, struct g2d_compat_task)
 #define G2D_IOC_PRIORITY       _IOR('M', 5, int32_t)
 #define G2D_IOC_PERFORMANCE    _IOR('M', 6, struct g2d_performance)
+#define G2D_IOC_VERSION		_IOR('M', 7, uint32_t)
 
 #ifdef __cplusplus
 }

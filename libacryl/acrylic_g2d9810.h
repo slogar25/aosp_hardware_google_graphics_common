@@ -123,6 +123,7 @@ public:
     virtual int prioritize(int priority = -1);
     virtual bool requestPerformanceQoS(AcrylicPerformanceRequest *request);
 private:
+    int ioctlG2D(void);
     bool executeG2D(int fence[], unsigned int num_fences, bool nonblocking);
     bool prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[]);
     bool prepareSource(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size, int index);
@@ -134,6 +135,7 @@ private:
     G2DHdrWriter  mHdrWriter;
     unsigned int  mMaxSourceCount;
     int mPriority;
+    unsigned int mVersion;
 
     g2d_fmt *halfmt_to_g2dfmt_tbl;
     size_t len_halfmt_to_g2dfmt_tbl;
