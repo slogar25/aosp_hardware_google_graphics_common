@@ -317,7 +317,12 @@ static g2d_fmt __halfmt_to_g2dfmt_9820[] = {
     {HAL_PIXEL_FORMAT_YCbCr_422_I,                G2D_FMT_YUYV,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,         G2D_FMT_YVYU,      1, 0},
     {HAL_PIXEL_FORMAT_YCbCr_422_SP,               G2D_FMT_NV16,      1, 0},
-    // TODO: add p010
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,     G2D_FMT_NV12_SBWC, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,      G2D_FMT_NV12_SBWC, 1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC, G2D_FMT_NV12_SBWC_10B, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,  G2D_FMT_NV12_SBWC_10B, 1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,     G2D_FMT_NV21_SBWC, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC, G2D_FMT_NV21_SBWC_10B, 2, 0},
 };
 
 static g2d_fmt *halfmt_to_g2dfmt(struct g2d_fmt *tbl, size_t tbl_len, uint32_t halfmt)
@@ -359,7 +364,32 @@ AcrylicCompositorG2D9810::~AcrylicCompositorG2D9810()
     ALOGD_TEST("Deleting Acrylic for G2D 9810 on %p", this);
 }
 
-bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[])
+#define SBWC_BLOCK_WIDTH 32
+#define SBWC_BLOCK_HEIGHT 4
+#define SBWC_BLOCK_SIZE(bit) (SBWC_BLOCK_WIDTH * SBWC_BLOCK_HEIGHT * (bit) / 8)
+
+#define SBWC_HEADER_ALIGN 16
+#define SBWC_PAYLOAD_ALIGN 32
+
+#define SBWC_HEADER_STRIDE(w) \
+	ALIGN(((w) / SBWC_BLOCK_WIDTH / 2), SBWC_HEADER_ALIGN)
+#define SBWC_PAYLOAD_STRIDE(w, dep)\
+	ALIGN(((w) / SBWC_BLOCK_WIDTH) * SBWC_BLOCK_SIZE(dep), \
+	      SBWC_PAYLOAD_ALIGN)
+
+static uint32_t mfc_stride_formats[] = {
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC,
+};
+
+bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[], int index)
 {
     image.flags = 0;
 
@@ -375,8 +405,13 @@ bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_lay
     if (!g2dfmt)
         return false;
 
-    if (g2dfmt->halfmt == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN)
-        image.flags |= G2D_LAYERFLAG_MFC_STRIDE;
+    image.flags &= ~G2D_LAYERFLAG_MFC_STRIDE;
+    for (size_t i = 0; i < ARRSIZE(mfc_stride_formats); i++) {
+        if (layer.getFormat() == mfc_stride_formats[i]) {
+            image.flags |= G2D_LAYERFLAG_MFC_STRIDE;
+            break;
+        }
+    }
 
     if (layer.getBufferType() == AcrylicCanvas::MT_OTF) {
         image.buffer_type = G2D_BUFTYPE_EMPTY;
@@ -419,8 +454,40 @@ bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_lay
             cmd[G2DSFR_IMG_COLORMODE] = G2D_FMT_BGR565;
         cmd[G2DSFR_IMG_COLORMODE] |= G2D_DATAFORMAT_AFBC;
         cmd[G2DSFR_IMG_STRIDE] = 0;
+    } else if (g2dfmt->g2dfmt & G2D_DATAFORMAT_SBWC) {
+        cmd[G2DSFR_IMG_STRIDE] = 0;
     } else {
         cmd[G2DSFR_IMG_STRIDE] = g2dfmt->rgb_bpp * xy.hori;
+    }
+
+    if (g2dfmt->g2dfmt & G2D_DATAFORMAT_SBWC) {
+        int dep = (g2dfmt->g2dfmt & G2D_FMT_YCBCR_10BIT) ? 10 : 8;
+        unsigned int header = SBWC_HEADER_STRIDE(xy.hori);
+        unsigned int payload = SBWC_PAYLOAD_STRIDE(xy.hori, dep);
+
+        if (index < 0) {
+            cmd[G2DSFR_DST_Y_HEADER_STRIDE] = header;
+            cmd[G2DSFR_DST_C_HEADER_STRIDE] = header;
+            cmd[G2DSFR_DST_Y_PAYLOAD_STRIDE] = payload;
+            cmd[G2DSFR_DST_C_PAYLOAD_STRIDE] = payload;
+        } else {
+            cmd[G2DSFR_SRC_Y_HEADER_STRIDE] = header;
+            cmd[G2DSFR_SRC_C_HEADER_STRIDE] = header;
+            cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = payload;
+            cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = payload;
+        }
+    } else {
+        if (index < 0) {
+            cmd[G2DSFR_DST_Y_HEADER_STRIDE] = 0;
+            cmd[G2DSFR_DST_C_HEADER_STRIDE] = 0;
+            cmd[G2DSFR_DST_Y_PAYLOAD_STRIDE] = 0;
+            cmd[G2DSFR_DST_C_PAYLOAD_STRIDE] = 0;
+        } else {
+            cmd[G2DSFR_SRC_Y_HEADER_STRIDE] = 0;
+            cmd[G2DSFR_SRC_C_HEADER_STRIDE] = 0;
+            cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = 0;
+            cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = 0;
+        }
     }
 
     cmd[G2DSFR_IMG_LEFT]   = 0;
@@ -479,6 +546,10 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
     cmd[G2DSFR_SRC_BLEND] = 0;
     cmd[G2DSFR_SRC_YCBCRMODE] = 0;
     cmd[G2DSFR_SRC_HDRMODE] = 0;
+    cmd[G2DSFR_SRC_Y_HEADER_STRIDE] = 0;
+    cmd[G2DSFR_SRC_C_HEADER_STRIDE] = 0;
+    cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = 0;
+    cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = 0;
 
     return true;
 }
@@ -486,7 +557,7 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
 bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[],
                                              hw2d_coord_t target_size, int index)
 {
-    if (!prepareImage(layer, image, cmd))
+    if (!prepareImage(layer, image, cmd, index))
         return false;
 
     cmd[G2DSFR_SRC_SELECT] = 0;
@@ -560,10 +631,6 @@ bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_lay
     } else {
        cmd[G2DSFR_SRC_COMMAND] |= G2D_LAYERCMD_ALPHABLEND;
     }
-
-    if ((layer.getFormat() == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B) ||
-            (layer.getFormat() == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B))
-        image.flags |= G2D_LAYERFLAG_MFC_STRIDE;
 
     cmd[G2DSFR_SRC_YCBCRMODE] = 0;
     cmd[G2DSFR_SRC_HDRMODE] = 0;
@@ -678,7 +745,7 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
 
     mTask.flags = 0;
 
-    if (!prepareImage(getCanvas(), mTask.target, mTask.commands.target)) {
+    if (!prepareImage(getCanvas(), mTask.target, mTask.commands.target, -1)) {
         ALOGE("Failed to configure the target image");
         return false;
     }
