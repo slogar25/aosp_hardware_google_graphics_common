@@ -292,10 +292,10 @@ uint32_t S3CFormatToHalFormat(int format)
     return HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED;
 }
 
-int S3CFormatToDrmFormat(int format)
+int halFormatToDrmFormat(int format)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if (exynos_format_desc[i].s3cFormat == static_cast<decon_pixel_format>(format))
+        if (exynos_format_desc[i].halFormat == format)
             return exynos_format_desc[i].drmFormat;
     }
     return DRM_FORMAT_UNDEFINED;

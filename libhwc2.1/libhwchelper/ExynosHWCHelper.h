@@ -301,7 +301,7 @@ inline int HEIGHT(const hwc_frect_t &rect) { return (int)(rect.bottom - rect.top
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space);
 enum decon_pixel_format halFormatToS3CFormat(int format);
 uint32_t S3CFormatToHalFormat(int format);
-int S3CFormatToDrmFormat(int format);
+int halFormatToDrmFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DeconFormatToBpp(decon_pixel_format format);
 enum decon_blending halBlendingToS3CBlending(int32_t blending);
