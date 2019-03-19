@@ -88,6 +88,14 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     }
 #endif
 
+    if (mExynosDisplay->mMaxWindowNum != getMaxWindowNum()) {
+        ALOGE("%s:: Invalid max window number (mMaxWindowNum: %d, getMaxWindowNum(): %d",
+                __func__, mExynosDisplay->mMaxWindowNum, getMaxWindowNum());
+        return;
+    }
+
+    mOldFbIds.assign(getMaxWindowNum(), 0);
+
     mVsyncCallbak.init(mExynosDisplay->mDevice, mExynosDisplay);
     mDrmVSyncWorker.Init(mDrmDevice, mExynosDisplay->mDisplayId);
     mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(&mVsyncCallbak));
@@ -371,9 +379,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 {
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq;
-    struct decon_win_config *config = mExynosDisplay->mWinConfigData->config;
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
-    uint32_t fbIds[MAX_DECON_WIN] = {0, };
+    std::vector<uint32_t> fbIds(getMaxWindowNum(), 0);
     android::String8 result;
 
     uint64_t out_fences[mDrmDevice->crtcs().size()];
@@ -393,8 +400,9 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         planeEnableInfo[plane->id()] = 0;
     }
 
-    for (size_t i = 0; i <= NUM_HW_WINDOWS; i++) {
-        if (config[i].state == config[i].DECON_WIN_STATE_BUFFER) {
+    for (size_t i = 0; i < mExynosDisplay->mDpuData.configs.size(); i++) {
+        exynos_win_config_data& config = mExynosDisplay->mDpuData.configs[i];
+        if (config.state == config.WIN_STATE_BUFFER) {
             uint32_t fb_id = 0;
             /*
              * [HACK]: We can use only the first plane
@@ -404,23 +412,23 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             /* Set this plane is enabled */
             planeEnableInfo[plane->id()] = 1;
 
-            int drmFormat = S3CFormatToDrmFormat(config[i].format);
+            int drmFormat = halFormatToDrmFormat(config.format);
             if (drmFormat == DRM_FORMAT_UNDEFINED) {
                 HWC_LOGE(mExynosDisplay, "%s:: known drm format (%d)",
-                        __func__, config[i].format);
+                        __func__, config.format);
                 ret = -EINVAL;
                 drmReq.setError(ret, this);
                 return ret;
             }
 
-            uint32_t bpp = formatToBpp(S3CFormatToHalFormat(config[i].format));
+            uint32_t bpp = formatToBpp(config.format);
             uint32_t pitches[HWC_DRM_BO_MAX_PLANES] =
-            {config[i].src.f_w * bpp, config[i].src.f_w * bpp, config[i].src.f_w * bpp, 0};
+            {config.src.f_w * bpp, config.src.f_w * bpp, config.src.f_w * bpp, 0};
             uint32_t offsets[HWC_DRM_BO_MAX_PLANES] =
             {0, };
             uint32_t buf_handles[HWC_DRM_BO_MAX_PLANES] =
-            {(uint32_t)config[i].fd_idma[0], (uint32_t)config[i].fd_idma[1], (uint32_t)config[i].fd_idma[2], 0};
-            if ((ret = drmModeAddFB2(mDrmDevice->fd(), config[i].src.f_w, config[i].src.f_h,
+            {(uint32_t)config.fd_idma[0], (uint32_t)config.fd_idma[1], (uint32_t)config.fd_idma[2], 0};
+            if ((ret = drmModeAddFB2(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
                     drmFormat, buf_handles, pitches, offsets, &fb_id, 0)) != NO_ERROR) {
                 HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add FB, fb_id(%d), ret(%d)",
                         __func__, i, fb_id, ret);
@@ -436,28 +444,28 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->crtc_x_property().id(),
-                    config[i].dst.x) < 0;
+                    config.dst.x) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->crtc_y_property().id(),
-                    config[i].dst.y) < 0;
+                    config.dst.y) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->crtc_w_property().id(),
-                    config[i].dst.w) < 0;
+                    config.dst.w) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->crtc_h_property().id(),
-                    config[i].dst.h) < 0;
+                    config.dst.h) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->src_x_property().id(),
-                    (int)(config[i].src.x) << 16) < 0;
+                    (int)(config.src.x) << 16) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->src_y_property().id(),
-                    (int)(config[i].src.y) << 16) < 0;
+                    (int)(config.src.y) << 16) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->src_w_property().id(),
-                    (int)(config[i].src.w) << 16) < 0;
+                    (int)(config.src.w) << 16) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->src_h_property().id(),
-                    (int)(config[i].src.h) << 16) < 0;
+                    (int)(config.src.h) << 16) < 0;
             if (ret) {
                 HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add plane %d to set, ret(%d)",
                         __func__, i, plane->id(), ret);
@@ -468,7 +476,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             /* TODO: Set rotation, blending, alpha */
             uint64_t rotation = DRM_MODE_ROTATE_0;
             uint64_t blend;
-            //uint32_t blending =  config[i].blending;
+            //uint32_t blending =  config.blending;
             uint32_t blending = HWC2_BLEND_MODE_NONE;
             if (plane->blend_property().id()) {
                 switch (blending) {
@@ -518,7 +526,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
             if (plane->alpha_property().id()) {
                 ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->alpha_property().id(), config[i].plane_alpha) < 0;
+                        plane->alpha_property().id(), config.plane_alpha) < 0;
                 if (ret) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add alpha property %d for plane %d, ret(%d)",
                             __func__, i, plane->alpha_property().id(), plane->id(), ret);
@@ -527,14 +535,14 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 }
             }
 
-            if (config[i].acq_fence >= 0) {
+            if (config.acq_fence >= 0) {
                 int prop_id = plane->in_fence_fd_property().id();
                 if (prop_id == 0) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to get IN_FENCE_FD property id for plane %d",
                             __func__, i, plane->id());
                     break;
                 }
-                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(), prop_id, config[i].acq_fence) < 0;
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(), prop_id, config.acq_fence) < 0;
                 if (ret) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add IN_FENCE_FD property to pset for plane %d, ret(%d)",
                             __func__, i, plane->id(), ret);
@@ -574,7 +582,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
         dumpAtomicCommitInfo(result, drmReq.pset(), true);
 
-        for (size_t i = 0; i < MAX_DECON_WIN; i++) {
+        for (size_t i = 0; i < getMaxWindowNum(); i++) {
             if (mOldFbIds[i])
                 drmModeRmFB(mDrmDevice->fd(), mOldFbIds[i]);
             mOldFbIds[i] = fbIds[i];
@@ -591,15 +599,17 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         return ret;
     }
 
-    mExynosDisplay->mWinConfigData->retire_fence = (int)out_fences[mDrmCrtc->pipe()];
+    mExynosDisplay->mDpuData.retire_fence = (int)out_fences[mDrmCrtc->pipe()];
     /*
      * [HACK] dup retire_fence for each layer's release fence
      * Do not use hwc_dup because hwc_dup increase usage count of fence treacer
      * Usage count of this fence is incresed by ExynosDisplay::deliverWinConfigData()
      */
-    for (size_t i = 0; i <= NUM_HW_WINDOWS; i++) {
-        if (config[i].state == config[i].DECON_WIN_STATE_BUFFER) {
-            config[i].rel_fence = dup(mExynosDisplay->mWinConfigData->retire_fence);
+    for (auto &display_config : mExynosDisplay->mDpuData.configs) {
+        if ((display_config.state == display_config.WIN_STATE_BUFFER) ||
+            (display_config.state == display_config.WIN_STATE_CURSOR)) {
+            display_config.rel_fence =
+                dup((int)out_fences[mDrmCrtc->pipe()]);
         }
     }
 
@@ -727,6 +737,11 @@ String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmMod
                 i, pset->items[i].object_id, pset->items[i].property_id, property->name().c_str(), pset->items[i].value);
     }
     return result;
+}
+
+inline uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
+{
+        return mDrmDevice->planes().size();
 }
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()

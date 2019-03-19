@@ -73,6 +73,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         virtual int32_t setForcePanic();
         virtual int getDisplayFd() { return mDrmDevice->fd(); };
         virtual void initDrmDevice(DrmDevice *drmDevice);
+        inline virtual uint32_t getMaxWindowNum();
     protected:
         int32_t applyDisplayMode();
         String8& dumpAtomicCommitInfo(String8 &result, drmModeAtomicReqPtr pset, bool debugPrint = false);
@@ -108,7 +109,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         /* Mapping plane id to ExynosMPP, key is plane id */
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;
         /* TODO: Temporary variable to manage fb id */
-        uint32_t mOldFbIds[MAX_DECON_WIN] = {0, };
+        std::vector<uint32_t> mOldFbIds;
 };
 
 #endif
