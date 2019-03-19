@@ -304,6 +304,9 @@ uint32_t S3CFormatToHalFormat(int format);
 int S3CFormatToDrmFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DeconFormatToBpp(decon_pixel_format format);
+enum decon_blending halBlendingToS3CBlending(int32_t blending);
+enum dpp_rotate halTransformToS3CRot(uint32_t halTransform);
+
 bool isFormatRgb(int format);
 bool isFormatYUV(int format);
 bool isFormatYUV420(int format);

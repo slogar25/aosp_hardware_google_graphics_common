@@ -341,6 +341,51 @@ android_dataspace colorModeToDataspace(android_color_mode_t mode)
     return dataSpace;
 }
 
+enum decon_blending halBlendingToS3CBlending(int32_t blending)
+{
+    switch (blending) {
+    case HWC2_BLEND_MODE_NONE:
+        return DECON_BLENDING_NONE;
+    case HWC2_BLEND_MODE_PREMULTIPLIED:
+        return DECON_BLENDING_PREMULT;
+    case HWC2_BLEND_MODE_COVERAGE:
+        return DECON_BLENDING_COVERAGE;
+
+    default:
+        return DECON_BLENDING_MAX;
+    }
+}
+
+enum dpp_rotate halTransformToS3CRot(uint32_t halTransform)
+{
+    switch (halTransform) {
+    case HAL_TRANSFORM_FLIP_H:
+        return DPP_ROT_YFLIP;
+    case HAL_TRANSFORM_FLIP_V:
+        return DPP_ROT_XFLIP;
+    case HAL_TRANSFORM_ROT_180:
+        return DPP_ROT_180;
+    case HAL_TRANSFORM_ROT_90:
+        return DPP_ROT_90;
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
+        /*
+         * HAL: HAL_TRANSFORM_FLIP_H -> HAL_TRANSFORM_ROT_90
+         * VPP: ROT_90 -> XFLIP
+         */
+        return DPP_ROT_90_XFLIP;
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
+        /*
+         * HAL: HAL_TRANSFORM_FLIP_V -> HAL_TRANSFORM_ROT_90
+         * VPP: ROT_90 -> YFLIP
+         */
+        return DPP_ROT_90_YFLIP;
+    case HAL_TRANSFORM_ROT_270:
+        return DPP_ROT_270;
+    default:
+        return DPP_ROT_NORMAL;
+    }
+}
+
 void dumpHandle(uint32_t type, private_handle_t *h)
 {
     if (h == NULL)
