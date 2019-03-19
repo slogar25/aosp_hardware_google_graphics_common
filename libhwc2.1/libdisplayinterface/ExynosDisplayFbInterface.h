@@ -22,6 +22,8 @@
 #include <hardware/hwcomposer2.h>
 #include <linux/videodev2.h>
 #include "videodev2_exynos_displayport.h"
+#include "ExynosDisplay.h"
+#include "DeconHeader.h"
 
 class ExynosDisplay;
 class ExynosDisplayFbInterface : public ExynosDisplayInterface {
@@ -52,11 +54,19 @@ class ExynosDisplayFbInterface : public ExynosDisplayInterface {
         virtual int32_t disableSelfRefresh(uint32_t disable);
         virtual int32_t setForcePanic();
         virtual int getDisplayFd() { return mDisplayFd; };
+        inline virtual uint32_t getMaxWindowNum();
+    protected:
+        void clearFbWinConfigData(decon_win_config_data &winConfigData);
+        dpp_csc_eq halDataSpaceToDisplayParam(exynos_win_config_data& config);
+        dpp_hdr_standard halTransferToDisplayParam(exynos_win_config_data& config);
+        String8& dumpFbWinConfigInfo(String8 &result,
+                decon_win_config_data &fbConfig, bool debugPrint = false);
     protected:
         /**
          * LCD device member variables
          */
         int mDisplayFd;
+        decon_win_config_data mFbConfigData;
 };
 
 class ExynosPrimaryDisplay;
