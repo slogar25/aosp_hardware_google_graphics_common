@@ -23,7 +23,6 @@
 #include <hardware/hwcomposer_defs.h>
 #include <sync/sync.h>
 #include <map>
-#include "ExynosHWCDebug.h"
 #include "ExynosDisplay.h"
 #include "ExynosExternalDisplay.h"
 #include "ExynosLayer.h"
@@ -37,36 +36,6 @@
 using namespace android;
 extern struct exynos_hwc_control exynosHWCControl;
 extern struct update_time_info updateTimeInfo;
-
-enum dpp_rotate halTransformToHWRot(uint32_t halTransform)
-{
-    switch (halTransform) {
-    case HAL_TRANSFORM_FLIP_H:
-        return DPP_ROT_YFLIP;
-    case HAL_TRANSFORM_FLIP_V:
-        return DPP_ROT_XFLIP;
-    case HAL_TRANSFORM_ROT_180:
-        return DPP_ROT_180;
-    case HAL_TRANSFORM_ROT_90:
-        return DPP_ROT_90;
-    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
-        /*
-         * HAL: HAL_TRANSFORM_FLIP_H -> HAL_TRANSFORM_ROT_90
-         * VPP: ROT_90 -> XFLIP
-         */
-        return DPP_ROT_90_XFLIP;
-    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
-        /*
-         * HAL: HAL_TRANSFORM_FLIP_V -> HAL_TRANSFORM_ROT_90
-         * VPP: ROT_90 -> YFLIP
-         */
-        return DPP_ROT_90_YFLIP;
-    case HAL_TRANSFORM_ROT_270:
-        return DPP_ROT_270;
-    default:
-        return DPP_ROT_NORMAL;
-    }
-}
 
 int ExynosSortedLayer::compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs)
 {
@@ -159,9 +128,9 @@ ExynosCompositionInfo::ExynosCompositionInfo(uint32_t type)
     if(type == COMPOSITION_CLIENT)
         mEnableSkipStatic = true;
 
-    memset(&mLastConfig, 0x0, sizeof(mLastConfig));
-    mLastConfig.acq_fence = -1;
-    mLastConfig.rel_fence = -1;
+    memset(&mLastWinConfigData, 0x0, sizeof(mLastWinConfigData));
+    mLastWinConfigData.acq_fence = -1;
+    mLastWinConfigData.rel_fence = -1;
 }
 
 void ExynosCompositionInfo::initializeInfos(ExynosDisplay *display)
@@ -304,10 +273,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mUpdateCallCnt(0),
     mDefaultDMA(MAX_DECON_DMA_TYPE),
     mFps(0),
-    mWinConfigData(NULL),
-    mLastWinConfigData(NULL),
     mLastRetireFence(-1),
-    mMaxWindowNum(NUM_HW_WINDOWS),
     mWindowNumUsed(0),
     mBaseWindowIndex(0),
     mBlendingNoneIndex(-1),
@@ -347,31 +313,19 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
         return;
     }
 
-    mWinConfigData = (struct decon_win_config_data *)malloc(sizeof(*mWinConfigData));
-    if (mWinConfigData == NULL)
-        ALOGE("Fail to allocate mWinConfigData");
-    else {
-        memset(mWinConfigData, 0, sizeof(*mWinConfigData));
-        mWinConfigData->retire_fence = -1;
-        for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-            mWinConfigData->config[i].acq_fence = -1;
-            mWinConfigData->config[i].rel_fence = -1;
-        }
-    }
-
-    mLastWinConfigData = (struct decon_win_config_data *)malloc(sizeof(*mLastWinConfigData));
-    if (mLastWinConfigData == NULL)
-        ALOGE("Fail to allocate mLastWinConfigData");
-    else {
-        memset(mLastWinConfigData, 0, sizeof(*mLastWinConfigData));
-        mLastWinConfigData->retire_fence = -1;
-        for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-            mLastWinConfigData->config[i].acq_fence = -1;
-            mLastWinConfigData->config[i].rel_fence = -1;
-        }
-    }
-
     mResourceManager = device->mResourceManager;
+
+    /* The number of window is same with the number of otfMPP */
+    mMaxWindowNum = mResourceManager->getOtfMPPs().size();
+
+    for(uint32_t i = 0; i < mMaxWindowNum; i++)
+    {
+        exynos_win_config_data config_data;
+        mDpuData.configs.push_back(config_data);
+        mLastDpuData.configs.push_back(config_data);
+    }
+    ALOGI("window configs size(%zu)", mDpuData.configs.size());
+
     mLowFpsLayerInfo.initializeInfos();
 
     mUseDecon = true;
@@ -380,12 +334,6 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
 
 ExynosDisplay::~ExynosDisplay()
 {
-    if (mLastWinConfigData != NULL)
-        free(mLastWinConfigData);
-
-    if (mWinConfigData != NULL)
-        free(mWinConfigData);
-
     if (mDisplayInterface != NULL)
         delete mDisplayInterface;
 }
@@ -413,9 +361,9 @@ void ExynosDisplay::initDisplay() {
         mClientCompositionInfo.mSkipSrcInfo.dstInfo[i].acquireFenceFd = -1;
         mClientCompositionInfo.mSkipSrcInfo.dstInfo[i].releaseFenceFd = -1;
     }
-    memset(&mClientCompositionInfo.mLastConfig, 0x0, sizeof(mClientCompositionInfo.mLastConfig));
-    mClientCompositionInfo.mLastConfig.acq_fence = -1;
-    mClientCompositionInfo.mLastConfig.rel_fence = -1;
+    memset(&mClientCompositionInfo.mLastWinConfigData, 0x0, sizeof(mClientCompositionInfo.mLastWinConfigData));
+    mClientCompositionInfo.mLastWinConfigData.acq_fence = -1;
+    mClientCompositionInfo.mLastWinConfigData.rel_fence = -1;
 
     mExynosCompositionInfo.initializeInfos(this);
     mExynosCompositionInfo.mEnableSkipStatic = false;
@@ -429,9 +377,9 @@ void ExynosDisplay::initDisplay() {
         mExynosCompositionInfo.mSkipSrcInfo.dstInfo[i].releaseFenceFd = -1;
     }
 
-    memset(&mExynosCompositionInfo.mLastConfig, 0x0, sizeof(mExynosCompositionInfo.mLastConfig));
-    mExynosCompositionInfo.mLastConfig.acq_fence = -1;
-    mExynosCompositionInfo.mLastConfig.rel_fence = -1;
+    memset(&mExynosCompositionInfo.mLastWinConfigData, 0x0, sizeof(mExynosCompositionInfo.mLastWinConfigData));
+    mExynosCompositionInfo.mLastWinConfigData.acq_fence = -1;
+    mExynosCompositionInfo.mLastWinConfigData.rel_fence = -1;
 
     mGeometryChanged = 0x0;
     mRenderingState = RENDERING_STATE_NONE;
@@ -439,19 +387,8 @@ void ExynosDisplay::initDisplay() {
     mDynamicReCompMode = NO_MODE_SWITCH;
     mCursorIndex = -1;
 
-    memset(mWinConfigData, 0, sizeof(*mWinConfigData));
-    mWinConfigData->retire_fence = -1;
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        mWinConfigData->config[i].acq_fence = -1;
-        mWinConfigData->config[i].rel_fence = -1;
-    }
-
-    memset(mLastWinConfigData, 0, sizeof(*mLastWinConfigData));
-    mLastWinConfigData->retire_fence = -1;
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        mLastWinConfigData->config[i].acq_fence = -1;
-        mLastWinConfigData->config[i].rel_fence = -1;
-    }
+    mDpuData.initData();
+    mLastDpuData.initData();
 
     if (mDisplayControl.earlyStartMPP == true) {
         for (size_t i = 0; i < mLayers.size(); i++) {
@@ -821,17 +758,18 @@ int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
         return NO_ERROR;
     }
     if ((compositionInfo.mWindowIndex < 0) ||
-        (compositionInfo.mWindowIndex >= (int32_t)NUM_HW_WINDOWS))
+        (compositionInfo.mWindowIndex >= (int32_t)mDpuData.configs.size()))
     {
         DISPLAY_LOGE("invalid mWindowIndex(%d)", compositionInfo.mWindowIndex);
         return -EINVAL;
     }
 
+    exynos_win_config_data &config = mDpuData.configs[compositionInfo.mWindowIndex];
+
     /* Store configuration of client target configuration */
     if (compositionInfo.mSkipFlag == false) {
-        memcpy(&compositionInfo.mLastConfig,
-            &mWinConfigData->config[compositionInfo.mWindowIndex],
-            sizeof(compositionInfo.mLastConfig));
+        memcpy(&compositionInfo.mLastWinConfigData, &config,
+            sizeof(compositionInfo.mLastWinConfigData));
         DISPLAY_LOGD(eDebugSkipStaicLayer, "config[%d] is stored",
                 compositionInfo.mWindowIndex);
     } else {
@@ -844,46 +782,39 @@ int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
         }
 
         if (compositionInfo.mTargetBuffer == NULL) {
-            fence_close(mWinConfigData->config[compositionInfo.mWindowIndex].acq_fence, this,
+            fence_close(config.acq_fence, this,
                     FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_ALL);
 
-            memcpy(&mWinConfigData->config[compositionInfo.mWindowIndex],
-                    &compositionInfo.mLastConfig, sizeof(compositionInfo.mLastConfig));
+            memcpy(&config, &compositionInfo.mLastWinConfigData, sizeof(compositionInfo.mLastWinConfigData));
             /* Assigned otfMPP for client target can be changed */
-            mWinConfigData->config[compositionInfo.mWindowIndex].idma_type = getDeconDMAType(compositionInfo.mOtfMPP);
+            config.assignedMPP = compositionInfo.mOtfMPP;
             /* acq_fence was closed by DPU driver in the previous frame */
-            mWinConfigData->config[compositionInfo.mWindowIndex].acq_fence = -1;
+            config.acq_fence = -1;
         } else {
             /* Check target buffer is same with previous frame */
-            if ((mWinConfigData->config[compositionInfo.mWindowIndex].fd_idma[0] !=
-                 compositionInfo.mLastConfig.fd_idma[0]) ||
-                (mWinConfigData->config[compositionInfo.mWindowIndex].fd_idma[1] !=
-                 compositionInfo.mLastConfig.fd_idma[1]) ||
-                (mWinConfigData->config[compositionInfo.mWindowIndex].fd_idma[2] !=
-                 compositionInfo.mLastConfig.fd_idma[2])) {
+            if ((config.fd_idma[0] != compositionInfo.mLastWinConfigData.fd_idma[0]) ||
+                (config.fd_idma[1] != compositionInfo.mLastWinConfigData.fd_idma[1]) ||
+                (config.fd_idma[2] != compositionInfo.mLastWinConfigData.fd_idma[2])) {
                 DISPLAY_LOGE("Current config [%d][%d, %d, %d]",
                         compositionInfo.mWindowIndex,
-                        mWinConfigData->config[compositionInfo.mWindowIndex].fd_idma[0],
-                        mWinConfigData->config[compositionInfo.mWindowIndex].fd_idma[1],
-                        mWinConfigData->config[compositionInfo.mWindowIndex].fd_idma[2]);
+                        config.fd_idma[0], config.fd_idma[1], config.fd_idma[2]);
                 DISPLAY_LOGE("=============================  dump last win configs  ===================================");
-                struct decon_win_config *config = mLastWinConfigData->config;
-                for (size_t i = 0; i <= NUM_HW_WINDOWS; i++) {
+                for (size_t i = 0; i <= mLastDpuData.configs.size(); i++) {
                     android::String8 result;
                     result.appendFormat("config[%zu]\n", i);
-                    dumpConfig(result, config[i]);
+                    dumpConfig(result, mLastDpuData.configs[i]);
                     DISPLAY_LOGE("%s", result.string());
                 }
-                DISPLAY_LOGE("compositionInfo.mLastConfig config [%d, %d, %d]",
-                        compositionInfo.mLastConfig.fd_idma[0],
-                        compositionInfo.mLastConfig.fd_idma[1],
-                        compositionInfo.mLastConfig.fd_idma[2]);
+                DISPLAY_LOGE("compositionInfo.mLastWinConfigData config [%d, %d, %d]",
+                        compositionInfo.mLastWinConfigData.fd_idma[0],
+                        compositionInfo.mLastWinConfigData.fd_idma[1],
+                        compositionInfo.mLastWinConfigData.fd_idma[2]);
                 return -EINVAL;
             }
         }
 
         DISPLAY_LOGD(eDebugSkipStaicLayer, "skipStaticLayer config[%d]", compositionInfo.mWindowIndex);
-        dumpConfig(mWinConfigData->config[compositionInfo.mWindowIndex]);
+        dumpConfig(config);
     }
 
     return NO_ERROR;
@@ -1168,94 +1099,6 @@ int ExynosDisplay::doExynosComposition() {
     return ret;
 }
 
-enum decon_blending halBlendingToS3CBlending(int32_t blending)
-{
-    switch (blending) {
-    case HWC2_BLEND_MODE_NONE:
-        return DECON_BLENDING_NONE;
-    case HWC2_BLEND_MODE_PREMULTIPLIED:
-        return DECON_BLENDING_PREMULT;
-    case HWC2_BLEND_MODE_COVERAGE:
-        return DECON_BLENDING_COVERAGE;
-
-    default:
-        return DECON_BLENDING_MAX;
-    }
-}
-
-uint32_t halDataSpaceToDisplayParam(exynos_image srcImg, android_dataspace dataspace, ExynosMPP* otfMPP)
-{
-    uint32_t cscEQ = 0;
-    if (dataspace == HAL_DATASPACE_UNKNOWN) {
-        if (isFormatRgb(srcImg.format))
-            dataspace = HAL_DATASPACE_V0_SRGB;
-    }
-    uint32_t standard = (dataspace & HAL_DATASPACE_STANDARD_MASK);
-    uint32_t range = (dataspace & HAL_DATASPACE_RANGE_MASK);
-
-    if (otfMPP == NULL) return cscEQ;
-
-    if (dataspace_standard_map.find(standard) != dataspace_standard_map.end())
-        cscEQ = dataspace_standard_map.at(standard).eq_mode;
-    else
-        cscEQ = CSC_UNSPECIFIED;
-
-    if ((otfMPP->mAttr & MPP_ATTR_WCG) == 0) {
-        switch(cscEQ) {
-            case CSC_BT_709:
-            case CSC_BT_601:
-            case CSC_BT_2020:
-            case CSC_DCI_P3:
-                break;
-            default:
-                cscEQ = CSC_UNSPECIFIED;
-                break;
-        }
-        switch(range) {
-            case HAL_DATASPACE_RANGE_FULL:
-            case HAL_DATASPACE_RANGE_LIMITED:
-                break;
-            default:
-                range = HAL_DATASPACE_RANGE_UNSPECIFIED;
-                break;
-        }
-    }
-
-    if (dataspace_range_map.find(range) != dataspace_range_map.end())
-        cscEQ |= (cscEQ | (dataspace_range_map.at(range)));
-    else
-        cscEQ |= (cscEQ | (CSC_RANGE_UNSPECIFIED << CSC_RANGE_SHIFT));
-
-    return cscEQ;
-}
-
-dpp_hdr_standard halTransferToDisplayParam(exynos_image srcImg, android_dataspace dataspace, ExynosMPP* otfMPP)
-{
-    if (dataspace == HAL_DATASPACE_UNKNOWN) {
-        if (isFormatRgb(srcImg.format))
-            dataspace = HAL_DATASPACE_V0_SRGB;
-    }
-
-    uint32_t transfer = (dataspace & HAL_DATASPACE_TRANSFER_MASK);
-    dpp_hdr_standard ret = DPP_HDR_OFF;
-
-    if (otfMPP == NULL) return ret;
-
-    if ((otfMPP->mAttr & MPP_ATTR_WCG) == 0) {
-        if (hasHdrInfo(srcImg) == false)
-            return DPP_HDR_OFF;
-    }
-
-    if (((otfMPP->mAttr & MPP_ATTR_HDR10) == 0) &&
-            ((otfMPP->mAttr & MPP_ATTR_WCG) == 0) &&
-            ((otfMPP->mAttr & MPP_ATTR_HDR10PLUS) == 0)) return DPP_HDR_OFF;
-
-    if (dataspace_transfer_map.find(transfer) != dataspace_transfer_map.end())
-        ret = dataspace_transfer_map.at(transfer).hdr_std;
-
-    return ret;
-}
-
 decon_idma_type ExynosDisplay::getDeconDMAType(ExynosMPP* __unused otfMPP)
 {
     return MAX_DECON_DMA_TYPE;
@@ -1266,7 +1109,7 @@ bool ExynosDisplay::getHDRException(ExynosLayer* __unused layer)
     return false;
 }
 
-int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_win_config &cfg)
+int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_win_config_data &cfg)
 {
     /* TODO : this is hardcoded */
     int32_t ret = NO_ERROR;
@@ -1288,7 +1131,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
 
     cfg.compression = layer.mCompressed;
     if (layer.mCompressed) {
-        cfg.dpp_parm.comp_src = DPP_COMP_SRC_GPU;
+        cfg.comp_src = DPP_COMP_SRC_GPU;
     }
     if (otfMPP == NULL) {
         HWC_LOGE(this, "%s:: otfMPP is NULL", __func__);
@@ -1340,9 +1183,9 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
 
     if ((layer.mExynosCompositionType == HWC2_COMPOSITION_DEVICE) &&
         (layer.mCompositionType == HWC2_COMPOSITION_CURSOR))
-        cfg.state = cfg.DECON_WIN_STATE_CURSOR;
+        cfg.state = cfg.WIN_STATE_CURSOR;
     else
-        cfg.state = cfg.DECON_WIN_STATE_BUFFER;
+        cfg.state = cfg.WIN_STATE_BUFFER;
     cfg.dst.x = x;
     cfg.dst.y = y;
     cfg.dst.w = w;
@@ -1354,11 +1197,11 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
     if ((planeAlpha >= 0) && (planeAlpha < 255)) {
         cfg.plane_alpha = planeAlpha;
     }
-    cfg.blending = halBlendingToS3CBlending(blending);
-    cfg.idma_type = getDeconDMAType(otfMPP);
+    cfg.blending = blending;
+    cfg.assignedMPP = otfMPP;
 
     if (layer.mIsDimLayer && handle == NULL) {
-        cfg.state = cfg.DECON_WIN_STATE_COLOR;
+        cfg.state = cfg.WIN_STATE_COLOR;
         hwc_color_t color = layer.mColor;
         cfg.color = (color.r << 16) | (color.g << 8) | color.b;
         if (!((planeAlpha >= 0) && (planeAlpha <= 255)))
@@ -1367,7 +1210,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
         return ret;
     }
 
-    cfg.format = halFormatToS3CFormat(handle->format);
+    cfg.format = handle->format;
 
     cfg.fd_idma[0] = handle->fd;
     cfg.fd_idma[1] = handle->fd1;
@@ -1389,7 +1232,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
             cfg.src.y = mpp_dst_img.y;
             cfg.src.w = mpp_dst_img.w;
             cfg.src.h = mpp_dst_img.h;
-            cfg.format = halFormatToS3CFormat(mpp_dst_img.format);
+            cfg.format = mpp_dst_img.format;
             cfg.acq_fence =
                 hwcCheckFenceDebug(this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP, mpp_dst_img.releaseFenceFd);
 
@@ -1404,9 +1247,9 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
         } else {
             HWC_LOGE(this, "%s:: Failed to get dst info of m2mMPP", __func__);
         }
-        cfg.dpp_parm.eq_mode = (dpp_csc_eq)halDataSpaceToDisplayParam(layer.mMidImg, mpp_dst_img.dataSpace, otfMPP);
+        cfg.dataspace = mpp_dst_img.dataSpace;
 
-        cfg.dpp_parm.rot = DPP_ROT_NORMAL;
+        cfg.transform = 0;
 
         if (hasHdrInfo(layer.mMidImg)) {
             bool hdr_exception = getHDRException(&layer);
@@ -1425,7 +1268,9 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
             }
 
             if (!hdr_exception)
-                cfg.dpp_parm.hdr_std = halTransferToDisplayParam(layer.mMidImg, layer.mMidImg.dataSpace, otfMPP);
+                cfg.hdr_enable = true;
+            else
+                cfg.hdr_enable = false;
 
             /*
              * Static info uses 0.0001nit unit for luminace
@@ -1437,7 +1282,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
             luminanceMax = src_img.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
         } else {
-            cfg.dpp_parm.hdr_std = halTransferToDisplayParam(layer.mMidImg, layer.mMidImg.dataSpace, otfMPP);
+            cfg.hdr_enable = true;
         }
 
         src_img = layer.mMidImg;
@@ -1451,13 +1296,15 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
         cfg.acq_fence = hwcCheckFenceDebug(this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP, fence_fd);
         setFenceName(cfg.acq_fence, FENCE_DPP_SRC_LAYER);
 
-        cfg.dpp_parm.eq_mode = (dpp_csc_eq)halDataSpaceToDisplayParam(src_img, src_img.dataSpace, otfMPP);
-        cfg.dpp_parm.rot = (dpp_rotate)halTransformToHWRot(src_img.transform);
+        cfg.dataspace = src_img.dataSpace;
+        cfg.transform = src_img.transform;
 
         if (hasHdrInfo(src_img)) {
             bool hdr_exception = getHDRException(&layer);
             if (!hdr_exception)
-                cfg.dpp_parm.hdr_std = halTransferToDisplayParam(src_img, src_img.dataSpace, otfMPP);
+                cfg.hdr_enable = true;
+            else
+                cfg.hdr_enable = false;
 
             if (layer.mBufferHasMetaParcel == false) {
                 uint32_t parcelFdIndex = getBufferNumOfFormat(handle->format);
@@ -1468,12 +1315,12 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
             luminanceMax = src_img.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
         } else {
-            cfg.dpp_parm.hdr_std = halTransferToDisplayParam(src_img, src_img.dataSpace, otfMPP);
+            cfg.hdr_enable = true;
         }
     }
 
-    cfg.dpp_parm.min_luminance = luminanceMin;
-    cfg.dpp_parm.max_luminance = luminanceMax;
+    cfg.min_luminance = luminanceMin;
+    cfg.max_luminance = luminanceMax;
 
     /* Adjust configuration */
     uint32_t srcMaxWidth, srcMaxHeight, srcWidthAlign, srcHeightAlign = 0;
@@ -1521,7 +1368,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
     }
 
     uint64_t bufSize = handle->size * formatToBpp(handle->format);
-    uint64_t srcSize = cfg.src.f_w * cfg.src.f_h * DeconFormatToBpp(cfg.format);
+    uint64_t srcSize = cfg.src.f_w * cfg.src.f_h * formatToBpp(cfg.format);
 
     if (bufSize < srcSize) {
         DISPLAY_LOGE("%s:: buffer size is smaller than source size, buf(size: %d, format: %d), src(w: %d, h: %d, format: %d)",
@@ -1533,7 +1380,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
 }
 
 
-int32_t ExynosDisplay::configureOverlay(ExynosLayer *layer, decon_win_config &cfg)
+int32_t ExynosDisplay::configureOverlay(ExynosLayer *layer, exynos_win_config_data &cfg)
 {
     int32_t ret = NO_ERROR;
     if(layer != NULL) {
@@ -1547,16 +1394,17 @@ int32_t ExynosDisplay::configureOverlay(ExynosLayer *layer, decon_win_config &cf
 }
 int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
 {
-    struct decon_win_config *config = mWinConfigData->config;
     int32_t windowIndex = compositionInfo.mWindowIndex;
     private_handle_t *handle = compositionInfo.mTargetBuffer;
 
-    if (windowIndex < 0)
+    if ((windowIndex < 0) || (windowIndex >= (int32_t)mDpuData.configs.size()))
     {
         HWC_LOGE(this, "%s:: ExynosCompositionInfo(%d) has invalid data, windowIndex(%d)",
                 __func__, compositionInfo.mType, windowIndex);
         return -EINVAL;
     }
+
+    exynos_win_config_data &config = mDpuData.configs[windowIndex];
 
     if (handle == NULL) {
         /* config will be set by handleStaticLayers */
@@ -1570,7 +1418,7 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
                 compositionInfo.mAcquireFence = fence_close(compositionInfo.mAcquireFence, this,
                         FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB);
             }
-            config[windowIndex].state = config[windowIndex].DECON_WIN_STATE_DISABLED;
+            config.state = config.WIN_STATE_DISABLED;
             return NO_ERROR;
         } else {
             HWC_LOGE(this, "%s:: ExynosCompositionInfo(%d) has invalid data, handle(%p)",
@@ -1579,30 +1427,30 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
         }
     }
 
-    config[windowIndex].fd_idma[0] = handle->fd;
-    config[windowIndex].fd_idma[1] = handle->fd1;
-    config[windowIndex].fd_idma[2] = handle->fd2;
-    config[windowIndex].protection = (getDrmMode(handle) == SECURE_DRM) ? 1 : 0;
-    config[windowIndex].state = config[windowIndex].DECON_WIN_STATE_BUFFER;
+    config.fd_idma[0] = handle->fd;
+    config.fd_idma[1] = handle->fd1;
+    config.fd_idma[2] = handle->fd2;
+    config.protection = (getDrmMode(handle) == SECURE_DRM) ? 1 : 0;
+    config.state = config.WIN_STATE_BUFFER;
 
-    config[windowIndex].idma_type = getDeconDMAType(compositionInfo.mOtfMPP);
+    config.assignedMPP = compositionInfo.mOtfMPP;
 
-    config[windowIndex].dst.f_w = mXres;
-    config[windowIndex].dst.f_h = mYres;
-    config[windowIndex].format = halFormatToS3CFormat(handle->format);
+    config.dst.f_w = mXres;
+    config.dst.f_h = mYres;
+    config.format = handle->format;
     if (compositionInfo.mType == COMPOSITION_EXYNOS) {
-        config[windowIndex].src.f_w = pixel_align(mXres, G2D_JUSTIFIED_DST_ALIGN);
-        config[windowIndex].src.f_h = pixel_align(mYres, G2D_JUSTIFIED_DST_ALIGN);
+        config.src.f_w = pixel_align(mXres, G2D_JUSTIFIED_DST_ALIGN);
+        config.src.f_h = pixel_align(mYres, G2D_JUSTIFIED_DST_ALIGN);
     } else {
-        config[windowIndex].src.f_w = handle->stride;
-        config[windowIndex].src.f_h = handle->vstride;
+        config.src.f_w = handle->stride;
+        config.src.f_h = handle->vstride;
     }
-    config[windowIndex].compression = compositionInfo.mCompressed;
+    config.compression = compositionInfo.mCompressed;
     if (compositionInfo.mCompressed) {
         if (compositionInfo.mType == COMPOSITION_EXYNOS)
-            config[windowIndex].dpp_parm.comp_src = DPP_COMP_SRC_G2D;
+            config.comp_src = DPP_COMP_SRC_G2D;
         else if (compositionInfo.mType == COMPOSITION_CLIENT)
-            config[windowIndex].dpp_parm.comp_src = DPP_COMP_SRC_GPU;
+            config.comp_src = DPP_COMP_SRC_GPU;
         else
             HWC_LOGE(this, "unknown composition type: %d", compositionInfo.mType);
     }
@@ -1639,18 +1487,18 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
                     merged_rect.bottom);
         }
 
-        config[windowIndex].src.x = merged_rect.left;
-        config[windowIndex].src.y = merged_rect.top;
-        config[windowIndex].src.w = merged_rect.right - merged_rect.left;
-        config[windowIndex].src.h = merged_rect.bottom - merged_rect.top;
+        config.src.x = merged_rect.left;
+        config.src.y = merged_rect.top;
+        config.src.w = merged_rect.right - merged_rect.left;
+        config.src.h = merged_rect.bottom - merged_rect.top;
 
-        ExynosMPP* exynosMPP = getExynosMPPForDma(config[windowIndex].idma_type);
+        ExynosMPP* exynosMPP = config.assignedMPP;
         if (exynosMPP == NULL) {
-            DISPLAY_LOGE("getExynosMPP error: %d invalid idma_type(%d)", windowIndex, config[windowIndex].idma_type);
+            DISPLAY_LOGE("%s:: assignedMPP is NULL", __func__);
             useCompositionCrop = false;
         } else {
             /* Check size constraints */
-            uint32_t restrictionIdx = getRestrictionIndex(config[windowIndex].format);
+            uint32_t restrictionIdx = getRestrictionIndex(config.format);
             uint32_t srcXAlign = exynosMPP->getSrcXOffsetAlign(restrictionIdx);
             uint32_t srcYAlign = exynosMPP->getSrcYOffsetAlign(restrictionIdx);
             uint32_t srcWidthAlign = exynosMPP->getSrcCropWidthAlign(restrictionIdx);
@@ -1658,83 +1506,82 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
             uint32_t srcMinWidth = exynosMPP->getSrcMinWidth(restrictionIdx);
             uint32_t srcMinHeight = exynosMPP->getSrcMinHeight(restrictionIdx);
 
-            if (config[windowIndex].src.w < srcMinWidth) {
-                config[windowIndex].src.x -= (srcMinWidth - config[windowIndex].src.w);
-                if (config[windowIndex].src.x < 0)
-                    config[windowIndex].src.x = 0;
-                config[windowIndex].src.w = srcMinWidth;
+            if (config.src.w < srcMinWidth) {
+                config.src.x -= (srcMinWidth - config.src.w);
+                if (config.src.x < 0)
+                    config.src.x = 0;
+                config.src.w = srcMinWidth;
             }
-            if (config[windowIndex].src.h < srcMinHeight) {
-                config[windowIndex].src.y -= (srcMinHeight - config[windowIndex].src.h);
-                if (config[windowIndex].src.y < 0)
-                    config[windowIndex].src.y = 0;
-                config[windowIndex].src.h = srcMinHeight;
+            if (config.src.h < srcMinHeight) {
+                config.src.y -= (srcMinHeight - config.src.h);
+                if (config.src.y < 0)
+                    config.src.y = 0;
+                config.src.h = srcMinHeight;
             }
 
-            int32_t alignedSrcX = pixel_align_down(config[windowIndex].src.x, srcXAlign);
-            int32_t alignedSrcY = pixel_align_down(config[windowIndex].src.y, srcYAlign);
-            config[windowIndex].src.w += (config[windowIndex].src.x - alignedSrcX);
-            config[windowIndex].src.h += (config[windowIndex].src.y - alignedSrcY);
-            config[windowIndex].src.x = alignedSrcX;
-            config[windowIndex].src.y = alignedSrcY;
-            config[windowIndex].src.w = pixel_align(config[windowIndex].src.w, srcWidthAlign);
-            config[windowIndex].src.h = pixel_align(config[windowIndex].src.h, srcHeightAlign);
+            int32_t alignedSrcX = pixel_align_down(config.src.x, srcXAlign);
+            int32_t alignedSrcY = pixel_align_down(config.src.y, srcYAlign);
+            config.src.w += (config.src.x - alignedSrcX);
+            config.src.h += (config.src.y - alignedSrcY);
+            config.src.x = alignedSrcX;
+            config.src.y = alignedSrcY;
+            config.src.w = pixel_align(config.src.w, srcWidthAlign);
+            config.src.h = pixel_align(config.src.h, srcHeightAlign);
         }
 
-        config[windowIndex].dst.x = config[windowIndex].src.x;
-        config[windowIndex].dst.y = config[windowIndex].src.y;
-        config[windowIndex].dst.w = config[windowIndex].src.w;
-        config[windowIndex].dst.h = config[windowIndex].src.h;
+        config.dst.x = config.src.x;
+        config.dst.y = config.src.y;
+        config.dst.w = config.src.w;
+        config.dst.h = config.src.h;
 
-        if ((config[windowIndex].src.x < 0) ||
-            (config[windowIndex].src.y < 0) ||
-            ((config[windowIndex].src.x + config[windowIndex].src.w) > mXres) ||
-            ((config[windowIndex].src.y + config[windowIndex].src.h) > mYres)) {
+        if ((config.src.x < 0) ||
+            (config.src.y < 0) ||
+            ((config.src.x + config.src.w) > mXres) ||
+            ((config.src.y + config.src.h) > mYres)) {
             useCompositionCrop = false;
             ALOGW("Invalid composition target crop size: (%d, %d, %d, %d)",
-                    config[windowIndex].src.x, config[windowIndex].src.y,
-                    config[windowIndex].src.w, config[windowIndex].src.h);
+                    config.src.x, config.src.y,
+                    config.src.w, config.src.h);
         }
 
         DISPLAY_LOGD(eDebugWinConfig, "composition(%d) config[%d] x : %d, y : %d, w : %d, h : %d",
                 compositionInfo.mType, windowIndex,
-                config[windowIndex].dst.x, config[windowIndex].dst.y,
-                config[windowIndex].dst.w, config[windowIndex].dst.h);
+                config.dst.x, config.dst.y,
+                config.dst.w, config.dst.h);
     } else {
         useCompositionCrop = false;
     }
 
     if (useCompositionCrop == false) {
-        config[windowIndex].src.x = 0;
-        config[windowIndex].src.y = 0;
-        config[windowIndex].src.w = mXres;
-        config[windowIndex].src.h = mYres;
-        config[windowIndex].dst.x = 0;
-        config[windowIndex].dst.y = 0;
-        config[windowIndex].dst.w = mXres;
-        config[windowIndex].dst.h = mYres;
+        config.src.x = 0;
+        config.src.y = 0;
+        config.src.w = mXres;
+        config.src.h = mYres;
+        config.dst.x = 0;
+        config.dst.y = 0;
+        config.dst.w = mXres;
+        config.dst.h = mYres;
     }
 
-    config[windowIndex].blending = DECON_BLENDING_PREMULT;
+    config.blending = HWC2_BLEND_MODE_PREMULTIPLIED;
 
-    config[windowIndex].acq_fence =
+    config.acq_fence =
         hwcCheckFenceDebug(this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP, compositionInfo.mAcquireFence);
-    config[windowIndex].plane_alpha = 255;
-    config[windowIndex].dpp_parm.eq_mode =
-        (dpp_csc_eq)halDataSpaceToDisplayParam(compositionInfo.mSrcImg, compositionInfo.mSrcImg.dataSpace, compositionInfo.mOtfMPP);
-    config[windowIndex].dpp_parm.hdr_std = halTransferToDisplayParam(compositionInfo.mSrcImg, compositionInfo.mSrcImg.dataSpace, compositionInfo.mOtfMPP);
+    config.plane_alpha = 255;
+    config.dataspace = compositionInfo.mSrcImg.dataSpace;
+    config.hdr_enable = true;
 
     /* This will be closed by setReleaseFences() using config.acq_fence */
     compositionInfo.mAcquireFence = -1;
     DISPLAY_LOGD(eDebugSkipStaicLayer, "Configure composition target[%d], config[%d]!!!!",
             compositionInfo.mType, windowIndex);
-    dumpConfig(config[windowIndex]);
+    dumpConfig(config);
 
     uint64_t bufSize = handle->size * formatToBpp(handle->format);
-    uint64_t srcSize = config[windowIndex].src.f_w * config[windowIndex].src.f_h * DeconFormatToBpp(config[windowIndex].format);
+    uint64_t srcSize = config.src.f_w * config.src.f_h * formatToBpp(config.format);
     if (bufSize < srcSize) {
         DISPLAY_LOGE("%s:: buffer size is smaller than source size, buf(size: %d, format: %d), src(w: %d, h: %d, format: %d)",
-                __func__, handle->size, handle->format, config[windowIndex].src.f_w, config[windowIndex].src.f_h, config[windowIndex].format);
+                __func__, handle->size, handle->format, config.src.f_w, config.src.f_h, config.format);
         return -EINVAL;
     }
 
@@ -1746,16 +1593,7 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
  */
 int ExynosDisplay::setWinConfigData() {
     int ret = NO_ERROR;
-    struct decon_win_config *config = mWinConfigData->config;
-    memset(config, 0, sizeof(mWinConfigData->config));
-    mWinConfigData->retire_fence = -1;
-
-    /* init */
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        config[i].acq_fence = -1;
-        config[i].rel_fence = -1;
-        config[i].protection = 0;
-    }
+    mDpuData.initData();
 
     if (mClientCompositionInfo.mHasCompositionLayer) {
         if ((ret = configureOverlay(mClientCompositionInfo)) != NO_ERROR)
@@ -1775,8 +1613,13 @@ int ExynosDisplay::setWinConfigData() {
                 (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT))
             continue;
         int32_t windowIndex =  mLayers[i]->mWindowIndex; 
+        if ((windowIndex < 0) || (windowIndex >= (int32_t)mDpuData.configs.size())) {
+            DISPLAY_LOGE("%s:: %zu layer has invalid windowIndex(%d)",
+                    __func__, i, windowIndex);
+            return -EINVAL;
+        }
         DISPLAY_LOGD(eDebugWinConfig, "%zu layer, config[%d]", i, windowIndex);
-        if ((ret = configureOverlay(mLayers[i], config[windowIndex])) != NO_ERROR)
+        if ((ret = configureOverlay(mLayers[i], mDpuData.configs[windowIndex])) != NO_ERROR)
             return ret;
     }
 
@@ -1850,23 +1693,20 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
         }
     }
 
-    if (mWinConfigData != NULL) {
-        result.appendFormat("=============================  dump win configs  ===================================\n");
-        ALOGD("%s", result.string());
+    result.appendFormat("=============================  dump win configs  ===================================\n");
+    ALOGD("%s", result.string());
+    if (pFile != NULL) {
+        fwrite(result.string(), 1, result.size(), pFile);
+    }
+    result.clear();
+    for (size_t i = 0; i <= mDpuData.configs.size(); i++) {
+        ALOGD("config[%zu]", i);
+        printConfig(mDpuData.configs[i]);
         if (pFile != NULL) {
+            result.appendFormat("config[%zu]\n", i);
+            dumpConfig(result, mDpuData.configs[i]);
             fwrite(result.string(), 1, result.size(), pFile);
-        }
-        result.clear();
-        struct decon_win_config *config = mWinConfigData->config;
-        for (size_t i = 0; i <= NUM_HW_WINDOWS; i++) {
-            ALOGD("config[%zu]", i);
-            printConfig(config[i]);
-            if (pFile != NULL) {
-                result.appendFormat("config[%zu]\n", i);
-                dumpConfig(result, config[i]);
-                fwrite(result.string(), 1, result.size(), pFile);
-                result.clear();
-            }
+            result.clear();
         }
     }
     if (pFile != NULL) {
@@ -1876,91 +1716,79 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
 
 int32_t ExynosDisplay::validateWinConfigData()
 {
-    struct decon_win_config *config = mWinConfigData->config;
     bool flagValidConfig = true;
     int bufferStateCnt = 0;
 
-    for (size_t i = 0; i < MAX_DECON_WIN; i++) {
-        if (config[i].state == config[i].DECON_WIN_STATE_BUFFER) {
+    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
+        exynos_win_config_data &config = mDpuData.configs[i];
+        if (config.state == config.WIN_STATE_BUFFER) {
             bool configInvalid = false;
             /* multiple dma mapping */
-            for (size_t j = (i+1); j < MAX_DECON_WIN; j++) {
-                if ((config[i].state == config[i].DECON_WIN_STATE_BUFFER) &&
-                    (config[j].state == config[j].DECON_WIN_STATE_BUFFER)) {
-                    if (config[i].idma_type == config[j].idma_type) {
-                        DISPLAY_LOGE("WIN_CONFIG error: duplicated dma(%d) between win%zu, win%zu",
-                                config[i].idma_type, i, j);
-                        config[j].state = config[j].DECON_WIN_STATE_DISABLED;
+            for (size_t j = (i+1); j < mDpuData.configs.size(); j++) {
+                exynos_win_config_data &compare_config = mDpuData.configs[j];
+                if ((config.state == config.WIN_STATE_BUFFER) &&
+                    (compare_config.state == compare_config.WIN_STATE_BUFFER)) {
+                    if ((config.assignedMPP != NULL) &&
+                        (config.assignedMPP == compare_config.assignedMPP)) {
+                        DISPLAY_LOGE("WIN_CONFIG error: duplicated assignedMPP(%s) between win%zu, win%zu",
+                                config.assignedMPP->mName.string(), i, j);
+                        compare_config.state = compare_config.WIN_STATE_DISABLED;
                         flagValidConfig = false;
                         continue;
                     }
                 }
             }
-            if ((config[i].src.x < 0) || (config[i].src.y < 0)||
-                (config[i].dst.x < 0) || (config[i].dst.y < 0)||
-                (config[i].src.w <= 0) || (config[i].src.h <= 0)||
-                (config[i].dst.w <= 0) || (config[i].dst.h <= 0)||
-                (config[i].dst.x + config[i].dst.w > (uint32_t)mXres) ||
-                (config[i].dst.y + config[i].dst.h > (uint32_t)mYres)) {
+            if ((config.src.x < 0) || (config.src.y < 0)||
+                (config.dst.x < 0) || (config.dst.y < 0)||
+                (config.src.w <= 0) || (config.src.h <= 0)||
+                (config.dst.w <= 0) || (config.dst.h <= 0)||
+                (config.dst.x + config.dst.w > (uint32_t)mXres) ||
+                (config.dst.y + config.dst.h > (uint32_t)mYres)) {
                 DISPLAY_LOGE("WIN_CONFIG error: invalid pos or size win%zu", i);
                 configInvalid = true;
             }
 
-            if (i >= NUM_HW_WINDOWS) {
-                DISPLAY_LOGE("WIN_CONFIG error: invalid window number win%zu", i);
-                configInvalid = true;
-            }
-
-            if ((config[i].idma_type >= MAX_DECON_DMA_TYPE) ||
-                (config[i].format >= DECON_PIXEL_FORMAT_MAX) ||
-                (config[i].blending >= DECON_BLENDING_MAX)) {
-                DISPLAY_LOGE("WIN_CONFIG error: invalid configuration, dma_type(%d) "
-                        "format(%d), blending(%d)", config[i].idma_type,
-                        config[i].format, config[i].blending);
-                configInvalid = true;
-            }
-
-            if ((config[i].src.w > config[i].src.f_w) ||
-                    (config[i].src.h > config[i].src.f_h)) {
+            if ((config.src.w > config.src.f_w) ||
+                (config.src.h > config.src.f_h)) {
                 DISPLAY_LOGE("WIN_CONFIG error: invalid size %zu, %d, %d, %d, %d", i,
-                        config[i].src.w, config[i].src.f_w, config[i].src.h, config[i].src.f_h);
+                        config.src.w, config.src.f_w, config.src.h, config.src.f_h);
                 configInvalid = true;
             }
 
             /* Source alignment check */
-            ExynosMPP* exynosMPP = getExynosMPPForDma(config[i].idma_type);
+            ExynosMPP* exynosMPP = config.assignedMPP;
             if (exynosMPP == NULL) {
-                DISPLAY_LOGE("WIN_CONFIG error: %zu invalid idma_type(%d)", i, config[i].idma_type);
+                DISPLAY_LOGE("WIN_CONFIG error: config %zu assigendMPP is NULL", i);
                 configInvalid = true;
             } else {
-                uint32_t restrictionIdx = getRestrictionIndex(config[i].format);
+                uint32_t restrictionIdx = getRestrictionIndex(config.format);
                 uint32_t srcXAlign = exynosMPP->getSrcXOffsetAlign(restrictionIdx);
                 uint32_t srcYAlign = exynosMPP->getSrcYOffsetAlign(restrictionIdx);
                 uint32_t srcWidthAlign = exynosMPP->getSrcCropWidthAlign(restrictionIdx);
                 uint32_t srcHeightAlign = exynosMPP->getSrcCropHeightAlign(restrictionIdx);
-                if ((config[i].src.x % srcXAlign != 0) ||
-                    (config[i].src.y % srcYAlign != 0) ||
-                    (config[i].src.w % srcWidthAlign != 0) ||
-                    (config[i].src.h % srcHeightAlign != 0))
+                if ((config.src.x % srcXAlign != 0) ||
+                    (config.src.y % srcYAlign != 0) ||
+                    (config.src.w % srcWidthAlign != 0) ||
+                    (config.src.h % srcHeightAlign != 0))
                 {
                     DISPLAY_LOGE("WIN_CONFIG error: invalid src alignment : %zu, "\
-                            "idma: %d, mppType:%d, format(%d), s_x: %d(%d), s_y: %d(%d), s_w : %d(%d), s_h : %d(%d)", i,
-                            config[i].idma_type, exynosMPP->mLogicalType, config[i].format, config[i].src.x, srcXAlign,
-                            config[i].src.y, srcYAlign, config[i].src.w, srcWidthAlign, config[i].src.h, srcHeightAlign);
+                            "assignedMPP: %s, mppType:%d, format(%d), s_x: %d(%d), s_y: %d(%d), s_w : %d(%d), s_h : %d(%d)", i,
+                            config.assignedMPP->mName.string(), exynosMPP->mLogicalType, config.format, config.src.x, srcXAlign,
+                            config.src.y, srcYAlign, config.src.w, srcWidthAlign, config.src.h, srcHeightAlign);
                     configInvalid = true;
                 }
             }
 
             if (configInvalid) {
-                config[i].state = config[i].DECON_WIN_STATE_DISABLED;
+                config.state = config.WIN_STATE_DISABLED;
                 flagValidConfig = false;
             }
 
             bufferStateCnt++;
         }
 
-        if ((config[i].state == config[i].DECON_WIN_STATE_COLOR) ||
-            (config[i].state == config[i].DECON_WIN_STATE_CURSOR))
+        if ((config.state == config.WIN_STATE_COLOR) ||
+            (config.state == config.WIN_STATE_CURSOR))
             bufferStateCnt++;
     }
 
@@ -1982,7 +1810,7 @@ int ExynosDisplay::setDisplayWinConfigData() {
     return 0;
 }
 
-bool ExynosDisplay::checkConfigChanged(struct decon_win_config_data &lastConfigData, struct decon_win_config_data &newConfigData)
+bool ExynosDisplay::checkConfigChanged(const exynos_dpu_data &lastConfigsData, const exynos_dpu_data &newConfigsData)
 {
     if (exynosHWCControl.skipWinConfig == 0)
         return true;
@@ -1993,22 +1821,22 @@ bool ExynosDisplay::checkConfigChanged(struct decon_win_config_data &lastConfigD
         (mDisplayId == HWC_DISPLAY_PRIMARY))
         return true;
 
-    for (size_t i = 0; i <= MAX_DECON_WIN; i++) {
-        if ((lastConfigData.config[i].state != newConfigData.config[i].state) ||
-                (lastConfigData.config[i].fd_idma[0] != newConfigData.config[i].fd_idma[0]) ||
-                (lastConfigData.config[i].fd_idma[1] != newConfigData.config[i].fd_idma[1]) ||
-                (lastConfigData.config[i].fd_idma[2] != newConfigData.config[i].fd_idma[2]) ||
-                (lastConfigData.config[i].dst.x != newConfigData.config[i].dst.x) ||
-                (lastConfigData.config[i].dst.y != newConfigData.config[i].dst.y) ||
-                (lastConfigData.config[i].dst.w != newConfigData.config[i].dst.w) ||
-                (lastConfigData.config[i].dst.h != newConfigData.config[i].dst.h) ||
-                (lastConfigData.config[i].src.x != newConfigData.config[i].src.x) ||
-                (lastConfigData.config[i].src.y != newConfigData.config[i].src.y) ||
-                (lastConfigData.config[i].src.w != newConfigData.config[i].src.w) ||
-                (lastConfigData.config[i].src.h != newConfigData.config[i].src.h) ||
-                (lastConfigData.config[i].format != newConfigData.config[i].format) ||
-                (lastConfigData.config[i].blending != newConfigData.config[i].blending) ||
-                (lastConfigData.config[i].plane_alpha != newConfigData.config[i].plane_alpha))
+    for (size_t i = 0; i < lastConfigsData.configs.size(); i++) {
+        if ((lastConfigsData.configs[i].state != newConfigsData.configs[i].state) ||
+            (lastConfigsData.configs[i].fd_idma[0] != newConfigsData.configs[i].fd_idma[0]) ||
+            (lastConfigsData.configs[i].fd_idma[1] != newConfigsData.configs[i].fd_idma[1]) ||
+            (lastConfigsData.configs[i].fd_idma[2] != newConfigsData.configs[i].fd_idma[2]) ||
+            (lastConfigsData.configs[i].dst.x != newConfigsData.configs[i].dst.x) ||
+            (lastConfigsData.configs[i].dst.y != newConfigsData.configs[i].dst.y) ||
+            (lastConfigsData.configs[i].dst.w != newConfigsData.configs[i].dst.w) ||
+            (lastConfigsData.configs[i].dst.h != newConfigsData.configs[i].dst.h) ||
+            (lastConfigsData.configs[i].src.x != newConfigsData.configs[i].src.x) ||
+            (lastConfigsData.configs[i].src.y != newConfigsData.configs[i].src.y) ||
+            (lastConfigsData.configs[i].src.w != newConfigsData.configs[i].src.w) ||
+            (lastConfigsData.configs[i].src.h != newConfigsData.configs[i].src.h) ||
+            (lastConfigsData.configs[i].format != newConfigsData.configs[i].format) ||
+            (lastConfigsData.configs[i].blending != newConfigsData.configs[i].blending) ||
+            (lastConfigsData.configs[i].plane_alpha != newConfigsData.configs[i].plane_alpha))
             return true;
     }
 
@@ -2021,32 +1849,32 @@ bool ExynosDisplay::checkConfigChanged(struct decon_win_config_data &lastConfigD
     return false;
 }
 
-int ExynosDisplay::checkConfigDstChanged(struct decon_win_config_data &lastConfigData, struct decon_win_config_data &newConfigData, uint32_t index)
+int ExynosDisplay::checkConfigDstChanged(const exynos_dpu_data &lastConfigsData, const exynos_dpu_data &newConfigsData, uint32_t index)
 {
-    if ((lastConfigData.config[index].state != newConfigData.config[index].state) ||
-        (lastConfigData.config[index].fd_idma[0] != newConfigData.config[index].fd_idma[0]) ||
-        (lastConfigData.config[index].fd_idma[1] != newConfigData.config[index].fd_idma[1]) ||
-        (lastConfigData.config[index].fd_idma[2] != newConfigData.config[index].fd_idma[2]) ||
-        (lastConfigData.config[index].format != newConfigData.config[index].format) ||
-        (lastConfigData.config[index].blending != newConfigData.config[index].blending) ||
-        (lastConfigData.config[index].plane_alpha != newConfigData.config[index].plane_alpha)) {
+    if ((lastConfigsData.configs[index].state != newConfigsData.configs[index].state) ||
+        (lastConfigsData.configs[index].fd_idma[0] != newConfigsData.configs[index].fd_idma[0]) ||
+        (lastConfigsData.configs[index].fd_idma[1] != newConfigsData.configs[index].fd_idma[1]) ||
+        (lastConfigsData.configs[index].fd_idma[2] != newConfigsData.configs[index].fd_idma[2]) ||
+        (lastConfigsData.configs[index].format != newConfigsData.configs[index].format) ||
+        (lastConfigsData.configs[index].blending != newConfigsData.configs[index].blending) ||
+        (lastConfigsData.configs[index].plane_alpha != newConfigsData.configs[index].plane_alpha)) {
         DISPLAY_LOGD(eDebugWindowUpdate, "damage region is skip, but other configuration except dst was changed");
         DISPLAY_LOGD(eDebugWindowUpdate, "\tstate[%d, %d], fd[%d, %d], format[0x%8x, 0x%8x], blending[%d, %d], plane_alpha[%d, %d]",
-                lastConfigData.config[index].state, newConfigData.config[index].state,
-                lastConfigData.config[index].fd_idma[0], newConfigData.config[index].fd_idma[0],
-                lastConfigData.config[index].format, newConfigData.config[index].format,
-                lastConfigData.config[index].blending, newConfigData.config[index].blending,
-                lastConfigData.config[index].plane_alpha, newConfigData.config[index].plane_alpha);
+                lastConfigsData.configs[index].state, newConfigsData.configs[index].state,
+                lastConfigsData.configs[index].fd_idma[0], newConfigsData.configs[index].fd_idma[0],
+                lastConfigsData.configs[index].format, newConfigsData.configs[index].format,
+                lastConfigsData.configs[index].blending, newConfigsData.configs[index].blending,
+                lastConfigsData.configs[index].plane_alpha, newConfigsData.configs[index].plane_alpha);
         return -1;
     }
-    if ((lastConfigData.config[index].dst.x != newConfigData.config[index].dst.x) ||
-        (lastConfigData.config[index].dst.y != newConfigData.config[index].dst.y) ||
-        (lastConfigData.config[index].dst.w != newConfigData.config[index].dst.w) ||
-        (lastConfigData.config[index].dst.h != newConfigData.config[index].dst.h) ||
-        (lastConfigData.config[index].src.x != newConfigData.config[index].src.x) ||
-        (lastConfigData.config[index].src.y != newConfigData.config[index].src.y) ||
-        (lastConfigData.config[index].src.w != newConfigData.config[index].src.w) ||
-        (lastConfigData.config[index].src.h != newConfigData.config[index].src.h))
+    if ((lastConfigsData.configs[index].dst.x != newConfigsData.configs[index].dst.x) ||
+        (lastConfigsData.configs[index].dst.y != newConfigsData.configs[index].dst.y) ||
+        (lastConfigsData.configs[index].dst.w != newConfigsData.configs[index].dst.w) ||
+        (lastConfigsData.configs[index].dst.h != newConfigsData.configs[index].dst.h) ||
+        (lastConfigsData.configs[index].src.x != newConfigsData.configs[index].src.x) ||
+        (lastConfigsData.configs[index].src.y != newConfigsData.configs[index].src.y) ||
+        (lastConfigsData.configs[index].src.w != newConfigsData.configs[index].src.w) ||
+        (lastConfigsData.configs[index].src.h != newConfigsData.configs[index].src.h))
         return 1;
 
     else
@@ -2061,7 +1889,6 @@ int ExynosDisplay::deliverWinConfigData() {
     ATRACE_CALL();
     String8 errString;
     int ret = NO_ERROR;
-    struct decon_win_config *config = mWinConfigData->config;
     struct timeval tv_s, tv_e;
     long timediff;
 
@@ -2071,24 +1898,24 @@ int ExynosDisplay::deliverWinConfigData() {
         goto err;
     }
 
-    for (size_t i = 0; i <= NUM_HW_WINDOWS; i++) {
+    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
         if (i == DECON_WIN_UPDATE_IDX) {
             DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "window update config[%zu]", i);
         } else {
             DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "deliver config[%zu]", i);
         }
-        dumpConfig(config[i]);
+        dumpConfig(mDpuData.configs[i]);
     }
 
-    if (checkConfigChanged(*mWinConfigData, *mLastWinConfigData) == false) {
+    if (checkConfigChanged(mDpuData, mLastDpuData) == false) {
         DISPLAY_LOGD(eDebugWinConfig, "Winconfig : same");
 #ifndef DISABLE_FENCE
         if (mLastRetireFence > 0) {
-            mWinConfigData->retire_fence =
+            mDpuData.retire_fence =
                 hwcCheckFenceDebug(this, FENCE_TYPE_RETIRE, FENCE_IP_DPP,
                         hwc_dup(mLastRetireFence, this,  FENCE_TYPE_RETIRE, FENCE_IP_DPP));
         } else
-            mWinConfigData->retire_fence = -1;
+            mDpuData.retire_fence = -1;
 #endif
         ret = 0;
     } else {
@@ -2113,23 +1940,23 @@ int ExynosDisplay::deliverWinConfigData() {
             }
         }
 
-        for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-            setFenceInfo(mWinConfigData->config[i].acq_fence, this,
+        for (size_t i = 0; i < mDpuData.configs.size(); i++) {
+            setFenceInfo(mDpuData.configs[i].acq_fence, this,
                     FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP, FENCE_TO);
         }
 
         if ((ret = mDisplayInterface->deliverWinConfigData()) < 0) {
-            errString.appendFormat("ioctl S3CFB_WIN_CONFIG failed: %s ret(%d)\n", strerror(errno), ret);
+            errString.appendFormat("interface's deliverWinConfigData() failed: %s ret(%d)\n", strerror(errno), ret);
             goto err;
         } else {
-            memcpy(mLastWinConfigData, mWinConfigData, sizeof(*mWinConfigData));
+            mLastDpuData = mDpuData;
         }
 
-        for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-            setFenceInfo(mWinConfigData->config[i].rel_fence, this,
+        for (size_t i = 0; i < mDpuData.configs.size(); i++) {
+            setFenceInfo(mDpuData.configs[i].rel_fence, this,
                     FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP, FENCE_FROM);
         }
-        setFenceInfo(mWinConfigData->retire_fence, this,
+        setFenceInfo(mDpuData.retire_fence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP, FENCE_FROM);
     }
 
@@ -2148,7 +1975,6 @@ err:
  */
 int ExynosDisplay::setReleaseFences() {
 
-    struct decon_win_config *config = mWinConfigData->config;
     int release_fd = -1;
     String8 errString;
 
@@ -2157,10 +1983,10 @@ int ExynosDisplay::setReleaseFences() {
      * SurfaceFlinger doesn't get release fence for client target buffer
      */
     if ((mClientCompositionInfo.mHasCompositionLayer) &&
-            (mClientCompositionInfo.mWindowIndex >= 0) &&
-            (mClientCompositionInfo.mWindowIndex < (int32_t)NUM_HW_WINDOWS)) {
+        (mClientCompositionInfo.mWindowIndex >= 0) &&
+        (mClientCompositionInfo.mWindowIndex < (int32_t)mDpuData.configs.size())) {
 
-        int32_t windowIndex = mClientCompositionInfo.mWindowIndex;
+        exynos_win_config_data &config = mDpuData.configs[mClientCompositionInfo.mWindowIndex];
 
         for (int i = mClientCompositionInfo.mFirstIndex; i <= mClientCompositionInfo.mLastIndex; i++) {
             if (mLayers[i]->mExynosCompositionType != HWC2_COMPOSITION_CLIENT) {
@@ -2176,25 +2002,31 @@ int ExynosDisplay::setReleaseFences() {
             else
                 mLayers[i]->mReleaseFence =
                     hwcCheckFenceDebug(this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP,
-                            hwc_dup(mWinConfigData->config[windowIndex].rel_fence, this,
+                            hwc_dup(config.rel_fence, this,
                                 FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP));
         }
-        mWinConfigData->config[windowIndex].rel_fence =
-            fence_close(mWinConfigData->config[windowIndex].rel_fence, this,
+        config.rel_fence = fence_close(config.rel_fence, this,
                    FENCE_TYPE_SRC_RELEASE, FENCE_IP_FB);
     }
 
-    // TODO Caution!!: DPU do not return acq_fence as -1, Need this codes??
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        if (config[i].acq_fence != -1)
-            fence_close(config[i].acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
-        config[i].acq_fence = -1;
+    // DPU doesn't close acq_fence, HWC should close it.
+    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
+        if (mDpuData.configs[i].acq_fence != -1)
+            fence_close(mDpuData.configs[i].acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
+        mDpuData.configs[i].acq_fence = -1;
     }
 
     for (size_t i = 0; i < mLayers.size(); i++) {
         if ((mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT) ||
             (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_EXYNOS))
             continue;
+        if ((mLayers[i]->mWindowIndex < 0) ||
+            (mLayers[i]->mWindowIndex >= mDpuData.configs.size())) {
+            errString.appendFormat("%s:: layer[%zu] has invalid window index(%d)\n",
+                    __func__, i, mLayers[i]->mWindowIndex);
+            goto err;
+        }
+        exynos_win_config_data &config = mDpuData.configs[mLayers[i]->mWindowIndex];
         if (mLayers[i]->mOtfMPP != NULL) {
             mLayers[i]->mOtfMPP->setHWStateFence(-1);
         }
@@ -2203,7 +2035,7 @@ int ExynosDisplay::setReleaseFences() {
                 mLayers[i]->mReleaseFence = mLayers[i]->mM2mMPP->getSrcReleaseFence(0);
             else {
                 mLayers[i]->mReleaseFence = hwcCheckFenceDebug(this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP,
-                    hwc_dup(mWinConfigData->config[mLayers[i]->mWindowIndex].rel_fence, this,
+                    hwc_dup(config.rel_fence, this,
                         FENCE_TYPE_SRC_RELEASE, FENCE_IP_LAYER));
             }
 
@@ -2212,9 +2044,9 @@ int ExynosDisplay::setReleaseFences() {
             mLayers[i]->mM2mMPP->setDstAcquireFence(-1);
 #else
             DISPLAY_LOGD(eDebugFence, "m2m : win_index(%d), releaseFencefd(%d)",
-                    mLayers[i]->mWindowIndex, mWinConfigData->config[mLayers[i]->mWindowIndex].rel_fence);
-            if (mWinConfigData->config[mLayers[i]->mWindowIndex].rel_fence > 0) {
-                release_fd = mWinConfigData->config[mLayers[i]->mWindowIndex].rel_fence;
+                    mLayers[i]->mWindowIndex, config.rel_fence);
+            if (config.rel_fence > 0) {
+                release_fd = config.rel_fence;
                 if (release_fd >= 0) {
                     setFenceName(release_fd,
                             this, FENCE_TYPE_DST_ACQUIRE, FENCE_IP_DPP, FENCE_FROM, true);
@@ -2234,9 +2066,9 @@ int ExynosDisplay::setReleaseFences() {
             mLayers[i]->mReleaseFence = -1;
 #else
             DISPLAY_LOGD(eDebugFence, "other : win_index(%d), releaseFencefd(%d)",
-                    mLayers[i]->mWindowIndex, mWinConfigData->config[mLayers[i]->mWindowIndex].rel_fence);
-            if (mWinConfigData->config[mLayers[i]->mWindowIndex].rel_fence > 0) {
-                release_fd = hwcCheckFenceDebug(this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP, mWinConfigData->config[mLayers[i]->mWindowIndex].rel_fence);
+                    mLayers[i]->mWindowIndex, config.rel_fence);
+            if (config.rel_fence > 0) {
+                release_fd = hwcCheckFenceDebug(this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP, config.rel_fence);
                 if (release_fd >= 0)
                     mLayers[i]->mReleaseFence = release_fd;
                 else {
@@ -2258,6 +2090,14 @@ int ExynosDisplay::setReleaseFences() {
             errString.appendFormat("There is exynos composition, but m2mMPP is NULL\n");
             goto err;
         }
+        if (mUseDecon &&
+            ((mExynosCompositionInfo.mWindowIndex < 0) ||
+             (mExynosCompositionInfo.mWindowIndex >= (int32_t)mDpuData.configs.size()))) {
+            errString.appendFormat("%s:: exynosComposition has invalid window index(%d)\n",
+                    __func__, mExynosCompositionInfo.mWindowIndex);
+            goto err;
+        }
+        exynos_win_config_data &config = mDpuData.configs[mExynosCompositionInfo.mWindowIndex];
         for (int i = mExynosCompositionInfo.mFirstIndex; i <= mExynosCompositionInfo.mLastIndex; i++) {
             /* break when only framebuffer target is assigned on ExynosCompositor */
             if (i == -1)
@@ -2273,7 +2113,7 @@ int ExynosDisplay::setReleaseFences() {
                     mExynosCompositionInfo.mM2mMPP->getSrcReleaseFence(i-mExynosCompositionInfo.mFirstIndex);
             else {
                 mLayers[i]->mReleaseFence =
-                    hwc_dup(mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence,
+                    hwc_dup(config.rel_fence,
                             this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_LAYER);
             }
 
@@ -2285,10 +2125,10 @@ int ExynosDisplay::setReleaseFences() {
 #ifdef DISABLE_FENCE
             mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
 #else
-            if (mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence > 0) {
-                setFenceName(mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence,
+            if (config.rel_fence > 0) {
+                setFenceName(config.rel_fence,
                         this, FENCE_TYPE_DST_ACQUIRE, FENCE_IP_DPP, FENCE_FROM, true);
-                mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(mWinConfigData->config[mExynosCompositionInfo.mWindowIndex].rel_fence);
+                mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(config.rel_fence);
             }
             else
                 mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
@@ -2734,7 +2574,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         }
     }
 
-    clearWinConfigData(mWinConfigData);
+    mDpuData.initData();
 
     if ((mLayers.size() == 0) &&
         (mDisplayId != HWC_DISPLAY_VIRTUAL)) {
@@ -2819,23 +2659,23 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     if ((ret = deliverWinConfigData()) != NO_ERROR) {
         HWC_LOGE(this, "%s:: fail to deliver win_config (%d)", __func__, ret);
-        if (mWinConfigData->retire_fence > 0)
-            fence_close(mWinConfigData->retire_fence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
-        mWinConfigData->retire_fence = -1;
+        if (mDpuData.retire_fence > 0)
+            fence_close(mDpuData.retire_fence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
+        mDpuData.retire_fence = -1;
     }
 
     setReleaseFences();
 
-    if (mWinConfigData->retire_fence != -1) {
+    if (mDpuData.retire_fence != -1) {
 #ifdef DISABLE_FENCE
-        if (mWinConfigData->retire_fence >= 0)
-            fence_close(mWinConfigData->retire_fence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
+        if (mDpuData.retire_fence >= 0)
+            fence_close(mDpuData.retire_fence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
         *outRetireFence = -1;
 #else
         *outRetireFence =
-            hwcCheckFenceDebug(this, FENCE_TYPE_RETIRE, FENCE_IP_DPP, mWinConfigData->retire_fence);
+            hwcCheckFenceDebug(this, FENCE_TYPE_RETIRE, FENCE_IP_DPP, mDpuData.retire_fence);
 #endif
-        setFenceInfo(mWinConfigData->retire_fence, this,
+        setFenceInfo(mDpuData.retire_fence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_LAYER, FENCE_TO);
     } else
         *outRetireFence = -1;
@@ -2889,7 +2729,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         printDebugInfos(errString);
     }
 
-    clearWinConfigData(mWinConfigData);
+    mDpuData.initData();
 
     mRenderingState = RENDERING_STATE_PRESENTED;
 
@@ -2902,12 +2742,12 @@ err:
     mRenderingState = RENDERING_STATE_PRESENTED;
     setGeometryChanged(GEOMETRY_ERROR_CASE);
 
-    clearWinConfigData(mLastWinConfigData);
+    mLastDpuData.initData();
 
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mExynosCompositionInfo.mSkipStaticInitFlag = false;
 
-    clearWinConfigData(mWinConfigData);
+    mDpuData.initData();
 
     if (!mDevice->validateFences(this)){
         errString.appendFormat("%s:: validate fence failed. \n", __func__);
@@ -2956,19 +2796,19 @@ int32_t ExynosDisplay::setClientTarget(
             DISPLAY_LOGD(eDebugOverlaySupported, "ClientTarget handle: %p [fd: %d, %d, %d]",
                     handle, handle->fd, handle->fd1, handle->fd2);
             if ((mClientCompositionInfo.mSkipFlag == true) &&
-                ((mClientCompositionInfo.mLastConfig.fd_idma[0] != handle->fd) ||
-                 (mClientCompositionInfo.mLastConfig.fd_idma[1] != handle->fd1) ||
-                 (mClientCompositionInfo.mLastConfig.fd_idma[2] != handle->fd2))) {
+                ((mClientCompositionInfo.mLastWinConfigData.fd_idma[0] != handle->fd) ||
+                 (mClientCompositionInfo.mLastWinConfigData.fd_idma[1] != handle->fd1) ||
+                 (mClientCompositionInfo.mLastWinConfigData.fd_idma[2] != handle->fd2))) {
                 String8 errString;
                 DISPLAY_LOGE("skip flag is enabled but buffer is updated lastConfig[%d, %d, %d], handle[%d, %d, %d]\n",
-                        mClientCompositionInfo.mLastConfig.fd_idma[0],
-                        mClientCompositionInfo.mLastConfig.fd_idma[1],
-                        mClientCompositionInfo.mLastConfig.fd_idma[2],
+                        mClientCompositionInfo.mLastWinConfigData.fd_idma[0],
+                        mClientCompositionInfo.mLastWinConfigData.fd_idma[1],
+                        mClientCompositionInfo.mLastWinConfigData.fd_idma[2],
                         handle->fd, handle->fd1, handle->fd2);
                 DISPLAY_LOGE("last win config");
-                for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
+                for (size_t i = 0; i < mLastDpuData.configs.size(); i++) {
                     errString.appendFormat("config[%zu]\n", i);
-                    dumpConfig(errString, mLastWinConfigData->config[i]);
+                    dumpConfig(errString, mLastDpuData.configs[i]);
                     DISPLAY_LOGE("\t%s", errString.string());
                     errString.clear();
                 }
@@ -3029,12 +2869,7 @@ int ExynosDisplay::clearDisplay() {
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mClientCompositionInfo.mSkipFlag = false;
 
-    memset(mLastWinConfigData, 0, sizeof(*mLastWinConfigData));
-    mLastWinConfigData->retire_fence = -1;
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        mLastWinConfigData->config[i].acq_fence = -1;
-        mLastWinConfigData->config[i].rel_fence = -1;
-    }
+    mLastDpuData.initData();
 
     /* Update last retire fence */
     mLastRetireFence = fence_close(mLastRetireFence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
@@ -3277,24 +3112,26 @@ int32_t ExynosDisplay::setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos) {
     return HWC2_ERROR_NONE;
 }
 
-void ExynosDisplay::dumpConfig(decon_win_config &c)
+void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
 {
     DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "\tstate = %u", c.state);
-    if (c.state == c.DECON_WIN_STATE_COLOR) {
+    if (c.state == c.WIN_STATE_COLOR) {
         DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer,
                 "\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %u\n",
                 c.dst.x, c.dst.y, c.dst.w, c.dst.h, c.color, c.plane_alpha);
-    } else/* if (c.state != c.DECON_WIN_STATE_DISABLED) */{
-        DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "\t\tfd = (%d, %d, %d), dma = %u, acq_fence = %d, rel_fence = %d "
+    } else/* if (c.state != c.WIN_STATE_DISABLED) */{
+        DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "\t\tfd = (%d, %d, %d), acq_fence = %d, rel_fence = %d "
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
-                "format = %u, pa = %d, rot = %d, eq_mode = 0x%4x, hdr_std = %d, blending = %u, protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
+                "format = %u, pa = %d, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
+                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
                 "block(x:%d, y:%d, w:%d, h:%d)",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
-                c.idma_type, c.acq_fence, c.rel_fence,
+                c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
                 c.dst.f_w, c.dst.f_h, c.dst.x, c.dst.y, c.dst.w, c.dst.h,
-                c.format, c.plane_alpha, c.dpp_parm.rot, c.dpp_parm.eq_mode, c.dpp_parm.hdr_std, c.blending, c.protection, c.compression, c.dpp_parm.comp_src,
+                c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable,
+                c.blending, c.protection, c.compression, c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
     }
@@ -3316,45 +3153,49 @@ void ExynosDisplay::dump(String8& result)
     result.appendFormat("\n");
 }
 
-void ExynosDisplay::dumpConfig(String8 &result, decon_win_config &c)
+void ExynosDisplay::dumpConfig(String8 &result, const exynos_win_config_data &c)
 {
     result.appendFormat("\tstate = %u\n", c.state);
-    if (c.state == c.DECON_WIN_STATE_COLOR) {
+    if (c.state == c.WIN_STATE_COLOR) {
         result.appendFormat("\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %u\n",
                 c.dst.x, c.dst.y, c.dst.w, c.dst.h, c.color, c.plane_alpha);
-    } else/* if (c.state != c.DECON_WIN_STATE_DISABLED) */{
-        result.appendFormat("\t\tfd = (%d, %d, %d), dma = %u, acq_fence = %d, rel_fence = %d "
+    } else/* if (c.state != c.WIN_STATE_DISABLED) */{
+        result.appendFormat("\t\tfd = (%d, %d, %d), acq_fence = %d, rel_fence = %d "
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
-                "format = %u, eq_mode = 0x%4x, hdr_std = %d, blending = %u, protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
+                "format = %u, pa = %d, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
+                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
                 "block(x:%d, y:%d, w:%d, h:%d)\n",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
-                c.idma_type, c.acq_fence, c.rel_fence,
+                c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
                 c.dst.f_w, c.dst.f_h, c.dst.x, c.dst.y, c.dst.w, c.dst.h,
-                c.format, c.dpp_parm.eq_mode, c.dpp_parm.hdr_std, c.blending, c.protection, c.compression, c.dpp_parm.comp_src,
+                c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable, c.blending, c.protection,
+                c.compression, c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
     }
 }
 
-void ExynosDisplay::printConfig(decon_win_config &c)
+void ExynosDisplay::printConfig(exynos_win_config_data &c)
 {
     ALOGD("\tstate = %u", c.state);
-    if (c.state == c.DECON_WIN_STATE_COLOR) {
+    if (c.state == c.WIN_STATE_COLOR) {
         ALOGD("\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %u\n",
                 c.dst.x, c.dst.y, c.dst.w, c.dst.h, c.color, c.plane_alpha);
-    } else/* if (c.state != c.DECON_WIN_STATE_DISABLED) */{
-        ALOGD("\t\tfd = %d, dma = %u, acq_fence = %d, rel_fence = %d "
+    } else/* if (c.state != c.WIN_STATE_DISABLED) */{
+        ALOGD("\t\tfd = (%d, %d, %d), acq_fence = %d, rel_fence = %d "
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
-                "format = %u, eq_mode = 0x%4x, hdr_std = %d, blending = %u, protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
+                "format = %u, pa = %d, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
+                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
                 "block(x:%d, y:%d, w:%d, h:%d)",
-                c.fd_idma[0], c.idma_type, c.acq_fence, c.rel_fence,
+                c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
+                c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
                 c.dst.f_w, c.dst.f_h, c.dst.x, c.dst.y, c.dst.w, c.dst.h,
-                //c.format, c.blending, c.protection, c.compression,
-                c.format, c.dpp_parm.eq_mode, c.dpp_parm.hdr_std, c.blending, 0, c.compression, c.dpp_parm.comp_src,
+                c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable, c.blending, c.protection,
+                c.compression, c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
     }
@@ -3670,7 +3511,8 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex)
     uint32_t highPriorityIndex = 0;
     uint32_t highPriorityNum = 0;
     int32_t highPriorityCheck = 0;
-    uint32_t highPriority[MAX_DECON_WIN];
+    std::vector<int32_t> highPriority;
+    highPriority.assign(mLayers.size(), -1);
     /* handle sandwiched layers */
     for (int32_t i = startIndex; i <= endIndex; i++) {
         ExynosLayer *layer = mLayers[i];
@@ -3886,9 +3728,9 @@ bool ExynosDisplay::windowUpdateExceptions()
         if (mLayers[i]->mTransform != 0) return true;
     }
 
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        struct decon_win_config config = mWinConfigData->config[i];
-        if (config.state == config.DECON_WIN_STATE_BUFFER) {
+    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
+        exynos_win_config_data &config = mDpuData.configs[i];
+        if (config.state == config.WIN_STATE_BUFFER) {
             if (config.src.w/config.dst.w != 1 || config.src.h/config.dst.h != 1) {
                 DISPLAY_LOGD(eDebugWindowUpdate, "Skip reason : scaled");
                 return true;
@@ -3903,11 +3745,9 @@ int ExynosDisplay::handleWindowUpdate()
 {
     int ret = NO_ERROR;
     // TODO will be implemented
-    size_t winUpdateInfoIdx = DECON_WIN_UPDATE_IDX;
-    struct decon_win_config *config = mWinConfigData->config;
     unsigned int excp;
 
-    config[winUpdateInfoIdx].state = config[winUpdateInfoIdx].DECON_WIN_STATE_DISABLED;
+    mDpuData.enable_win_update = false;
 
     if (exynosHWCControl.windowUpdate != 1) return 0;
 
@@ -3941,7 +3781,7 @@ int ExynosDisplay::handleWindowUpdate()
         }
         else if (excp == eDamageRegionSkip) {
             int32_t windowIndex = mLayers[i]->mWindowIndex;
-            if ((ret = checkConfigDstChanged(*mWinConfigData, *mLastWinConfigData, windowIndex)) < 0) {
+            if ((ret = checkConfigDstChanged(mDpuData, mLastDpuData, windowIndex)) < 0) {
                 return 0;
             } else if (ret > 0) {
                 damageRect.left = mLayers[i]->mDisplayFrame.left;
@@ -3951,9 +3791,9 @@ int ExynosDisplay::handleWindowUpdate()
                 DISPLAY_LOGD(eDebugWindowUpdate, "Skip layer (origin) : %d, %d, %d, %d",
                         damageRect.left, damageRect.top, damageRect.right, damageRect.bottom);
                 mergedRect = expand(mergedRect, damageRect);
-                hwc_rect prevDst = {mLastWinConfigData->config[i].dst.x, mLastWinConfigData->config[i].dst.y,
-                    mLastWinConfigData->config[i].dst.x + (int)mLastWinConfigData->config[i].dst.w,
-                    mLastWinConfigData->config[i].dst.y + (int)mLastWinConfigData->config[i].dst.h};
+                hwc_rect prevDst = {mLastDpuData.configs[i].dst.x, mLastDpuData.configs[i].dst.y,
+                    mLastDpuData.configs[i].dst.x + (int)mLastDpuData.configs[i].dst.w,
+                    mLastDpuData.configs[i].dst.y + (int)mLastDpuData.configs[i].dst.h};
                 mergedRect = expand(mergedRect, prevDst);
             } else {
                 DISPLAY_LOGD(eDebugWindowUpdate, "layer(%zu) skip", i);
@@ -4014,11 +3854,11 @@ int ExynosDisplay::handleWindowUpdate()
     if (mergedRect.left == 0 && mergedRect.right == (int32_t)mXres &&
             mergedRect.top == 0 && mergedRect.bottom == (int32_t)mYres) {
         DISPLAY_LOGD(eDebugWindowUpdate, "Partial(aligned) : Full size");
-        config[winUpdateInfoIdx].state = config[winUpdateInfoIdx].DECON_WIN_STATE_UPDATE;
-        config[winUpdateInfoIdx].dst.x = 0;
-        config[winUpdateInfoIdx].dst.w = mXres; 
-        config[winUpdateInfoIdx].dst.y = 0;
-        config[winUpdateInfoIdx].dst.h = mYres;
+        mDpuData.enable_win_update = true;
+        mDpuData.win_update_region.x = 0;
+        mDpuData.win_update_region.w = mXres;
+        mDpuData.win_update_region.y = 0;
+        mDpuData.win_update_region.h = mYres;
         DISPLAY_LOGD(eDebugWindowUpdate, "window update end ------------------");
         return 0;
     }
@@ -4028,11 +3868,11 @@ int ExynosDisplay::handleWindowUpdate()
         DISPLAY_LOGD(eDebugWindowUpdate, "Partial(aligned) : %d, %d, %d, %d",
                 mergedRect.left, mergedRect.top, mergedRect.right, mergedRect.bottom);
 
-        config[winUpdateInfoIdx].state = config[winUpdateInfoIdx].DECON_WIN_STATE_UPDATE;
-        config[winUpdateInfoIdx].dst.x = mergedRect.left;
-        config[winUpdateInfoIdx].dst.w = WIDTH(mergedRect);
-        config[winUpdateInfoIdx].dst.y = mergedRect.top;
-        config[winUpdateInfoIdx].dst.h = HEIGHT(mergedRect);
+        mDpuData.enable_win_update = true;
+        mDpuData.win_update_region.x = mergedRect.left;
+        mDpuData.win_update_region.w = WIDTH(mergedRect);
+        mDpuData.win_update_region.y = mergedRect.top;
+        mDpuData.win_update_region.h = HEIGHT(mergedRect);
     }
     else {
         DISPLAY_LOGD(eDebugWindowUpdate, "Partial canceled, All layer skiped" );
@@ -4111,44 +3951,12 @@ ExynosMPP* ExynosDisplay::getExynosMPPForDma(decon_idma_type __unused idma)
     return NULL;
 }
 
-uint32_t ExynosDisplay::getRestrictionIndex(int format)
+uint32_t ExynosDisplay::getRestrictionIndex(int halFormat)
 {
-    switch (format) {
-        case DECON_PIXEL_FORMAT_ARGB_8888:
-        case DECON_PIXEL_FORMAT_ABGR_8888:
-        case DECON_PIXEL_FORMAT_RGBA_8888:
-        case DECON_PIXEL_FORMAT_BGRA_8888:
-        case DECON_PIXEL_FORMAT_XRGB_8888:
-        case DECON_PIXEL_FORMAT_XBGR_8888:
-        case DECON_PIXEL_FORMAT_RGBX_8888:
-        case DECON_PIXEL_FORMAT_BGRX_8888:
-        case DECON_PIXEL_FORMAT_RGBA_5551:
-        case DECON_PIXEL_FORMAT_RGB_565:
-        case DECON_PIXEL_FORMAT_RGBA_1010102:
-        case DECON_PIXEL_FORMAT_BGRA_1010102:
-        case DECON_PIXEL_FORMAT_ARGB_2101010:
-        case DECON_PIXEL_FORMAT_ABGR_2101010:
-            return RESTRICTION_RGB;
-        case DECON_PIXEL_FORMAT_NV16:
-        case DECON_PIXEL_FORMAT_NV61:
-        case DECON_PIXEL_FORMAT_YVU422_3P:
-        case DECON_PIXEL_FORMAT_NV12:
-        case DECON_PIXEL_FORMAT_NV21:
-        case DECON_PIXEL_FORMAT_NV12M:
-        case DECON_PIXEL_FORMAT_NV21M:
-        case DECON_PIXEL_FORMAT_YUV420:
-        case DECON_PIXEL_FORMAT_YVU420:
-        case DECON_PIXEL_FORMAT_YUV420M:
-        case DECON_PIXEL_FORMAT_YVU420M:
-        case DECON_PIXEL_FORMAT_NV12N:
-        case DECON_PIXEL_FORMAT_NV12N_10B:
-        case DECON_PIXEL_FORMAT_NV12M_S10B:
-        case DECON_PIXEL_FORMAT_NV12M_P010:
-        case DECON_PIXEL_FORMAT_NV12_P010:
-            return RESTRICTION_YUV;
-        default:
-            return RESTRICTION_MAX;
-    }
+    if (isFormatRgb(halFormat))
+        return RESTRICTION_RGB;
+    else
+        return RESTRICTION_YUV;
 }
 
 void ExynosDisplay::closeFencesForSkipFrame(rendering_state renderingState)
@@ -4207,16 +4015,15 @@ void ExynosDisplay::closeFencesForSkipFrame(rendering_state renderingState)
 }
 void ExynosDisplay::closeFences()
 {
-    struct decon_win_config *config = mWinConfigData->config;
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        if (config[i].acq_fence != -1)
-            fence_close(config[i].acq_fence, this,
+    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
+        if (mDpuData.configs[i].acq_fence != -1)
+            fence_close(mDpuData.configs[i].acq_fence, this,
                     FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
-        config[i].acq_fence = -1;
-        if (config[i].rel_fence >= 0)
-            fence_close(config[i].rel_fence, this,
+        mDpuData.configs[i].acq_fence = -1;
+        if (mDpuData.configs[i].rel_fence >= 0)
+            fence_close(mDpuData.configs[i].rel_fence, this,
                     FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP);
-        config[i].rel_fence = -1;
+        mDpuData.configs[i].rel_fence = -1;
     }
     for (size_t i = 0; i < mLayers.size(); i++) {
         if (mLayers[i]->mReleaseFence > 0) {
@@ -4250,9 +4057,9 @@ void ExynosDisplay::closeFences()
     mClientCompositionInfo.mAcquireFence = fence_close(mClientCompositionInfo.mAcquireFence, this,
             FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB);
 
-    if (mWinConfigData->retire_fence > 0)
-        fence_close(mWinConfigData->retire_fence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
-    mWinConfigData->retire_fence = -1;
+    if (mDpuData.retire_fence > 0)
+        fence_close(mDpuData.retire_fence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
+    mDpuData.retire_fence = -1;
 
     mLastRetireFence = fence_close(mLastRetireFence, this,  FENCE_TYPE_RETIRE, FENCE_IP_DPP);
 }
@@ -4312,23 +4119,6 @@ void ExynosDisplay::increaseMPPDstBufIndex() {
     if ((mExynosCompositionInfo.mHasCompositionLayer) &&
         (mExynosCompositionInfo.mM2mMPP != NULL)) {
         mExynosCompositionInfo.mM2mMPP->increaseDstBuffIndex();
-    }
-}
-
-void ExynosDisplay::clearWinConfigData(decon_win_config_data *winConfigData)
-{
-    struct decon_win_config *config = winConfigData->config;
-    memset(config, 0, sizeof(winConfigData->config));
-    winConfigData->fd_odma = -1;
-    winConfigData->retire_fence = -1;
-    /* init */
-    for (size_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        config[i].fd_idma[0] = -1;
-        config[i].fd_idma[1] = -1;
-        config[i].fd_idma[2] = -1;
-        config[i].acq_fence = -1;
-        config[i].rel_fence = -1;
-        config[i].protection = 0;
     }
 }
 

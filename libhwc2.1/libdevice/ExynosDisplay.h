@@ -32,6 +32,7 @@
 #include "ExynosMPP.h"
 #include "ExynosResourceManager.h"
 #include "ExynosDisplayInterface.h"
+#include "ExynosHWCDebug.h"
 
 #define HWC_CLEARDISPLAY_WITH_COLORMAP
 #define HWC_PRINT_FRAME_NUM     10
@@ -100,6 +101,88 @@ struct ExynosFrameInfo
     exynos_image dstInfo[NUM_SKIP_STATIC_LAYER];
 };
 
+struct exynos_win_config_data
+{
+    enum {
+        WIN_STATE_DISABLED = 0,
+        WIN_STATE_COLOR,
+        WIN_STATE_BUFFER,
+        WIN_STATE_UPDATE,
+        WIN_STATE_CURSOR,
+    } state = WIN_STATE_DISABLED;
+
+    uint32_t color = 0;
+    int fd_idma[3] = {-1, -1, -1};
+    int acq_fence = -1;
+    int rel_fence = -1;
+    int plane_alpha = 0;
+    int32_t blending = HWC2_BLEND_MODE_NONE;
+    ExynosMPP* assignedMPP = NULL;
+    int format = 0;
+    uint32_t transform = 0;
+    android_dataspace dataspace = HAL_DATASPACE_UNKNOWN;
+    bool hdr_enable = false;
+    enum dpp_comp_src comp_src = DPP_COMP_SRC_NONE;
+    uint32_t min_luminance = 0;
+    uint32_t max_luminance = 0;
+    struct decon_win_rect block_area = { 0, 0, 0, 0};
+    struct decon_win_rect transparent_area = {0, 0, 0, 0};
+    struct decon_win_rect opaque_area = {0, 0, 0, 0};
+    struct decon_frame src = {0, 0, 0, 0, 0, 0};
+    struct decon_frame dst = {0, 0, 0, 0, 0, 0};
+    bool protection = false;
+    bool compression = false;
+
+    void initData(){
+        state = WIN_STATE_DISABLED;
+        color = 0;
+        fd_idma[0] = -1; fd_idma[1] = -1; fd_idma[2] = -1;
+        acq_fence = -1;
+        rel_fence = -1;
+        plane_alpha = 0;
+        blending = HWC2_BLEND_MODE_NONE;
+        assignedMPP = NULL;
+        format = 0;
+        transform = 0;
+        dataspace = HAL_DATASPACE_UNKNOWN;
+        hdr_enable = false;
+        comp_src = DPP_COMP_SRC_NONE;
+        min_luminance = 0;
+        max_luminance = 0;
+        block_area.x = 0; block_area.y = 0; block_area.w = 0; block_area.h = 0;
+        transparent_area.x = 0; transparent_area.y = 0; transparent_area.w = 0; transparent_area.h = 0;
+        opaque_area.x = 0; opaque_area.y = 0; opaque_area.w = 0; opaque_area.h = 0;
+        src.x = 0; src.y = 0; src.w = 0; src.h = 0; src.f_w = 0; src.f_h = 0;
+        dst.x = 0; dst.y = 0; dst.w = 0; dst.h = 0; dst.f_w = 0; dst.f_h = 0;
+        protection = false;
+        compression = false;
+    };
+};
+struct exynos_dpu_data
+{
+    int retire_fence = -1;
+    std::vector<exynos_win_config_data> configs;
+    bool enable_win_update = false;
+    struct decon_frame win_update_region = {0, 0, 0, 0, 0, 0};
+
+    void initData() {
+        retire_fence = -1;
+        for (uint32_t i = 0; i < configs.size(); i++)
+            configs[i].initData();
+    };
+    exynos_dpu_data& operator =(const exynos_dpu_data configs_data){
+        retire_fence = configs_data.retire_fence;
+        if (configs.size() != configs_data.configs.size()) {
+            HWC_LOGE(NULL, "invalid config, it has different configs size");
+            return *this;
+        }
+        for (uint32_t i = 0; i < configs.size(); i++) {
+            configs[i] = configs_data.configs[i];
+        }
+        return *this;
+    };
+};
+
 class ExynosLowFpsLayerInfo
 {
     public:
@@ -136,7 +219,7 @@ class ExynosCompositionInfo : public ExynosMPPSource {
         bool mSkipStaticInitFlag;
         bool mSkipFlag;
         ExynosFrameInfo mSkipSrcInfo;
-        struct decon_win_config mLastConfig;
+        exynos_win_config_data mLastWinConfigData;
 
         int32_t mWindowIndex;
         bool mCompressed;
@@ -284,12 +367,12 @@ class ExynosDisplay {
         /**
          * DECON WIN_CONFIG information.
          */
-        decon_win_config_data *mWinConfigData;
+        exynos_dpu_data mDpuData;
 
         /**
          * Last win_config data is used as WIN_CONFIG skip decision or debugging.
          */
-        decon_win_config_data *mLastWinConfigData;
+        exynos_dpu_data mLastDpuData;
 
         /**
          * Restore release fenc from DECON.
@@ -384,10 +467,10 @@ class ExynosDisplay {
 
         int doExynosComposition();
 
-        int32_t configureOverlay(ExynosLayer *layer, decon_win_config &cfg);
+        int32_t configureOverlay(ExynosLayer *layer, exynos_win_config_data &cfg);
         int32_t configureOverlay(ExynosCompositionInfo &compositionInfo);
 
-        int32_t configureHandle(ExynosLayer &layer,  int fence_fd, decon_win_config &cfg);
+        int32_t configureHandle(ExynosLayer &layer,  int fence_fd, exynos_win_config_data &cfg);
         virtual decon_idma_type getDeconDMAType(ExynosMPP *otfMPP);
 
         virtual int setWinConfigData();
@@ -595,9 +678,9 @@ class ExynosDisplay {
 
         virtual int32_t startPostProcessing();
 
-        void dumpConfig(decon_win_config &c);
-        void dumpConfig(String8 &result, decon_win_config &c);
-        void printConfig(decon_win_config &c);
+        void dumpConfig(const exynos_win_config_data &c);
+        void dumpConfig(String8 &result, const exynos_win_config_data &c);
+        void printConfig(exynos_win_config_data &c);
 
         unsigned int getLayerRegion(ExynosLayer *layer,
                 hwc_rect *rect_area, uint32_t regionType);
@@ -610,12 +693,13 @@ class ExynosDisplay {
         bool validateExynosCompositionLayer();
         void printDebugInfos(String8 &reason);
 
-        bool checkConfigChanged(struct decon_win_config_data &lastConfigData, struct decon_win_config_data &newConfigData);
-        int checkConfigDstChanged(struct decon_win_config_data &lastConfigData,
-                struct decon_win_config_data &newConfigData, uint32_t index);
+        bool checkConfigChanged(const exynos_dpu_data &lastConfigsData,
+                const exynos_dpu_data &newConfigsData);
+        int checkConfigDstChanged(const exynos_dpu_data &lastConfigData,
+                const exynos_dpu_data &newConfigData, uint32_t index);
 
         virtual ExynosMPP* getExynosMPPForDma(decon_idma_type idma);
-        uint32_t getRestrictionIndex(int format);
+        uint32_t getRestrictionIndex(int halFormat);
         void closeFences();
         void closeFencesForSkipFrame(rendering_state renderingState);
 
@@ -640,7 +724,6 @@ class ExynosDisplay {
         ExynosDisplayInterface *mDisplayInterface;
 
     private:
-        void clearWinConfigData(decon_win_config_data *config);
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
 };
 

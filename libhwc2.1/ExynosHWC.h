@@ -21,7 +21,6 @@
 #include "ExynosMPPType.h"
 #include "ExynosHWCModule.h"
 #include "ExynosDevice.h"
-#include "DeconHeader.h"
 
 //#define DISABLE_FENCE
 
@@ -55,7 +54,6 @@ enum {
     HWC_CTL_SYS_FENCE_LOGGING = 309,
 };
 
-const size_t NUM_HW_WINDOWS = MAX_DECON_WIN;
 class ExynosDevice;
 
 hwc2_function_pointer_t exynos_getFunction(struct hwc2_device* device, int32_t descriptor);

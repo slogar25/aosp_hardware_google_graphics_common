@@ -24,7 +24,7 @@
 #else
 #include "gralloc_priv.h"
 #endif
-#include "DeconHeader.h"
+#include "DeconCommonHeader.h"
 #include "VendorVideoAPI.h"
 #include "exynos_sync.h"
 

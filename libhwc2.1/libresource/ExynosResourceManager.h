@@ -137,6 +137,7 @@ class ExynosResourceManager {
         mpp_phycal_type_t getPhysicalType(int ch);
         ExynosMPP* getOtfMPPWithChannel(int ch);
         uint32_t getFeatureTableSize();
+        const ExynosMPPVector& getOtfMPPs() { return mOtfMPPs; };
 
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,

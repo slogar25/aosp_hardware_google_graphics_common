@@ -56,6 +56,7 @@ class ExynosDisplayInterface {
         virtual int32_t disableSelfRefresh(uint32_t __unused disable) {return NO_ERROR;};
         virtual int32_t setForcePanic() {return NO_ERROR;};
         virtual int getDisplayFd() {return -1;};
+        virtual uint32_t getMaxWindowNum() {return 0;};
 };
 
 #endif

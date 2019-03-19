@@ -63,6 +63,7 @@ ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t __unused type, ExynosDevice 
     mDisplayControl.enableExynosCompositionOptimization = false;
     mDisplayControl.enableClientCompositionOptimization = false;
     mDisplayControl.handleLowFpsLayers = false;
+    mMaxWindowNum = 0;
 }
 
 ExynosVirtualDisplay::~ExynosVirtualDisplay()
@@ -322,7 +323,7 @@ int32_t ExynosVirtualDisplay::validateWinConfigData()
 
 int ExynosVirtualDisplay::deliverWinConfigData()
 {
-    mWinConfigData->retire_fence = -1;
+    mDpuData.retire_fence = -1;
     return 0;
 }
 

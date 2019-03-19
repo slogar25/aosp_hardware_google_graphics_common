@@ -1328,7 +1328,8 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
     layer->setExynosMidImage(dst_img);
 
     validateFlag = validateLayer(layer_index, display, layer);
-    if (display->mWindowNumUsed >= display->mMaxWindowNum)
+    if ((display->mUseDecon) &&
+        (display->mWindowNumUsed >= display->mMaxWindowNum))
         validateFlag |= eInsufficientWindow;
 
     HDEBUGLOGD(eDebugResourceManager, "\t[%d] layer: validateFlag(0x%8x), supportedMPPFlag(0x%8x)",
