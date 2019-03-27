@@ -230,6 +230,11 @@ int32_t ExynosDisplayFbInterface::getHdrCapabilities(uint32_t* outNumTypes,
     return 0;
 }
 
+decon_idma_type ExynosDisplayFbInterface::getDeconDMAType(ExynosMPP* __unused otfMPP)
+{
+    return MAX_DECON_DMA_TYPE;
+}
+
 int32_t ExynosDisplayFbInterface::deliverWinConfigData()
 {
     int32_t ret = 0;
@@ -258,7 +263,7 @@ int32_t ExynosDisplayFbInterface::deliverWinConfigData()
             HWC_LOGE(mExynosDisplay, "%s:: config [%d] has invalid idma_type, assignedMPP is NULL",
                     __func__, i);
             return -EINVAL;
-        } else if ((config[i].idma_type = mExynosDisplay->getDeconDMAType(display_config.assignedMPP))
+        } else if ((config[i].idma_type = getDeconDMAType(display_config.assignedMPP))
                 == MAX_DECON_DMA_TYPE) {
             HWC_LOGE(mExynosDisplay, "%s:: config [%d] has invalid idma_type, assignedMPP(%s)",
                     __func__, i, display_config.assignedMPP->mName.string());
@@ -531,7 +536,7 @@ String8& ExynosDisplayFbInterface::dumpFbWinConfigInfo(String8 &result,
     return result;
 }
 
-inline uint32_t ExynosDisplayFbInterface::getMaxWindowNum()
+uint32_t ExynosDisplayFbInterface::getMaxWindowNum()
 {
     return NUM_HW_WINDOWS;
 }

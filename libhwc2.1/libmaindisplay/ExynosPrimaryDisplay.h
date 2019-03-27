@@ -29,8 +29,6 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
 
-        virtual ExynosMPP* getExynosMPPForDma(decon_idma_type idma);
-        virtual decon_idma_type getDeconDMAType(ExynosMPP *otfMPP);
         virtual void initDisplayInterface(uint32_t interfaceType);
     protected:
         virtual int32_t setPowerMode(

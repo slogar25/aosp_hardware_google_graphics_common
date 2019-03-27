@@ -20,7 +20,7 @@
 #include "ExynosDevice.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosExternalDisplay.h"
-#include "ExynosDisplayFbInterface.h"
+#include "ExynosDisplayFbInterfaceModule.h"
 #include "ExynosDisplayDrmInterface.h"
 
 extern struct exynos_hwc_control exynosHWCControl;
@@ -139,13 +139,6 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
     return HWC2_ERROR_NONE;
 }
 
-ExynosMPP* ExynosPrimaryDisplay::getExynosMPPForDma(decon_idma_type idma) {
-    return ExynosDisplay::getExynosMPPForDma(idma);
-}
-decon_idma_type ExynosPrimaryDisplay::getDeconDMAType(ExynosMPP *otfMPP) {
-    return ExynosDisplay::getDeconDMAType(otfMPP);
-}
-
 bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
 {
     return false;
@@ -156,6 +149,6 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
     if (interfaceType == INTERFACE_TYPE_DRM)
         mDisplayInterface = new ExynosDisplayDrmInterface((ExynosDisplay *)this);
     else
-        mDisplayInterface = new ExynosPrimaryDisplayFbInterface((ExynosDisplay *)this);
+        mDisplayInterface = new ExynosPrimaryDisplayFbInterfaceModule((ExynosDisplay *)this);
     mDisplayInterface->init(this);
 }

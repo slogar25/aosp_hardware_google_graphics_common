@@ -1099,11 +1099,6 @@ int ExynosDisplay::doExynosComposition() {
     return ret;
 }
 
-decon_idma_type ExynosDisplay::getDeconDMAType(ExynosMPP* __unused otfMPP)
-{
-    return MAX_DECON_DMA_TYPE;
-}
-
 bool ExynosDisplay::getHDRException(ExynosLayer* __unused layer)
 {
     return false;
@@ -3944,11 +3939,6 @@ unsigned int ExynosDisplay::getLayerRegion(ExynosLayer *layer, hwc_rect *rect_ar
     }
 
     return eDamageRegionFull;
-}
-
-ExynosMPP* ExynosDisplay::getExynosMPPForDma(decon_idma_type __unused idma)
-{
-    return NULL;
 }
 
 uint32_t ExynosDisplay::getRestrictionIndex(int halFormat)

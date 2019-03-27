@@ -72,6 +72,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(TARGET_SOC)/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource

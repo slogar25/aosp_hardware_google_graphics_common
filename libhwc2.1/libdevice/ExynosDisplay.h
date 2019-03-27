@@ -471,7 +471,6 @@ class ExynosDisplay {
         int32_t configureOverlay(ExynosCompositionInfo &compositionInfo);
 
         int32_t configureHandle(ExynosLayer &layer,  int fence_fd, exynos_win_config_data &cfg);
-        virtual decon_idma_type getDeconDMAType(ExynosMPP *otfMPP);
 
         virtual int setWinConfigData();
 
@@ -698,7 +697,6 @@ class ExynosDisplay {
         int checkConfigDstChanged(const exynos_dpu_data &lastConfigData,
                 const exynos_dpu_data &newConfigData, uint32_t index);
 
-        virtual ExynosMPP* getExynosMPPForDma(decon_idma_type idma);
         uint32_t getRestrictionIndex(int halFormat);
         void closeFences();
         void closeFencesForSkipFrame(rendering_state renderingState);

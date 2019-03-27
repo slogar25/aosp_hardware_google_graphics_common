@@ -54,7 +54,8 @@ class ExynosDisplayFbInterface : public ExynosDisplayInterface {
         virtual int32_t disableSelfRefresh(uint32_t disable);
         virtual int32_t setForcePanic();
         virtual int getDisplayFd() { return mDisplayFd; };
-        inline virtual uint32_t getMaxWindowNum();
+        virtual uint32_t getMaxWindowNum();
+        virtual decon_idma_type getDeconDMAType(ExynosMPP *otfMPP);
     protected:
         void clearFbWinConfigData(decon_win_config_data &winConfigData);
         dpp_csc_eq halDataSpaceToDisplayParam(exynos_win_config_data& config);

@@ -21,7 +21,7 @@
 #include "ExynosLayer.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosHWCDebug.h"
-#include "ExynosDisplayFbInterface.h"
+#include "ExynosDisplayFbInterfaceModule.h"
 #include "ExynosDisplayDrmInterface.h"
 #include <linux/fb.h>
 
@@ -576,6 +576,6 @@ void ExynosExternalDisplay::initDisplayInterface(uint32_t __unused interfaceType
     if (interfaceType == INTERFACE_TYPE_DRM)
         mDisplayInterface = new ExynosDisplayDrmInterface((ExynosDisplay *)this);
     else
-        mDisplayInterface = new ExynosExternalDisplayFbInterface((ExynosDisplay *)this);
+        mDisplayInterface = new ExynosExternalDisplayFbInterfaceModule((ExynosDisplay *)this);
     mDisplayInterface->init(this);
 }
