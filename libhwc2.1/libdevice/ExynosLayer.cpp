@@ -141,17 +141,13 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.displayFrame = mDisplayFrame;
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
 
-    // FIXME: HWC_DIM_LAYER is not defined in AOSP
-    //        HWC guys should fix this.
-#if 0
-    if (!!(mLayerFlag & HWC_DIM_LAYER) || (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR)) {
+    if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
         mIsDimLayer = true;
-        mLayerFlag |= HWC_DIM_LAYER;
+        mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
     } else {
         mIsDimLayer = false;
-        mLayerFlag &= ~(HWC_DIM_LAYER);
+        mLayerFlag &= ~(EXYNOS_HWC_DIM_LAYER);
     }
-#endif
 
     if (mLayerBuffer == NULL) {
         if (mOverlayPriority != priority)
@@ -564,22 +560,6 @@ int32_t ExynosLayer::setLayerZOrder(uint32_t z) {
         setGeometryChanged(GEOMETRY_LAYER_ZORDER_CHANGED);
         mZOrder = z;
     }
-    return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosLayer::setLayerFlag(int32_t /*user define*/ flag)
-{
-    if (mLayerFlag != flag) {
-        setGeometryChanged(GEOMETRY_LAYER_FLAG_CHANGED);
-        mLayerFlag = flag;
-    }
-    // FIXME: HWC_DIM_LAYER is not defined in AOSP
-    //        HWC guys should fix this.
-#if 0
-    mIsDimLayer = !!(mLayerFlag & HWC_DIM_LAYER);
-#endif
-    mIsDimLayer = false;
-
     return HWC2_ERROR_NONE;
 }
 

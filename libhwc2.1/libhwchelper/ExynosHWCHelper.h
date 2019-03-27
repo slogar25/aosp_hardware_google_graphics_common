@@ -55,6 +55,10 @@ class ExynosDisplay;
 
 using namespace android;
 
+enum {
+    EXYNOS_HWC_DIM_LAYER = 0x00000001,
+};
+
 typedef enum format_type {
 
     /* format */

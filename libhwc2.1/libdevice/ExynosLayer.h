@@ -336,10 +336,6 @@ class ExynosLayer : public ExynosMPPSource {
          */
         virtual int32_t setLayerZOrder(uint32_t z);
 
-        /* setLayerFlag(..., flag)
-         */
-        virtual int32_t setLayerFlag(int32_t /*user define*/ flag);
-
         virtual int32_t setLayerPerFrameMetadata(uint32_t numElements,
                 const int32_t* /*hw2_per_frame_metadata_key_t*/ keys, const float* metadata);
 

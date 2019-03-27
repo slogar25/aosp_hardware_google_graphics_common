@@ -581,16 +581,9 @@ void ExynosDisplay::doPreProcessing() {
         if ((i != 0) && (mLayers[i]->mBlending == HWC2_BLEND_MODE_NONE)) {
             if (handle == NULL)
                 mBlendingNoneIndex = i;
-            /*
-             * FIXME: HWC_SET_OPAQUE is not in AOSP.
-             *        Exynos HWC guys should fix this
-             */
-#if 0
             else if ((mLayers[i]->mOverlayPriority < ePriorityHigh) &&
-                     formatHasAlphaChannel(handle->format)  &&
-                     ((mLayers[i]->mLayerFlag & HWC_SET_OPAQUE) == 0))
+                     formatHasAlphaChannel(handle->format))
                 mBlendingNoneIndex = i;
-#endif
         }
         if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_CLIENT)
             skipStaticLayers = false;
@@ -912,8 +905,7 @@ bool ExynosDisplay::skipStaticLayerChanged(ExynosCompositionInfo& compositionInf
         ExynosLayer *layer = mLayers[i];
         size_t index = i - compositionInfo.mFirstIndex;
         if ((layer->mLayerBuffer == NULL) ||
-                (layer->mLayerFlag & HWC_SKIP_LAYER) ||
-                (compositionInfo.mSkipSrcInfo.srcInfo[index].bufferHandle != layer->mLayerBuffer))
+            (compositionInfo.mSkipSrcInfo.srcInfo[index].bufferHandle != layer->mLayerBuffer))
         {
             isChanged = true;
             DISPLAY_LOGD(eDebugSkipStaicLayer, "layer[%zu] handle is changed"\
@@ -1529,16 +1521,6 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer,  int fence_fd, decon_
         cfg.src.h = pixel_align_down(cfg.src.h, srcCropHeightAlign);
     }
 
-#if 0
-    /*
-     * FIXME: HWC_SET_OPAQUE is not in AOSP.
-     *        Exynos HWC guys should fix this
-     */
-    if ((layer.mLayerFlag & HWC_SET_OPAQUE) &&
-       (cfg.format == DECON_PIXEL_FORMAT_RGBA_8888))
-       cfg.format = DECON_PIXEL_FORMAT_RGBX_8888;
-
-#endif
     uint64_t bufSize = handle->size * formatToBpp(handle->format);
     uint64_t srcSize = cfg.src.f_w * cfg.src.f_h * DeconFormatToBpp(cfg.format);
 

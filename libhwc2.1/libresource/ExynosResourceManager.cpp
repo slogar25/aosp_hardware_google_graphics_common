@@ -1062,8 +1062,6 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         (display->mDynamicReCompMode == DEVICE_2_CLIENT))
         return eDynamicRecomposition;
 
-    if (layer->mLayerFlag & HWC_SKIP_LAYER)
-        return eSkipLayer;
     if ((layer->mLayerBuffer != NULL) &&
             (display->mDisplayId == HWC_DISPLAY_PRIMARY) &&
             (mForceReallocState != DST_REALLOC_DONE)) {
@@ -1072,11 +1070,6 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
     }
 
     if (layer->mCompositionType == HWC2_COMPOSITION_CLIENT)
-        return eSkipLayer;
-
-    /* If display is virtual/external and layer has HWC_SKIP_LAYER, HWC skips it */
-    if ((layer != NULL) && (layer->mLayerFlag & HWC_SKIP_LAYER) && (display != NULL) &&
-        (display->mDisplayId == HWC_DISPLAY_VIRTUAL || display->mDisplayId == HWC_DISPLAY_EXTERNAL))
         return eSkipLayer;
 
     if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY)

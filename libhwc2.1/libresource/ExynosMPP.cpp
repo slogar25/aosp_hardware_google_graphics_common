@@ -1191,16 +1191,6 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
 
     srcImgInfo->mppLayer->setImageDimension(src.fullWidth, src.fullHeight);
 
-    /*
-     * FIXME: HWC_SET_OPAQUE is not in AOSP.
-     *        Exynos HWC guys should fix this
-     */
-#if 0
-    if ((srcHandle->format == HAL_PIXEL_FORMAT_RGBA_8888) &&
-        (src.layerFlags & HWC_SET_OPAQUE)) {
-        srcImgInfo->mppLayer->setImageType(HAL_PIXEL_FORMAT_RGBX_8888, dataspace);
-    } else if (srcHandle->format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
-#endif
     if (srcHandle->format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
         srcImgInfo->mppLayer->setImageType(HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M, dataspace);
     } else {
@@ -1245,16 +1235,6 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
     srcImgInfo->acrylicAcquireFenceFd = -1;
     srcImgInfo->format = srcHandle->format;
 
-    /*
-     * FIXME: HWC_SET_OPAQUE is not in AOSP.
-     *        Exynos HWC guys should fix this
-     */
-#if 0
-    if ((srcImgInfo->format == HAL_PIXEL_FORMAT_RGBA_8888) &&
-        (src.layerFlags & HWC_SET_OPAQUE)) {
-        srcImgInfo->format = HAL_PIXEL_FORMAT_RGBX_8888;
-    } else if (srcHandle->format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
-#endif
     if (srcHandle->format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
         srcImgInfo->format = HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M;
     }
@@ -1959,19 +1939,13 @@ int32_t ExynosMPP::setupRestriction() {
 int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src, struct exynos_image &dst)
 {
 
-    /*
-     * FIXME: HWC_SET_OPAQUE is not in AOSP.
-     *        Exynos HWC guys should fix this
-     */
-#if 0
-    if (!!(src.layerFlags & HWC_DIM_LAYER)) // Dim layer
+    if (!!(src.layerFlags & EXYNOS_HWC_DIM_LAYER)) // Dim layer
     {
         if (isDimLayerSupported())
             return NO_ERROR;
         else
             return -eMPPUnsupportedDIMLayer;
     }
-#endif
 
     uint32_t maxSrcWidth = getSrcMaxWidth(src);
     uint32_t maxSrcHeight = getSrcMaxHeight(src);
