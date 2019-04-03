@@ -33,6 +33,7 @@ public:
     virtual ~IG2DHdr10CommandWriter() { };
     static IG2DHdr10CommandWriter *createInstance();
     virtual bool setLayerStaticMetadata(int layer_index, int dataspace, unsigned int min_luminance, unsigned int max_luminance) = 0;
+    virtual bool setLayerOpaqueData(int __unused layer_index, void __unused *data, size_t __unused len) { return true; }
     virtual bool setLayerImageInfo(int __unused layer_index, unsigned int __unused pixfmt, bool __unused alpha_premult) { return true; }
     virtual bool setTargetInfo(int dataspace, void *data) = 0;
     virtual void setTargetDisplayLuminance(unsigned int __unused min, unsigned int __unused max) { };

@@ -50,6 +50,11 @@ public:
         return mWriter ? mWriter->setLayerImageInfo(layer_index, pixfmt, alpha_premult) : true;
     }
 
+    void setLayerOpaqueData(int layer_index, void *data, size_t len) {
+        if (mWriter)
+            mWriter->setLayerOpaqueData(layer_index, data, len);
+    }
+
     bool setTargetInfo(int dataspace, void *data) {
         return mWriter ? mWriter->setTargetInfo(dataspace, data) : true;
     }
