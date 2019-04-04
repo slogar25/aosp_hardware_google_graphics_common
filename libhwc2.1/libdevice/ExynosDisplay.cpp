@@ -272,7 +272,6 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mUpdateEventCnt(0),
     mUpdateCallCnt(0),
     mDefaultDMA(MAX_DECON_DMA_TYPE),
-    mFps(0),
     mLastRetireFence(-1),
     mWindowNumUsed(0),
     mBaseWindowIndex(0),

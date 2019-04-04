@@ -360,11 +360,6 @@ class ExynosDisplay {
         decon_idma_type mDefaultDMA;
 
         /**
-         * Display 'fps' information for Dynamic re-composition.
-         */
-        uint32_t  mFps;
-
-        /**
          * DECON WIN_CONFIG information.
          */
         exynos_dpu_data mDpuData;
