@@ -2020,15 +2020,6 @@ int32_t ExynosMPP::setupRestriction() {
 
 int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src, struct exynos_image &dst)
 {
-
-    if (src.isDimLayer()) // Dim layer
-    {
-        if (isDimLayerSupported())
-            return NO_ERROR;
-        else
-            return -eMPPUnsupportedDIMLayer;
-    }
-
     uint32_t maxSrcWidth = getSrcMaxWidth(src);
     uint32_t maxSrcHeight = getSrcMaxHeight(src);
     uint32_t minSrcWidth = getSrcMinWidth(src);
@@ -2065,6 +2056,21 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         rot_dst.h = dst.w;
     }
 
+    if (rot_dst.w > maxDstWidth)
+        return -eMPPExeedMaxDstWidth;
+    else if (rot_dst.h > maxDstHeight)
+        return -eMPPExeedMaxDstHeight;
+    else if (rot_dst.w < minDstWidth)
+        return -eMPPExeedMinDstWidth;
+    else if (rot_dst.h < minDstHeight)
+        return -eMPPExeedMinDstHeight;
+    else if (src.isDimLayer()) { // Dim layer
+        if (isDimLayerSupported()) {
+            return NO_ERROR;
+        } else {
+            return -eMPPUnsupportedDIMLayer;
+        }
+    }
     if (!isSupportedCapability(display, src))
         return -eMPPSaveCapability;
     else if (!isSrcFormatSupported(src))
@@ -2087,14 +2093,6 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         return -eMPPExeedSrcWCropMin;
     else if (src.h < minSrcCropHeight)
         return -eMPPExeedSrcHCropMin;
-    else if (rot_dst.w > maxDstWidth)
-        return -eMPPExeedMaxDstWidth;
-    else if (rot_dst.h > maxDstHeight)
-        return -eMPPExeedMaxDstHeight;
-    else if (rot_dst.w < minDstWidth)
-        return -eMPPExeedMinDstWidth;
-    else if (rot_dst.h < minDstHeight)
-        return -eMPPExeedMinDstWidth;
     else if ((rot_dst.w % dstWidthAlign != 0) || (rot_dst.h % dstHeightAlign != 0))
         return -eMPPNotAlignedDstSize;
     else if (src.w > rot_dst.w * maxDownscale)
