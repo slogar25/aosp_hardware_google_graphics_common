@@ -1091,8 +1091,10 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
     if (layer->mCompositionType == HWC2_COMPOSITION_CLIENT)
         return eSkipLayer;
 
+#ifndef HWC_SUPPORT_COLOR_TRANSFORM
     if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY)
         return eUnSupportedColorTransform;
+#endif
 
     if ((display->mLowFpsLayerInfo.mHasLowFpsLayer == true) &&
         (display->mLowFpsLayerInfo.mFirstIndex <= (int32_t)index) &&

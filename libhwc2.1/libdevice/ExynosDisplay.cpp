@@ -22,6 +22,7 @@
 #include <utils/CallStack.h>
 #include <hardware/hwcomposer_defs.h>
 #include <sync/sync.h>
+
 #include <map>
 #include "ExynosDisplay.h"
 #include "ExynosExternalDisplay.h"
@@ -2812,7 +2813,7 @@ int32_t ExynosDisplay::setClientTarget(
 }
 
 int32_t ExynosDisplay::setColorTransform(
-        const float* __unused matrix,
+        const float* matrix,
         int32_t /*android_color_transform_t*/ hint) {
     if ((hint < HAL_COLOR_TRANSFORM_IDENTITY) ||
         (hint > HAL_COLOR_TRANSFORM_CORRECT_TRITANOPIA))
@@ -2821,7 +2822,11 @@ int32_t ExynosDisplay::setColorTransform(
     if (mColorTransformHint != hint)
         setGeometryChanged(GEOMETRY_DISPLAY_COLOR_TRANSFORM_CHANGED);
     mColorTransformHint = (android_color_transform_t)hint;
+#ifdef HWC_SUPPORT_COLOR_TRANSFORM
+    return mDisplayInterface->setColorTransform(matrix, hint);
+#else
     return HWC2_ERROR_NONE;
+#endif
 }
 
 int32_t ExynosDisplay::setColorMode(
