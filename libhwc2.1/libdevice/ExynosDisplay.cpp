@@ -3493,6 +3493,9 @@ int32_t ExynosDisplay::addClientCompositionLayer(uint32_t layerIndex)
             DISPLAY_LOGD(eDebugResourceManager, "\t[%d] layer changed", i);
             if (layer->mValidateCompositionType == HWC2_COMPOSITION_EXYNOS)
                 exynosCompositionChanged = true;
+            else {
+                if (layer->mValidateCompositionType == HWC2_COMPOSITION_DEVICE) mWindowNumUsed--;
+            }
             layer->resetAssignedResource();
             layer->mValidateCompositionType = HWC2_COMPOSITION_CLIENT;
             layer->mOverlayInfo |= eSandwitchedBetweenGLES;
@@ -3724,10 +3727,12 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex)
                         __func__, m2mMPP->mName.string(), ret);
                 return ret;
             }
+            if (layer->mValidateCompositionType == HWC2_COMPOSITION_DEVICE) mWindowNumUsed--;
             mExynosCompositionInfo.mFirstIndex = min(mExynosCompositionInfo.mFirstIndex, (int32_t)i);
             mExynosCompositionInfo.mLastIndex = max(mExynosCompositionInfo.mLastIndex, (int32_t)i);
         } else {
-            DISPLAY_LOGD(eDebugResourceManager, "\t[%d] layer is has known type (%d)", i, layer->mValidateCompositionType);
+            DISPLAY_LOGD(eDebugResourceManager, "\t[%d] layer has known type (%d)", i,
+                         layer->mValidateCompositionType);
         }
     }
 
