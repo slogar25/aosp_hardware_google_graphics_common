@@ -101,6 +101,11 @@ hwc2_function_pointer_t exynos_function_pointer[] =
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_LAYER_FLOAT_COLOR
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setLayerPerFrameMetadata),    //HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getPerFrameMetadataKeys),     //HWC2_FUNCTION_GET_PER_FRAME_METADATA_KEYS
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_SET_READBACK_BUFFER
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_GET_READBACK_BUFFER_ATTRIBUTES
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_GET_READBACK_BUFFER_FENCE
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getRenderIntents),            //HWC2_FUNCTION_GET_RENDER_INTENTS
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setColorModeWithRenderIntent),//HWC2_FUNCTION_SET_COLOR_MODE_WITH_RENDER_INTENT
 };
 
 inline ExynosDevice* checkDevice(hwc2_device_t *dev)
@@ -144,7 +149,7 @@ hwc2_function_pointer_t exynos_getFunction(struct hwc2_device *dev,
     if (!exynosDevice)
         return NULL;
 
-    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_GET_PER_FRAME_METADATA_KEYS)
+    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_SET_COLOR_MODE_WITH_RENDER_INTENT)
         return NULL;
     return exynos_function_pointer[descriptor];
 }
@@ -298,6 +303,40 @@ int32_t exynos_getColorModes(hwc2_device_t *dev, hwc2_display_t display, uint32_
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
         if (exynosDisplay)
             return exynosDisplay->getColorModes(outNumModes, outModes);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_getRenderIntents(hwc2_device_t* dev, hwc2_display_t display, int32_t mode,
+                uint32_t* outNumIntents, int32_t* /*android_render_intent_v1_1_t*/ outIntents)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+    ALOGD("%s:: mode(%d)", __func__, mode);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->getRenderIntents(mode, outNumIntents, outIntents);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_setColorModeWithRenderIntent(hwc2_device_t* dev, hwc2_display_t display,
+        int32_t /*android_color_mode_t*/ mode,
+        int32_t /*android_render_intent_v1_1_t */ intent)
+{
+    if (mode < 0)
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    ExynosDevice *exynosDevice = checkDevice(dev);
+    ALOGD("%s:: mode(%d), intent(%d)", __func__, mode, intent);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->setColorModeWithRenderIntent(mode, intent);
     }
 
     return HWC2_ERROR_BAD_DISPLAY;

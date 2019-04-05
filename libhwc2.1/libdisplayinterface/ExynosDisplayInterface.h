@@ -58,6 +58,9 @@ class ExynosDisplayInterface {
         virtual uint32_t getMaxWindowNum() {return 0;};
         virtual int32_t setColorTransform(const float* __unused matrix,
                 int32_t __unused hint) {return HWC2_ERROR_UNSUPPORTED;}
+        virtual int32_t getRenderIntents(int32_t __unused mode, uint32_t* __unused outNumIntents,
+                int32_t* __unused outIntents) {return 0;}
+        virtual int32_t setColorModeWithRenderIntent(int32_t __unused mode, int32_t __unused intent) {return 0;}
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

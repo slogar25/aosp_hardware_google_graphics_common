@@ -2849,6 +2849,23 @@ int32_t ExynosDisplay::setColorMode(
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosDisplay::getRenderIntents(int32_t mode, uint32_t* outNumIntents,
+        int32_t* /*android_render_intent_v1_1_t*/ outIntents)
+{
+    ALOGI("%s:: mode(%d), outNum(%d), outIntents(%p)",
+            __func__, mode, *outNumIntents, outIntents);
+
+    return mDisplayInterface->getRenderIntents(mode, outNumIntents, outIntents);
+}
+
+int32_t ExynosDisplay::setColorModeWithRenderIntent(int32_t /*android_color_mode_t*/ mode,
+        int32_t /*android_render_intent_v1_1_t */ intent)
+{
+    ALOGI("%s:: mode(%d), intent(%d)", __func__, mode, intent);
+
+    return mDisplayInterface->setColorModeWithRenderIntent(mode, intent);
+}
+
 int32_t ExynosDisplay::setOutputBuffer(
         buffer_handle_t __unused buffer,
         int32_t __unused releaseFence) {

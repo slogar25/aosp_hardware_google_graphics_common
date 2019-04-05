@@ -124,6 +124,11 @@ int32_t exynos_setLayerPerFrameMetadata(hwc2_device_t* device, hwc2_display_t di
         const float* metadata);
 int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* device, hwc2_display_t display,
         uint32_t* outNumKeys, int32_t* /*hwc2_per_frame_metadata_key_t*/ outKeys);
+int32_t exynos_getRenderIntents(hwc2_device_t* device, hwc2_display_t display, int32_t mode,
+        uint32_t* outNumIntents, int32_t* /*android_render_intent_v1_1_t*/ outIntents);
+int32_t exynos_setColorModeWithRenderIntent(hwc2_device_t* device, hwc2_display_t display,
+        int32_t /*android_color_mode_t*/ mode,
+        int32_t /*android_render_intent_v1_1_t */ intent);
 
 enum {
     NO_DRM = 0,
