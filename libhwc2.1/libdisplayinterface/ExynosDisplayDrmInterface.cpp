@@ -449,7 +449,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                     plane->crtc_property().id(), mDrmCrtc->id()) < 0;
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->fb_property().id(), fb_id) < 0;
-
             ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                     plane->crtc_x_property().id(),
                     config.dst.x) < 0;
@@ -507,6 +506,23 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                             __func__, i, plane->id(), blend, ret);
                     drmReq.setError(ret, this);
                     return ret;
+                }
+            }
+
+            if (plane->zpos_property().id() &&
+                !plane->zpos_property().is_immutable()) {
+                uint64_t min_zpos = 0;
+
+                // Ignore ret and use min_zpos as 0 by default
+                std::tie(std::ignore, min_zpos) = plane->zpos_property().range_min();
+
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->zpos_property().id(),
+                        i + min_zpos) < 0;
+                if (ret < 0) {
+                    ALOGE("Failed to add zpos property %d to plane %d, ret(%d)",
+                            plane->zpos_property().id(), plane->id(), ret);
+                    break;
                 }
             }
 
