@@ -2821,9 +2821,12 @@ int32_t ExynosDisplay::setColorTransform(
     ALOGI("%s:: %d, %d", __func__, mColorTransformHint, hint);
     if (mColorTransformHint != hint)
         setGeometryChanged(GEOMETRY_DISPLAY_COLOR_TRANSFORM_CHANGED);
-    mColorTransformHint = (android_color_transform_t)hint;
+    mColorTransformHint = hint;
 #ifdef HWC_SUPPORT_COLOR_TRANSFORM
-    return mDisplayInterface->setColorTransform(matrix, hint);
+    int ret = mDisplayInterface->setColorTransform(matrix, hint);
+    if (ret < 0)
+        mColorTransformHint = HAL_COLOR_TRANSFORM_ERROR;
+    return ret;
 #else
     return HWC2_ERROR_NONE;
 #endif

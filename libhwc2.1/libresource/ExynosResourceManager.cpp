@@ -1094,6 +1094,10 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
 #ifndef HWC_SUPPORT_COLOR_TRANSFORM
     if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY)
         return eUnSupportedColorTransform;
+#else
+    if ((display->mColorTransformHint == HAL_COLOR_TRANSFORM_ERROR) &&
+        (layer->mOverlayPriority < ePriorityHigh))
+        return eUnSupportedColorTransform;
 #endif
 
     if ((display->mLowFpsLayerInfo.mHasLowFpsLayer == true) &&

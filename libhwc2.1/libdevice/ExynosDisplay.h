@@ -379,7 +379,7 @@ class ExynosDisplay {
         uint32_t mNumMaxPriorityAllowed;
         int32_t mCursorIndex;
 
-        android_color_transform mColorTransformHint;
+        int32_t mColorTransformHint;
 
         ExynosLowFpsLayerInfo mLowFpsLayerInfo;
 
