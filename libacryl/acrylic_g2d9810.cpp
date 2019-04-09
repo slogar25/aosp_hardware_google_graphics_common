@@ -707,6 +707,7 @@ int AcrylicCompositorG2D9810::ioctlG2D(void)
             return -errno;
 
         mTask.flags = task.flags;
+        mTask.laptime_in_usec = task.laptime_in_usec;
 
         for (unsigned int i = 0; i < mTask.num_release_fences; i++)
             mTask.release_fence[i] = task.release_fence[i];
