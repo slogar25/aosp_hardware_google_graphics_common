@@ -17,6 +17,8 @@
 #ifndef _EXYNOSDEVICEINTERFACE_H
 #define _EXYNOSDEVICEINTERFACE_H
 
+#include "ExynosHWCHelper.h"
+
 class ExynosDevice;
 class ExynosDeviceInterface {
     protected:
@@ -28,5 +30,7 @@ class ExynosDeviceInterface {
         virtual void updateRestrictions() = 0;
         virtual bool getUseQuery() { return mUseQuery; };
         ExynosDevice* getExynosDevice() {return mExynosDevice;};
+    public:
+        uint32_t mType = INTERFACE_TYPE_NONE;
 };
 #endif //_EXYNOSDEVICEINTERFACE_H

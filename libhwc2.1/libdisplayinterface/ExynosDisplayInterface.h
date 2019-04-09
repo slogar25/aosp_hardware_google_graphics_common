@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <hardware/hwcomposer2.h>
 #include <utils/Errors.h>
+#include "ExynosHWCHelper.h"
 
 class ExynosDisplay;
 
@@ -57,6 +58,8 @@ class ExynosDisplayInterface {
         virtual int32_t setForcePanic() {return NO_ERROR;};
         virtual int getDisplayFd() {return -1;};
         virtual uint32_t getMaxWindowNum() {return 0;};
+    public:
+        uint32_t mType = INTERFACE_TYPE_NONE;
 };
 
 #endif

@@ -60,6 +60,12 @@ enum {
     EXYNOS_HWC_DIM_LAYER = 0x00000001,
 };
 
+enum {
+    INTERFACE_TYPE_NONE = 0,
+    INTERFACE_TYPE_FB   = 1,
+    INTERFACE_TYPE_DRM  = 2,
+};
+
 typedef enum format_type {
 
     /* format */

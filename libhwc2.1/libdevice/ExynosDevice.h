@@ -101,11 +101,6 @@ typedef struct update_time_info {
 } update_time_info_t;
 
 enum {
-    INTERFACE_TYPE_FB  = 0,
-    INTERFACE_TYPE_DRM = 1,
-};
-
-enum {
     GEOMETRY_LAYER_TYPE_CHANGED             = 1ULL << 0,
     GEOMETRY_LAYER_DATASPACE_CHANGED        = 1ULL << 1,
     GEOMETRY_LAYER_DISPLAYFRAME_CHANGED     = 1ULL << 2,
