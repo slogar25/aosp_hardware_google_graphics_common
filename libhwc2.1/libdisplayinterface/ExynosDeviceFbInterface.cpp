@@ -215,6 +215,7 @@ void *hwc_eventHndler_thread(void *data) {
 
 ExynosDeviceFbInterface::ExynosDeviceFbInterface(ExynosDevice *exynosDevice)
 {
+    mType = INTERFACE_TYPE_FB;
 }
 
 ExynosDeviceFbInterface::~ExynosDeviceFbInterface()

@@ -31,6 +31,7 @@ ExynosDisplayFbInterface::ExynosDisplayFbInterface(ExynosDisplay *exynosDisplay)
 {
     mExynosDisplay = exynosDisplay;
     clearFbWinConfigData(mFbConfigData);
+    mType = INTERFACE_TYPE_FB;
 }
 
 ExynosDisplayFbInterface::~ExynosDisplayFbInterface()
