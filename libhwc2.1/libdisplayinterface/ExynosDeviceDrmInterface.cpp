@@ -24,6 +24,7 @@
 
 ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice)
 {
+    mType = INTERFACE_TYPE_DRM;
 }
 
 ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface()

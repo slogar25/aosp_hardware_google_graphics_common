@@ -37,6 +37,7 @@ extern struct exynos_hwc_control exynosHWCControl;
 static const int32_t kUmPerInch = 25400;
 ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
 {
+    mType = INTERFACE_TYPE_DRM;
     init(exynosDisplay);
 }
 
