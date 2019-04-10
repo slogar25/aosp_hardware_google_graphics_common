@@ -383,6 +383,17 @@ int32_t ExynosDisplayDrmInterface::getHdrCapabilities(uint32_t* outNumTypes,
     return 0;
 }
 
+int ExynosDisplayDrmInterface::getDeconChannel(ExynosMPP *otfMPP)
+{
+    int32_t channelNum = sizeof(IDMA_CHANNEL_MAP)/sizeof(dpp_channel_map_t);
+    for (int i = 0; i < channelNum; i++) {
+        if((IDMA_CHANNEL_MAP[i].type == otfMPP->mPhysicalType) &&
+           (IDMA_CHANNEL_MAP[i].index == otfMPP->mPhysicalIndex))
+            return IDMA_CHANNEL_MAP[i].channel;
+    }
+    return -EINVAL;
+}
+
 int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 {
     int ret = NO_ERROR;
@@ -412,11 +423,15 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         exynos_win_config_data& config = mExynosDisplay->mDpuData.configs[i];
         if (config.state == config.WIN_STATE_BUFFER) {
             uint32_t fb_id = 0;
-            /*
-             * [HACK]: We can use only the first plane
-             * We should map window to plane
-             */
-            auto &plane = mDrmDevice->planes().at(0);
+            int channelId = 0;
+            if ((channelId = getDeconChannel(config.assignedMPP)) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s:: Failed to get channel id (%d)",
+                        __func__, channelId);
+                ret = -EINVAL;
+                drmReq.setError(ret, this);
+                return ret;
+            }
+            auto &plane = mDrmDevice->planes().at(channelId);
             /* Set this plane is enabled */
             planeEnableInfo[plane->id()] = 1;
 
@@ -494,13 +509,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 return ret;
             }
 
-            /* TODO: Set rotation, blending, alpha */
-            uint64_t rotation = DRM_MODE_ROTATE_0;
-            uint64_t blend;
-            //uint32_t blending =  config.blending;
-            uint32_t blending = HWC2_BLEND_MODE_NONE;
+            uint64_t rotation = halTransformToDrmRot(config.transform);
+            uint64_t blend = 0;
             if (plane->blend_property().id()) {
-                switch (blending) {
+                switch (config.blending) {
                     case HWC2_BLEND_MODE_PREMULTIPLIED:
                         std::tie(blend, ret) = plane->blend_property().GetEnumValueWithName(
                                 "Pre-multiplied");
