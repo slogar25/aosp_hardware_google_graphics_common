@@ -491,7 +491,7 @@ int32_t ExynosResourceManager::assignResource(ExynosDisplay *display)
         }
     }
 
-    if (!display->mUseDecon) {
+    if (!display->mUseDpu) {
         if (display->mClientCompositionInfo.mHasCompositionLayer) {
             if ((ret = display->mExynosCompositionInfo.mM2mMPP->assignMPP(display, &display->mClientCompositionInfo)) != NO_ERROR)
             {
@@ -999,10 +999,10 @@ int32_t ExynosResourceManager::assignCompositionTarget(ExynosDisplay * display, 
 
     if (targetType == COMPOSITION_EXYNOS) {
         for (uint32_t i = 0; i < mM2mMPPs.size(); i++) {
-            if ((display->mUseDecon == true) &&
+            if ((display->mUseDpu == true) &&
                 (mM2mMPPs[i]->mLogicalType != MPP_LOGICAL_G2D_RGB))
                 continue;
-            if ((display->mUseDecon == false) &&
+            if ((display->mUseDpu == false) &&
                 (mM2mMPPs[i]->mLogicalType != MPP_LOGICAL_G2D_COMBO))
                 continue;
             if (mM2mMPPs[i]->isAssignableState(display, src_img, dst_img)) {
@@ -1025,7 +1025,7 @@ int32_t ExynosResourceManager::assignCompositionTarget(ExynosDisplay * display, 
         return -EINVAL;
     }
 
-    if (display->mUseDecon == false) {
+    if (display->mUseDpu == false) {
         return NO_ERROR;
     }
 
@@ -1326,7 +1326,7 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
     layer->setExynosMidImage(dst_img);
 
     validateFlag = validateLayer(layer_index, display, layer);
-    if ((display->mUseDecon) &&
+    if ((display->mUseDpu) &&
         (display->mWindowNumUsed >= display->mMaxWindowNum))
         validateFlag |= eInsufficientWindow;
 
@@ -1365,10 +1365,10 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
         /* 2. Find available m2mMPP */
         for (uint32_t j = 0; j < mM2mMPPs.size(); j++) {
 
-            if ((display->mUseDecon == true) &&
+            if ((display->mUseDpu == true) &&
                 (mM2mMPPs[j]->mLogicalType == MPP_LOGICAL_G2D_COMBO))
                 continue;
-            if ((display->mUseDecon == false) &&
+            if ((display->mUseDpu == false) &&
                 (mM2mMPPs[j]->mLogicalType == MPP_LOGICAL_G2D_RGB))
                 continue;
 
@@ -1589,7 +1589,7 @@ int32_t ExynosResourceManager::assignWindow(ExynosDisplay *display)
     int ret = NO_ERROR;
     uint32_t windowIndex = 0;
 
-    if (!display->mUseDecon)
+    if (!display->mUseDpu)
         return ret;
 
     windowIndex = display->mBaseWindowIndex;

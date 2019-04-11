@@ -327,7 +327,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
 
     mLowFpsLayerInfo.initializeInfos();
 
-    mUseDecon = true;
+    mUseDpu = true;
     return;
 }
 
@@ -979,14 +979,14 @@ bool ExynosDisplay::validateExynosCompositionLayer()
         (mExynosCompositionInfo.mLastIndex >= 0)) {
         sourceSize = mExynosCompositionInfo.mLastIndex - mExynosCompositionInfo.mFirstIndex + 1;
 
-        if (!mUseDecon && mClientCompositionInfo.mHasCompositionLayer)
+        if (!mUseDpu && mClientCompositionInfo.mHasCompositionLayer)
             sourceSize++;
     }
 
     if (m2mMpp->mAssignedSources.size() == 0) {
         DISPLAY_LOGE("No source images");
         isValid = false;
-    } else if (mUseDecon && (((mExynosCompositionInfo.mFirstIndex < 0) ||
+    } else if (mUseDpu && (((mExynosCompositionInfo.mFirstIndex < 0) ||
                (mExynosCompositionInfo.mLastIndex < 0)) ||
                (sourceSize != (int)m2mMpp->mAssignedSources.size()))) {
         DISPLAY_LOGE("Invalid index (%d, %d), size(%zu), sourceSize(%d)",
@@ -1594,7 +1594,7 @@ int ExynosDisplay::setWinConfigData() {
         if ((mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_EXYNOS) ||
                 (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT))
             continue;
-        int32_t windowIndex =  mLayers[i]->mWindowIndex; 
+        int32_t windowIndex =  mLayers[i]->mWindowIndex;
         if ((windowIndex < 0) || (windowIndex >= (int32_t)mDpuData.configs.size())) {
             DISPLAY_LOGE("%s:: %zu layer has invalid windowIndex(%d)",
                     __func__, i, windowIndex);
@@ -2072,7 +2072,7 @@ int ExynosDisplay::setReleaseFences() {
             errString.appendFormat("There is exynos composition, but m2mMPP is NULL\n");
             goto err;
         }
-        if (mUseDecon &&
+        if (mUseDpu &&
             ((mExynosCompositionInfo.mWindowIndex < 0) ||
              (mExynosCompositionInfo.mWindowIndex >= (int32_t)mDpuData.configs.size()))) {
             errString.appendFormat("%s:: exynosComposition has invalid window index(%d)\n",
@@ -2103,7 +2103,7 @@ int ExynosDisplay::setReleaseFences() {
                     i, mLayers[i]->mReleaseFence);
         }
         mExynosCompositionInfo.mM2mMPP->resetSrcReleaseFence();
-        if(mUseDecon) {
+        if(mUseDpu) {
 #ifdef DISABLE_FENCE
             mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
 #else

@@ -365,7 +365,7 @@ class ExynosDisplay {
          */
         int mLastRetireFence;
 
-        bool mUseDecon;
+        bool mUseDpu;
 
         /**
          * Max Window number, It should be set by display module(chip)
