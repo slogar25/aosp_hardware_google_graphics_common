@@ -24,7 +24,7 @@
 #include "acrylic_internal.h"
 
 Acrylic::Acrylic(const HW2DCapability &capability)
-    : mLayerCount(0), mLayers(nullptr), mCapability(capability), mHasDefaultColor(false),
+    : mLayerCount(0), mLayers(nullptr), mCapability(capability), mHasBackgroundColor(false),
       mMaxTargetLuminance(100), mMinTargetLuminance(0), mTargetDisplayInfo(nullptr),
       mCanvas(this, AcrylicCanvas::CANVAS_TARGET)
 {

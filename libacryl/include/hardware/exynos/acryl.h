@@ -172,6 +172,7 @@ public:
         FEATURE_UORDER_WRITE = 1 << 7,
         FEATURE_OTF_READ     = 1 << 8,
         FEATURE_OTF_WRITE    = 1 << 9,
+        FEATURE_SOLIDCOLOR  = 1 << 10,
     };
 
     enum { RESAMPLING_FRACTION_BITS = 20 };
@@ -437,6 +438,7 @@ public:
      *                U-order memory access by GPU helps the BUS efficiency.
      * - ATTR_OTF: The image buffer is hard-wired. If this attribute is given, libacryl
      *             ignores the buffer configuration to the canvas.
+     * - ATTR_SOLIDCOLOR : The image buffer is empty and should be filled with one RGBA value by H/W.
      */
     enum layer_attr_t {
         ATTR_NONE       = 0,
@@ -444,7 +446,8 @@ public:
         ATTR_COMPRESSED = 2,
         ATTR_UORDER     = 4,
         ATTR_OTF        = 8,
-        ATTR_ALL_MASK   = 0xF
+        ATTR_SOLIDCOLOR = 16,
+        ATTR_ALL_MASK   = 0x1F
     };
     /*
      * Describes how the buffer of the image is identified.
@@ -453,9 +456,9 @@ public:
      * - MT_USERPTR: the buffer is identified by a memory address that is valid
      *               in the current process. Usally it is a bug if mAttributes
      *               has ATTR_PROTECTED whlie mMemoryType is MT_USERPTR.
-     * - MT_OTF : the buffer is hard-wired.
+     * - MT_EMTPY : the buffer is empty such as hare-wired buffer or colorfill layer.
      */
-    enum memory_type { MT_DMABUF = 1, MT_USERPTR = 2, MT_OTF = 3 };
+    enum memory_type { MT_DMABUF = 1, MT_USERPTR = 2, MT_EMPTY = 3 };
     /*
      * Indicates the configured or modified settings
      * - SETTING_TYPE: Image format and color space information is configured by users.
@@ -502,6 +505,11 @@ public:
      * while JFIF(JPEG, SRGB) does not have.
      */
     bool setImageType(uint32_t fmt, int dataspace);
+    /*
+     * Configure color fill layer that fill only one RGBA color without actual buffer.
+     * Note that this successes if the compositor supports FEATURE_SOLIDCOLOR.
+     */
+    bool setImageBuffer(int a, int r, int g, int b, uint32_t attr = ATTR_NONE);
     /*
      * Configure the image buffer of dmabuf type.
      */
@@ -569,6 +577,10 @@ public:
      * Study if the canvas buffer is hard-wired.
      */
     bool isOTF() { return !!(mAttributes & ATTR_OTF); }
+    /*
+     * Study if the image is filled with solid color.
+     */
+    bool isSolidColor() { return !!(mAttributes & ATTR_SOLIDCOLOR); }
     /*
      * Obtain the acquire fence of the buffer.
      */
@@ -641,6 +653,10 @@ public:
      * Obtain the flags that indicates the configuration status
      */
     uint32_t getSettingFlags() { return mSettingFlags; }
+    /*
+     * Obtain the solid color combined by 8bit of A, R, G, B
+     */
+    uint32_t getSolidColor() { return mSolidColor; }
 protected:
     enum canvas_type_t {
         CANVAS_SOURCE,
@@ -677,6 +693,7 @@ private:
     int mFence; // NOTE: this should be reset to -1 after Acrylic::execute()
     uint32_t mAttributes;
     uint32_t mSettingFlags;
+    uint32_t mSolidColor; // [32:0] ARGB order.
     canvas_type_t mCanvasType;
 };
 
@@ -997,18 +1014,18 @@ public:
      */
     void setDefaultColor(uint16_t red, uint16_t green, uint16_t blue, uint16_t alpha)
     {
-        mDefaultColor.R = red;
-        mDefaultColor.G = green;
-        mDefaultColor.B = blue;
-        mDefaultColor.A = alpha;
-        mHasDefaultColor = true;
+        mBackgroundColor.R = red;
+        mBackgroundColor.G = green;
+        mBackgroundColor.B = blue;
+        mBackgroundColor.A = alpha;
+        mHasBackgroundColor = true;
     }
     /*
      * Cancel the configured default color values.
      */
     void clearDefaultColor()
     {
-        mHasDefaultColor = false;
+        mHasBackgroundColor = false;
     }
     /*
      * Configures cofficients the tone mapper if the user of Acrylic wants to
@@ -1134,15 +1151,15 @@ protected:
         // if mLayers == NULL, mLayerCount should be 0
         return (index < mLayerCount) ? mLayers[index] : NULL;
     }
-    void getDefaultColor(uint16_t *red, uint16_t *green, uint16_t *blue,
+    void getBackgroundColor(uint16_t *red, uint16_t *green, uint16_t *blue,
                          uint16_t *alpha)
     {
-        *red   = mDefaultColor.R;
-        *green = mDefaultColor.G;
-        *blue  = mDefaultColor.B;
-        *alpha = mDefaultColor.A;
+        *red   = mBackgroundColor.R;
+        *green = mBackgroundColor.G;
+        *blue  = mBackgroundColor.B;
+        *alpha = mBackgroundColor.A;
     }
-    bool hasDefaultColor() { return mHasDefaultColor; }
+    bool hasBackgroundColor() { return mHasBackgroundColor; }
     uint16_t getMaxTargetDisplayLuminance() { return mMaxTargetLuminance; }
     uint16_t getMinTargetDisplayLuminance() { return mMinTargetLuminance; }
     void *getTargetDisplayInfo() { return mTargetDisplayInfo; }
@@ -1155,8 +1172,8 @@ private:
         uint16_t G;
         uint16_t B;
         uint16_t A;
-    } mDefaultColor;
-    bool mHasDefaultColor;
+    } mBackgroundColor;
+    bool mHasBackgroundColor;
     uint16_t mMaxTargetLuminance;
     uint16_t mMinTargetLuminance;
     void *mTargetDisplayInfo;
@@ -1177,7 +1194,7 @@ struct AcrylicPerformanceRequestFrame {
     int             mFrameRate;
     uint32_t        mTargetPixFormat;
     hw2d_coord_t    mTargetDimension;
-    bool            mHasSolidColorLayer;
+    bool            mHasBackgroundLayer;
     struct AcrylicPerformanceRequestLayer *mLayers;
 
     AcrylicPerformanceRequestFrame();
@@ -1207,11 +1224,11 @@ struct AcrylicPerformanceRequestFrame {
         }
     }
 
-    void setTargetDimension(int width, int height, uint32_t fmt, bool bSolidLayer) {
+    void setTargetDimension(int width, int height, uint32_t fmt, bool bBackground) {
         mTargetDimension.hori = width;
         mTargetDimension.vert = height;
         mTargetPixFormat = fmt;
-        mHasSolidColorLayer = bSolidLayer;
+        mHasBackgroundLayer = bBackground;
     }
 
     void setFrameRate(int rate) { mFrameRate = rate; }

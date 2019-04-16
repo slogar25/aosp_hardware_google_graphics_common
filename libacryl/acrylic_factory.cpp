@@ -288,7 +288,7 @@ const static stHW2DCapability __capability_fimg2d_9830 = {
     .transform_type = HW2DCapability::TRANSFORM_ALL,
     .auxiliary_feature = HW2DCapability::FEATURE_PLANE_ALPHA | HW2DCapability::FEATURE_UORDER_WRITE
                          | HW2DCapability::FEATURE_AFBC_ENCODE | HW2DCapability::FEATURE_AFBC_DECODE
-                         | HW2DCapability::FEATURE_OTF_WRITE,
+                         | HW2DCapability::FEATURE_OTF_WRITE | HW2DCapability::FEATURE_SOLIDCOLOR,
     .num_formats = ARRSIZE(all_fimg2d_sbwc_formats),
     .num_dataspaces = ARRSIZE(all_hwc_dataspaces),
     .max_layers = 16,

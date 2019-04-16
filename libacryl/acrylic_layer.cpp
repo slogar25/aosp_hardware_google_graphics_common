@@ -90,6 +90,34 @@ bool AcrylicCanvas::setImageDimension(int32_t width, int32_t height)
     return true;
 }
 
+bool AcrylicCanvas::setImageBuffer(int a, int r, int g, int b, uint32_t attr)
+{
+    if (!getCompositor()) {
+        ALOGE("Trying to set buffer to an orphaned layer");
+        return false;
+    }
+
+    const HW2DCapability &cap = getCompositor()->getCapabilities();
+
+    if (((mCanvasType == CANVAS_SOURCE) && !cap.isFeatureSupported(HW2DCapability::FEATURE_SOLIDCOLOR)) ||
+        (mCanvasType == CANVAS_TARGET)) {
+        ALOGE("SolidColor is not supported for %s", canvasTypeName(mCanvasType));
+        return false;
+    }
+
+    mFence = -1;
+    mMemoryType = MT_EMPTY;
+    mNumBuffers = 0;
+
+    mAttributes = (attr & ATTR_ALL_MASK) | ATTR_SOLIDCOLOR;
+
+    set(SETTING_BUFFER | SETTING_BUFFER_MODIFIED);
+
+    mSolidColor  = ((a & 0xFF) << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | ((b & 0xFF));
+
+    return true;
+}
+
 bool AcrylicCanvas::setImageBuffer(int fd[MAX_HW2D_PLANES], size_t len[MAX_HW2D_PLANES], off_t offset[MAX_HW2D_PLANES],
                                    int num_buffers, int fence, uint32_t attr)
 {
@@ -215,7 +243,7 @@ bool AcrylicCanvas::setImageOTFBuffer(uint32_t attr)
     }
 
     mFence = -1;
-    mMemoryType = MT_OTF;
+    mMemoryType = MT_EMPTY;
     mNumBuffers = 0;
 
     mAttributes = (attr & ATTR_ALL_MASK) | ATTR_OTF;

@@ -128,6 +128,7 @@ private:
     bool prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[], int index);
     bool prepareSource(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size, int index);
     bool prepareSolidLayer(AcrylicCanvas &canvas, struct g2d_layer &image, uint32_t cmd[]);
+    bool prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size);
     bool reallocLayer(unsigned int layercount);
 
     AcrylicDevice mDev;

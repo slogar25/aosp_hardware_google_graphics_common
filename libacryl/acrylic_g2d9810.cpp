@@ -413,7 +413,7 @@ bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_lay
         }
     }
 
-    if (layer.getBufferType() == AcrylicCanvas::MT_OTF) {
+    if (layer.getBufferType() == AcrylicCanvas::MT_EMPTY) {
         image.buffer_type = G2D_BUFTYPE_EMPTY;
     } else {
         if (layer.getBufferCount() < g2dfmt->num_bufs) {
@@ -502,10 +502,8 @@ bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_lay
 
 #define G2D_SCALE_FACTOR(from, to) ((static_cast<uint32_t>(from) << G2D_SCALEFACTOR_FRACBITS) / (to))
 
-bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g2d_layer &image, uint32_t cmd[])
+static void setSolidLayer(struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t xy)
 {
-    hw2d_coord_t xy = canvas.getImageDimension();
-
     image.flags = G2D_LAYERFLAG_COLORFILL;
     image.buffer_type = G2D_BUFTYPE_EMPTY;
     image.num_buffers = 0;
@@ -513,27 +511,10 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
     cmd[G2DSFR_IMG_COLORMODE] = G2D_FMT_ARGB8888;
     cmd[G2DSFR_IMG_STRIDE] = 4 * xy.hori;
 
-    cmd[G2DSFR_IMG_LEFT]   = 0;
-    cmd[G2DSFR_IMG_TOP]    = 0;
-    cmd[G2DSFR_IMG_RIGHT]  = xy.hori;
-    cmd[G2DSFR_IMG_BOTTOM] = xy.vert;
     cmd[G2DSFR_IMG_WIDTH]  = xy.hori;
     cmd[G2DSFR_IMG_HEIGHT] = xy.vert;
 
-    cmd[G2DSFR_SRC_DSTLEFT]   = 0;
-    cmd[G2DSFR_SRC_DSTTOP]    = 0;
-    cmd[G2DSFR_SRC_DSTRIGHT]  = xy.hori;
-    cmd[G2DSFR_SRC_DSTBOTTOM] = xy.vert;
-
-    uint16_t a, r, g, b;
-    getDefaultColor(&r, &g, &b, &a);
-
-    cmd[G2DSFR_SRC_COLOR]  = (a & 0xFF00) << 16;
-    cmd[G2DSFR_SRC_COLOR] |= (r & 0xFF00) << 8;
-    cmd[G2DSFR_SRC_COLOR] |= (g & 0xFF00) << 0;
-    cmd[G2DSFR_SRC_COLOR] |= (b & 0xFF00) >> 8;
     cmd[G2DSFR_SRC_SELECT] = G2D_LAYERSEL_COLORFILL;
-
     cmd[G2DSFR_SRC_COMMAND] = G2D_LAYERCMD_VALID;
 
     cmd[G2DSFR_SRC_ROTATE] = 0;
@@ -550,6 +531,56 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
     cmd[G2DSFR_SRC_C_HEADER_STRIDE] = 0;
     cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = 0;
     cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = 0;
+}
+
+bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g2d_layer &image, uint32_t cmd[])
+{
+    hw2d_coord_t xy = canvas.getImageDimension();
+
+    uint16_t a, r, g, b;
+    getBackgroundColor(&r, &g, &b, &a);
+
+    cmd[G2DSFR_SRC_COLOR]  = (a & 0xFF00) << 16;
+    cmd[G2DSFR_SRC_COLOR] |= (r & 0xFF00) << 8;
+    cmd[G2DSFR_SRC_COLOR] |= (g & 0xFF00) << 0;
+    cmd[G2DSFR_SRC_COLOR] |= (b & 0xFF00) >> 8;
+
+    cmd[G2DSFR_IMG_LEFT]   = 0;
+    cmd[G2DSFR_IMG_TOP]    = 0;
+    cmd[G2DSFR_IMG_RIGHT]  = xy.hori;
+    cmd[G2DSFR_IMG_BOTTOM] = xy.vert;
+
+    cmd[G2DSFR_SRC_DSTLEFT]   = 0;
+    cmd[G2DSFR_SRC_DSTTOP]    = 0;
+    cmd[G2DSFR_SRC_DSTRIGHT]  = xy.hori;
+    cmd[G2DSFR_SRC_DSTBOTTOM] = xy.vert;
+
+    setSolidLayer(image, cmd, xy);
+
+    return true;
+}
+
+bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size)
+{
+    hw2d_coord_t xy = layer.getImageDimension();
+
+    cmd[G2DSFR_SRC_COLOR]  = layer.getSolidColor();
+
+    hw2d_rect_t crop = layer.getImageRect();
+    cmd[G2DSFR_IMG_LEFT]   = crop.pos.hori;
+    cmd[G2DSFR_IMG_TOP]    = crop.pos.vert;
+    cmd[G2DSFR_IMG_RIGHT]  = crop.size.hori + crop.pos.hori;
+    cmd[G2DSFR_IMG_BOTTOM] = crop.size.vert + crop.pos.vert;
+
+    hw2d_rect_t window = layer.getTargetRect();
+    if (area_is_zero(window))
+        window.size = target_size;
+    cmd[G2DSFR_SRC_DSTLEFT]   = window.pos.hori;
+    cmd[G2DSFR_SRC_DSTTOP]    = window.pos.vert;
+    cmd[G2DSFR_SRC_DSTRIGHT]  = window.size.hori + window.pos.hori;
+    cmd[G2DSFR_SRC_DSTBOTTOM] = window.size.vert + window.pos.vert;
+
+    setSolidLayer(image, cmd, xy);
 
     return true;
 }
@@ -557,6 +588,12 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
 bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[],
                                              hw2d_coord_t target_size, int index)
 {
+    if (layer.isSolidColor()) {
+        prepareSolidLayer(layer, image, cmd, target_size);
+
+        return true;
+    }
+
     if (!prepareImage(layer, image, cmd, index))
         return false;
 
@@ -730,7 +767,7 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
     if (num_fences > layercount + 1)
         num_fences = layercount + 1;
 
-    if (hasDefaultColor()) {
+    if (hasBackgroundColor()) {
         layercount++;
 
         if (layercount > getCapabilities().maxLayerCount()) {
@@ -756,7 +793,7 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
 
     unsigned int baseidx = 0;
 
-    if (hasDefaultColor()) {
+    if (hasBackgroundColor()) {
         baseidx++;
         prepareSolidLayer(getCanvas(), mTask.source[0], mTask.commands.source[0]);
     }
@@ -984,17 +1021,17 @@ bool AcrylicCompositorG2D9810::requestPerformanceQoS(AcrylicPerformanceRequest *
         bandwidth >>= ((bpp == 12) && src_yuv420 && src_rotate) ? 12 : 13;
         data.frame[i].bandwidth_write = static_cast<uint32_t>(bandwidth);
 
-        if (frame->mHasSolidColorLayer)
+        if (frame->mHasBackgroundLayer)
             data.frame[i].frame_attr |= G2D_PERF_FRAME_SOLIDCOLORFILL;
 
         data.frame[i].num_layers = frame->getLayerCount();
         data.frame[i].target_pixelcount = frame->mTargetDimension.vert * frame->mTargetDimension.hori;
         data.frame[i].frame_rate = frame->mFrameRate;
 
-        ALOGD_TEST("    FRAME[%d]: BW:(%u, %u) Layercount %d, Framerate %d, Target %dx%d, FMT %#x Solid fill? %d",
+        ALOGD_TEST("    FRAME[%d]: BW:(%u, %u) Layercount %d, Framerate %d, Target %dx%d, FMT %#x Background? %d",
             i, data.frame[i].bandwidth_read, data.frame[i].bandwidth_write, data.frame[i].num_layers, frame->mFrameRate,
             frame->mTargetDimension.hori, frame->mTargetDimension.vert, frame->mTargetPixFormat,
-            frame->mHasSolidColorLayer);
+            frame->mHasBackgroundLayer);
     }
 
     data.num_frame = request->getFrameCount();
