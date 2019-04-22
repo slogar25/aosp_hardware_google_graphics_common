@@ -42,7 +42,7 @@ int DrmPlane::Init() {
   }
 
   uint64_t type;
-  ret = p.value(&type);
+  std::tie(ret, type) = p.value();
   if (ret) {
     ALOGE("Failed to get plane type property value");
     return ret;
@@ -117,6 +117,10 @@ int DrmPlane::Init() {
     ALOGE("Could not get SRC_H property");
     return ret;
   }
+
+  ret = drm_->GetPlaneProperty(*this, "zpos", &zpos_property_);
+  if (ret)
+    ALOGE("Could not get zpos property for plane %u", id());
 
   ret = drm_->GetPlaneProperty(*this, "rotation", &rotation_property_);
   if (ret)
@@ -202,6 +206,10 @@ const DrmProperty &DrmPlane::src_w_property() const {
 
 const DrmProperty &DrmPlane::src_h_property() const {
   return src_h_property_;
+}
+
+const DrmProperty &DrmPlane::zpos_property() const {
+  return zpos_property_;
 }
 
 const DrmProperty &DrmPlane::rotation_property() const {
