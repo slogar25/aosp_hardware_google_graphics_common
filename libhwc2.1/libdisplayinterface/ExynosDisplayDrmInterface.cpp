@@ -430,16 +430,30 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             }
 
             uint32_t bpp = formatToBpp(config.format);
-            uint32_t pitches[HWC_DRM_BO_MAX_PLANES] =
-            {config.src.f_w * bpp, config.src.f_w * bpp, config.src.f_w * bpp, 0};
-            uint32_t offsets[HWC_DRM_BO_MAX_PLANES] =
-            {0, };
-            uint32_t buf_handles[HWC_DRM_BO_MAX_PLANES] =
-            {(uint32_t)config.fd_idma[0], (uint32_t)config.fd_idma[1], (uint32_t)config.fd_idma[2], 0};
-            if ((ret = drmModeAddFB2(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
-                    drmFormat, buf_handles, pitches, offsets, &fb_id, 0)) != NO_ERROR) {
-                HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add FB, fb_id(%d), ret(%d)",
-                        __func__, i, fb_id, ret);
+            uint32_t pitches[HWC_DRM_BO_MAX_PLANES] = {0};
+            uint32_t offsets[HWC_DRM_BO_MAX_PLANES] = {0};
+            uint32_t buf_handles[HWC_DRM_BO_MAX_PLANES] = {0};
+            uint32_t planeNum = getBufferNumOfFormat(config.format);
+            for(uint32_t planeIndex = 0; planeIndex < planeNum; planeIndex++) {
+                pitches[planeIndex] = config.src.f_w * bpp;
+                buf_handles[planeIndex] = (uint32_t)config.fd_idma[planeIndex];
+            }
+
+            uint64_t modifiers[HWC_DRM_BO_MAX_PLANES] = {0};
+            if (config.compression)
+                modifiers[0] = DRM_FORMAT_MOD_ARM_AFBC(AFBC_FORMAT_MOD_BLOCK_SIZE_16x16);
+
+            ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
+                    drmFormat, buf_handles, pitches, offsets, modifiers, &fb_id, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
+            if (ret != NO_ERROR) {
+                HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add FB, fb_id(%d), ret(%d), f_w: %d, f_h: %d, format: %d, buf_handles[%d, %d, %d, %d], "
+                        "pitches[%d, %d, %d, %d], offsets[%d, %d, %d, %d], modifiers[%#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 "]",
+                        __func__, i, fb_id, ret,
+                        config.src.f_w, config.src.f_h, drmFormat,
+                        buf_handles[0], buf_handles[1], buf_handles[2], buf_handles[3],
+                        pitches[0], pitches[1], pitches[2], pitches[3],
+                        offsets[0], offsets[1], offsets[2], offsets[3],
+                        modifiers[0], modifiers[1], modifiers[2], modifiers[3]);
                 drmReq.setError(ret, this);
                 return ret;
             }
