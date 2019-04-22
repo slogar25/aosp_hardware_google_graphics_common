@@ -148,6 +148,7 @@ int DrmPlane::Init() {
   properties_.push_back(&src_y_property_);
   properties_.push_back(&src_w_property_);
   properties_.push_back(&src_h_property_);
+  properties_.push_back(&zpos_property_);
   properties_.push_back(&rotation_property_);
   properties_.push_back(&alpha_property_);
   properties_.push_back(&blend_property_);
