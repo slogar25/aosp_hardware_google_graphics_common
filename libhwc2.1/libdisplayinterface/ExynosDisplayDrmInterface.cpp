@@ -145,7 +145,7 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
 
 int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
 {
-    mDrmVSyncWorker.VSyncControl((bool)enabled);
+    mDrmVSyncWorker.VSyncControl(HWC2_VSYNC_ENABLE == enabled);
     return NO_ERROR;
 }
 
