@@ -101,6 +101,8 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     mDrmVSyncWorker.Init(mDrmDevice, mExynosDisplay->mDisplayId);
     mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(&mVsyncCallbak));
 
+    chosePreferredConfig();
+
     return;
 }
 
@@ -192,6 +194,17 @@ int32_t ExynosDisplayDrmInterface::getDisplayAttribute(
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
+{
+    uint32_t num_configs = 0;
+    int32_t err = getDisplayConfigs(&num_configs, NULL);
+    if (err != HWC2_ERROR_NONE || !num_configs)
+        return err;
+
+    ALOGI("Preferred mode id: %d", mDrmConnector->get_preferred_mode_id());
+    return setActiveConfig(mDrmConnector->get_preferred_mode_id());
+}
+
 int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         uint32_t* outNumConfigs,
         hwc2_config_t* outConfigs)
@@ -218,12 +231,6 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         outConfigs[idx++] = mode.id();
     }
     *outNumConfigs = idx;
-
-    /* TODO:
-     * Check how to get active config
-     * Current code sets config in first index
-     */
-    setActiveConfig(outConfigs[0]);
 
     return 0;
 }

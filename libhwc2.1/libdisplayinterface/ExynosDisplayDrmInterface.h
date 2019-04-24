@@ -77,6 +77,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
     protected:
         int32_t applyDisplayMode();
         String8& dumpAtomicCommitInfo(String8 &result, drmModeAtomicReqPtr pset, bool debugPrint = false);
+        int32_t chosePreferredConfig();
     protected:
         struct ModeState {
             bool needs_modeset = false;
