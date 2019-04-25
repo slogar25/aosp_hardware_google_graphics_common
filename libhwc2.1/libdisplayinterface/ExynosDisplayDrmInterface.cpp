@@ -707,11 +707,13 @@ String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmMod
 
     for (uint32_t i = 0; i < (uint32_t)drmModeAtomicGetCursor(pset); i++) {
         const DrmProperty *property = NULL;
+        String8 objectName;
         /* Check crtc properties */
         if (pset->items[i].object_id == mDrmCrtc->id()) {
             for (auto property_ptr : mDrmCrtc->properties()) {
                 if (pset->items[i].property_id == property_ptr->id()){
                     property = property_ptr;
+                    objectName.appendFormat("Crtc");
                     break;
                 }
             }
@@ -723,6 +725,7 @@ String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmMod
             for (auto property_ptr : mDrmConnector->properties()) {
                 if (pset->items[i].property_id == property_ptr->id()){
                     property = property_ptr;
+                    objectName.appendFormat("Connector");
                     break;
                 }
             }
@@ -731,11 +734,13 @@ String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmMod
                         __func__);
             }
         } else {
+            uint32_t channelId = 0;
             for (auto &plane : mDrmDevice->planes()) {
                 if (pset->items[i].object_id == plane->id()) {
                     for (auto property_ptr : plane->properties()) {
                         if (pset->items[i].property_id == property_ptr->id()){
                             property = property_ptr;
+                            objectName.appendFormat("Plane[%d]", channelId);
                             break;
                         }
                     }
@@ -744,6 +749,7 @@ String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmMod
                                 __func__);
                     }
                 }
+                channelId++;
             }
         }
         if (property == NULL) {
@@ -754,11 +760,11 @@ String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmMod
         }
 
         if (debugPrint)
-            ALOGD("property[%d] object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
-                    i, pset->items[i].object_id, pset->items[i].property_id, property->name().c_str(), pset->items[i].value);
+            ALOGD("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
+                    i, objectName.string(), pset->items[i].object_id, pset->items[i].property_id, property->name().c_str(), pset->items[i].value);
         else
-            result.appendFormat("property[%d] object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
-                i, pset->items[i].object_id, pset->items[i].property_id, property->name().c_str(), pset->items[i].value);
+            result.appendFormat("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
+                i,  objectName.string(), pset->items[i].object_id, pset->items[i].property_id, property->name().c_str(), pset->items[i].value);
     }
     return result;
 }
