@@ -20,7 +20,6 @@
 
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 #include <cutils/properties.h>
-#include <system/graphics.h>
 #include <unordered_set>
 #include "ExynosResourceManager.h"
 #include "ExynosMPPModule.h"
@@ -1157,7 +1156,6 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
 
     /* Copy origin source HDR metadata */
     dst_img.metaParcel = src_img.metaParcel;
-    dst_img.needDegamma = false; //Dst side need not degamma
 
     uint32_t dstW = dst_img.w;
     uint32_t dstH = dst_img.h;
@@ -1872,16 +1870,6 @@ int32_t ExynosResourceManager::preProcessLayer(ExynosDisplay * display)
         if (layer->mIsHdrLayer) hasHdrLayer = true;
         if ((layer->mLayerBuffer != NULL) && (getDrmMode(layer->mLayerBuffer) != NO_DRM))
             hasDrmLayer = true;
-    }
-
-    /* Check to need degamma */
-    if ((display->mDisplayId == HWC_DISPLAY_EXTERNAL) &&
-            (((ExynosExternalDisplay *)display)->mExternalHdrSupported) && (hasHdrLayer)) {
-        for (uint32_t i = 0; i < display->mLayers.size(); i++) {
-            ExynosLayer *layer = display->mLayers[i];
-            if(!layer->mIsHdrLayer)
-                layer->mNeedDegamma = true;
-        }
     }
 
     // Re-align layer priority for max overlay resources

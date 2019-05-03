@@ -436,16 +436,6 @@ bool ExynosMPP::checkCSCRestriction(struct exynos_image &src, struct exynos_imag
     return true;
 }
 
-bool ExynosMPP::isSupportedDegamma(struct exynos_image &src)
-{
-    if (!src.needDegamma)
-        return true;
-
-    if (mAttr & MPP_ATTR_DEGAMMA)
-        return true;
-
-    return false;
-}
 bool ExynosMPP::isDimLayerSupported()
 {
     if (mAttr & MPP_ATTR_DIM)
@@ -2070,8 +2060,6 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         return -eMPPExeedMaxUpScale;
     else if (!isSupportedDRM(src))
         return -eMPPUnsupportedDRM;
-    else if (!isSupportedDegamma(src))
-        return -eMPPUnsupportedDegamma;
     else if (!isSupportedHStrideCrop(src))
         return -eMPPStrideCrop;
     else if (src.fullWidth > maxSrcWidth)
