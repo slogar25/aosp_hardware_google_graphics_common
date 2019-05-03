@@ -1330,19 +1330,6 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
             dataspace = HAL_DATASPACE_V0_BT601_625;
     }
 
-    /* HDR degamma operation here */
-    if ((mLogicalType == MPP_LOGICAL_G2D_RGB) && isComposition) {
-        size_t sourceNum = mAssignedSources.size();
-        for (size_t i = 0; i < sourceNum; i++) {
-            if(mAssignedSources[i]->mSrcImg.needDegamma) {
-                MPP_LOGD(eDebugMPP, "HWC2: degamma here %p",
-                        private_handle_t::dynamicCast(mSrcImgs[i].bufferHandle));
-                dataspace = HAL_DATASPACE_BT2020_PQ;
-                break;
-            }
-        }
-    }
-
     bufFds[0] = dstHandle->fd;
     bufFds[1] = dstHandle->fd1;
     bufFds[2] = dstHandle->fd2;
