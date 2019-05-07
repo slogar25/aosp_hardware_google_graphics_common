@@ -334,6 +334,28 @@ class ExynosLayer : public ExynosMPPSource {
         virtual int32_t setLayerPerFrameMetadata(uint32_t numElements,
                 const int32_t* /*hw2_per_frame_metadata_key_t*/ keys, const float* metadata);
 
+        /* setLayerPerFrameMetadataBlobs(...,numElements, keys, sizes, blobs)
+         * Descriptor: HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA_BLOBS
+         * Parameters:
+         *   numElements is the number of elements in each of the keys, sizes, and
+         *   metadata arrays
+         *   keys is a pointer to an array of keys.  Current valid keys are those listed
+         *   above as valid blob type keys.
+         *   sizes is a pointer to an array of unsigned ints specifying the sizes of
+         *   each metadata blob
+         *   metadata is a pointer to a blob of data holding all blobs contiguously in
+         *   memory
+         *
+         *   Returns HWC2_ERROR_NONE or one of the following erros:
+         *     HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         *     HWC2_ERROR_BAD_PARAMETER - sizes of keys and metadata parameters does
+         *     not match numElements, numElements < 0, or keys contains a
+         *     non-valid key (see above for current valid blob type keys).
+         *     HWC2_ERROR_UNSUPPORTED - metadata is not supported on this display
+         */
+        int32_t SetLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
+                const uint8_t* metadata);
+
         void resetValidateData();
         virtual void dump(String8& result);
         void printLayer();

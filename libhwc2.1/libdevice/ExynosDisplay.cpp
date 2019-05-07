@@ -2879,6 +2879,28 @@ int32_t ExynosDisplay::setColorModeWithRenderIntent(int32_t /*android_color_mode
     return mDisplayInterface->setColorModeWithRenderIntent(mode, intent);
 }
 
+int32_t ExynosDisplay::getDisplayIdentificationData(uint8_t* outPort,
+        uint32_t* outDataSize, uint8_t* outData)
+{
+    return mDisplayInterface->getDisplayIdentificationData(outPort, outDataSize, outData);
+}
+
+int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
+        uint32_t* outCapabilities)
+{
+    return mDisplayInterface->getDisplayCapabilities(outNumCapabilities, outCapabilities);
+}
+
+int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
+{
+    return mDisplayInterface->getDisplayBrightnessSupport(outSupport);
+}
+
+int32_t ExynosDisplay::setDisplayBrightness(float brightness)
+{
+    return mDisplayInterface->setDisplayBrightness(brightness);
+}
+
 int32_t ExynosDisplay::setOutputBuffer(
         buffer_handle_t __unused buffer,
         int32_t __unused releaseFence) {

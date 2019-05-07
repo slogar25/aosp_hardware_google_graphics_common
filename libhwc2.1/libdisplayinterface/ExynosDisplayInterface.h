@@ -63,6 +63,13 @@ class ExynosDisplayInterface {
         virtual int32_t setColorModeWithRenderIntent(int32_t __unused mode, int32_t __unused intent) {return 0;}
         virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
                 int32_t* /*android_dataspace_t*/ outDataspace);
+        /* HWC 2.3 APIs */
+        virtual int32_t getDisplayIdentificationData(uint8_t* __unused outPort,
+                uint32_t* __unused outDataSize, uint8_t* __unused outData) {return 0;}
+        virtual int32_t getDisplayCapabilities(uint32_t* __unused outNumCapabilities,
+                uint32_t* __unused outCapabilities) {return 0;}
+        virtual int32_t getDisplayBrightnessSupport(bool* __unused outSupport) {return 0;}
+        virtual int32_t setDisplayBrightness(float __unused brightness) {return 0;}
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

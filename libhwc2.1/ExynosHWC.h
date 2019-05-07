@@ -137,6 +137,29 @@ int32_t exynos_setReadbackBuffer(hwc2_device_t *dev, hwc2_display_t display,
 int32_t exynos_getReadbackBufferFence(hwc2_device_t *dev, hwc2_display_t display,
         int32_t* outFence);
 
+int32_t exynos_getDisplayIdentificationData(hwc2_device_t* device, hwc2_display_t display, uint8_t* outPort,
+        uint32_t* outDataSize, uint8_t* outData);
+int32_t exynos_getDisplayCapabilities(hwc2_device_t* device, hwc2_display_t display, uint32_t* outNumCapabilities,
+        uint32_t* outCapabilities);
+int32_t exynos_setLayerColorTransform(hwc2_device_t* device, hwc2_display_t display, hwc2_layer_t layer,
+        const float* matrix);
+int32_t exynos_getDisplayedContentSamplingAttributes(hwc2_device_t* device, hwc2_display_t display,
+        int32_t* /* andrmid_pixel_format_t */ format,
+        int32_t* /* android_dataspace_t */ dataspace,
+        uint8_t* /* mask of android_component_t */ supported_components);
+int32_t exynos_setDisplayedContentSamplingEnabled(hwc2_device_t* device, hwc2_display_t display,
+        int32_t /*hwc2_displayed_content_sampling_t*/ enabled,
+        uint8_t /* mask of android_component_t */ component_mask,
+        uint64_t max_frames);
+int32_t exynos_getDisplayedContentSample(hwc2_device_t* device, hwc2_display_t display,
+        uint64_t max_frames, uint64_t timestamp,
+        uint64_t* frame_count, int32_t samples_size[4], uint64_t* samples[4]);
+int32_t exynos_SetLayerPerFrameMetadataBlobs(hwc2_device_t* device, hwc2_display_t display,
+        hwc2_layer_t layer, uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
+        const uint8_t* metadata);
+int32_t exynos_getDisplayBrightnessSupport(hwc2_device_t* device, hwc2_display_t display, bool* outSupport);
+int32_t exynos_setDisplayBrightness(hwc2_device_t* device, hwc2_display_t display, float brightness);
+
 enum {
     NO_DRM = 0,
     NORMAL_DRM,

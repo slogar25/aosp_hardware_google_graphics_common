@@ -640,6 +640,12 @@ int32_t ExynosLayer::setLayerPerFrameMetadata(uint32_t numElements,
     return NO_ERROR;
 }
 
+int32_t ExynosLayer::SetLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
+        const uint8_t* metadata)
+{
+    return NO_ERROR;
+}
+
 void ExynosLayer::resetValidateData()
 {
     mValidateCompositionType = HWC2_COMPOSITION_INVALID;

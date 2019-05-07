@@ -685,6 +685,71 @@ class ExynosDisplay {
         int32_t setColorModeWithRenderIntent(int32_t /*android_color_mode_t*/ mode,
                 int32_t /*android_render_intent_v1_1_t */ intent);
 
+        /* HWC 2.3 APIs */
+
+        /* getDisplayIdentificationData(..., outPort, outDataSize, outData)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_IDENTIFICATION_DATA
+         * Parameters:
+         *   outPort - the connector to which the display is connected;
+         *             pointer will be non-NULL
+         *   outDataSize - if outData is NULL, the size in bytes of the data which would
+         *       have been returned; if outData is not NULL, the size of outData, which
+         *       must not exceed the value stored in outDataSize prior to the call;
+         *       pointer will be non-NULL
+         *   outData - the EDID 1.3 blob identifying the display
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         */
+        int32_t getDisplayIdentificationData(uint8_t* outPort,
+                uint32_t* outDataSize, uint8_t* outData);
+
+        /* getDisplayCapabilities(..., outCapabilities)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_CAPABILITIES
+         * Parameters:
+         *   outNumCapabilities - if outCapabilities was nullptr, returns the number of capabilities
+         *       if outCapabilities was not nullptr, returns the number of capabilities stored in
+         *       outCapabilities, which must not exceed the value stored in outNumCapabilities prior
+         *       to the call; pointer will be non-NULL
+         *   outCapabilities - a list of supported capabilities.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         */
+        /* Capabilities
+           Invalid = HWC2_CAPABILITY_INVALID,
+           SidebandStream = HWC2_CAPABILITY_SIDEBAND_STREAM,
+           SkipClientColorTransform = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM,
+           PresentFenceIsNotReliable = HWC2_CAPABILITY_PRESENT_FENCE_IS_NOT_RELIABLE,
+           SkipValidate = HWC2_CAPABILITY_SKIP_VALIDATE,
+        */
+        int32_t getDisplayCapabilities(uint32_t* outNumCapabilities,
+                uint32_t* outCapabilities);
+
+        /* getDisplayBrightnessSupport(displayToken)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_BRIGHTNESS_SUPPORT
+         * Parameters:
+         *   outSupport - whether the display supports operations.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY when the display is invalid.
+         */
+        int32_t getDisplayBrightnessSupport(bool* outSupport);
+
+        /* setDisplayBrightness(displayToken, brightnesss)
+         * Descriptor: HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS
+         * Parameters:
+         *   brightness - a number between 0.0f (minimum brightness) and 1.0f (maximum brightness), or
+         *          -1.0f to turn the backlight off.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY   when the display is invalid, or
+         *   HWC2_ERROR_UNSUPPORTED   when brightness operations are not supported, or
+         *   HWC2_ERROR_BAD_PARAMETER when the brightness is invalid, or
+         *   HWC2_ERROR_NO_RESOURCES  when the brightness cannot be applied.
+         */
+        int32_t setDisplayBrightness(float brightness);
+
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
 
