@@ -33,6 +33,7 @@
 #include "ExynosExternalDisplay.h"
 #include "ExynosDeviceInterface.h"
 
+#ifndef USE_MODULE_ATTR
 /* Basic supported features */
 feature_support_t feature_table[] =
 {
@@ -75,6 +76,7 @@ feature_support_t feature_table[] =
         MPP_ATTR_HDR10 | MPP_ATTR_USE_CAPA
     }
 };
+#endif
 
 using namespace android;
 

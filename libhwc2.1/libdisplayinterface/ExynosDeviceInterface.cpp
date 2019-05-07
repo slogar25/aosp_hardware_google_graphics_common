@@ -19,10 +19,13 @@
 #include "ExynosDevice.h"
 #include "ExynosResourceManager.h"
 #include "ExynosMPP.h"
+#include "ExynosResourceRestriction.h"
 #include <unordered_set>
 #include <unordered_map>
 
+#ifndef USE_MODULE_ATTR
 extern feature_support_t feature_table[];
+#endif
 
 void ExynosDeviceInterface::printDppRestriction(struct dpp_ch_restriction res)
 {
