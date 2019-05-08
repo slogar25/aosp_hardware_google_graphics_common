@@ -72,7 +72,6 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mType = HWC_DISPLAY_PRIMARY;
     mIndex = index;
     mDisplayId = getDisplayId(mType, mIndex);
-    mDisplayName = android::String8("PrimaryDisplay");
 
     // Prepare multi resolution
     // Will be exynosHWCControl.multiResoultion

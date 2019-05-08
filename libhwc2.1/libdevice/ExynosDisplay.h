@@ -356,6 +356,7 @@ class ExynosDisplay {
         uint32_t mDisplayId;
         uint32_t mType;
         uint32_t mIndex;
+        String8 mDeconNodeName;
         uint32_t mXres;
         uint32_t mYres;
         uint32_t mXdpi;

@@ -32,8 +32,6 @@ ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t index, ExynosDevice *device)
     : ExynosDisplay(index, device)
 {
     /* Initialization */
-    mDisplayName = android::String8("VirtualDisplay");
-
     mType = HWC_DISPLAY_VIRTUAL;
     mIndex = index;
     mDisplayId = getDisplayId(mType, mIndex);

@@ -80,41 +80,53 @@ ExynosDevice::ExynosDevice()
     exynosHWCControl.doFenceFileDump = false;
     exynosHWCControl.fenceTracer = 0;
     exynosHWCControl.sysFenceLogging = false;
+    exynosHWCControl.useDynamicRecomp = false;
 
     mInterfaceType = getDeviceInterfaceType();
 
     ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
     mResourceManager = new ExynosResourceManagerModule(this);
 
-    ExynosPrimaryDisplayModule *primary_display = new ExynosPrimaryDisplayModule(0, this);
+    for (size_t i = 0; i < DISPLAY_COUNT; i++) {
+        exynos_display_t display_t = AVAILABLE_DISPLAY_UNITS[i];
+        ExynosDisplay *exynos_display = NULL;
+        switch(display_t.type) {
+            case HWC_DISPLAY_PRIMARY:
+                exynos_display = (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this));
+                if(display_t.index == 0) {
+                    exynos_display->mPlugState = true;
+                    ExynosMPP::mainDisplayWidth = exynos_display->mXres;
+                    if (ExynosMPP::mainDisplayWidth <= 0) {
+                        ExynosMPP::mainDisplayWidth = 1440;
+                    }
+                    ExynosMPP::mainDisplayHeight = exynos_display->mYres;
+                    if (ExynosMPP::mainDisplayHeight <= 0) {
+                        ExynosMPP::mainDisplayHeight = 2560;
+                    }
+                }
+                break;
+            case HWC_DISPLAY_EXTERNAL:
+                exynos_display = (ExynosDisplay *)(new ExynosExternalDisplayModule(display_t.index, this));
+                break;
+            case HWC_DISPLAY_VIRTUAL:
+                exynos_display = (ExynosDisplay *)(new ExynosVirtualDisplayModule(display_t.index, this));
+                mNumVirtualDisplay = 0;
+                break;
+            default:
+                ALOGE("Unsupported display type(%d)", display_t.type);
+                break;
+        }
+        exynos_display->mDeconNodeName.appendFormat("%s", display_t.decon_node_name);
+        exynos_display->mDisplayName.appendFormat("%s", display_t.display_name);
+        mDisplays.add(exynos_display);
 
-    primary_display->mPlugState = true;
-    ExynosMPP::mainDisplayWidth = primary_display->mXres;
-    if (ExynosMPP::mainDisplayWidth <= 0) {
-        ExynosMPP::mainDisplayWidth = 1440;
+#ifndef FORCE_DISABLE_DR
+        if (exynos_display->mDREnable)
+            exynosHWCControl.useDynamicRecomp = true;
+#endif
     }
-    ExynosMPP::mainDisplayHeight = primary_display->mYres;
-    if (ExynosMPP::mainDisplayHeight <= 0) {
-        ExynosMPP::mainDisplayHeight = 2560;
-    }
-
-    ExynosExternalDisplayModule *external_display = new ExynosExternalDisplayModule(0, this);
-
-    ExynosVirtualDisplayModule *virtual_display = new ExynosVirtualDisplayModule(0, this);
-
-    mNumVirtualDisplay = 0;
-
-    mDisplays.add((ExynosDisplay*) primary_display);
-    mDisplays.add((ExynosDisplay*) external_display);
-    mDisplays.add((ExynosDisplay*) virtual_display);
 
     memset(mCallbackInfos, 0, sizeof(mCallbackInfos));
-#ifndef FORCE_DISABLE_DR
-    exynosHWCControl.useDynamicRecomp = (primary_display->mDREnable) || (external_display->mDREnable) ||
-                                        (virtual_display->mDREnable);
-#else
-    exynosHWCControl.useDynamicRecomp = false;
-#endif
 
     dynamicRecompositionThreadCreate();
 
@@ -149,6 +161,7 @@ ExynosDevice::ExynosDevice()
 
     PixelDisplayInit(this);
 
+    ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     char value[PROPERTY_VALUE_MAX];
     property_get("vendor.display.lbe.supported", value, "0");
     mLbeSupported = atoi(value) ? true : false;
@@ -983,7 +996,7 @@ bool ExynosDevice::isLbeSupported() {
 
 void ExynosDevice::setLbeState(LbeState state) {
     if (mLbeSupported) {
-        ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
+        ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
         primary_display->setLbeState(state);
         invalidate();
     }
@@ -991,7 +1004,7 @@ void ExynosDevice::setLbeState(LbeState state) {
 
 void ExynosDevice::setLbeAmbientLight(int value) {
     if (mLbeSupported) {
-        ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
+        ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
         primary_display->setLbeAmbientLight(value);
         invalidate();
     }
@@ -999,7 +1012,7 @@ void ExynosDevice::setLbeAmbientLight(int value) {
 
 LbeState ExynosDevice::getLbeState() {
     if (mLbeSupported) {
-        ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
+        ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
         return primary_display->getLbeState();
     }
     return LbeState::OFF;

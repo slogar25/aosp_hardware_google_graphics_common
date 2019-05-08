@@ -55,9 +55,7 @@ ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice *devic
 
     //TODO : Hard coded currently
     mNumMaxPriorityAllowed = 1;
-
     mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
-    mDisplayName = android::String8("ExternalDisplay");
 }
 
 ExynosExternalDisplay::~ExynosExternalDisplay()
