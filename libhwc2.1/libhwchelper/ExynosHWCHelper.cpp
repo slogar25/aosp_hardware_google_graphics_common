@@ -550,6 +550,37 @@ uint32_t getBufferNumOfFormat(int format)
     return 0;
 }
 
+uint32_t getPlaneNumOfFormat(int format)
+{
+    if (isFormatRgb(format))
+        return 1;
+    switch (format) {
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_TILED:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M:
+        case HAL_PIXEL_FORMAT_YCBCR_P010:
+            return 2;
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YV12_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN:
+        case HAL_PIXEL_FORMAT_YV12:
+            return 3;
+        /* Not supported format */
+        default:
+            return 0;
+    }
+}
+
 void setFenceName(int fenceFd, hwc_fence_type fenceType)
 {
     if (fenceFd >= 3)
@@ -586,12 +617,16 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B:
         HDEBUGLOGD(eDebugMPP, "8bit size(Y) : %d, extra size : %d", NV12M_Y_SIZE(width, height), NV12M_Y_2B_SIZE(width, height));
         return NV12M_Y_SIZE(width, height) + NV12M_Y_2B_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B:
+        return NV12N_10B_Y_8B_SIZE(width, height) + NV12N_10B_Y_2B_SIZE(width, height);
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M:
         HDEBUGLOGD(eDebugMPP, "size(Y) : %d", P010M_Y_SIZE(width, height));
         return P010M_Y_SIZE(width, height);
     case HAL_PIXEL_FORMAT_YCBCR_P010:
         HDEBUGLOGD(eDebugMPP, "size(Y) : %d", P010_Y_SIZE(width, height));
         return P010_Y_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
+        return YUV420N_Y_SIZE(width, height);
     }
 
     return NV12M_Y_SIZE(width, height) + ((width % 128) == 0 ? 0 : 256);

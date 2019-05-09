@@ -343,6 +343,7 @@ String8 getFormatStr(int format);
 String8 getMPPStr(int typeId);
 void adjustRect(hwc_rect_t &rect, int32_t width, int32_t height);
 uint32_t getBufferNumOfFormat(int format);
+uint32_t getPlaneNumOfFormat(int format);
 
 int fence_close(int fence, ExynosDisplay* display,
         hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip);
@@ -371,6 +372,7 @@ inline int pixel_align(int x, int a) {
     return x;
 }
 
+uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format);
 int getBufLength(private_handle_t *handle, uint32_t planer_num, size_t *length, int format, uint32_t width, uint32_t height);
 
 //class hwc_fence_info(sync_fence_info_data* data, sync_pt_info* info) {
