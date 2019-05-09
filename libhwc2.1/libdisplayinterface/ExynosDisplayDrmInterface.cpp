@@ -19,6 +19,9 @@
 #include "ExynosDisplay.h"
 #include "ExynosHWCDebug.h"
 
+constexpr uint32_t MAX_PLANE_NUM = 3;
+constexpr uint32_t CBCR_INDEX = 1;
+
 typedef struct _drmModeAtomicReqItem drmModeAtomicReqItem, *drmModeAtomicReqItemPtr;
 
 struct _drmModeAtomicReqItem {
@@ -448,10 +451,36 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             uint32_t pitches[HWC_DRM_BO_MAX_PLANES] = {0};
             uint32_t offsets[HWC_DRM_BO_MAX_PLANES] = {0};
             uint32_t buf_handles[HWC_DRM_BO_MAX_PLANES] = {0};
-            uint32_t planeNum = getBufferNumOfFormat(config.format);
-            for(uint32_t planeIndex = 0; planeIndex < planeNum; planeIndex++) {
-                pitches[planeIndex] = config.src.f_w * bpp;
-                buf_handles[planeIndex] = (uint32_t)config.fd_idma[planeIndex];
+            uint32_t bufferNum, planeNum = 0;
+            if ((bufferNum = getBufferNumOfFormat(config.format)) == 0) {
+                HWC_LOGE(mExynosDisplay, "%s:: getBufferNumOfFormat(%d) error",
+                        __func__, config.format);
+                ret = -EINVAL;
+                drmReq.setError(ret, this);
+                return ret;
+            }
+            if (((planeNum = getPlaneNumOfFormat(config.format)) == 0) ||
+                (planeNum > MAX_PLANE_NUM)) {
+                HWC_LOGE(mExynosDisplay, "%s:: getPlaneNumOfFormat(%d) error, planeNum(%d)",
+                        __func__, config.format, planeNum);
+                ret = -EINVAL;
+                drmReq.setError(ret, this);
+                return ret;
+            }
+            for(uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
+                pitches[bufferIndex] = config.src.f_w * bpp;
+                buf_handles[bufferIndex] = (uint32_t)config.fd_idma[bufferIndex];
+            }
+            if ((bufferNum == 1) && (planeNum > bufferNum)) {
+                /* offset for cbcr */
+                offsets[CBCR_INDEX] =
+                    getExynosBufferYLength(config.src.f_w, config.src.f_h, config.format);
+
+                for (uint32_t planeIndex = 1; planeIndex < planeNum; planeIndex++)
+                {
+                    buf_handles[planeIndex] = buf_handles[0];
+                    pitches[planeIndex] = pitches[0];
+                }
             }
 
             uint64_t modifiers[HWC_DRM_BO_MAX_PLANES] = {0};
