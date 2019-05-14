@@ -523,8 +523,6 @@ static void setSolidLayer(struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t 
     cmd[G2DSFR_SRC_YSCALE] = G2D_SCALE_FACTOR(1, 1);
     cmd[G2DSFR_SRC_XPHASE] = 0;
     cmd[G2DSFR_SRC_YPHASE] = 0;
-    cmd[G2DSFR_SRC_ALPHA] = 0;
-    cmd[G2DSFR_SRC_BLEND] = 0;
     cmd[G2DSFR_SRC_YCBCRMODE] = 0;
     cmd[G2DSFR_SRC_HDRMODE] = 0;
     cmd[G2DSFR_SRC_Y_HEADER_STRIDE] = 0;
@@ -536,6 +534,8 @@ static void setSolidLayer(struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t 
 bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g2d_layer &image, uint32_t cmd[])
 {
     hw2d_coord_t xy = canvas.getImageDimension();
+
+    setSolidLayer(image, cmd, xy);
 
     uint16_t a, r, g, b;
     getBackgroundColor(&r, &g, &b, &a);
@@ -555,14 +555,17 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
     cmd[G2DSFR_SRC_DSTRIGHT]  = xy.hori;
     cmd[G2DSFR_SRC_DSTBOTTOM] = xy.vert;
 
-    setSolidLayer(image, cmd, xy);
+    cmd[G2DSFR_SRC_ALPHA] = 0;
+    cmd[G2DSFR_SRC_BLEND] = 0;
 
     return true;
 }
 
-bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size)
+bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size, int index)
 {
     hw2d_coord_t xy = layer.getImageDimension();
+
+    setSolidLayer(image, cmd, xy);
 
     cmd[G2DSFR_SRC_COLOR]  = layer.getSolidColor();
 
@@ -580,7 +583,26 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d
     cmd[G2DSFR_SRC_DSTRIGHT]  = window.size.hori + window.pos.hori;
     cmd[G2DSFR_SRC_DSTBOTTOM] = window.size.vert + window.pos.vert;
 
-    setSolidLayer(image, cmd, xy);
+    uint8_t alpha = layer.getPlaneAlpha();
+    cmd[G2DSFR_SRC_ALPHA] = (alpha << 24) | (alpha << 16) | (alpha << 8) | alpha;
+    if ((layer.getCompositingMode() == HWC_BLENDING_PREMULT) ||
+            (layer.getCompositingMode() == HWC2_BLEND_MODE_PREMULTIPLIED)) {
+        cmd[G2DSFR_SRC_BLEND] = G2D_BLEND_SRCOVER;
+    } else if ((layer.getCompositingMode() == HWC_BLENDING_COVERAGE) ||
+               (layer.getCompositingMode() == HWC2_BLEND_MODE_COVERAGE)) {
+        cmd[G2DSFR_SRC_BLEND] = G2D_BLEND_NONE;
+    } else {
+        cmd[G2DSFR_SRC_BLEND] = G2D_BLEND_SRCCOPY;
+    }
+
+    /* bottom layer always is opaque */
+    if (index == 0) {
+       cmd[G2DSFR_SRC_COMMAND] |= G2D_LAYERCMD_OPAQUE;
+       if (alpha < 255)
+           cmd[G2DSFR_SRC_COMMAND] |= G2D_LAYERCMD_PREMULT_GLOBALALPHA;
+    } else {
+       cmd[G2DSFR_SRC_COMMAND] |= G2D_LAYERCMD_ALPHABLEND;
+    }
 
     return true;
 }
@@ -589,7 +611,7 @@ bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_lay
                                              hw2d_coord_t target_size, int index)
 {
     if (layer.isSolidColor()) {
-        prepareSolidLayer(layer, image, cmd, target_size);
+        prepareSolidLayer(layer, image, cmd, target_size, index);
 
         return true;
     }
