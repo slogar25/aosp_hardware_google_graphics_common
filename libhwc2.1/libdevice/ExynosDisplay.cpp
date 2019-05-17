@@ -1186,7 +1186,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     if (layer.isDimLayer() && handle == NULL) {
         cfg.state = cfg.WIN_STATE_COLOR;
         hwc_color_t color = layer.mColor;
-        cfg.color = (color.r << 16) | (color.g << 8) | color.b;
+        cfg.color = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
         if (!((planeAlpha >= 0) && (planeAlpha <= 255)))
             cfg.plane_alpha = 0;
         DISPLAY_LOGD(eDebugWinConfig, "HWC2: DIM layer is enabled, alpha : %d", cfg.plane_alpha);
