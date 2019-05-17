@@ -79,6 +79,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         String8& dumpAtomicCommitInfo(String8 &result, drmModeAtomicReqPtr pset, bool debugPrint = false);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
+        uint32_t getBytePerPixelOfPrimaryPlane(int format);
     protected:
         struct ModeState {
             bool needs_modeset = false;

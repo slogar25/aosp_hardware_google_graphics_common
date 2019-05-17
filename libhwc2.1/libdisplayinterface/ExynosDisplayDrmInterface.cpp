@@ -447,7 +447,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 return ret;
             }
 
-            uint32_t bpp = formatToBpp(config.format);
+            uint32_t bpp = getBytePerPixelOfPrimaryPlane(config.format);
             uint32_t pitches[HWC_DRM_BO_MAX_PLANES] = {0};
             uint32_t offsets[HWC_DRM_BO_MAX_PLANES] = {0};
             uint32_t buf_handles[HWC_DRM_BO_MAX_PLANES] = {0};
@@ -839,4 +839,16 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
     }
     if(mPset)
         drmModeAtomicFree(mPset);
+}
+
+uint32_t ExynosDisplayDrmInterface::getBytePerPixelOfPrimaryPlane(int format)
+{
+    if (isFormatRgb(format))
+        return (formatToBpp(format)/8);
+    else if (isFormat10BitYUV420(format))
+        return 2;
+    else if (isFormatYUV420(format))
+        return 1;
+    else
+        return 0;
 }
