@@ -57,6 +57,7 @@ class DrmPlane {
   const DrmProperty &alpha_property() const;
   const DrmProperty &blend_property() const;
   const DrmProperty &in_fence_fd_property() const;
+  const DrmProperty &color_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -85,6 +86,7 @@ class DrmPlane {
   DrmProperty alpha_property_;
   DrmProperty blend_property_;
   DrmProperty in_fence_fd_property_;
+  DrmProperty color_property_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android
