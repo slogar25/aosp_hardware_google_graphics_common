@@ -424,7 +424,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     for (size_t i = 0; i < mExynosDisplay->mDpuData.configs.size(); i++) {
         exynos_win_config_data& config = mExynosDisplay->mDpuData.configs[i];
-        if (config.state == config.WIN_STATE_BUFFER) {
+        if ((config.state == config.WIN_STATE_BUFFER) ||
+            (config.state == config.WIN_STATE_COLOR)) {
             uint32_t fb_id = 0;
             int channelId = 0;
             if ((channelId = getDeconChannel(config.assignedMPP)) < 0) {
@@ -438,62 +439,83 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             /* Set this plane is enabled */
             planeEnableInfo[plane->id()] = 1;
 
-            int drmFormat = halFormatToDrmFormat(config.format);
-            if (drmFormat == DRM_FORMAT_UNDEFINED) {
-                HWC_LOGE(mExynosDisplay, "%s:: known drm format (%d)",
-                        __func__, config.format);
-                ret = -EINVAL;
-                drmReq.setError(ret, this);
-                return ret;
-            }
-
-            uint32_t bpp = getBytePerPixelOfPrimaryPlane(config.format);
+            int drmFormat = DRM_FORMAT_UNDEFINED;
+            uint32_t bpp = 0;
             uint32_t pitches[HWC_DRM_BO_MAX_PLANES] = {0};
             uint32_t offsets[HWC_DRM_BO_MAX_PLANES] = {0};
             uint32_t buf_handles[HWC_DRM_BO_MAX_PLANES] = {0};
-            uint32_t bufferNum, planeNum = 0;
-            if ((bufferNum = getBufferNumOfFormat(config.format)) == 0) {
-                HWC_LOGE(mExynosDisplay, "%s:: getBufferNumOfFormat(%d) error",
-                        __func__, config.format);
-                ret = -EINVAL;
-                drmReq.setError(ret, this);
-                return ret;
-            }
-            if (((planeNum = getPlaneNumOfFormat(config.format)) == 0) ||
-                (planeNum > MAX_PLANE_NUM)) {
-                HWC_LOGE(mExynosDisplay, "%s:: getPlaneNumOfFormat(%d) error, planeNum(%d)",
-                        __func__, config.format, planeNum);
-                ret = -EINVAL;
-                drmReq.setError(ret, this);
-                return ret;
-            }
-            for(uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
-                pitches[bufferIndex] = config.src.f_w * bpp;
-                buf_handles[bufferIndex] = (uint32_t)config.fd_idma[bufferIndex];
-            }
-            if ((bufferNum == 1) && (planeNum > bufferNum)) {
-                /* offset for cbcr */
-                offsets[CBCR_INDEX] =
-                    getExynosBufferYLength(config.src.f_w, config.src.f_h, config.format);
-
-                for (uint32_t planeIndex = 1; planeIndex < planeNum; planeIndex++)
-                {
-                    buf_handles[planeIndex] = buf_handles[0];
-                    pitches[planeIndex] = pitches[0];
-                }
-            }
-
             uint64_t modifiers[HWC_DRM_BO_MAX_PLANES] = {0};
-            if (config.compression)
-                modifiers[0] = DRM_FORMAT_MOD_ARM_AFBC(AFBC_FORMAT_MOD_BLOCK_SIZE_16x16);
+            uint32_t bufferNum, planeNum = 0;
+            if (config.state == config.WIN_STATE_BUFFER) {
+                drmFormat = halFormatToDrmFormat(config.format);
+                if (drmFormat == DRM_FORMAT_UNDEFINED) {
+                    HWC_LOGE(mExynosDisplay, "%s:: known drm format (%d)",
+                            __func__, config.format);
+                    ret = -EINVAL;
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
 
-            ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
-                    drmFormat, buf_handles, pitches, offsets, modifiers, &fb_id, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
+                bpp = getBytePerPixelOfPrimaryPlane(config.format);
+                if ((bufferNum = getBufferNumOfFormat(config.format)) == 0) {
+                    HWC_LOGE(mExynosDisplay, "%s:: getBufferNumOfFormat(%d) error",
+                            __func__, config.format);
+                    ret = -EINVAL;
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
+                if (((planeNum = getPlaneNumOfFormat(config.format)) == 0) ||
+                    (planeNum > MAX_PLANE_NUM)) {
+                    HWC_LOGE(mExynosDisplay, "%s:: getPlaneNumOfFormat(%d) error, planeNum(%d)",
+                            __func__, config.format, planeNum);
+                    ret = -EINVAL;
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
+                for(uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
+                    pitches[bufferIndex] = config.src.f_w * bpp;
+                    buf_handles[bufferIndex] = (uint32_t)config.fd_idma[bufferIndex];
+                }
+                if ((bufferNum == 1) && (planeNum > bufferNum)) {
+                    /* offset for cbcr */
+                    offsets[CBCR_INDEX] =
+                        getExynosBufferYLength(config.src.f_w, config.src.f_h, config.format);
+                    for (uint32_t planeIndex = 1; planeIndex < planeNum; planeIndex++)
+                    {
+                        buf_handles[planeIndex] = buf_handles[0];
+                        pitches[planeIndex] = pitches[0];
+                    }
+                }
+
+                if (config.compression)
+                    modifiers[0] = DRM_FORMAT_MOD_ARM_AFBC(AFBC_FORMAT_MOD_BLOCK_SIZE_16x16);
+
+                ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
+                        drmFormat, buf_handles, pitches, offsets, modifiers, &fb_id, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
+            } else if (config.state == config.WIN_STATE_COLOR) {
+                drmFormat = DRM_FORMAT_BGRA8888;
+                buf_handles[0] = 0xffff;
+                bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
+                pitches[0] = config.dst.w * bpp;
+                config.src.w = config.dst.w;
+                config.src.h = config.dst.h;
+
+                ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.dst.w, config.dst.h,
+                        drmFormat, buf_handles, pitches, offsets, modifiers, &fb_id, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
+            } else {
+                HWC_LOGE(mExynosDisplay, "%s:: config[%zu] known config state(%d)",
+                        __func__, i, config.state);
+                ret = -EINVAL;
+                drmReq.setError(ret, this);
+                return ret;
+            }
+
             if (ret != NO_ERROR) {
-                HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add FB, fb_id(%d), ret(%d), f_w: %d, f_h: %d, format: %d, buf_handles[%d, %d, %d, %d], "
+                HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add FB, fb_id(%d), ret(%d), f_w: %d, f_h: %d, dst.w: %d, dst.h: %d, "
+                        "format: %d, buf_handles[%d, %d, %d, %d], "
                         "pitches[%d, %d, %d, %d], offsets[%d, %d, %d, %d], modifiers[%#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 "]",
                         __func__, i, fb_id, ret,
-                        config.src.f_w, config.src.f_h, drmFormat,
+                        config.src.f_w, config.src.f_h, config.dst.w, config.dst.h, drmFormat,
                         buf_handles[0], buf_handles[1], buf_handles[2], buf_handles[3],
                         pitches[0], pitches[1], pitches[2], pitches[3],
                         offsets[0], offsets[1], offsets[2], offsets[3],
@@ -536,6 +558,17 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                         __func__, i, plane->id(), ret);
                 drmReq.setError(ret, this);
                 return ret;
+            }
+
+            if (config.state == config.WIN_STATE_COLOR) {
+                ret =  drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->color_property().id(), config.color) < 0;
+                if (ret) {
+                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to set color(%d) for plane %d, ret(%d)",
+                            __func__, i, config.color, plane->id(), ret);
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
             }
 
             uint64_t rotation = halTransformToDrmRot(config.transform);
