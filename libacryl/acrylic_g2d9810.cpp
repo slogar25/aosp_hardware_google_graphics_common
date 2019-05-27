@@ -789,7 +789,13 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
     if (num_fences > layercount + 1)
         num_fences = layercount + 1;
 
-    if (hasBackgroundColor()) {
+    bool hasBackground = hasBackgroundColor();
+
+    g2d_fmt *g2dfmt = halfmt_to_g2dfmt(halfmt_to_g2dfmt_tbl, len_halfmt_to_g2dfmt_tbl, getCanvas().getFormat());
+    if (g2dfmt && (g2dfmt->g2dfmt & G2D_DATAFORMAT_SBWC))
+        hasBackground = true;
+
+    if (hasBackground) {
         layercount++;
 
         if (layercount > getCapabilities().maxLayerCount()) {
@@ -815,7 +821,7 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
 
     unsigned int baseidx = 0;
 
-    if (hasBackgroundColor()) {
+    if (hasBackground) {
         baseidx++;
         prepareSolidLayer(getCanvas(), mTask.source[0], mTask.commands.source[0]);
     }
