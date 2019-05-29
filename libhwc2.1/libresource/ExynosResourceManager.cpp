@@ -1412,13 +1412,13 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                 continue;
             }
 
-            isAssignable = mM2mMPPs[j]->isAssignable(display, src_img, dst_img);
+            bool isAssignableState = mM2mMPPs[j]->isAssignableState(display, src_img, dst_img);
 
-            HDEBUGLOGD(eDebugResourceManager, "\t\t check %s: supportedBit(%d), isAssignable(%d)",
+            HDEBUGLOGD(eDebugResourceManager, "\t\t check %s: supportedBit(%d), isAssignableState(%d)",
                     mM2mMPPs[j]->mName.string(),
-                    (layer->mSupportedMPPFlag & mM2mMPPs[j]->mLogicalType), isAssignable);
+                    (layer->mSupportedMPPFlag & mM2mMPPs[j]->mLogicalType), isAssignableState);
 
-            if (isAssignable) {
+            if (isAssignableState) {
                 if ((mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_RGB) &&
                     (mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_COMBO)) {
                     exynos_image otf_src_img = dst_img;
@@ -1450,7 +1450,8 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                         if (otf_src_img.needColorTransform)
                             m2m_src_img.needColorTransform = false;
 
-                        if ((isSupported = mM2mMPPs[j]->isSupported(*display, m2m_src_img, otf_src_img)) != NO_ERROR)
+                        if (((isAssignable = mM2mMPPs[j]->isAssignable(display, m2m_src_img, otf_src_img)) == false) ||
+                            ((isSupported = mM2mMPPs[j]->isSupported(*display, m2m_src_img, otf_src_img)) != NO_ERROR))
                         {
                             HDEBUGLOGD(eDebugResourceManager, "\t\t\t check %s: supportedBit(0x%" PRIx64 ")",
                                     mM2mMPPs[j]->mName.string(), -isSupported);
