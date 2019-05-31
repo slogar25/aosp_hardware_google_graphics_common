@@ -129,7 +129,7 @@ class ExynosResourceManager {
 
         virtual void makeAcrylRestrictions(mpp_phycal_type_t type);
         void makeSizeRestrictions(uint32_t mppId, restriction_size_t size, restriction_classification_t format);
-        void makeFormatRestrictions(restriction_key_t table, int deviceFormat);
+        void makeFormatRestrictions(restriction_key_t table);
 
         void updateRestrictions();
 

@@ -2190,14 +2190,14 @@ void ExynosResourceManager::makeSizeRestrictions(uint32_t mppId, restriction_siz
             size.cropHeightAlign);
 }
 
-void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table, int deviceFormat) {
+void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table) {
 
     mFormatRestrictions[mFormatRestrictionCnt] = table;
 
-    HDEBUGLOGD(eDebugDefault, "MPP : %s, %d, %s(device : %d), %d"
+    HDEBUGLOGD(eDebugDefault, "MPP : %s, %d, %s, %d"
             ,getMPPStr(mFormatRestrictions[mFormatRestrictionCnt].hwType).string()
             ,mFormatRestrictions[mFormatRestrictionCnt].nodeType
-            ,getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format).string(), deviceFormat
+            ,getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format).string()
             ,mFormatRestrictions[mFormatRestrictionCnt].reserved);
     mFormatRestrictionCnt++;
 }
@@ -2226,8 +2226,7 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
             queried_format.nodeType = NODE_NONE;
             queried_format.format = exynos_format_desc[i].halFormat;
             queried_format.reserved = 0;
-            makeFormatRestrictions(queried_format,
-                    queried_format.format);
+            makeFormatRestrictions(queried_format);
         }
     }
 
