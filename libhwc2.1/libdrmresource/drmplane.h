@@ -62,6 +62,7 @@ class DrmPlane {
   const DrmProperty &range_property() const;
   const DrmProperty &max_luminance_property() const;
   const DrmProperty &min_luminance_property() const;
+  const DrmProperty &hw_restrictions_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -95,6 +96,7 @@ class DrmPlane {
   DrmProperty range_;
   DrmProperty max_luminance_;
   DrmProperty min_luminance_;
+  DrmProperty hw_restrictions_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android
