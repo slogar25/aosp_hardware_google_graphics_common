@@ -1263,8 +1263,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
              * and uses 0.0001nit unit for min luminance
              * Conversion is required
              */
-            luminanceMin = src_img.hdrStaticInfo.sType1.mMinDisplayLuminance;
-            luminanceMax = src_img.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
+            luminanceMin = src_img.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
+            luminanceMax = src_img.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
         } else {
             cfg.hdr_enable = true;
@@ -1296,8 +1296,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
                 if (parcelFdIndex > 0)
                     cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
             }
-            luminanceMin = src_img.hdrStaticInfo.sType1.mMinDisplayLuminance;
-            luminanceMax = src_img.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
+            luminanceMin = src_img.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
+            luminanceMax = src_img.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
         } else {
             cfg.hdr_enable = true;

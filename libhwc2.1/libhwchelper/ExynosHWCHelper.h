@@ -292,8 +292,8 @@ typedef struct exynos_image {
     /* refer
      * frameworks/native/include/media/hardware/VideoAPI.h
      * frameworks/native/include/media/hardware/HardwareAPI.h */
-    ExynosHdrStaticInfo hdrStaticInfo;
-    ExynosHdrDynamicInfo hdrDynamicInfo;
+    bool hasMetaParcel = false;
+    ExynosVideoMeta metaParcel;
     ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
     bool needDegamma = false;
     bool isDimLayer()

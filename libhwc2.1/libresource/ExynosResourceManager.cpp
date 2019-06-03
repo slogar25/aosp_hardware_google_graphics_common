@@ -1154,7 +1154,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     dst_img.dataSpace = src_img.dataSpace;
 
     /* Copy origin source HDR metadata */
-    dst_img.hdrStaticInfo = src_img.hdrStaticInfo;
+    dst_img.metaParcel = src_img.metaParcel;
     dst_img.needDegamma = false; //Dst side need not degamma
 
     uint32_t dstW = dst_img.w;

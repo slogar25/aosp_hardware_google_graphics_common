@@ -724,13 +724,14 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
     src_img->planeAlpha = mPlaneAlpha;
     src_img->zOrder = mZOrder;
     /* Copy HDR metadata */
-    memset(&(src_img->hdrStaticInfo), 0, sizeof(src_img->hdrStaticInfo));
-    memset(&(src_img->hdrDynamicInfo), 0, sizeof(src_img->hdrDynamicInfo));
+    memset(&(src_img->metaParcel), 0, sizeof(ExynosVideoMeta));
     src_img->metaType = VIDEO_INFO_TYPE_INVALID;
     if (mMetaParcel != NULL) {
-        src_img->hdrStaticInfo = mMetaParcel->sHdrStaticInfo;
-        src_img->hdrDynamicInfo = mMetaParcel->sHdrDynamicInfo;
+        memcpy(&(src_img->metaParcel), mMetaParcel, sizeof(ExynosVideoMeta));
         src_img->metaType = mMetaParcel->eType;
+        src_img->hasMetaParcel = true;
+    } else {
+        src_img->hasMetaParcel = false;
     }
     src_img->needDegamma = mNeedDegamma;
 
@@ -795,13 +796,14 @@ int32_t ExynosLayer::setDstExynosImage(exynos_image *dst_img)
     dst_img->zOrder = mZOrder;
 
     /* Copy HDR metadata */
-    memset(&(dst_img->hdrStaticInfo), 0, sizeof(dst_img->hdrStaticInfo));
-    memset(&(dst_img->hdrDynamicInfo), 0, sizeof(dst_img->hdrDynamicInfo));
+    memset(&(dst_img->metaParcel), 0, sizeof(ExynosVideoMeta));
     dst_img->metaType = VIDEO_INFO_TYPE_INVALID;
     if (mMetaParcel != NULL) {
-        dst_img->hdrStaticInfo = mMetaParcel->sHdrStaticInfo;
-        dst_img->hdrDynamicInfo = mMetaParcel->sHdrDynamicInfo;
+        memcpy(&(dst_img->metaParcel), mMetaParcel, sizeof(ExynosVideoMeta));
         dst_img->metaType = mMetaParcel->eType;
+        dst_img->hasMetaParcel = true;
+    } else {
+        dst_img->hasMetaParcel = false;
     }
     dst_img->needDegamma = false;
 

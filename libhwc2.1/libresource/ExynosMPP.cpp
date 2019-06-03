@@ -1162,12 +1162,17 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
 
     /* HDR process */
     if (hasHdrInfo(src)) {
-        unsigned int max = (src.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000);
-        unsigned int min = src.hdrStaticInfo.sType1.mMinDisplayLuminance;
+        unsigned int max = (src.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000);
+        unsigned int min = src.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
 
         srcImgInfo->mppLayer->setMasterDisplayLuminance(min,max);
         MPP_LOGD(eDebugMPP, "HWC2: G2D luminance min %d, max %d", min, max);
         MPP_LOGD(eDebugMPP|eDebugFence, "G2D getting HDR source!");
+    }
+
+    /* Transfer MetaData */
+    if (src.hasMetaParcel) {
+        srcImgInfo->mppLayer->setLayerData(&src.metaParcel, sizeof(ExynosVideoMeta));
     }
 
     srcImgInfo->bufferType = getBufferType(srcHandle);
