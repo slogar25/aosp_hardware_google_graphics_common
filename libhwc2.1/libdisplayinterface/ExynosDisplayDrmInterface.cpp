@@ -771,7 +771,7 @@ int32_t ExynosDisplayDrmInterface::setForcePanic()
     if (exynosHWCControl.forcePanic == 0)
         return NO_ERROR;
 
-    usleep(20000);
+    usleep(20000000);
 
     FILE *forcePanicFd = fopen(HWC_FORCE_PANIC_PATH, "w");
     if (forcePanicFd == NULL) {
