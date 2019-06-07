@@ -60,6 +60,8 @@ class DrmPlane {
   const DrmProperty &color_property() const;
   const DrmProperty &compression_source_property() const;
   const DrmProperty &dataspace_property() const;
+  const DrmProperty &max_luminance_property() const;
+  const DrmProperty &min_luminance_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -91,6 +93,8 @@ class DrmPlane {
   DrmProperty color_property_;
   DrmProperty compression_source_;
   DrmProperty dataspace_;
+  DrmProperty max_luminance_;
+  DrmProperty min_luminance_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android

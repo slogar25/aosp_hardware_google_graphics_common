@@ -150,6 +150,14 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get dataspace property");
 
+  ret = drm_->GetPlaneProperty(*this, "max_luminance", &max_luminance_);
+  if (ret)
+    ALOGI("Could not get max_luminance property");
+
+  ret = drm_->GetPlaneProperty(*this, "min_luminance", &min_luminance_);
+  if (ret)
+    ALOGI("Could not get min_luminance property");
+
   properties_.push_back(&crtc_property_);
   properties_.push_back(&fb_property_);
   properties_.push_back(&crtc_x_property_);
@@ -168,6 +176,8 @@ int DrmPlane::Init() {
   properties_.push_back(&color_property_);
   properties_.push_back(&compression_source_);
   properties_.push_back(&dataspace_);
+  properties_.push_back(&max_luminance_);
+  properties_.push_back(&min_luminance_);
 
   return 0;
 }
@@ -254,5 +264,13 @@ const DrmProperty &DrmPlane::compression_source_property() const {
 
 const DrmProperty &DrmPlane::dataspace_property() const {
   return dataspace_;
+}
+
+const DrmProperty &DrmPlane::max_luminance_property() const {
+  return max_luminance_;
+}
+
+const DrmProperty &DrmPlane::min_luminance_property() const {
+  return min_luminance_;
 }
 }  // namespace android
