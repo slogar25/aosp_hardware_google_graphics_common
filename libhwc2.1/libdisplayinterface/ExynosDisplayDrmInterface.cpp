@@ -673,6 +673,30 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 }
             }
 
+            if (hasHdrInfo(config.dataspace)) {
+                int min_luminance_prop_id = plane->min_luminance_property().id();
+                int max_luminance_prop_id = plane->max_luminance_property().id();
+                if ((min_luminance_prop_id == 0) || (max_luminance_prop_id == 0)) {
+                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to get min/max_luminance property id for plane %d",
+                            __func__, i, plane->id());
+                    break;
+                }
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(), min_luminance_prop_id, config.min_luminance);
+                if (ret < 0) {
+                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add min_luminance property to pset for plane %d, ret(%d)",
+                            __func__, i, plane->id(), ret);
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(), max_luminance_prop_id, config.max_luminance);
+                if (ret < 0) {
+                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add max_luminance property to pset for plane %d, ret(%d)",
+                            __func__, i, plane->id(), ret);
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
+            }
+
             if (plane->compression_source_property().id()) {
                 uint64_t compression_source = 0;
                 switch (config.comp_src) {
