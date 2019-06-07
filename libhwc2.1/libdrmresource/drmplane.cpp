@@ -146,6 +146,10 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get compression source property");
 
+  ret = drm_->GetPlaneProperty(*this, "dataspace", &dataspace_);
+  if (ret)
+    ALOGI("Could not get dataspace property");
+
   properties_.push_back(&crtc_property_);
   properties_.push_back(&fb_property_);
   properties_.push_back(&crtc_x_property_);
@@ -163,6 +167,7 @@ int DrmPlane::Init() {
   properties_.push_back(&in_fence_fd_property_);
   properties_.push_back(&color_property_);
   properties_.push_back(&compression_source_);
+  properties_.push_back(&dataspace_);
 
   return 0;
 }
@@ -245,5 +250,9 @@ const DrmProperty &DrmPlane::color_property() const {
 
 const DrmProperty &DrmPlane::compression_source_property() const {
   return compression_source_;
+}
+
+const DrmProperty &DrmPlane::dataspace_property() const {
+  return dataspace_;
 }
 }  // namespace android
