@@ -304,6 +304,21 @@ int halFormatToDrmFormat(int format, bool compressed)
     return DRM_FORMAT_UNDEFINED;
 }
 
+uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat,
+        uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT])
+{
+    *numFormat = 0;
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].drmFormat == format) {
+            halFormats[*numFormat] = exynos_format_desc[i].halFormat;
+            *numFormat = *numFormat + 1;
+        }
+        if (*numFormat >= MAX_SAME_HAL_PIXEL_FORMAT)
+            break;
+    }
+    return *numFormat;
+}
+
 android_dataspace colorModeToDataspace(android_color_mode_t mode)
 {
     android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
