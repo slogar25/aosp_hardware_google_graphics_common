@@ -447,7 +447,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             uint64_t modifiers[HWC_DRM_BO_MAX_PLANES] = {0};
             uint32_t bufferNum, planeNum = 0;
             if (config.state == config.WIN_STATE_BUFFER) {
-                drmFormat = halFormatToDrmFormat(config.format);
+                drmFormat = halFormatToDrmFormat(config.format, config.compression);
                 if (drmFormat == DRM_FORMAT_UNDEFINED) {
                     HWC_LOGE(mExynosDisplay, "%s:: known drm format (%d)",
                             __func__, config.format);
