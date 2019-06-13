@@ -830,6 +830,8 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
                                     getCanvas().getDataspace(),
                                     &mTask.commands.target[G2DSFR_DST_YCBCRMODE]);
 
+    mTask.commands.target[G2DSFR_DST_YCBCRMODE] |= (G2D_LAYER_YCBCRMODE_OFFX | G2D_LAYER_YCBCRMODE_OFFY);
+
     for (unsigned int i = baseidx; i < layercount; i++) {
         AcrylicLayer &layer = *getLayer(i - baseidx);
 
