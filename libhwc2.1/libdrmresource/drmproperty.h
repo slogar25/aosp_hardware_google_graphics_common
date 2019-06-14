@@ -52,6 +52,8 @@ class DrmProperty {
   std::tuple<int, uint64_t> range_min() const;
   std::tuple<int, uint64_t> range_max() const;
 
+  void printProperty() const;
+
  private:
   class DrmPropertyEnum {
    public:

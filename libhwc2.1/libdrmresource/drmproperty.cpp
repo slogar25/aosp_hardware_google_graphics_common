@@ -22,6 +22,8 @@
 #include <string>
 
 #include <xf86drmMode.h>
+#include <log/log.h>
+#include <inttypes.h>
 
 namespace android {
 
@@ -93,6 +95,21 @@ std::tuple<int, uint64_t> DrmProperty::value() const {
     default:
       return std::make_tuple(-EINVAL, 0);
   }
+}
+
+void DrmProperty::printProperty() const
+{
+    ALOGD("=====================================================");
+    ALOGD("name: %s, type(%d), value_(%" PRId64 ")", name_.c_str(), type_, value_);
+    ALOGD("values.size(%zu)",  values_.size());
+    for(uint32_t i = 0; i < values_.size(); i++) {
+        ALOGD("[%d] %" PRId64 "", i, values_[i]);
+    }
+    ALOGD("enums.size(%zu)",  enums_.size());
+    uint32_t i = 0;
+    for (auto const &it : enums_) {
+        ALOGD("[%d] %s %" PRId64 "", i++, it.name_.c_str(), it.value_);
+    }
 }
 
 bool DrmProperty::is_immutable() const {
