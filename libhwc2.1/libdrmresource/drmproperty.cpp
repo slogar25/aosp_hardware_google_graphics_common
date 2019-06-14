@@ -62,6 +62,8 @@ void DrmProperty::Init(drmModePropertyPtr p, uint64_t value) {
     type_ = DRM_PROPERTY_TYPE_OBJECT;
   else if (flags_ & DRM_MODE_PROP_BLOB)
     type_ = DRM_PROPERTY_TYPE_BLOB;
+  else if (flags_ & DRM_MODE_PROP_BITMASK)
+    type_ = DRM_PROPERTY_TYPE_BITMASK;
 }
 
 uint32_t DrmProperty::id() const {
@@ -81,6 +83,9 @@ std::tuple<int, uint64_t> DrmProperty::value() const {
 
   switch (type_) {
     case DRM_PROPERTY_TYPE_INT:
+      return std::make_tuple(0, value_);
+
+    case DRM_PROPERTY_TYPE_BITMASK:
       return std::make_tuple(0, value_);
 
     case DRM_PROPERTY_TYPE_ENUM:
