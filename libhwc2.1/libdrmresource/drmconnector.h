@@ -62,6 +62,10 @@ class DrmConnector {
   const DrmProperty &writeback_pixel_formats() const;
   const DrmProperty &writeback_fb_id() const;
   const DrmProperty &writeback_out_fence() const;
+  const DrmProperty &max_luminance() const;
+  const DrmProperty &max_avg_luminance() const;
+  const DrmProperty &min_luminance() const;
+  const DrmProperty &hdr_formats() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -103,6 +107,10 @@ class DrmConnector {
   DrmProperty writeback_pixel_formats_;
   DrmProperty writeback_fb_id_;
   DrmProperty writeback_out_fence_;
+  DrmProperty max_luminance_;
+  DrmProperty max_avg_luminance_;
+  DrmProperty min_luminance_;
+  DrmProperty hdr_formats_;
   std::vector<DrmProperty *> properties_;
 
   std::vector<DrmEncoder *> possible_encoders_;

@@ -73,6 +73,26 @@ int DrmConnector::Init() {
     }
   }
 
+  ret = drm_->GetConnectorProperty(*this, "max_luminance", &max_luminance_);
+  if (ret) {
+    ALOGE("Could not get max_luminance property\n");
+  }
+
+  ret = drm_->GetConnectorProperty(*this, "max_avg_luminance", &max_avg_luminance_);
+  if (ret) {
+    ALOGE("Could not get max_avg_luminance property\n");
+  }
+
+  ret = drm_->GetConnectorProperty(*this, "min_luminance", &min_luminance_);
+  if (ret) {
+    ALOGE("Could not get min_luminance property\n");
+  }
+
+  ret = drm_->GetConnectorProperty(*this, "hdr_formats", &hdr_formats_);
+  if (ret) {
+    ALOGE("Could not get hdr_formats property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   if (writeback()) {
@@ -80,6 +100,10 @@ int DrmConnector::Init() {
       properties_.push_back(&writeback_fb_id_);
       properties_.push_back(&writeback_out_fence_);
   }
+  properties_.push_back(&max_luminance_);
+  properties_.push_back(&max_avg_luminance_);
+  properties_.push_back(&min_luminance_);
+  properties_.push_back(&hdr_formats_);
 
   return 0;
 }
@@ -187,6 +211,22 @@ const DrmProperty &DrmConnector::writeback_fb_id() const {
 
 const DrmProperty &DrmConnector::writeback_out_fence() const {
   return writeback_out_fence_;
+}
+
+const DrmProperty &DrmConnector::max_luminance() const {
+  return max_luminance_;
+}
+
+const DrmProperty &DrmConnector::max_avg_luminance() const {
+  return max_avg_luminance_;
+}
+
+const DrmProperty &DrmConnector::min_luminance() const {
+  return min_luminance_;
+}
+
+const DrmProperty &DrmConnector::hdr_formats() const {
+  return hdr_formats_;
 }
 
 DrmEncoder *DrmConnector::encoder() const {
