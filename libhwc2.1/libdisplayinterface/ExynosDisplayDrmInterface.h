@@ -64,9 +64,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         virtual int32_t setColorMode(int32_t mode);
         virtual int32_t setActiveConfig(hwc2_config_t config);
         virtual int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
-        virtual int32_t getHdrCapabilities(uint32_t* outNumTypes,
-                int32_t* outTypes, float* outMaxLuminance,
-                float* outMaxAverageLuminance, float* outMinLuminance);
+        virtual int32_t updateHdrCapabilities();
         virtual int32_t deliverWinConfigData();
         virtual int32_t clearDisplay();
         virtual int32_t disableSelfRefresh(uint32_t disable);

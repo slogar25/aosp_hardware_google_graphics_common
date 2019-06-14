@@ -21,6 +21,7 @@
 
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
+constexpr float DISPLAY_LUMINANCE_UNIT = 10000;
 
 typedef struct _drmModeAtomicReqItem drmModeAtomicReqItem, *drmModeAtomicReqItemPtr;
 
@@ -378,11 +379,96 @@ int32_t ExynosDisplayDrmInterface::setCursorPositionAsync(uint32_t x_pos, uint32
     return 0;
 }
 
-int32_t ExynosDisplayDrmInterface::getHdrCapabilities(uint32_t* outNumTypes,
-        int32_t* outTypes, float* outMaxLuminance,
-        float* outMaxAverageLuminance, float* outMinLuminance)
+int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
 {
-    *outNumTypes = 0;
+    /* Init member variables */
+    mExynosDisplay->mHdrTypeNum = 0;
+    mExynosDisplay->mMaxLuminance = 0;
+    mExynosDisplay->mMaxAverageLuminance = 0;
+    mExynosDisplay->mMinLuminance = 0;
+
+    const DrmProperty &prop_max_luminance = mDrmConnector->max_luminance();
+    const DrmProperty &prop_max_avg_luminance = mDrmConnector->max_avg_luminance();
+    const DrmProperty &prop_min_luminance = mDrmConnector->min_luminance();
+    const DrmProperty &prop_hdr_formats = mDrmConnector->hdr_formats();
+
+    int ret = 0;
+    uint64_t max_luminance = 0;
+    uint64_t max_avg_luminance = 0;
+    uint64_t min_luminance = 0;
+    uint64_t hdr_formats = 0;
+
+    if ((prop_max_luminance.id() == 0) ||
+        (prop_max_avg_luminance.id() == 0) ||
+        (prop_min_luminance.id() == 0) ||
+        (prop_hdr_formats.id() == 0)) {
+        ALOGE("%s:: there is no property for hdrCapabilities (max_luminance: %d, max_avg_luminance: %d, min_luminance: %d, hdr_formats: %d",
+                __func__, prop_max_luminance.id(), prop_max_avg_luminance.id(),
+                prop_min_luminance.id(), prop_hdr_formats.id());
+        return -1;
+    }
+
+    std::tie(ret, max_luminance) = prop_max_luminance.value();
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "%s:: there is no max_luminance (ret = %d)",
+                __func__, ret);
+        return -1;
+    }
+    mExynosDisplay->mMaxLuminance = (float)max_luminance / DISPLAY_LUMINANCE_UNIT;
+
+    std::tie(ret, max_avg_luminance) = prop_max_avg_luminance.value();
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "%s:: there is no max_avg_luminance (ret = %d)",
+                __func__, ret);
+        return -1;
+    }
+    mExynosDisplay->mMaxAverageLuminance = (float)max_avg_luminance / DISPLAY_LUMINANCE_UNIT;
+
+    std::tie(ret, min_luminance) = prop_min_luminance.value();
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "%s:: there is no min_luminance (ret = %d)",
+                __func__, ret);
+        return -1;
+    }
+    mExynosDisplay->mMinLuminance = (float)min_luminance / DISPLAY_LUMINANCE_UNIT;
+
+    std::tie(ret, hdr_formats) = prop_hdr_formats.value();
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "%s:: there is no hdr_formats (ret = %d)",
+                __func__, ret);
+        return -1;
+    }
+
+    uint32_t typeBit;
+    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("Dolby Vision");
+    if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
+        mExynosDisplay->mHdrTypes[mExynosDisplay->mHdrTypeNum++] = HAL_HDR_DOLBY_VISION;
+        HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
+                mExynosDisplay->mDisplayName.string(), HAL_HDR_DOLBY_VISION);
+    }
+    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HDR10");
+    if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
+        mExynosDisplay->mHdrTypes[mExynosDisplay->mHdrTypeNum++] = HAL_HDR_HDR10;
+        HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
+                mExynosDisplay->mDisplayName.string(), HAL_HDR_HDR10);
+    }
+    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HLG");
+    if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
+        mExynosDisplay->mHdrTypes[mExynosDisplay->mHdrTypeNum++] = HAL_HDR_HLG;
+        HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
+                mExynosDisplay->mDisplayName.string(), HAL_HDR_HLG);
+    }
+
+    ALOGI("%s: get hdrCapabilities info max_luminance(%" PRId64 "), "
+            "max_avg_luminance(%" PRId64 "), min_luminance(%" PRId64 "), "
+            "hdr_formats(0x%" PRIx64 ")",
+            mExynosDisplay->mDisplayName.string(),
+            max_luminance, max_avg_luminance, min_luminance, hdr_formats);
+
+    ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
+            mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypeNum, mExynosDisplay->mMaxLuminance,
+            mExynosDisplay->mMaxAverageLuminance, mExynosDisplay->mMinLuminance);
+
     return 0;
 }
 
