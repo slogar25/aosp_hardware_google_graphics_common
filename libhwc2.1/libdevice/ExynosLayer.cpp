@@ -29,6 +29,11 @@
 
 using namespace android;
 
+#ifndef HWC2_HDR10_PLUS_SEI
+/* baseed on android.hardware.composer.2_3 */
+#define HWC2_HDR10_PLUS_SEI 12
+#endif
+
 /**
  * ExynosLayer implementation
  */
@@ -633,6 +638,21 @@ int32_t ExynosLayer::setLayerPerFrameMetadata(uint32_t numElements,
 int32_t ExynosLayer::SetLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
         const uint8_t* metadata)
 {
+
+    for (uint32_t i = 0; i < numElements; i++) {
+        HDEBUGLOGD(eDebugLayer, "HWC2: SetLayerPerFrameMetadataBlobs key(%d), value(%d)",
+                keys[i], metadata[i]);
+        switch (keys[i]) {
+        case HWC2_HDR10_PLUS_SEI:
+            if (allocMetaParcel() == NO_ERROR) {
+                memcpy(&mMetaParcel, metadata, *sizes);
+            } else ALOGE("Layer has no metaParcel!");
+            break;
+        default:
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+    }
+
     return NO_ERROR;
 }
 
