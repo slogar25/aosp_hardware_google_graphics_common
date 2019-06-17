@@ -66,8 +66,6 @@ class ExynosDisplayInterface {
         /* HWC 2.3 APIs */
         virtual int32_t getDisplayIdentificationData(uint8_t* __unused outPort,
                 uint32_t* __unused outDataSize, uint8_t* __unused outData) {return 0;}
-        virtual int32_t getDisplayCapabilities(uint32_t* __unused outNumCapabilities,
-                uint32_t* __unused outCapabilities) {return 0;}
         virtual int32_t getDisplayBrightnessSupport(bool* __unused outSupport) {return 0;}
         virtual int32_t setDisplayBrightness(float __unused brightness) {return 0;}
     public:

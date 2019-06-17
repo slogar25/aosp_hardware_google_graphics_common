@@ -2888,7 +2888,20 @@ int32_t ExynosDisplay::getDisplayIdentificationData(uint8_t* outPort,
 int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
         uint32_t* outCapabilities)
 {
-    return mDisplayInterface->getDisplayCapabilities(outNumCapabilities, outCapabilities);
+    /* If each display has their own capabilities,
+     * this should be described in display module codes */
+
+    uint32_t capabilityNum = 0;
+    if (outCapabilities == NULL) {
+        *outNumCapabilities = capabilityNum;
+        return HWC2_ERROR_NONE;
+    }
+    if (capabilityNum != *outNumCapabilities) {
+        ALOGE("%s:: invalid outNumCapabilities(%d), should be(%d)", __func__, *outNumCapabilities, capabilityNum);
+        return HWC2_ERROR_NONE;
+    }
+
+    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
