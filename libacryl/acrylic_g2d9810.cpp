@@ -323,6 +323,9 @@ static g2d_fmt __halfmt_to_g2dfmt_9820[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,  G2D_FMT_NV12_SBWC_10B, 1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,     G2D_FMT_NV21_SBWC, 2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC, G2D_FMT_NV21_SBWC_10B, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50, G2D_FMT_NV12_SBWC, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40, G2D_FMT_NV12_SBWC_10B, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80, G2D_FMT_NV12_SBWC_10B, 2, 0},
 };
 
 static g2d_fmt *halfmt_to_g2dfmt(struct g2d_fmt *tbl, size_t tbl_len, uint32_t halfmt)
@@ -377,6 +380,10 @@ AcrylicCompositorG2D9810::~AcrylicCompositorG2D9810()
 	ALIGN(((w) / SBWC_BLOCK_WIDTH) * SBWC_BLOCK_SIZE(dep), \
 	      SBWC_PAYLOAD_ALIGN)
 
+#define SBWC_LOSSY_PAYLOAD_STRIDE(w, block_byte) \
+	ALIGN(((w) / SBWC_BLOCK_WIDTH) * (block_byte), \
+	      SBWC_PAYLOAD_ALIGN)
+
 static uint32_t mfc_stride_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,
@@ -387,6 +394,12 @@ static uint32_t mfc_stride_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,
     HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,
     HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC,
+};
+
+static unsigned int sbwc_lossy_formats[] = {
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80,
 };
 
 bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[], int index)
@@ -460,34 +473,42 @@ bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_lay
         cmd[G2DSFR_IMG_STRIDE] = g2dfmt->rgb_bpp * xy.hori;
     }
 
-    if (g2dfmt->g2dfmt & G2D_DATAFORMAT_SBWC) {
-        int dep = (g2dfmt->g2dfmt & G2D_FMT_YCBCR_10BIT) ? 10 : 8;
-        unsigned int header = SBWC_HEADER_STRIDE(xy.hori);
-        unsigned int payload = SBWC_PAYLOAD_STRIDE(xy.hori, dep);
+    unsigned int payload = 0, header = 0, lossyByteNum = 0;
 
-        if (index < 0) {
-            cmd[G2DSFR_DST_Y_HEADER_STRIDE] = header;
-            cmd[G2DSFR_DST_C_HEADER_STRIDE] = header;
-            cmd[G2DSFR_DST_Y_PAYLOAD_STRIDE] = payload;
-            cmd[G2DSFR_DST_C_PAYLOAD_STRIDE] = payload;
-        } else {
-            cmd[G2DSFR_SRC_Y_HEADER_STRIDE] = header;
-            cmd[G2DSFR_SRC_C_HEADER_STRIDE] = header;
-            cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = payload;
-            cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = payload;
+    if (g2dfmt->g2dfmt & G2D_DATAFORMAT_SBWC) {
+        unsigned int blocksize;
+        unsigned int isLossy = 0;
+        unsigned int format = layer.getFormat();
+
+        for (unsigned int i = 0; i < ARRSIZE(sbwc_lossy_formats); i++) {
+            if (format == sbwc_lossy_formats[i]) {
+                isLossy = 1;
+                blocksize = (i < 2) ? 64 : 128;
+                break;
+            }
         }
+
+        if (isLossy) {
+            lossyByteNum = (blocksize >> 1) | isLossy;
+            payload = SBWC_LOSSY_PAYLOAD_STRIDE(xy.hori, blocksize);
+        } else {
+            payload = SBWC_PAYLOAD_STRIDE(xy.hori, (g2dfmt->g2dfmt & G2D_FMT_YCBCR_10BIT) ? 10 : 8);
+            header = SBWC_HEADER_STRIDE(xy.hori);
+        }
+    }
+
+    if (index < 0) {
+        cmd[G2DSFR_DST_Y_HEADER_STRIDE] = header;
+        cmd[G2DSFR_DST_C_HEADER_STRIDE] = header;
+        cmd[G2DSFR_DST_Y_PAYLOAD_STRIDE] = payload;
+        cmd[G2DSFR_DST_C_PAYLOAD_STRIDE] = payload;
+        cmd[G2DSFR_DST_SBWCINFO] = lossyByteNum;
     } else {
-        if (index < 0) {
-            cmd[G2DSFR_DST_Y_HEADER_STRIDE] = 0;
-            cmd[G2DSFR_DST_C_HEADER_STRIDE] = 0;
-            cmd[G2DSFR_DST_Y_PAYLOAD_STRIDE] = 0;
-            cmd[G2DSFR_DST_C_PAYLOAD_STRIDE] = 0;
-        } else {
-            cmd[G2DSFR_SRC_Y_HEADER_STRIDE] = 0;
-            cmd[G2DSFR_SRC_C_HEADER_STRIDE] = 0;
-            cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = 0;
-            cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = 0;
-        }
+        cmd[G2DSFR_SRC_Y_HEADER_STRIDE] = header;
+        cmd[G2DSFR_SRC_C_HEADER_STRIDE] = header;
+        cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = payload;
+        cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = payload;
+        cmd[G2DSFR_SRC_SBWCINFO] = lossyByteNum;
     }
 
     cmd[G2DSFR_IMG_LEFT]   = 0;
@@ -529,6 +550,7 @@ static void setSolidLayer(struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t 
     cmd[G2DSFR_SRC_C_HEADER_STRIDE] = 0;
     cmd[G2DSFR_SRC_Y_PAYLOAD_STRIDE] = 0;
     cmd[G2DSFR_SRC_C_PAYLOAD_STRIDE] = 0;
+    cmd[G2DSFR_SRC_SBWCINFO] = 0;
 }
 
 bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g2d_layer &image, uint32_t cmd[])
