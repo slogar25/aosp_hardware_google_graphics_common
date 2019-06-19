@@ -292,8 +292,11 @@ uint32_t S3CFormatToHalFormat(int format)
     return HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED;
 }
 
-int halFormatToDrmFormat(int format)
+int halFormatToDrmFormat(int format, bool compressed)
 {
+    if (compressed && (format == HAL_PIXEL_FORMAT_RGB_565))
+        return DRM_FORMAT_RGB565;
+
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].halFormat == format)
             return exynos_format_desc[i].drmFormat;

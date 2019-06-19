@@ -106,7 +106,7 @@ const format_description_t exynos_format_desc[] = {
         1, 32, RGB|BIT8, false, String8("RGBx_8888"), 0},
     {HAL_PIXEL_FORMAT_RGB_888, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_RGB888,
         1, 32, RGB|BIT8, false, String8("RGB_888"), 0},
-    {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_RGB565,
+    {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_BGR565,
         1, 16, RGB|UNDEF_BIT, false, String8("RGB_565"), 0},
     {HAL_PIXEL_FORMAT_BGRA_8888, DECON_PIXEL_FORMAT_BGRA_8888, DRM_FORMAT_BGRA8888,
         1, 32, RGB|BIT8, true, String8("BGRA_8888"), 0},
@@ -313,7 +313,7 @@ inline int HEIGHT(const hwc_frect_t &rect) { return (int)(rect.bottom - rect.top
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space);
 enum decon_pixel_format halFormatToS3CFormat(int format);
 uint32_t S3CFormatToHalFormat(int format);
-int halFormatToDrmFormat(int format);
+int halFormatToDrmFormat(int format, bool compressed);
 uint8_t formatToBpp(int format);
 uint8_t DeconFormatToBpp(decon_pixel_format format);
 enum decon_blending halBlendingToS3CBlending(int32_t blending);
