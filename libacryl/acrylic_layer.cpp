@@ -298,7 +298,7 @@ void AcrylicCanvas::setFence(int fence)
 }
 
 AcrylicLayer::AcrylicLayer(Acrylic *compositor)
-    : AcrylicCanvas(compositor), mTransitData(NULL), mBlendingMode(HWC_BLENDING_NONE),
+    : AcrylicCanvas(compositor), mTransitData(nullptr), mBlendingMode(HWC_BLENDING_NONE),
       mTransform(0), mZOrder(0), mMaxLuminance(100), mMinLuminance(0), mPlaneAlpha(255)
 {
     // Default settings:
