@@ -2436,6 +2436,67 @@ float ExynosMPP::getPPC(struct exynos_image &src, struct exynos_image &dst, stru
     return PPC;
 }
 
+float ExynosMPP::getAssignedCapacity()
+{
+    float capacity = 0;
+    float baseCycles = 0;
+    uint32_t rotIndex = 0;
+
+    if (mPhysicalType != MPP_G2D)
+        return 0;
+
+    for (uint32_t i = 0; i < mAssignedSources.size(); i++) {
+        if ((mAssignedSources[i]->mSrcImg.transform & HAL_TRANSFORM_ROT_90) != 0)
+            rotIndex = PPC_ROT;
+    }
+
+    MPP_LOGD(eDebugCapacity, "Check all of assigned layers cycles");
+    /* PPC of layers that were added before should be changed */
+    /* Check cycles of all assigned layers again */
+    if ((mAssignedDisplay != NULL) && (mMaxSrcLayerNum > 1)) {
+        baseCycles += ((mAssignedDisplay->mXres * mAssignedDisplay->mYres) / G2D_BASE_PPC_COLORFILL);
+        MPP_LOGD(eDebugCapacity, "colorfill cycles: %f, total cycles: %f",
+                ((mAssignedDisplay->mXres * mAssignedDisplay->mYres) / G2D_BASE_PPC_COLORFILL), baseCycles);
+    }
+
+    for (uint32_t i = 0; i < mAssignedSources.size(); i++) {
+        float srcCycles = 0;
+        uint32_t srcResolution = mAssignedSources[i]->mSrcImg.w * mAssignedSources[i]->mSrcImg.h;
+        uint32_t dstResolution = mAssignedSources[i]->mMidImg.w * mAssignedSources[i]->mMidImg.h;
+        uint32_t maxResolution = max(srcResolution, dstResolution);
+        uint32_t tmpRotIndex = 0;
+        uint32_t formatIndex = 0;
+        uint32_t scaleIndex = 0;
+        float PPC = 0;
+
+        getPPCIndex(mAssignedSources[i]->mSrcImg,
+                mAssignedSources[i]->mMidImg,
+                formatIndex, tmpRotIndex, scaleIndex, mAssignedSources[i]->mSrcImg);
+
+        if (ppc_table_map.count(PPC_IDX(mPhysicalType, formatIndex, rotIndex)) != 0) {
+            PPC = ppc_table_map.at(PPC_IDX(mPhysicalType, formatIndex, rotIndex)).ppcList[scaleIndex];
+        }
+        srcCycles = maxResolution/PPC;
+
+        /* Hdr and drm layer is exception */
+        if ((hasHdrInfo(mAssignedSources[i]->mSrcImg) ||
+            (getDrmMode(mAssignedSources[i]->mSrcImg.usageFlags) != NO_DRM))) {
+            MPP_LOGD(eDebugCapacity, "Src[%d] is skipped(drm or hdr), cycles: %f, PPC: %f, srcResolution: %d, dstResolution: %d, rot(%d)",
+                    i, srcCycles, PPC, srcResolution, dstResolution, mAssignedSources[i]->mSrcImg.transform);
+            continue;
+        }
+
+        baseCycles += srcCycles;
+
+        MPP_LOGD(eDebugCapacity, "Src[%d] cycles: %f, total cycles: %f, PPC: %f, srcResolution: %d, dstResolution: %d, rot(%d)",
+                i, srcCycles, baseCycles, PPC, srcResolution, dstResolution, mAssignedSources[i]->mSrcImg.transform);
+    }
+
+    capacity = baseCycles/getMPPClock();
+
+    return capacity;
+}
+
 float ExynosMPP::getRequiredCapacity(ExynosDisplay *display, struct exynos_image &src,
         struct exynos_image &dst)
 {

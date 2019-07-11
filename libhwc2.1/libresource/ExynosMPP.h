@@ -667,6 +667,7 @@ public:
     virtual bool checkRotationCondition(struct exynos_image &src);
     void updateAttr();
     dstMetaInfo getDstMetaInfo(android_dataspace_t dstDataspace);
+    float getAssignedCapacity();
 
 protected:
     uint32_t getBufferType(uint64_t usage);

@@ -2392,3 +2392,14 @@ bool ExynosResourceManager::hasHDR10PlusMPP() {
 
     return false;
 }
+
+float ExynosResourceManager::getAssignedCapacity(uint32_t physicalType)
+{
+    float totalCapacity = 0;
+
+    for (size_t i = 0; i < mM2mMPPs.size(); i++) {
+        if (mM2mMPPs[i]->mPhysicalType == physicalType)
+            totalCapacity += mM2mMPPs[i]->getAssignedCapacity();
+    }
+    return totalCapacity;
+}
