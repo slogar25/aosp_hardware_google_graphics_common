@@ -2296,8 +2296,15 @@ ExynosMPP* ExynosResourceManager::getOtfMPPWithChannel(int ch)
 void ExynosResourceManager::updateRestrictions() {
 
     if (mDevice->mDeviceInterface->getUseQuery() == true) {
-        makeAcrylRestrictions(MPP_MSC);
-        makeAcrylRestrictions(MPP_G2D);
+        uint32_t num_mpp_units = sizeof(AVAILABLE_M2M_MPP_UNITS)/sizeof(exynos_mpp_t);
+        for(uint32_t i = MPP_DPP_NUM; i < MPP_P_TYPE_MAX; i++){
+            for(uint32_t j = 0; j < num_mpp_units; j++){
+                if(AVAILABLE_M2M_MPP_UNITS[j].physicalType == i){
+                    makeAcrylRestrictions((mpp_phycal_type_t)i);
+                    break;
+                }
+            }
+        }
     } else {
         mFormatRestrictionCnt = sizeof(restriction_format_table)/sizeof(restriction_key);
         for (uint32_t i = 0 ; i < mFormatRestrictionCnt; i++) {
