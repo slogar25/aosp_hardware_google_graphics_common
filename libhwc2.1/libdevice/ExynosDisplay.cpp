@@ -294,7 +294,8 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mDeviceYres(0),
     mColorMode(HAL_COLOR_MODE_NATIVE),
     mSkipFrame(false),
-    mBrightnessFd(NULL)
+    mBrightnessFd(NULL),
+    mMaxBrightness(0)
 {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
@@ -2893,6 +2894,8 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
      * this should be described in display module codes */
 
     uint32_t capabilityNum = 0;
+    if (mBrightnessFd != NULL)
+        capabilityNum++;
     if (outCapabilities == NULL) {
         *outNumCapabilities = capabilityNum;
         return HWC2_ERROR_NONE;
@@ -2902,17 +2905,37 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
         return HWC2_ERROR_NONE;
     }
 
+    uint32_t index = 0;
+    if (mBrightnessFd != NULL)
+        outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_BRIGHTNESS;
+
     return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
 {
-    return mDisplayInterface->getDisplayBrightnessSupport(outSupport);
+    if (mBrightnessFd == NULL) {
+        *outSupport = false;
+    } else {
+        *outSupport = true;
+    }
+
+    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::setDisplayBrightness(float brightness)
 {
-    return mDisplayInterface->setDisplayBrightness(brightness);
+    if (mBrightnessFd == NULL)
+        return HWC2_ERROR_NONE;
+
+    char val[4];
+    fread(&val, 4, 1, mBrightnessFd);
+    uint32_t scaledBrightness = brightness * mMaxBrightness;
+    HDEBUGLOGD(eDebugWinConfig, "brightness %d -> %d", atoi(val), scaledBrightness);
+
+    sprintf(val, "%d", scaledBrightness);
+    fwrite(&val, 4, 1, mBrightnessFd);
+    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::setOutputBuffer(

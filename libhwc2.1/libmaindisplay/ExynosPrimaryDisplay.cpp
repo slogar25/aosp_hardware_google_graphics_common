@@ -59,9 +59,15 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice 
 
     if (maxBrightnessFd != NULL) {
 
+        char val[4];
+        size_t size;
+        size = fread(&val, 4, 1, maxBrightnessFd);
+        mMaxBrightness = atoi(val);
+        ALOGI("Max brightness : %d", mMaxBrightness);
+
         fclose(maxBrightnessFd);
 
-        mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "r");
+        mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "wb");
         ALOGI("Trying %s open for brightness control", BRIGHTNESS_NODE_BASE);
 
         if (mBrightnessFd == NULL)
