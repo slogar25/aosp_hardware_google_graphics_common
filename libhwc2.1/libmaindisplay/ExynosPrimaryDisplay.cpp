@@ -52,10 +52,34 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice 
     mResolutionInfo.nDSCYSliceSize[2] = 74;
     mResolutionInfo.nDSCXSliceSize[2] = 720;
     mResolutionInfo.nPanelType[2] = PANEL_LEGACY;
+
+#if defined(MAX_BRIGHTNESS_NODE_BASE) && defined(BRIGHTNESS_NODE_BASE)
+    FILE *maxBrightnessFd = fopen(MAX_BRIGHTNESS_NODE_BASE, "r");
+    ALOGI("Trying %s open for get max brightness", MAX_BRIGHTNESS_NODE_BASE);
+
+    if (maxBrightnessFd != NULL) {
+
+        fclose(maxBrightnessFd);
+
+        mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "r");
+        ALOGI("Trying %s open for brightness control", BRIGHTNESS_NODE_BASE);
+
+        if (mBrightnessFd == NULL)
+            ALOGI("%s open failed!", BRIGHTNESS_NODE_BASE);
+
+    } else {
+        ALOGI("Brightness node is not opened");
+    }
+#endif
+
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
 {
+    if (mBrightnessFd != NULL) {
+        fclose(mBrightnessFd);
+        mBrightnessFd = NULL;
+    }
 }
 
 void ExynosPrimaryDisplay::setDDIScalerEnable(int width, int height) {

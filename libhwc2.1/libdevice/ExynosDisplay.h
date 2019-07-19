@@ -430,6 +430,9 @@ class ExynosDisplay {
         // Skip present frame if there was no validate after power on
         bool mSkipFrame;
 
+        FILE *mBrightnessFd;
+        unsigned int mMaxBrightness;
+
         void initDisplay();
 
         int getDisplayId();
