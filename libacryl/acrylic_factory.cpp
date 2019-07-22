@@ -338,7 +338,7 @@ const static stHW2DCapability __capability_fimg2d_9810_blter = {
     .base_align = 1,
 };
 
-const static stHW2DCapability __capability_fimg2d_9830 = {
+const static stHW2DCapability __capability_fimg2d_L16FSBWC = {
     .max_upsampling_num = {32767, 32767},
     .max_downsampling_factor = {31767, 32767},
     .max_upsizing_num = {32767, 32767},
@@ -362,7 +362,7 @@ const static stHW2DCapability __capability_fimg2d_9830 = {
     .base_align = 1,
 };
 
-const static stHW2DCapability __capability_fimg2d_9630 = {
+const static stHW2DCapability __capability_fimg2d_L8FSBWCL = {
     .max_upsampling_num = {32767, 32767},
     .max_downsampling_factor = {31767, 32767},
     .max_upsizing_num = {32767, 32767},
@@ -458,8 +458,8 @@ static const HW2DCapability capability_fimg2d_8895(__capability_fimg2d_8895);
 static const HW2DCapability capability_fimg2d_8890(__capability_fimg2d_8890);
 static const HW2DCapability capability_fimg2d_9610(__capability_fimg2d_9610);
 static const HW2DCapability capability_fimg2d_9810(__capability_fimg2d_9810);
-static const HW2DCapability capability_fimg2d_9830(__capability_fimg2d_9830);
-static const HW2DCapability capability_fimg2d_9630(__capability_fimg2d_9630);
+static const HW2DCapability capability_fimg2d_L16FSBWC(__capability_fimg2d_L16FSBWC);
+static const HW2DCapability capability_fimg2d_L8FSBWCL(__capability_fimg2d_L8FSBWCL);
 static const HW2DCapability capability_fimg2d_9810_blter(__capability_fimg2d_9810_blter);
 static const HW2DCapability capability_mscl_9810(__capability_mscl_9810);
 static const HW2DCapability capability_mscl_9830(__capability_mscl_9830);
@@ -482,10 +482,10 @@ Acrylic *Acrylic::createInstance(const char *spec)
         compositor = new AcrylicCompositorG2D9810(capability_fimg2d_9810_blter, false);
     } else if (strcmp(spec, "fimg2d_9820") == 0) {
         compositor = new AcrylicCompositorG2D9810(capability_fimg2d_9810, true);
-    } else if (strcmp(spec, "fimg2d_9830") == 0) {
-        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_9830, true);
-    } else if (strcmp(spec, "fimg2d_9630") == 0) {
-        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_9630, true);
+    } else if (strcmp(spec, "fimg2d_L8FSBWCL") == 0) {
+        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_L8FSBWCL, true);
+    } else if (strcmp(spec, "fimg2d_L16FSBWC") == 0) {
+        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_L16FSBWC, true);
     } else if (strcmp(spec, "mscl_9810") == 0) {
         compositor = new AcrylicCompositorMSCL9810(capability_mscl_9810);
     } else if (strcmp(spec, "mscl_9830") == 0) {
