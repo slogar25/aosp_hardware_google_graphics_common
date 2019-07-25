@@ -32,6 +32,7 @@ AcrylicCanvas::AcrylicCanvas(Acrylic *compositor, canvas_type_t type)
 
 AcrylicCanvas::~AcrylicCanvas()
 {
+    setFence(-1);
 }
 
 static const char *canvasTypeName(unsigned int type)
@@ -105,7 +106,7 @@ bool AcrylicCanvas::setImageBuffer(int a, int r, int g, int b, uint32_t attr)
         return false;
     }
 
-    mFence = -1;
+    setFence(-1);
     mMemoryType = MT_EMPTY;
     mNumBuffers = 0;
 
@@ -160,9 +161,9 @@ bool AcrylicCanvas::setImageBuffer(int fd[MAX_HW2D_PLANES], size_t len[MAX_HW2D_
     }
 
     ALOGE_IF((attr & ~ATTR_ALL_MASK) != 0,
-             "Configured unsupported attribute %#x to setImageBuffer(userptr))", attr);
+             "Configured unsupported attribute %#x to setImageBuffer(dmabuf))", attr);
 
-    mFence = fence;
+    setFence(fence);
     mMemoryType = MT_DMABUF;
     mNumBuffers = num_buffers;
 
@@ -214,6 +215,7 @@ bool AcrylicCanvas::setImageBuffer(void *addr[MAX_HW2D_PLANES], size_t len[MAX_H
     ALOGE_IF((attr & ~ATTR_ALL_MASK) != 0,
              "Configured unsupported attribute %#x to setImageBuffer(userptr))", attr);
 
+    setFence(-1);
     mMemoryType = MT_USERPTR;
     mNumBuffers = num_buffers;
 
@@ -242,7 +244,7 @@ bool AcrylicCanvas::setImageOTFBuffer(uint32_t attr)
         return false;
     }
 
-    mFence = -1;
+    setFence(-1);
     mMemoryType = MT_EMPTY;
     mNumBuffers = 0;
 
