@@ -220,6 +220,8 @@ int32_t exynos_destroyLayer(hwc2_device_t *dev, hwc2_display_t display,
             ExynosLayer *exynosLayer = checkLayer(exynosDisplay, layer);
             if (exynosLayer)
                 return exynosDisplay->destroyLayer((hwc2_layer_t)exynosLayer);
+            else
+                return HWC2_ERROR_BAD_LAYER;
         }
     }
 
@@ -499,6 +501,9 @@ int32_t exynos_setClientTarget(hwc2_device_t *dev, hwc2_display_t display,
 
 int32_t exynos_setColorMode(hwc2_device_t *dev, hwc2_display_t display, int32_t mode)
 {
+    if (mode < 0)
+        return HWC2_ERROR_BAD_PARAMETER;
+
     ExynosDevice *exynosDevice = checkDevice(dev);
 
     if (exynosDevice) {
@@ -770,6 +775,9 @@ int32_t exynos_setOutputBuffer(hwc2_device_t *dev, hwc2_display_t display,
 int32_t exynos_setPowerMode(hwc2_device_t *dev, hwc2_display_t __unused display,
         int32_t /*hwc2_power_mode_t*/ __unused mode)
 {
+    if (mode < 0)
+        return HWC2_ERROR_BAD_PARAMETER;
+
     ExynosDevice *exynosDevice = checkDevice(dev);
 
     if (exynosDevice) {
