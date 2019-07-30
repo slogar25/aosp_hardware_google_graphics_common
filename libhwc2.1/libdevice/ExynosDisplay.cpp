@@ -2392,7 +2392,11 @@ int32_t ExynosDisplay::getDisplayType(
 
 int32_t ExynosDisplay::getDozeSupport(
         int32_t* outSupport) {
+#ifdef USES_DOZEMODE
+    *outSupport = 1;
+#else
     *outSupport = 0;
+#endif
     return 0;
 }
 
@@ -2861,6 +2865,11 @@ int ExynosDisplay::clearDisplay() {
 int32_t ExynosDisplay::setPowerMode(
         int32_t /*hwc2_power_mode_t*/ mode) {
     Mutex::Autolock lock(mDisplayMutex);
+
+#ifndef USES_DOZEMODE
+    if ((mode == HWC_POWER_MODE_DOZE) || (mode == HWC_POWER_MODE_DOZE_SUSPEND))
+        return HWC2_ERROR_UNSUPPORTED;
+#endif
 
     if (mode == HWC_POWER_MODE_OFF) {
         mDevice->mPrimaryBlank = true;
