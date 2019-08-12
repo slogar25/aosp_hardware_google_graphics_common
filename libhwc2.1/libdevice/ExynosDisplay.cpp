@@ -2569,7 +2569,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         mLastRetireFence = fence_close(mLastRetireFence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP);
         mRenderingState = RENDERING_STATE_PRESENTED;
-        return ret;
+        return 0;
     }
 
     if (!checkFrameValidation()) {
@@ -2867,7 +2867,7 @@ int32_t ExynosDisplay::setPowerMode(
     Mutex::Autolock lock(mDisplayMutex);
 
 #ifndef USES_DOZEMODE
-    if ((mode == HWC_POWER_MODE_DOZE) || (mode == HWC_POWER_MODE_DOZE_SUSPEND))
+    if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND))
         return HWC2_ERROR_UNSUPPORTED;
 #endif
 
