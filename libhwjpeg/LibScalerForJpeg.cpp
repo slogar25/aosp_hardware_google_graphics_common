@@ -95,8 +95,6 @@ bool LibScalerForJpeg::SetImage(
             m_planes[i].m.userptr = reinterpret_cast<unsigned long>(addrs[i]);
     }
 
-    SC_LOGD("%s Success", __func__);
-
     return true;
 }
 
@@ -111,8 +109,6 @@ bool LibScalerForJpeg::SetFormat()
         ALOGE("Failed to S_FMT for the target");
         return false;
     }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
@@ -146,8 +142,6 @@ bool LibScalerForJpeg::ReqBufs(int count)
         return false;
     }
 
-    SC_LOGD("%s Success", __func__);
-
     return true;
 }
 
@@ -164,8 +158,6 @@ bool LibScalerForJpeg::StreamOn()
         ioctl(m_fdScaler, VIDIOC_STREAMOFF, &m_srcBuf.type);
         return false;
     }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
@@ -184,8 +176,6 @@ bool LibScalerForJpeg::QBuf()
         return false;
     }
 
-    SC_LOGD("%s Success", __func__);
-
     return true;
 }
 
@@ -201,8 +191,6 @@ bool LibScalerForJpeg::StreamOff()
         return false;
     }
 
-    SC_LOGD("%s Success", __func__);
-
     return true;
 }
 
@@ -213,8 +201,6 @@ bool LibScalerForJpeg::StopStreaming()
 
     if (!ReqBufs(0))
         return false;
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
@@ -230,8 +216,6 @@ bool LibScalerForJpeg::DQBuf()
         ALOGE("Failed to DQBuf the target buffer");
         return false;
     }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
@@ -259,8 +243,6 @@ bool LibScalerForJpeg::RunStream()
         goto err;
 
     m_needReqbuf = false;
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 

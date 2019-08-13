@@ -5,14 +5,6 @@
 #define SCALER_DEV_NODE "/dev/video50"
 #define SCALER_MAX_PLANES 3
 
-#define SC_LOGE(fmt, args...) ((void)ALOG(LOG_ERROR, LOG_TAG, "%s: " fmt, __func__, ##args))
-
-#ifdef SC_DEBUG
-#define SC_LOGD(args...) ((void)ALOG(LOG_INFO, LOG_TAG, ##args))
-#else
-#define SC_LOGD(args...) do { } while (0)
-#endif
-
 class LibScalerForJpeg {
 public:
     LibScalerForJpeg();
