@@ -59,19 +59,17 @@ LibScalerForJpeg::~LibScalerForJpeg()
 
 bool LibScalerForJpeg::SetImage(
         v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
-        unsigned int width, unsigned int height, unsigned int v4l2_format,
-        void *addrs[SCALER_MAX_PLANES], int mem_type)
+        unsigned int width, unsigned int height, unsigned int v4l2_format, unsigned int memtype)
 {
     /* Format information update*/
     if ((m_needReqbuf == true) ||
             (m_fmt.fmt.pix_mp.pixelformat != v4l2_format ||
             m_fmt.fmt.pix_mp.width != width ||
             m_fmt.fmt.pix_mp.height != height ||
-            m_buf.memory != static_cast<v4l2_memory>(mem_type))) {
+            m_buf.memory != memtype)) {
         m_fmt.fmt.pix_mp.pixelformat = v4l2_format;
         m_fmt.fmt.pix_mp.width  = width;
         m_fmt.fmt.pix_mp.height = height;
-        m_buf.memory = static_cast<v4l2_memory>(mem_type);
 
         // The driver returns the number and length of planes through TRY_FMT.
         if (ioctl(m_fdScaler, VIDIOC_TRY_FMT, &m_fmt) < 0) {
@@ -85,15 +83,40 @@ bool LibScalerForJpeg::SetImage(
     /* Buffer information update*/
     m_buf.index = 0;
     m_buf.length = m_fmt.fmt.pix_mp.num_planes;
+    m_buf.memory = memtype;
 
     for (unsigned long i = 0; i < m_buf.length; i++) {
         m_planes[i].length = m_fmt.fmt.pix_mp.plane_fmt[i].sizeimage;
         m_planes[i].bytesused = m_planes[i].length;
-        if (m_buf.memory == V4L2_MEMORY_DMABUF)
-            m_planes[i].m.fd = static_cast<__s32>(reinterpret_cast<long>(addrs[i]));
-        else
-            m_planes[i].m.userptr = reinterpret_cast<unsigned long>(addrs[i]);
     }
+
+    return true;
+}
+
+bool LibScalerForJpeg::SetImage(
+        v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
+        unsigned int width, unsigned int height, unsigned int v4l2_format,
+        int buf[SCALER_MAX_PLANES])
+{
+    if (!SetImage(m_fmt, m_buf, m_planes, width, height, v4l2_format, V4L2_MEMORY_DMABUF))
+        return false;
+
+    for (unsigned long i = 0; i < m_buf.length; i++)
+        m_planes[i].m.fd = buf[i];
+
+    return true;
+}
+
+bool LibScalerForJpeg::SetImage(
+        v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
+        unsigned int width, unsigned int height, unsigned int v4l2_format,
+        char *addrs[SCALER_MAX_PLANES])
+{
+    SetImage(m_fmt, m_buf, m_planes, width, height, v4l2_format, V4L2_MEMORY_USERPTR);
+        return false;
+
+    for (unsigned long i = 0; i < m_buf.length; i++)
+        m_planes[i].m.userptr = reinterpret_cast<unsigned long>(addrs[i]);
 
     return true;
 }

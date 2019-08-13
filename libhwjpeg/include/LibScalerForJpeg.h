@@ -10,18 +10,13 @@ public:
     LibScalerForJpeg();
     ~LibScalerForJpeg();
 
-    bool SetSrcImage(
-            unsigned int width, unsigned int height, unsigned int v4l2_format,
-            void *addrs[SCALER_MAX_PLANES], int mem_type) {
-        return SetImage(m_srcFmt, m_srcBuf, m_srcPlanes,
-                width, height, v4l2_format, addrs, mem_type);
+    template <class T>
+    bool SetSrcImage(unsigned int width, unsigned int height, unsigned int v4l2_format, T buf[SCALER_MAX_PLANES]) {
+        return SetImage(m_srcFmt, m_srcBuf, m_srcPlanes, width, height, v4l2_format, buf);
     }
 
-    bool SetDstImage(
-            unsigned int width, unsigned int height, unsigned int v4l2_format,
-            void *addrs[SCALER_MAX_PLANES], int mem_type) {
-        return SetImage(m_dstFmt, m_dstBuf, m_dstPlanes,
-                width, height, v4l2_format, addrs, mem_type);
+    bool SetDstImage(unsigned int width, unsigned int height, unsigned int v4l2_format, int buf) {
+        return SetImage(m_dstFmt, m_dstBuf, m_dstPlanes, width, height, v4l2_format, &buf);
     }
 
     bool RunStream();
@@ -39,7 +34,16 @@ private:
     bool SetImage(
             v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
             unsigned int width, unsigned int height, unsigned int v4l2_format,
-            void *addrs[SCALER_MAX_PLANES], int mem_type);
+            char *addrs[SCALER_MAX_PLANES]);
+
+    bool SetImage(
+            v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
+            unsigned int width, unsigned int height, unsigned int v4l2_format,
+            int buf[SCALER_MAX_PLANES]);
+
+    bool SetImage(
+            v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
+            unsigned int width, unsigned int height, unsigned int v4l2_format, unsigned int memtype);
 
     bool SetFormat();
     bool ReqBufs(int count = 1);

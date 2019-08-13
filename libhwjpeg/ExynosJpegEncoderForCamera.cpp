@@ -581,41 +581,36 @@ bool ExynosJpegEncoderForCamera::GenerateThumbnailImage()
     ALOGD("Generating thumbnail image: %dx%d -> %dx%d",
           main_width, main_height, m_nThumbWidth, m_nThumbHeight);
 
-    int len_srcbufs[3] = {0, 0, 0};
-    void *srcbufs[3] = {NULL, NULL, NULL};
-    int memtype;
+    bool okay = false;
 
     if (checkInBufType() == JPEG_BUF_TYPE_USER_PTR) {
         char *bufs[3];
+        int len_srcbufs[3];
+
         if (getInBuf(bufs, len_srcbufs, 3) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
-        memtype = V4L2_MEMORY_USERPTR;
-        srcbufs[0] = reinterpret_cast<void *>(bufs[0]);
-        srcbufs[1] = reinterpret_cast<void *>(bufs[1]);
-        srcbufs[2] = reinterpret_cast<void *>(bufs[2]);
+
+        okay = m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format, bufs);
     } else { // mainbuftype == JPEG_BUF_TYPE_DMA_BUF
         int bufs[3];
+        int len_srcbufs[3];
+
         if (getInBuf(bufs, len_srcbufs, 3) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
-        memtype = V4L2_MEMORY_DMABUF;
-        srcbufs[0] = reinterpret_cast<void *>(bufs[0]);
-        srcbufs[1] = reinterpret_cast<void *>(bufs[1]);
-        srcbufs[2] = reinterpret_cast<void *>(bufs[2]);
+        okay = m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format, bufs);
     }
 
-    void *dstbuf[3] = {NULL, NULL, NULL};
-    dstbuf[0] = reinterpret_cast<void *>(m_fdIONThumbImgBuffer);
-
-    if (!m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format, srcbufs, memtype)) {
+    if (!okay) {
         ALOGE("Failed to configure the main image format to LibScalerForJpeg");
         return false;
     }
+
     if (!m_pLibScaler.SetDstImage(m_nThumbWidth, m_nThumbHeight,
-                GetThumbnailFormat(v4l2Format), dstbuf, V4L2_MEMORY_DMABUF)) {
+                GetThumbnailFormat(v4l2Format), m_fdIONThumbImgBuffer)) {
         ALOGE("Failed to configure the target image format to LibScalerForJpeg");
         return false;
     }
