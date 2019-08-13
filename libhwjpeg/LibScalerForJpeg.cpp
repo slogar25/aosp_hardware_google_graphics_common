@@ -20,15 +20,11 @@
 
 LibScalerForJpeg::LibScalerForJpeg()
 {
-    memset(&m_srcFmt, 0, sizeof(m_srcFmt));
-    memset(&m_dstFmt, 0, sizeof(m_dstFmt));
     memset(&m_srcBuf, 0, sizeof(m_srcBuf));
     memset(&m_dstBuf, 0, sizeof(m_dstBuf));
     memset(&m_srcPlanes, 0, sizeof(m_srcPlanes));
     memset(&m_dstPlanes, 0, sizeof(m_dstPlanes));
 
-    m_srcFmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-    m_dstFmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
     m_srcBuf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
     m_dstBuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 
@@ -58,77 +54,98 @@ LibScalerForJpeg::~LibScalerForJpeg()
 }
 
 bool LibScalerForJpeg::SetImage(
-        v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
-        unsigned int width, unsigned int height, unsigned int v4l2_format, unsigned int memtype)
+        Image &img, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
+        unsigned int width, unsigned int height, unsigned int v4l2format, unsigned int memtype, unsigned int buftype)
 {
     /* Format information update*/
-    if ((m_needReqbuf == true) ||
-            (m_fmt.fmt.pix_mp.pixelformat != v4l2_format ||
-            m_fmt.fmt.pix_mp.width != width ||
-            m_fmt.fmt.pix_mp.height != height ||
-            m_buf.memory != memtype)) {
-        m_fmt.fmt.pix_mp.pixelformat = v4l2_format;
-        m_fmt.fmt.pix_mp.width  = width;
-        m_fmt.fmt.pix_mp.height = height;
+    if ((m_needReqbuf == true) || (!img.same(width, height, v4l2format) || m_buf.memory != memtype)) {
+        v4l2_format fmt{};
+
+        fmt.type = buftype;
+        fmt.fmt.pix_mp.pixelformat = v4l2format;
+        fmt.fmt.pix_mp.width = width;
+        fmt.fmt.pix_mp.height = height;
 
         // The driver returns the number and length of planes through TRY_FMT.
-        if (ioctl(m_fdScaler, VIDIOC_TRY_FMT, &m_fmt) < 0) {
+        if (ioctl(m_fdScaler, VIDIOC_TRY_FMT, &fmt) < 0) {
             ALOGE("Failed to TRY_FMT for source");
             m_needReqbuf = true;
             return false;
         }
         m_needReqbuf = true;
+
+        img.set(width, height, v4l2format);
+        img.setBufferRequirements(fmt.fmt.pix_mp.num_planes,
+                                  fmt.fmt.pix_mp.plane_fmt[0].sizeimage,
+                                  fmt.fmt.pix_mp.plane_fmt[1].sizeimage,
+                                  fmt.fmt.pix_mp.plane_fmt[2].sizeimage);
     }
 
     /* Buffer information update*/
     m_buf.index = 0;
-    m_buf.length = m_fmt.fmt.pix_mp.num_planes;
     m_buf.memory = memtype;
+    m_buf.length = img.planeCount;
 
     for (unsigned long i = 0; i < m_buf.length; i++) {
-        m_planes[i].length = m_fmt.fmt.pix_mp.plane_fmt[i].sizeimage;
+        m_planes[i].length = img.planeLength[i];
         m_planes[i].bytesused = m_planes[i].length;
     }
 
     return true;
 }
 
-bool LibScalerForJpeg::SetImage(
-        v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
-        unsigned int width, unsigned int height, unsigned int v4l2_format,
-        int buf[SCALER_MAX_PLANES])
+bool LibScalerForJpeg::SetSrcImage(unsigned int width, unsigned int height, unsigned int format, int buf[SCALER_MAX_PLANES])
 {
-    if (!SetImage(m_fmt, m_buf, m_planes, width, height, v4l2_format, V4L2_MEMORY_DMABUF))
+    if (!SetImage(mSrcImage, m_srcBuf, m_srcPlanes, width, height, format, V4L2_MEMORY_DMABUF, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE))
         return false;
 
-    for (unsigned long i = 0; i < m_buf.length; i++)
-        m_planes[i].m.fd = buf[i];
+    for (unsigned long i = 0; i < m_srcBuf.length; i++)
+        m_srcPlanes[i].m.fd = buf[i];
 
     return true;
 }
 
-bool LibScalerForJpeg::SetImage(
-        v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
-        unsigned int width, unsigned int height, unsigned int v4l2_format,
-        char *addrs[SCALER_MAX_PLANES])
+bool LibScalerForJpeg::SetSrcImage(unsigned int width, unsigned int height, unsigned int format, char *buf[SCALER_MAX_PLANES])
 {
-    SetImage(m_fmt, m_buf, m_planes, width, height, v4l2_format, V4L2_MEMORY_USERPTR);
+    if (!SetImage(mSrcImage, m_srcBuf, m_srcPlanes, width, height, format, V4L2_MEMORY_USERPTR, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE))
         return false;
 
-    for (unsigned long i = 0; i < m_buf.length; i++)
-        m_planes[i].m.userptr = reinterpret_cast<unsigned long>(addrs[i]);
+    for (unsigned long i = 0; i < m_srcBuf.length; i++)
+        m_srcPlanes[i].m.userptr = reinterpret_cast<unsigned long>(buf[i]);
+
+    return true;
+}
+
+bool LibScalerForJpeg::SetDstImage(unsigned int width, unsigned int height, unsigned int format, int buf)
+{
+    if (!SetImage(mDstImage, m_dstBuf, m_dstPlanes, width, height, format, V4L2_MEMORY_DMABUF, V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE))
+        return false;
+
+    m_dstPlanes[0].m.fd = buf;
 
     return true;
 }
 
 bool LibScalerForJpeg::SetFormat()
 {
-    if (ioctl(m_fdScaler, VIDIOC_S_FMT, &m_srcFmt) < 0) {
+    v4l2_format fmt{};
+
+    fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+    fmt.fmt.pix_mp.pixelformat = mSrcImage.format;
+    fmt.fmt.pix_mp.width  = mSrcImage.width;
+    fmt.fmt.pix_mp.height = mSrcImage.height;
+
+    if (ioctl(m_fdScaler, VIDIOC_S_FMT, &fmt) < 0) {
         ALOGE("Failed to S_FMT for the source");
         return false;
     }
 
-    if (ioctl(m_fdScaler, VIDIOC_S_FMT, &m_dstFmt) < 0) {
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+    fmt.fmt.pix_mp.pixelformat = mDstImage.format;
+    fmt.fmt.pix_mp.width  = mDstImage.width;
+    fmt.fmt.pix_mp.height = mDstImage.height;
+
+    if (ioctl(m_fdScaler, VIDIOC_S_FMT, &fmt) < 0) {
         ALOGE("Failed to S_FMT for the target");
         return false;
     }
