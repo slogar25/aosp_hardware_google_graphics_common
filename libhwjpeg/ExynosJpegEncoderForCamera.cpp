@@ -581,6 +581,17 @@ bool ExynosJpegEncoderForCamera::GenerateThumbnailImage()
     ALOGD("Generating thumbnail image: %dx%d -> %dx%d",
           main_width, main_height, m_nThumbWidth, m_nThumbHeight);
 
+    if (!m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format)) {
+        ALOGE("Failed to configure the main image format to LibScalerForJpeg");
+        return false;
+    }
+
+
+    if (!m_pLibScaler.SetDstImage(m_nThumbWidth, m_nThumbHeight, GetThumbnailFormat(v4l2Format))) {
+        ALOGE("Failed to configure the target image format to LibScalerForJpeg");
+        return false;
+    }
+
     bool okay = false;
 
     if (checkInBufType() == JPEG_BUF_TYPE_USER_PTR) {
@@ -592,7 +603,7 @@ bool ExynosJpegEncoderForCamera::GenerateThumbnailImage()
             return false;
         }
 
-        okay = m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format, bufs);
+        okay = m_pLibScaler.RunStream(bufs, m_fdIONThumbImgBuffer);
     } else { // mainbuftype == JPEG_BUF_TYPE_DMA_BUF
         int bufs[3];
         int len_srcbufs[3];
@@ -601,21 +612,10 @@ bool ExynosJpegEncoderForCamera::GenerateThumbnailImage()
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
-        okay = m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format, bufs);
+        okay = m_pLibScaler.RunStream(bufs, m_fdIONThumbImgBuffer);
     }
 
     if (!okay) {
-        ALOGE("Failed to configure the main image format to LibScalerForJpeg");
-        return false;
-    }
-
-    if (!m_pLibScaler.SetDstImage(m_nThumbWidth, m_nThumbHeight,
-                GetThumbnailFormat(v4l2Format), m_fdIONThumbImgBuffer)) {
-        ALOGE("Failed to configure the target image format to LibScalerForJpeg");
-        return false;
-    }
-
-    if (!m_pLibScaler.RunStream()) {
         ALOGE("Failed to convert the main image to thumbnail with LibScalerForJpeg");
         return false;
     }
