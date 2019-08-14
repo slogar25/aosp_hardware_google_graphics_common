@@ -18,14 +18,16 @@
 #ifndef __HARDWARE_EXYNOS_JPEG_ENCODER_FOR_CAMERA_H__
 #define __HARDWARE_EXYNOS_JPEG_ENCODER_FOR_CAMERA_H__
 
+#include <memory>
+
 #include <pthread.h>
 
 #include <ExynosExif.h>
 #include "ExynosJpegApi.h"
-#include "LibScalerForJpeg.h"
 #include <hardware/exynos/ExynosExif.h>
 
 class CAppMarkerWriter; // defined in libhwjpeg/AppMarkerWriter.h
+class ThumbnailScaler; // defined in libhwjpeg/thumbnail_scaler.h
 
 class ExynosJpegEncoderForCamera: public ExynosJpegEncoder {
     enum {
@@ -36,7 +38,7 @@ class ExynosJpegEncoderForCamera: public ExynosJpegEncoder {
     };
 
     CHWJpegCompressor *m_phwjpeg4thumb;
-    LibScalerForJpeg m_pLibScaler;
+    std::unique_ptr<ThumbnailScaler> mThumbnailScaler;
     int m_fdIONClient;
     int m_fdIONThumbImgBuffer;
     char *m_pIONThumbImgBuffer;

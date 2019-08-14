@@ -27,7 +27,7 @@
 
 #include "hwjpeg-internal.h"
 #include "AppMarkerWriter.h"
-#include "LibScalerForJpeg.h"
+#include "ThumbnailScaler.h"
 #include "IFDWriter.h"
 
 // Data length written by H/W without the scan data.
@@ -104,6 +104,8 @@ ExynosJpegEncoderForCamera::ExynosJpegEncoderForCamera(bool bBTBComp)
         SetState(STATE_THUMBSIZE_CHANGED);
 
     m_extraInfo.appInfo = m_appInfo;
+
+    mThumbnailScaler.reset(ThumbnailScaler::createInstance());
 
     ALOGD("ExynosJpegEncoderForCamera Created: %p, ION %d", this, m_fdIONClient);
 }
@@ -581,42 +583,47 @@ bool ExynosJpegEncoderForCamera::GenerateThumbnailImage()
     ALOGD("Generating thumbnail image: %dx%d -> %dx%d",
           main_width, main_height, m_nThumbWidth, m_nThumbHeight);
 
-    if (!m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format)) {
-        ALOGE("Failed to configure the main image format to LibScalerForJpeg");
+    if (!mThumbnailScaler) {
+        ALOGE("Thumbnail scaler is not prepared");
+        return false;
+    }
+
+    if (!mThumbnailScaler->SetSrcImage(main_width, main_height, v4l2Format)) {
+        ALOGE("Failed to configure the main image to the thumbnail scaler");
         return false;
     }
 
 
-    if (!m_pLibScaler.SetDstImage(m_nThumbWidth, m_nThumbHeight, GetThumbnailFormat(v4l2Format))) {
-        ALOGE("Failed to configure the target image format to LibScalerForJpeg");
+    if (!mThumbnailScaler->SetDstImage(m_nThumbWidth, m_nThumbHeight, GetThumbnailFormat(v4l2Format))) {
+        ALOGE("Failed to configure the target image to the thumbnail scaler");
         return false;
     }
 
     bool okay = false;
 
     if (checkInBufType() == JPEG_BUF_TYPE_USER_PTR) {
-        char *bufs[SCALER_MAX_PLANES];
-        int len_srcbufs[SCALER_MAX_PLANES];
+        char *bufs[ThumbnailScaler::SCALER_MAX_PLANES];
+        int len_srcbufs[ThumbnailScaler::SCALER_MAX_PLANES];
 
-        if (getInBuf(bufs, len_srcbufs, SCALER_MAX_PLANES) < 0) {
+        if (getInBuf(bufs, len_srcbufs, ThumbnailScaler::SCALER_MAX_PLANES) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
 
-        okay = m_pLibScaler.RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
+        okay = mThumbnailScaler->RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
     } else { // mainbuftype == JPEG_BUF_TYPE_DMA_BUF
-        int bufs[SCALER_MAX_PLANES];
-        int len_srcbufs[SCALER_MAX_PLANES];
+        int bufs[ThumbnailScaler::SCALER_MAX_PLANES];
+        int len_srcbufs[ThumbnailScaler::SCALER_MAX_PLANES];
 
-        if (getInBuf(bufs, len_srcbufs, SCALER_MAX_PLANES) < 0) {
+        if (getInBuf(bufs, len_srcbufs, ThumbnailScaler::SCALER_MAX_PLANES) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
-        okay = m_pLibScaler.RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
+        okay = mThumbnailScaler->RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
     }
 
     if (!okay) {
-        ALOGE("Failed to convert the main image to thumbnail with LibScalerForJpeg");
+        ALOGE("Failed to convert the main image to thumbnail with the thumbnail scaler");
         return false;
     }
 
