@@ -19,7 +19,6 @@
 #include "LibScalerForJpeg.h"
 
 #define SCALER_DEV_NODE "/dev/video50"
-#define SCALER_MAX_PLANES 3
 
 static const char *getBufTypeString(unsigned int buftype)
 {
@@ -55,20 +54,20 @@ LibScalerForJpeg::~LibScalerForJpeg()
     ALOGD("LibScalerForJpeg Destroyed: %p", this);
 }
 
-bool LibScalerForJpeg::RunStream(int srcBuf[], int dstBuf)
+bool LibScalerForJpeg::RunStream(int srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen)
 {
     if (!mSrcImage.begin(V4L2_MEMORY_DMABUF) || !mDstImage.begin(V4L2_MEMORY_DMABUF))
         return false;
 
-    return queue(srcBuf, dstBuf);
+    return queue(srcBuf, srcLen, dstBuf, dstLen);
 }
 
-bool LibScalerForJpeg::RunStream(char *srcBuf[], int dstBuf)
+bool LibScalerForJpeg::RunStream(char *srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen)
 {
     if (!mSrcImage.begin(V4L2_MEMORY_USERPTR) || !mDstImage.begin(V4L2_MEMORY_DMABUF))
         return false;
 
-    return queue(srcBuf, dstBuf);
+    return queue(srcBuf, srcLen, dstBuf, dstLen);
 }
 
 bool LibScalerForJpeg::Image::set(unsigned int width, unsigned int height, unsigned int format)
@@ -102,10 +101,6 @@ bool LibScalerForJpeg::Image::set(unsigned int width, unsigned int height, unsig
     }
 
     memoryType = 0; // new reqbufs is required.
-
-    planeCount = fmt.fmt.pix_mp.num_planes;
-    for (unsigned int i = 0; i < planeCount; i++)
-        planeLength[i] = fmt.fmt.pix_mp.plane_fmt[i].sizeimage;
 
     return true;
 }
@@ -161,7 +156,7 @@ bool LibScalerForJpeg::Image::cancelBuffer()
     return true;
 }
 
-bool LibScalerForJpeg::Image::queueBuffer(int buf[])
+bool LibScalerForJpeg::Image::queueBuffer(int buf, size_t len)
 {
     v4l2_buffer buffer{};
     v4l2_plane plane[SCALER_MAX_PLANES];
@@ -170,11 +165,32 @@ bool LibScalerForJpeg::Image::queueBuffer(int buf[])
 
     buffer.type = bufferType;
     buffer.memory = memoryType;
-    buffer.length = planeCount;
-    for (unsigned int i = 0; i < planeCount; i++) {
+    buffer.length = 1;
+    buffer.m.planes = plane;
+    plane[0].m.fd = buf;
+    plane[0].length = len;
+
+    if (ioctl(mDevFd, VIDIOC_QBUF, &buffer) < 0) {
+        ALOGERR("Failed to QBUF for %s", getBufTypeString(bufferType));
+        return false;
+    }
+
+    return true;
+}
+
+bool LibScalerForJpeg::Image::queueBuffer(int buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES])
+{
+    v4l2_buffer buffer{};
+    v4l2_plane plane[SCALER_MAX_PLANES];
+
+    memset(&plane, 0, sizeof(plane));
+
+    buffer.type = bufferType;
+    buffer.memory = memoryType;
+    buffer.length = SCALER_MAX_PLANES;
+    for (unsigned int i = 0; i < SCALER_MAX_PLANES; i++) {
         plane[i].m.fd = buf[i];
-        plane[i].length = planeLength[i];
-        plane[i].bytesused = planeLength[i];
+        plane[i].length = len[i];
     }
     buffer.m.planes = plane;
 
@@ -186,7 +202,7 @@ bool LibScalerForJpeg::Image::queueBuffer(int buf[])
     return true;
 }
 
-bool LibScalerForJpeg::Image::queueBuffer(char *buf[])
+bool LibScalerForJpeg::Image::queueBuffer(char *buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES])
 {
     v4l2_buffer buffer{};
     v4l2_plane plane[SCALER_MAX_PLANES];
@@ -195,11 +211,10 @@ bool LibScalerForJpeg::Image::queueBuffer(char *buf[])
 
     buffer.type = bufferType;
     buffer.memory = memoryType;
-    buffer.length = planeCount;
-    for (unsigned int i = 0; i < planeCount; i++) {
+    buffer.length = SCALER_MAX_PLANES;
+    for (unsigned int i = 0; i < SCALER_MAX_PLANES; i++) {
         plane[i].m.userptr = reinterpret_cast<unsigned long>(buf[i]);
-        plane[i].length = planeLength[i];
-        plane[i].bytesused = planeLength[i];
+        plane[i].length = len[i];
     }
     buffer.m.planes = plane;
 
@@ -220,7 +235,7 @@ bool LibScalerForJpeg::Image::dequeueBuffer()
 
     buffer.type = bufferType;
     buffer.memory = memoryType;
-    buffer.length = planeCount;
+    buffer.length = SCALER_MAX_PLANES;
 
     buffer.m.planes = plane;
 

@@ -5,6 +5,8 @@
 
 #include <tuple>
 
+#define SCALER_MAX_PLANES 3
+
 class LibScalerForJpeg {
 public:
     LibScalerForJpeg();
@@ -18,8 +20,8 @@ public:
         return mDstImage.set(width, height, v4l2_format);
     }
 
-    bool RunStream(int srcBuf[], int dstBuf);
-    bool RunStream(char *srcBuf[], int dstBuf);
+    bool RunStream(int srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen);
+    bool RunStream(char *srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen);
 
 private:
     int m_fdScaler = -1;
@@ -30,8 +32,6 @@ private:
         unsigned int height;
         unsigned int format;
         unsigned int memoryType = 0;
-        unsigned int planeCount = 1;
-        unsigned int planeLength[3] = {0, 0, 0};
         const unsigned int bufferType;
 
         Image(unsigned int w, unsigned int h, unsigned int f, unsigned int buftype)
@@ -44,17 +44,18 @@ private:
         bool same(unsigned int w, unsigned int h, unsigned int f) { return width == w && height == h && format == f; }
         bool begin(unsigned int memtype);
         bool cancelBuffer();
-        bool queueBuffer(char *buf[]);
-        bool queueBuffer(int buf[]);
+        bool queueBuffer(char *buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES]);
+        bool queueBuffer(int buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES]);
+        bool queueBuffer(int buf, size_t len);
         bool dequeueBuffer();
     };
 
     template<class T>
-    bool queue(T srcBuf, int dstBuf) {
-        if (!mSrcImage.queueBuffer(srcBuf))
+    bool queue(T srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen) {
+        if (!mSrcImage.queueBuffer(srcBuf, srcLen))
             return false;
 
-        if (!mDstImage.queueBuffer(&dstBuf)) {
+        if (!mDstImage.queueBuffer(dstBuf, dstLen)) {
             mSrcImage.cancelBuffer();
             return false;
         }

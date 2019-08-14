@@ -595,24 +595,24 @@ bool ExynosJpegEncoderForCamera::GenerateThumbnailImage()
     bool okay = false;
 
     if (checkInBufType() == JPEG_BUF_TYPE_USER_PTR) {
-        char *bufs[3];
-        int len_srcbufs[3];
+        char *bufs[SCALER_MAX_PLANES];
+        int len_srcbufs[SCALER_MAX_PLANES];
 
-        if (getInBuf(bufs, len_srcbufs, 3) < 0) {
+        if (getInBuf(bufs, len_srcbufs, SCALER_MAX_PLANES) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
 
-        okay = m_pLibScaler.RunStream(bufs, m_fdIONThumbImgBuffer);
+        okay = m_pLibScaler.RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
     } else { // mainbuftype == JPEG_BUF_TYPE_DMA_BUF
-        int bufs[3];
-        int len_srcbufs[3];
+        int bufs[SCALER_MAX_PLANES];
+        int len_srcbufs[SCALER_MAX_PLANES];
 
-        if (getInBuf(bufs, len_srcbufs, 3) < 0) {
+        if (getInBuf(bufs, len_srcbufs, SCALER_MAX_PLANES) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
-        okay = m_pLibScaler.RunStream(bufs, m_fdIONThumbImgBuffer);
+        okay = m_pLibScaler.RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
     }
 
     if (!okay) {
