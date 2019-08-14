@@ -2,8 +2,6 @@
 #define __HARDWARE_EXYNOS_LIBSCALERFORJPEG_H__
 
 #include <linux/videodev2.h>
-#define SCALER_DEV_NODE "/dev/video50"
-#define SCALER_MAX_PLANES 3
 
 #include <tuple>
 
@@ -22,6 +20,7 @@ public:
 
     bool RunStream(int srcBuf[], int dstBuf);
     bool RunStream(char *srcBuf[], int dstBuf);
+
 private:
     int m_fdScaler = -1;
 
@@ -45,19 +44,32 @@ private:
         bool same(unsigned int w, unsigned int h, unsigned int f) { return width == w && height == h && format == f; }
         bool begin(unsigned int memtype);
         bool cancelBuffer();
+        bool queueBuffer(char *buf[]);
+        bool queueBuffer(int buf[]);
+        bool dequeueBuffer();
     };
+
+    template<class T>
+    bool queue(T srcBuf, int dstBuf) {
+        if (!mSrcImage.queueBuffer(srcBuf))
+            return false;
+
+        if (!mDstImage.queueBuffer(&dstBuf)) {
+            mSrcImage.cancelBuffer();
+            return false;
+        }
+
+        if (!mSrcImage.dequeueBuffer() || !mDstImage.dequeueBuffer()) {
+            mSrcImage.cancelBuffer();
+            mDstImage.cancelBuffer();
+            return false;
+        }
+
+        return true;
+    }
 
     Image mSrcImage{0, 0, V4L2_PIX_FMT_YUYV, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE};
     Image mDstImage{0, 0, V4L2_PIX_FMT_YUYV, V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE};
-
-    v4l2_buffer m_srcBuf;
-    v4l2_buffer m_dstBuf;
-    v4l2_plane m_srcPlanes[SCALER_MAX_PLANES];
-    v4l2_plane m_dstPlanes[SCALER_MAX_PLANES];
-
-    bool RunStream(int dstBuf);
-    bool QBuf();
-    bool DQBuf();
 };
 
 #endif //__HARDWARE_EXYNOS_LIBSCALERFORJPEG_H__
