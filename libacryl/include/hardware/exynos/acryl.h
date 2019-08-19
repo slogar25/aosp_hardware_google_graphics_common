@@ -17,8 +17,8 @@
 #ifndef __HARDWARE_EXYNOS_ACRYLIC_H__
 #define __HARDWARE_EXYNOS_ACRYLIC_H__
 
+#include <cstdint>
 #include <unistd.h>
-#include <utils/RefBase.h>
 #include <system/graphics.h>
 #include <hardware/hwcomposer.h>
 
@@ -422,7 +422,7 @@ class Acrylic;
  * Creation of AcrylicCanvas by new operator is prohibited. The only way to
  * create an instance of AcrylicCavans is to call Acrylic::createLayer().
  */
-class AcrylicCanvas: public android::RefBase {
+class AcrylicCanvas {
     friend class Acrylic;
 public:
     /*
@@ -915,7 +915,7 @@ public:
  * and AcrylicCanvas that are created by Acrylic.
  * To create an instance of Acrylic, you should use AcrylicFactory.
  */
-class Acrylic: public android::RefBase {
+class Acrylic {
 public:
     /*
      * Factory methods of an instance of Acrylic subclasses
