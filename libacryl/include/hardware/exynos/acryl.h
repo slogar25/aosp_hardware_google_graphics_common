@@ -17,6 +17,7 @@
 #ifndef __HARDWARE_EXYNOS_ACRYLIC_H__
 #define __HARDWARE_EXYNOS_ACRYLIC_H__
 
+#include <vector>
 #include <cstdint>
 #include <unistd.h>
 #include <system/graphics.h>
@@ -1069,8 +1070,8 @@ public:
     /*
      * Run HW 2D. If @fence is not NULL and num_fences is not zero, execute()
      * fills the release fences to the array of @fence. The number of fences
-     * filled by execute() is min(num_fences, mLayerCount). If num_fences is
-     * larger than mLayerCount, execute() fills -1 to the rest of the elements
+     * filled by execute() is min(num_fences, mLayers.size()). If num_fences is
+     * larger than mLayers.size(), execute() fills -1 to the rest of the elements
      * of @fence.
      * execute() returns before HW 2D completes the processing, of course.
      */
@@ -1132,7 +1133,7 @@ public:
      * setCanvasDimension(), setCanvasImageType() and setCanvasBuffer().
      */
     AcrylicCanvas &getCanvas() { return mCanvas; }
-    unsigned int layerCount() { return mLayerCount; }
+    unsigned int layerCount() { return static_cast<unsigned int>(mLayers.size()); }
 protected:
     /*
      * Called when an AcrylicLayer is destroyed. Unlike removeLayer(),
@@ -1145,11 +1146,10 @@ protected:
      */
     virtual void removeTransitData(AcrylicLayer __attribute__((__unused__)) *layer) { }
     bool validateAllLayers();
-    void sortLayers(bool ascending = true);
+    void sortLayers();
     AcrylicLayer *getLayer(unsigned int index)
     {
-        // if mLayers == NULL, mLayerCount should be 0
-        return (index < mLayerCount) ? mLayers[index] : NULL;
+        return (index < mLayers.size()) ? mLayers[index] : nullptr;
     }
     void getBackgroundColor(uint16_t *red, uint16_t *green, uint16_t *blue,
                          uint16_t *alpha)
@@ -1164,8 +1164,7 @@ protected:
     uint16_t getMinTargetDisplayLuminance() { return mMinTargetLuminance; }
     void *getTargetDisplayInfo() { return mTargetDisplayInfo; }
 private:
-    unsigned int mLayerCount;
-    AcrylicLayer **mLayers;
+    std::vector<AcrylicLayer *> mLayers;
     const HW2DCapability &mCapability;
     struct {
         uint16_t R;

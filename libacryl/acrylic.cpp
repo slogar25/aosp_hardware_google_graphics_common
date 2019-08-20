@@ -24,7 +24,7 @@
 #include "acrylic_internal.h"
 
 Acrylic::Acrylic(const HW2DCapability &capability)
-    : mLayerCount(0), mLayers(nullptr), mCapability(capability), mHasBackgroundColor(false),
+    : mCapability(capability), mHasBackgroundColor(false),
       mMaxTargetLuminance(100), mMinTargetLuminance(0), mTargetDisplayInfo(nullptr),
       mCanvas(this, AcrylicCanvas::CANVAS_TARGET)
 {
@@ -35,61 +35,45 @@ Acrylic::~Acrylic()
 {
     mCanvas.disconnectLayer();
 
-    for (unsigned int i = 0; i < mLayerCount; i++) {
-        mLayers[i]->disconnectLayer();
-        removeTransitData(mLayers[i]);
+    for (auto layer: mLayers) {
+        layer->disconnectLayer();
+        removeTransitData(layer);
     }
-
-    delete mLayers;
 
     ALOGD_TEST("Destroyed Acrylic on %p", this);
 }
 
 AcrylicLayer *Acrylic::createLayer()
 {
-    if (mLayerCount >= getCapabilities().maxLayerCount()) {
-        ALOGE("Full of composit layer: current %u, max %u",
-                mLayerCount, getCapabilities().maxLayerCount());
+    if (mLayers.size() >= getCapabilities().maxLayerCount()) {
+        ALOGE("Full of composit layer: current %zu, max %u",
+                mLayers.size() , getCapabilities().maxLayerCount());
         return NULL;
     }
 
-    if (mLayers == NULL)
-        mLayers = new AcrylicLayer*[getCapabilities().maxLayerCount()];
-
-    if (mLayers == NULL) {
-        ALOGE("Failed to allocate layer array");
-        return NULL;
-    }
-
-    AcrylicLayer *layer = new AcrylicLayer(this);
+    auto *layer = new AcrylicLayer(this);
     if (!layer) {
         ALOGE("Failed to create a new compositing layer");
         return NULL;
     }
 
-    mLayers[mLayerCount++] = layer;
+    mLayers.push_back(layer);
 
-    ALOGD_TEST("A new Acrylic layer is created. Total %d layers", mLayerCount);
+    ALOGD_TEST("A new Acrylic layer is created. Total %zd layers", mLayers.size());
 
     return layer;
 }
 
 void Acrylic::removeLayer(AcrylicLayer *layer)
 {
-    for (unsigned int i = 0; i < mLayerCount; i++) {
-        if (mLayers[i] == layer) {
-            ALOGD_TEST("Removed an Acrylic layer (%d/%d)", i, mLayerCount);
-            mLayerCount--;
-            while (i < mLayerCount) {
-                mLayers[i] = mLayers[i + 1];
-                i++;
-            }
-            removeTransitData(layer);
-            return;
-        }
-    }
+    auto it = find(std::begin(mLayers), std::end(mLayers), layer);
 
-    ALOGE("Deleting an unregistered layer");
+    if (it == std::end(mLayers)) {
+        ALOGE("Deleting an unregistered layer");
+    } else {
+        removeTransitData(*it);
+        mLayers.erase(it);
+    }
 }
 
 int Acrylic::prioritize(int priority)
@@ -136,57 +120,57 @@ bool Acrylic::validateAllLayers()
     hw2d_rect_t rect;
     hw2d_coord_t xy = mCanvas.getImageDimension();
 
-    for (unsigned int i = 0; i < mLayerCount; i++) {
-        if (!mLayers[i]->isSettingOkay()) {
-            ALOGE("Incomplete settting (flags: %#x) on layer %d",
-                  mLayers[i]->getSettingFlags(), i);
+    for (auto layer: mLayers) {
+        if (!layer->isSettingOkay()) {
+            ALOGE("Incomplete settting (flags: %#x) on a layer of %zu layers",
+                  layer->getSettingFlags(), mLayers.size());
             return false;
         }
 
-        if (mLayers[i]->isCompressed() && !cap.isFeatureSupported(HW2DCapability::FEATURE_AFBC_DECODE)) {
+        if (layer->isCompressed() && !cap.isFeatureSupported(HW2DCapability::FEATURE_AFBC_DECODE)) {
             ALOGE("AFBC decoding is not supported");
             return false;
         }
 
-        if (mLayers[i]->isUOrder() && !cap.isFeatureSupported(HW2DCapability::FEATURE_UORDER_READ)) {
+        if (layer->isUOrder() && !cap.isFeatureSupported(HW2DCapability::FEATURE_UORDER_READ)) {
             ALOGE("Reading a texture in U-Order is not supported");
             return false;
         }
 
-        if ((mLayers[i]->getPlaneAlpha() != 255) && !cap.isFeatureSupported(HW2DCapability::FEATURE_PLANE_ALPHA)) {
-            ALOGE("Plane alpha is not supported but given %u for plane alpha", mLayers[i]->getPlaneAlpha());
+        if ((layer->getPlaneAlpha() != 255) && !cap.isFeatureSupported(HW2DCapability::FEATURE_PLANE_ALPHA)) {
+            ALOGE("Plane alpha is not supported but given %u for plane alpha", layer->getPlaneAlpha());
             return false;
         }
 
-        rect = mLayers[i]->getTargetRect();
+        rect = layer->getTargetRect();
         if (area_is_zero(rect)) {
             // If no target area is specified to a source layer,
             // the entire region of the target image becomes the target area.
             // Then, check the scaling capability
-            hw2d_rect_t ir = mLayers[i]->getImageRect();
-            if (!!(mLayers[i]->getCompositAttr() & AcrylicLayer::ATTR_NORESAMPLING)) {
-                if (!cap.supportedResizing(ir.size, xy, mLayers[i]->getTransform())) {
+            hw2d_rect_t ir = layer->getImageRect();
+            if (!!(layer->getCompositAttr() & AcrylicLayer::ATTR_NORESAMPLING)) {
+                if (!cap.supportedResizing(ir.size, xy, layer->getTransform())) {
                     ALOGE("Unsupported resizing from %dx%d@(%d,%d) --> Target %dx%d with transform %d",
                           ir.size.hori, ir.size.vert, ir.pos.hori, ir.pos.vert,
-                          xy.hori, xy.vert, mLayers[i]->getTransform());
+                          xy.hori, xy.vert, layer->getTransform());
                     return false;
                 }
             } else {
-                if (!cap.supportedResampling(ir.size, xy, mLayers[i]->getTransform())) {
+                if (!cap.supportedResampling(ir.size, xy, layer->getTransform())) {
                     ALOGE("Unsupported scaling from %dx%d@(%d,%d) --> Target %dx%d with transform %d",
                           ir.size.hori, ir.size.vert, ir.pos.hori, ir.pos.vert,
-                          xy.hori, xy.vert, mLayers[i]->getTransform());
+                          xy.hori, xy.vert, layer->getTransform());
                     return false;
                 }
             }
         } else if (rect > xy) {
-            ALOGE("Target area %dx%d@(%d,%d) of layer %d is out of bound (%dx%d)",
+            ALOGE("Target area %dx%d@(%d,%d) of a layer of %zu layers is out of bound (%dx%d)",
                     rect.size.hori, rect.size.vert, rect.pos.hori, rect.pos.vert,
-                    i, xy.hori, xy.vert);
+                    mLayers.size(), xy.hori, xy.vert);
             return false;
         }
 
-        prot = prot || mLayers[i]->isProtected();
+        prot = prot || layer->isProtected();
     }
 
     if (prot && !mCanvas.isProtected()) {
@@ -197,19 +181,7 @@ bool Acrylic::validateAllLayers()
     return true;
 }
 
-class AcrylicLayerSorter {
-    bool mAscending;
-public:
-    AcrylicLayerSorter(bool ascending): mAscending(ascending) { }
-    inline bool operator()(AcrylicLayer *l1, AcrylicLayer *l2)
-    {
-        bool result = l1->getZOrder() < l2->getZOrder();
-        return mAscending ? result : !result;
-    }
-};
-
-void Acrylic::sortLayers(bool ascending)
+void Acrylic::sortLayers()
 {
-    AcrylicLayerSorter sorter(ascending);
-    std::sort(mLayers, mLayers + mLayerCount, sorter);
+    std::sort(std::begin(mLayers), std::end(mLayers), [] (auto l1, auto l2) { return l1->getZOrder() < l2->getZOrder(); });
 }
