@@ -23,9 +23,9 @@
 static const char *getBufTypeString(unsigned int buftype)
 {
     if (buftype == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
-        return "source";
-    if (buftype == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
         return "destination";
+    if (buftype == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+        return "source";
     return "unknown";
 }
 
