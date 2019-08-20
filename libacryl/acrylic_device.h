@@ -18,6 +18,8 @@
 #ifndef __HARDWARE_EXYNOS_ACRYLIC_DEVICE_H__
 #define __HARDWARE_EXYNOS_ACRYLIC_DEVICE_H__
 
+#include <string>
+
 class AcrylicDevice {
 public:
     AcrylicDevice(const char *path);
@@ -26,7 +28,7 @@ public:
 private:
     bool open();
 
-    char *mDevPath;
+    std::string mDevPath;
     int mDevFD;
 };
 
@@ -49,7 +51,7 @@ public:
 private:
     bool open();
 
-    char *mDevPath;
+    std:: string mDevPath;
     int mDevFd[MAX_DEVICE_FD];
     int mFdIdx;
 };

@@ -27,21 +27,12 @@
 #include "acrylic_device.h"
 
 AcrylicDevice::AcrylicDevice(const char *devpath)
-    : mDevFD(-1)
+    : mDevPath(devpath), mDevFD(-1)
 {
-    mDevPath = new char[std::strlen(devpath) + 1];
-    if (mDevPath == NULL) {
-        ALOGE("Failed to allocate pathname buffer of %s", devpath);
-        return;
-    }
-
-    std::strcpy(mDevPath, devpath);
 }
 
 AcrylicDevice::~AcrylicDevice()
 {
-    if (mDevPath)
-        delete [] mDevPath;
     if (mDevFD >= 0)
         ::close(mDevFD);
 }
@@ -51,18 +42,13 @@ bool AcrylicDevice::open()
     if (mDevFD >= 0)
         return true;
 
-    if (mDevPath == NULL) {
-        ALOGE("Path to device node is not specified");
-        return false;
-    }
-
-    mDevFD = ::open(mDevPath, O_RDWR);
+    mDevFD = ::open(mDevPath.c_str(), O_RDWR);
     if (mDevFD < 0) {
-        ALOGERR("Failed to open %s", mDevPath);
+        ALOGERR("Failed to open %s", mDevPath.c_str());
         return false;
     }
 
-    ALOGD_TEST("Opened %s on fd %d", mDevPath, mDevFD);
+    ALOGD_TEST("Opened %s on fd %d", mDevPath.c_str(), mDevFD);
 
     return true;
 }
@@ -76,44 +62,27 @@ int AcrylicDevice::ioctl(int cmd, void *arg)
 }
 
 AcrylicRedundantDevice::AcrylicRedundantDevice(const char *devpath)
-    : mFdIdx(0)
+    : mDevPath(devpath), mDevFd{-1, -1, -1}, mFdIdx(0)
 {
-    for (int i = 0; i < MAX_DEVICE_FD; i++)
-        mDevFd[i] = -1;
-
-    mDevPath = new char[std::strlen(devpath) + 1];
-    if (mDevPath == NULL) {
-        ALOGE("Failed to allocate pathname buffer of %s", devpath);
-        return;
-    }
-
-    std::strcpy(mDevPath, devpath);
+    mDevPath = devpath;
 }
 
 AcrylicRedundantDevice::~AcrylicRedundantDevice()
 {
-    if (mDevPath)
-        delete [] mDevPath;
-
     for (int i = 0; i < MAX_DEVICE_FD; i++)
         ::close(mDevFd[i]);
 }
 
 bool AcrylicRedundantDevice::open()
 {
-    if (mDevPath == NULL) {
-        ALOGE("Path to device node is not specified");
-        return false;
-    }
-
     if (mDevFd[0] >= 0)
         return true;
 
     for (int i = 0; i < MAX_DEVICE_FD; i++) {
         if (mDevFd[i] < 0) {
-            mDevFd[i] = ::open(mDevPath, O_RDWR);
+            mDevFd[i] = ::open(mDevPath.c_str(), O_RDWR);
             if (mDevFd[i] < 0) {
-                ALOGERR("Failed to open %s for devfd[%d]", mDevPath, i);
+                ALOGERR("Failed to open %s for devfd[%d]", mDevPath.c_str(), i);
                 while (i-- > 0) {
                     ::close(mDevFd[i]);
                     mDevFd[i] = -1;
@@ -121,7 +90,7 @@ bool AcrylicRedundantDevice::open()
                 return false;
             }
 
-            ALOGD_TEST("Opened %s on devfd[%d] %d", mDevPath, i, mDevFd[i]);
+            ALOGD_TEST("Opened %s on devfd[%d] %d", mDevPath.c_str(), i, mDevFd[i]);
         }
     }
 
@@ -145,13 +114,11 @@ int AcrylicRedundantDevice::ioctl_current(int cmd, void *arg)
 }
 
 int AcrylicRedundantDevice::ioctl_broadcast(int cmd, void *arg) {
-    int ret;
-
     if (!open())
         return -1;
 
     for (int i = 0; i < MAX_DEVICE_FD; i++) {
-        ret = ::ioctl(mDevFd[i], cmd, arg);
+        int ret = ::ioctl(mDevFd[i], cmd, arg);
         if (ret < 0)
             return ret;
     }
