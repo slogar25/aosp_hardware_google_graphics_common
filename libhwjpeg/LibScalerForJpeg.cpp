@@ -109,6 +109,10 @@ LibScalerForJpeg::Device::~Device()
 
 bool LibScalerForJpeg::Device::requestBuffers(unsigned int buftype, unsigned int memtype, unsigned int count)
 {
+    // count==0 means this port should be reconfigured and it is successful under streaming is finished.
+    if (!count)
+        streamOff(buftype);
+
     v4l2_requestbuffers reqbufs{};
 
     reqbufs.type    = buftype;
