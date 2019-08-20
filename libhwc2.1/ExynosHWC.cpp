@@ -314,6 +314,9 @@ int32_t exynos_getRenderIntents(hwc2_device_t* dev, hwc2_display_t display, int3
     ExynosDevice *exynosDevice = checkDevice(dev);
     ALOGD("%s:: mode(%d)", __func__, mode);
 
+    if (mode < 0)
+        return HWC2_ERROR_BAD_PARAMETER;
+
     if (exynosDevice) {
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
         if (exynosDisplay)
@@ -327,7 +330,7 @@ int32_t exynos_setColorModeWithRenderIntent(hwc2_device_t* dev, hwc2_display_t d
         int32_t /*android_color_mode_t*/ mode,
         int32_t /*android_render_intent_v1_1_t */ intent)
 {
-    if (mode < 0)
+    if ((mode < 0) || (intent < 0))
         return HWC2_ERROR_BAD_PARAMETER;
 
     ExynosDevice *exynosDevice = checkDevice(dev);
