@@ -154,7 +154,7 @@ int32_t exynos_setDisplayedContentSamplingEnabled(hwc2_device_t* device, hwc2_di
 int32_t exynos_getDisplayedContentSample(hwc2_device_t* device, hwc2_display_t display,
         uint64_t max_frames, uint64_t timestamp,
         uint64_t* frame_count, int32_t samples_size[4], uint64_t* samples[4]);
-int32_t exynos_SetLayerPerFrameMetadataBlobs(hwc2_device_t* device, hwc2_display_t display,
+int32_t exynos_setLayerPerFrameMetadataBlobs(hwc2_device_t* device, hwc2_display_t display,
         hwc2_layer_t layer, uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
         const uint8_t* metadata);
 int32_t exynos_getDisplayBrightnessSupport(hwc2_device_t* device, hwc2_display_t display, bool* outSupport);

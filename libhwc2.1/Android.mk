@@ -55,6 +55,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	libsync libacryl libui libion_google libdrmresource libdrm
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
+LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 LOCAL_PROPRIETARY_MODULE := true
 
 LOCAL_C_INCLUDES += \
@@ -118,7 +119,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
 	libGrallocWrapper
-
+LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 LOCAL_PROPRIETARY_MODULE := true
 
 LOCAL_C_INCLUDES += \
@@ -179,6 +180,7 @@ ifeq ($(BOARD_USES_HWC_SERVICES),true)
 LOCAL_CFLAGS += -DUSES_HWC_SERVICES
 LOCAL_SHARED_LIBRARIES += libExynosHWCService
 endif
+LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 
 LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/common/include \

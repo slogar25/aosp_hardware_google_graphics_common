@@ -635,17 +635,17 @@ int32_t ExynosLayer::setLayerPerFrameMetadata(uint32_t numElements,
     return NO_ERROR;
 }
 
-int32_t ExynosLayer::SetLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
+int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
         const uint8_t* metadata)
 {
 
     for (uint32_t i = 0; i < numElements; i++) {
-        HDEBUGLOGD(eDebugLayer, "HWC2: SetLayerPerFrameMetadataBlobs key(%d), value(%d)",
-                keys[i], metadata[i]);
+        HDEBUGLOGD(eDebugLayer, "HWC2: setLayerPerFrameMetadataBlobs key(%d)", keys[i]);
         switch (keys[i]) {
         case HWC2_HDR10_PLUS_SEI:
             if (allocMetaParcel() == NO_ERROR) {
-                memcpy(&mMetaParcel, metadata, *sizes);
+                ExynosHdrDynamicInfo *info = &(mMetaParcel->sHdrDynamicInfo);
+                Exynos_parsing_user_data_registered_itu_t_t35(info, (void *)&metadata[i]);
             } else ALOGE("Layer has no metaParcel!");
             break;
         default:

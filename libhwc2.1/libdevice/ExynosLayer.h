@@ -353,7 +353,7 @@ class ExynosLayer : public ExynosMPPSource {
          *     non-valid key (see above for current valid blob type keys).
          *     HWC2_ERROR_UNSUPPORTED - metadata is not supported on this display
          */
-        int32_t SetLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
+        int32_t setLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
                 const uint8_t* metadata);
 
         void resetValidateData();

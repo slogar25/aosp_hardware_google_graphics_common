@@ -120,7 +120,7 @@ hwc2_function_pointer_t exynos_function_pointer[] =
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_DISPLAYED_CONTENT_SAMPLING_ATTRIBUTES
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_DISPLAYED_CONTENT_SAMPLING_ENABLED
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_DISPLAYED_CONTENT_SAMPLE
-    reinterpret_cast<hwc2_function_pointer_t>(exynos_SetLayerPerFrameMetadataBlobs), //HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA_BLOBS
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setLayerPerFrameMetadataBlobs), //HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA_BLOBS
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getDisplayBrightnessSupport),   //HWC2_FUNCTION_GET_DISPLAY_BRIGHTNESS_SUPPORT
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setDisplayBrightness),          //HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS
 };
@@ -1004,7 +1004,7 @@ int32_t exynos_getReadbackBufferFence(hwc2_device_t *dev, hwc2_display_t display
     return HWC2_ERROR_BAD_DISPLAY;
 }
 
-int32_t exynos_SetLayerPerFrameMetadataBlobs(hwc2_device_t* dev, hwc2_display_t display,
+int32_t exynos_setLayerPerFrameMetadataBlobs(hwc2_device_t* dev, hwc2_display_t display,
         hwc2_layer_t layer, uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
         const uint8_t* metadata)
 {
@@ -1015,7 +1015,7 @@ int32_t exynos_SetLayerPerFrameMetadataBlobs(hwc2_device_t* dev, hwc2_display_t 
         if (exynosDisplay) {
             ExynosLayer *exynosLayer = checkLayer(exynosDisplay, layer);
             if (exynosLayer)
-                return exynosLayer->SetLayerPerFrameMetadataBlobs(numElements, keys, sizes, metadata);
+                return exynosLayer->setLayerPerFrameMetadataBlobs(numElements, keys, sizes, metadata);
         }
     }
 
