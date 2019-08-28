@@ -261,23 +261,23 @@ enum {
  * member of bufferHandle. This means bufferHandle should be reallocated.
  * */
 typedef struct exynos_image {
-    uint32_t fullWidth;
-    uint32_t fullHeight;
-    uint32_t x;
-    uint32_t y;
-    uint32_t w;
-    uint32_t h;
-    uint32_t format;
-    uint64_t usageFlags;
-    uint32_t layerFlags;
+    uint32_t fullWidth = 0;
+    uint32_t fullHeight = 0;
+    uint32_t x = 0;
+    uint32_t y = 0;
+    uint32_t w = 0;
+    uint32_t h = 0;
+    uint32_t format= 0;
+    uint64_t usageFlags = 0;
+    uint32_t layerFlags = 0;
     int acquireFenceFd = -1;
     int releaseFenceFd = -1;
-    private_handle_t *bufferHandle;
-    android_dataspace dataSpace;
-    uint32_t blending;
-    uint32_t transform;
-    uint32_t compressed;
-    float planeAlpha;
+    private_handle_t *bufferHandle = NULL;
+    android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
+    uint32_t blending = 0;
+    uint32_t transform = 0;
+    uint32_t compressed = 0;
+    float planeAlpha = 0;
     uint32_t zOrder = 0;
     /* refer
      * frameworks/native/include/media/hardware/VideoAPI.h
@@ -286,6 +286,12 @@ typedef struct exynos_image {
     ExynosHdrDynamicInfo hdrDynamicInfo;
     ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
     bool needDegamma = false;
+    bool isDimLayer()
+    {
+        if (layerFlags & EXYNOS_HWC_DIM_LAYER)
+            return true;
+        return false;
+    };
 } exynos_image_t;
 
 uint32_t getHWC1CompType(int32_t /*hwc2_composition_t*/ type);

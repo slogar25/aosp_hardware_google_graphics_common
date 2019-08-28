@@ -61,7 +61,6 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
     mZOrder(0),
     mDataSpace(HAL_DATASPACE_UNKNOWN),
     mLayerFlag(0x0),
-    mIsDimLayer(false),
     mNeedDegamma(false),
     mIsHdrLayer(false),
     mBufferHasMetaParcel(false),
@@ -142,10 +141,8 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
 
     if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
-        mIsDimLayer = true;
         mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
     } else {
-        mIsDimLayer = false;
         mLayerFlag &= ~(EXYNOS_HWC_DIM_LAYER);
     }
 
@@ -655,7 +652,7 @@ void ExynosLayer::resetValidateData()
 int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
 {
     private_handle_t *handle = mLayerBuffer;
-    if (mIsDimLayer) {
+    if (isDimLayer()) {
         src_img->format = HAL_PIXEL_FORMAT_RGBA_8888;
         src_img->usageFlags = 0xb00;
         src_img->bufferHandle = 0;
@@ -758,7 +755,7 @@ int32_t ExynosLayer::setDstExynosImage(exynos_image *dst_img)
 #endif
     }
 
-    if (mIsDimLayer) {
+    if (isDimLayer()) {
         dst_img->usageFlags = 0xb00;
     }
 
@@ -987,4 +984,11 @@ int ExynosLayer::allocMetaParcel()
     }
 
     return NO_ERROR;
+}
+
+bool ExynosLayer::isDimLayer()
+{
+    if (mLayerFlag & EXYNOS_HWC_DIM_LAYER)
+        return true;
+    return false;
 }

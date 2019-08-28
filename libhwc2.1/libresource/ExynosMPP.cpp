@@ -1944,7 +1944,7 @@ int32_t ExynosMPP::setupRestriction() {
 int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src, struct exynos_image &dst)
 {
 
-    if (!!(src.layerFlags & EXYNOS_HWC_DIM_LAYER)) // Dim layer
+    if (src.isDimLayer()) // Dim layer
     {
         if (isDimLayerSupported())
             return NO_ERROR;

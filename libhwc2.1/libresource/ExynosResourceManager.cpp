@@ -1100,7 +1100,7 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         ((int32_t)index <= display->mLowFpsLayerInfo.mLastIndex))
         return eLowFpsLayer;
 
-    if(layer->mIsDimLayer && layer->mLayerBuffer == NULL) {
+    if(layer->isDimLayer() && layer->mLayerBuffer == NULL) {
         return eDimLayer;
     }
 

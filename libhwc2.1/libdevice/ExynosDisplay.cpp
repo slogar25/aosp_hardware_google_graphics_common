@@ -1135,7 +1135,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     else
         handle = layer.mLayerBuffer;
 
-    if ((!layer.mIsDimLayer) && handle == NULL) {
+    if ((!layer.isDimLayer()) && handle == NULL) {
         HWC_LOGE(this, "%s:: invalid handle", __func__);
         return -EINVAL;
     }
@@ -1193,7 +1193,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     cfg.blending = blending;
     cfg.assignedMPP = otfMPP;
 
-    if (layer.mIsDimLayer && handle == NULL) {
+    if (layer.isDimLayer() && handle == NULL) {
         cfg.state = cfg.WIN_STATE_COLOR;
         hwc_color_t color = layer.mColor;
         cfg.color = (color.r << 16) | (color.g << 8) | color.b;

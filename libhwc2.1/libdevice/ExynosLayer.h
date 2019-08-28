@@ -216,11 +216,6 @@ class ExynosLayer : public ExynosMPPSource {
         int32_t mLayerFlag;
         
         /**
-         * DIM layer
-         */
-        bool mIsDimLayer;
-
-        /**
          * HDR flags
          */
         bool mNeedDegamma;
@@ -349,6 +344,8 @@ class ExynosLayer : public ExynosMPPSource {
         bool isDrm() {return ((mLayerBuffer != NULL) && (getDrmMode(mLayerBuffer) != NO_DRM));};
         void setGeometryChanged(uint64_t changedBit);
         void clearGeometryChanged() {mGeometryChanged = 0;};
+        bool isDimLayer();
+
     private:
         ExynosVideoMeta *mMetaParcel;
         int allocMetaParcel();
