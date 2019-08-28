@@ -855,7 +855,7 @@ void ExynosExternalDisplayFbInterface::init(ExynosDisplay *exynosDisplay)
     mExynosDisplay = exynosDisplay;
     mExternalDisplay = (ExynosExternalDisplay *)exynosDisplay;
 
-    memset(&dv_timings, 0, sizeof(dv_timings));
+    memset(&mDVTimings, 0, sizeof(mDVTimings));
 }
 
 int32_t ExynosExternalDisplayFbInterface::getDisplayAttribute(
@@ -867,7 +867,7 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayAttribute(
         return -EINVAL;
     }
 
-    v4l2_dv_timings dv_timing = dv_timings[config];
+    v4l2_dv_timings dv_timing = mDVTimings[config];
     switch(attribute) {
     case HWC2_ATTRIBUTE_VSYNC_PERIOD:
         {
@@ -914,7 +914,7 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
             index++;
         }
 
-        dp_data.timings = dv_timings[outConfigs[0]];
+        dp_data.timings = mDVTimings[outConfigs[0]];
         dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_PRESET;
         if(ioctl(this->mDisplayFd, EXYNOS_SET_DISPLAYPORT_CONFIG, &dp_data) <0) {
             HWC_LOGE(mExternalDisplay, "%s fail to send selected config data, %d",
@@ -922,9 +922,9 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
             return -1;
         }
 
-        mExternalDisplay->mXres = dv_timings[outConfigs[0]].bt.width;
-        mExternalDisplay->mYres = dv_timings[outConfigs[0]].bt.height;
-        mExternalDisplay->mVsyncPeriod = calVsyncPeriod(dv_timings[outConfigs[0]]);
+        mExternalDisplay->mXres = mDVTimings[outConfigs[0]].bt.width;
+        mExternalDisplay->mYres = mDVTimings[outConfigs[0]].bt.height;
+        mExternalDisplay->mVsyncPeriod = calVsyncPeriod(mDVTimings[outConfigs[0]]);
         HDEBUGLOGD(eDebugExternalDisplay, "ExternalDisplay is connected to (%d x %d, %d fps) sink",
                 mExternalDisplay->mXres, mExternalDisplay->mYres, mExternalDisplay->mVsyncPeriod);
 
@@ -933,7 +933,7 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
         return HWC2_ERROR_NONE;
     }
 
-    memset(&dv_timings, 0, sizeof(dv_timings));
+    memset(&mDVTimings, 0, sizeof(mDVTimings));
     cleanConfigurations();
 
     /* configs store the index of mConfigurations */
@@ -955,7 +955,7 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
             return -1;
         }
 
-        dv_timings[index] = dp_data.etimings.timings;
+        mDVTimings[index] = dp_data.etimings.timings;
         mConfigurations.push_back(index);
         index++;
     }
@@ -968,15 +968,15 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
     }
 
     int config = 0;
-    v4l2_dv_timings temp_dv_timings = dv_timings[mConfigurations[mConfigurations.size()-1]];
+    v4l2_dv_timings temp_dv_timings = mDVTimings[mConfigurations[mConfigurations.size()-1]];
     for (config = 0; config < (int)mConfigurations[mConfigurations.size()-1]; config++) {
-        if (dv_timings[config].bt.width != 0) {
-            dv_timings[mConfigurations[mConfigurations.size()-1]] = dv_timings[config];
+        if (mDVTimings[config].bt.width != 0) {
+            mDVTimings[mConfigurations[mConfigurations.size()-1]] = mDVTimings[config];
             break;
         }
     }
 
-    dv_timings[config] = temp_dv_timings;
+    mDVTimings[config] = temp_dv_timings;
     mExternalDisplay->mActiveConfigIndex = config;
 
     *outNumConfigs = mConfigurations.size();
@@ -996,7 +996,7 @@ void ExynosExternalDisplayFbInterface::dumpDisplayConfigs()
 
     for (size_t i = 0; i <  mConfigurations.size(); i++ ) {
         unsigned int dv_timings_index = mConfigurations[i];
-        v4l2_dv_timings configuration = dv_timings[dv_timings_index];
+        v4l2_dv_timings configuration = mDVTimings[dv_timings_index];
         float refresh_rate = (float)((float)configuration.bt.pixelclock /
                 ((configuration.bt.width + configuration.bt.hfrontporch + configuration.bt.hsync + configuration.bt.hbackporch) *
                  (configuration.bt.height + configuration.bt.vfrontporch + configuration.bt.vsync + configuration.bt.vbackporch)));

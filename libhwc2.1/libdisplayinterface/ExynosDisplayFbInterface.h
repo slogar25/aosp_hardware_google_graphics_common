@@ -139,7 +139,7 @@ class ExynosExternalDisplayFbInterface: public ExynosDisplayFbInterface {
         void cleanConfigurations();
     protected:
         ExynosExternalDisplay *mExternalDisplay;
-        struct v4l2_dv_timings dv_timings[SUPPORTED_DV_TIMINGS_NUM];
+        struct v4l2_dv_timings mDVTimings[SUPPORTED_DV_TIMINGS_NUM];
         android::Vector< unsigned int > mConfigurations;
 };
 #endif
