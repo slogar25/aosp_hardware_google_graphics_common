@@ -1197,7 +1197,10 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
         return ret;
     }
 
-    cfg.format = handle->format;
+    if (!layer.mPreprocessedInfo.mUsePrivateFormat)
+        cfg.format = handle->format;
+    else
+        cfg.format = layer.mPreprocessedInfo.mPrivateFormat;
 
     cfg.fd_idma[0] = handle->fd;
     cfg.fd_idma[1] = handle->fd1;
