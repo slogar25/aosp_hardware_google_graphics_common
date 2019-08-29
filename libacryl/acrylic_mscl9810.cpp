@@ -593,8 +593,7 @@ bool AcrylicCompositorMSCL9810::dequeueBuffer(BUFDIRECTION dir, v4l2_buffer *buf
             ALOGERR("Failed VIDIOC_DQBUF: type=%d, memory=%d", buffer->type, buffer->memory);
             return false;
         } else if (!!(buffer->flags & V4L2_BUF_FLAG_ERROR)) {
-            ALOGE("Error during streaming: type=%d, memory=%d", buffer->type, buffer->memory);
-            return false;
+            ALOGI("Error during streaming: type=%d, memory=%d", buffer->type, buffer->memory);
         }
 
         clearDeviceState(dir, STATE_QBUF);
