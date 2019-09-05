@@ -27,5 +27,6 @@ class ExynosDeviceInterface {
         virtual void init(ExynosDevice *exynosDevice) = 0;
         virtual void updateRestrictions() = 0;
         virtual bool getUseQuery() { return mUseQuery; };
+        ExynosDevice* getExynosDevice() {return mExynosDevice;};
 };
 #endif //_EXYNOSDEVICEINTERFACE_H

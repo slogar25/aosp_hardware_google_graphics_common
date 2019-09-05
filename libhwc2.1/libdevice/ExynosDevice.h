@@ -28,6 +28,9 @@
 #include <sys/resource.h>
 #include <cutils/atomic.h>
 
+#include <thread>
+#include <atomic>
+
 #include <hardware/hwcomposer2.h>
 
 #include "ExynosHWC.h"
@@ -181,9 +184,9 @@ class ExynosDevice {
         /**
          * If Panel has not self-refresh feature, dynamic recomposition will be enabled.
          */
-        pthread_t mDRThread;
+        std::thread mDRThread;
         volatile int32_t mDRThreadStatus;
-        bool mDRLoopStatus;
+        std::atomic<bool> mDRLoopStatus;
         bool mPrimaryBlank;
 
         /**

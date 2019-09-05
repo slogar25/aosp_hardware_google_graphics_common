@@ -18,7 +18,7 @@
 #define _EXYNOSDEVICEFBINTERFACE_H
 
 #include <sys/types.h>
-#include <pthread.h>
+#include <thread>
 #include <poll.h>
 #include "ExynosDeviceInterface.h"
 #include "DeconCommonHeader.h"
@@ -36,6 +36,7 @@ class ExynosDeviceFbInterface : public ExynosDeviceInterface {
         virtual ~ExynosDeviceFbInterface();
         virtual void init(ExynosDevice *exynosDevice) override;
         virtual void updateRestrictions() override;
+        std::atomic<bool> mEventHandlerRunning = true;
     protected:
         int32_t makeDPURestrictions();
         int32_t updateFeatureTable();
@@ -43,7 +44,7 @@ class ExynosDeviceFbInterface : public ExynosDeviceInterface {
         /**
          * Kernel event handling thread (e.g.) Vsync, hotplug, TUI enable events.
          */
-        pthread_t mEventHandlerThread;
+        std::thread mEventHandlerThread;
         // Gathered DPU resctrictions
         dpu_dpp_info_t mDPUInfo;
         /* framebuffer fd for main display */
