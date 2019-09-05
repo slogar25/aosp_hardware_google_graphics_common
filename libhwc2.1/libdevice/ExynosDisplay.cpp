@@ -2896,6 +2896,11 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
     uint32_t capabilityNum = 0;
     if (mBrightnessFd != NULL)
         capabilityNum++;
+
+#ifdef USES_DOZEMODE
+    capabilityNum++;
+#endif
+
     if (outCapabilities == NULL) {
         *outNumCapabilities = capabilityNum;
         return HWC2_ERROR_NONE;
@@ -2908,6 +2913,10 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
     uint32_t index = 0;
     if (mBrightnessFd != NULL)
         outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_BRIGHTNESS;
+
+#ifdef USES_DOZEMODE
+    outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_DOZE;
+#endif
 
     return HWC2_ERROR_NONE;
 }
