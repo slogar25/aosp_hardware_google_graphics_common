@@ -550,16 +550,16 @@ int32_t ExynosResourceManager::setResourcePriority(ExynosDisplay *display)
             if (check_ret < 0) {
                 HWC_LOGE(display, "Fail to set exynoscomposition priority(%d)", ret);
             } else {
-                uint32_t firstIndex = (uint32_t)display->mExynosCompositionInfo.mFirstIndex;
-                uint32_t lastIndex = (uint32_t)display->mExynosCompositionInfo.mLastIndex;
-                for (uint32_t i = firstIndex; i <= lastIndex; i++) {
-                    if (display->mExynosCompositionInfo.mFirstIndex == -1)
-                        break;
-                    ExynosLayer *layer = display->mLayers[i];
-                    layer->resetAssignedResource();
-                    layer->mOverlayInfo |= eResourcePendingWork;
-                    layer->mValidateCompositionType = HWC2_COMPOSITION_DEVICE;
-                    layer->mCheckMPPFlag[m2mMPP->mLogicalType] = eMPPHWBusy;
+                if (display->mExynosCompositionInfo.mFirstIndex >= 0) {
+                    uint32_t firstIndex = (uint32_t)display->mExynosCompositionInfo.mFirstIndex;
+                    uint32_t lastIndex = (uint32_t)display->mExynosCompositionInfo.mLastIndex;
+                    for (uint32_t i = firstIndex; i <= lastIndex; i++) {
+                        ExynosLayer *layer = display->mLayers[i];
+                        layer->resetAssignedResource();
+                        layer->mOverlayInfo |= eResourcePendingWork;
+                        layer->mValidateCompositionType = HWC2_COMPOSITION_DEVICE;
+                        layer->mCheckMPPFlag[m2mMPP->mLogicalType] = eMPPHWBusy;
+                    }
                 }
                 compositionInfo.initializeInfos(display);
                 ret = EXYNOS_ERROR_CHANGED;
@@ -617,7 +617,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
             } else {
                 HWC_LOGE(display, "%s:: Fail to assign resource for ePriorityMax layer",
                         __func__);
-                goto err;
+                return ret;
             }
         }
 
@@ -628,7 +628,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
             } else {
                 HWC_LOGE(display, "%s:: Fail to assign resource for ePriorityHigh layer",
                         __func__);
-                goto err;
+                return ret;
             }
         }
 
@@ -647,13 +647,13 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
                     if (((ret = display->addClientCompositionLayer(i)) != NO_ERROR) &&
                         (ret != EXYNOS_ERROR_CHANGED)) {
                         HWC_LOGE(display, "Change compositionTypes to HWC2_COMPOSITION_CLIENT, but addClientCompositionLayer failed (%d)", ret);
-                        goto err;
+                        return ret;
                     }
                 }
                 display->mExynosCompositionInfo.initializeInfos(display);
                 ret = EXYNOS_ERROR_CHANGED;
             } else {
-                goto err;
+                return ret;
             }
         }
 
@@ -662,7 +662,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
                 if ((ret = assignLayers(display, i)) == EXYNOS_ERROR_CHANGED)
                     break;
                 if (ret != NO_ERROR)
-                    goto err;
+                    return ret;
             }
         }
 
@@ -676,7 +676,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
     if (retry_count == ASSIGN_RESOURCE_TRY_COUNT) {
         HWC_LOGE(display, "%s:: assign resources fail", __func__);
         ret = eUnknown;
-        goto err;
+        return ret;
     } else {
         if ((ret = updateExynosComposition(display)) != NO_ERROR)
             return ret;
@@ -694,8 +694,6 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
             }
         }
     }
-    return ret;
-err:
     return ret;
 }
 int32_t ExynosResourceManager::updateExynosComposition(ExynosDisplay *display)
@@ -1933,6 +1931,12 @@ int32_t ExynosResourceManager::updateResourceState()
     return NO_ERROR;
 }
 
+/*
+ * This function is called every frame.
+ * This base function does nothing.
+ * Module that supports setting frame rate should implement this function
+ * in the module source code (hardware/samsung_slsi/graphics/exynos...).
+ */
 void ExynosResourceManager::setFrameRateForPerformance(ExynosMPP __unused &mpp,
         AcrylicPerformanceRequestFrame __unused *frame)
 {
@@ -2202,8 +2206,6 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
 
     Acrylic *arc = NULL;
     const HW2DCapability *cap;
-//    restriction_key queried_format_table[128];
-    int cnt=0;
 
     if (type == MPP_MSC)
         arc = Acrylic::createScaler();
@@ -2216,18 +2218,16 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
 
     cap = &arc->getCapabilities();
 
-    restriction_key_t queried_format_table[1024];
-
     /* format restriction */
     for (uint32_t i = 0; i < FORMAT_MAX_CNT; i++) {
         if (cap->isFormatSupported(exynos_format_desc[i].halFormat)) {
-            queried_format_table[cnt].hwType = type;
-            queried_format_table[cnt].nodeType = NODE_NONE;
-            queried_format_table[cnt].format = exynos_format_desc[i].halFormat;
-            queried_format_table[cnt].reserved = 0;
-            makeFormatRestrictions(queried_format_table[cnt],
-                    queried_format_table[cnt].format);
-            cnt++;
+            restriction_key_t queried_format;
+            queried_format.hwType = type;
+            queried_format.nodeType = NODE_NONE;
+            queried_format.format = exynos_format_desc[i].halFormat;
+            queried_format.reserved = 0;
+            makeFormatRestrictions(queried_format,
+                    queried_format.format);
         }
     }
 
@@ -2271,7 +2271,7 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
     delete arc;
 }
 
-mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) {
+mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) const {
 
     for (int i=0; i < MAX_DECON_DMA_TYPE; i++){
         if(IDMA_CHANNEL_MAP[i].channel == ch)
@@ -2332,7 +2332,7 @@ void ExynosResourceManager::updateRestrictions() {
     }
 }
 
-uint32_t ExynosResourceManager::getFeatureTableSize()
+uint32_t ExynosResourceManager::getFeatureTableSize() const
 {
     return sizeof(feature_table)/sizeof(feature_support_t);
 }

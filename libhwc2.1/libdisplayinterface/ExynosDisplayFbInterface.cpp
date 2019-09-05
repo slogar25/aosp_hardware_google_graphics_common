@@ -54,7 +54,6 @@ void ExynosDisplayFbInterface::init(ExynosDisplay *exynosDisplay)
 
 int32_t ExynosDisplayFbInterface::setPowerMode(int32_t mode)
 {
-    int32_t ret = NO_ERROR;
     int fb_blank = 0;
     if (mode == HWC_POWER_MODE_OFF) {
         fb_blank = FB_BLANK_POWERDOWN;
@@ -62,6 +61,7 @@ int32_t ExynosDisplayFbInterface::setPowerMode(int32_t mode)
         fb_blank = FB_BLANK_UNBLANK;
     }
 
+    int32_t ret = NO_ERROR;
     if ((ret = ioctl(mDisplayFd, FBIOBLANK, fb_blank)) != NO_ERROR) {
         HWC_LOGE(mExynosDisplay, "set powermode ioctl failed errno : %d", errno);
     }
@@ -181,7 +181,7 @@ int32_t ExynosDisplayFbInterface::setCursorPositionAsync(uint32_t x_pos, uint32_
     struct decon_user_window win_pos;
     win_pos.x = x_pos;
     win_pos.y = y_pos;
-    return ioctl(this->mDisplayFd, S3CFB_WIN_POSITION, &win_pos);
+    return ioctl(mDisplayFd, S3CFB_WIN_POSITION, &win_pos);
 }
 
 int32_t ExynosDisplayFbInterface::getHdrCapabilities(uint32_t* outNumTypes,
@@ -341,8 +341,6 @@ int32_t ExynosDisplayFbInterface::deliverWinConfigData()
 
 int32_t ExynosDisplayFbInterface::clearDisplay()
 {
-    int ret = 0;
-
     struct decon_win_config_data win_data;
     memset(&win_data, 0, sizeof(win_data));
     win_data.retire_fence = -1;
@@ -372,7 +370,7 @@ int32_t ExynosDisplayFbInterface::clearDisplay()
 
     win_data.retire_fence = -1;
 
-    ret = ioctl(mDisplayFd, S3CFB_WIN_CONFIG, &win_data);
+    const int ret = ioctl(mDisplayFd, S3CFB_WIN_CONFIG, &win_data);
     if (ret < 0)
         HWC_LOGE(mExynosDisplay, "ioctl S3CFB_WIN_CONFIG failed to clear screen: %s",
                 strerror(errno));
@@ -398,7 +396,7 @@ int32_t ExynosDisplayFbInterface::setForcePanic()
 
 void ExynosDisplayFbInterface::clearFbWinConfigData(decon_win_config_data &winConfigData)
 {
-    memset(&winConfigData, 0, sizeof(winConfigData));
+    winConfigData = {};
     winConfigData.fd_odma = -1;
     winConfigData.retire_fence = -1;
     struct decon_win_config *config = winConfigData.config;
@@ -412,15 +410,11 @@ void ExynosDisplayFbInterface::clearFbWinConfigData(decon_win_config_data &winCo
     }
 }
 
-dpp_csc_eq ExynosDisplayFbInterface::halDataSpaceToDisplayParam(exynos_win_config_data& config)
+dpp_csc_eq ExynosDisplayFbInterface::halDataSpaceToDisplayParam(const exynos_win_config_data& config)
 {
     uint32_t cscEQ = 0;
-    android_dataspace dataspace = config.dataspace;
+    android_dataspace dataspace = dataspaceFromConfig(config);
     ExynosMPP* otfMPP = config.assignedMPP;
-    if (dataspace == HAL_DATASPACE_UNKNOWN) {
-        if (isFormatRgb(config.format))
-            dataspace = HAL_DATASPACE_V0_SRGB;
-    }
     uint32_t standard = (dataspace & HAL_DATASPACE_STANDARD_MASK);
     uint32_t range = (dataspace & HAL_DATASPACE_RANGE_MASK);
 
@@ -456,22 +450,17 @@ dpp_csc_eq ExynosDisplayFbInterface::halDataSpaceToDisplayParam(exynos_win_confi
     }
 
     if (dataspace_range_map.find(range) != dataspace_range_map.end())
-        cscEQ |= (cscEQ | (dataspace_range_map.at(range)));
+        cscEQ |= dataspace_range_map.at(range);
     else
-        cscEQ |= (cscEQ | (CSC_RANGE_UNSPECIFIED << CSC_RANGE_SHIFT));
+        cscEQ |= (CSC_RANGE_UNSPECIFIED << CSC_RANGE_SHIFT);
 
     return (dpp_csc_eq)cscEQ;
 }
 
 dpp_hdr_standard ExynosDisplayFbInterface::halTransferToDisplayParam(exynos_win_config_data& config)
 {
-    android_dataspace dataspace = config.dataspace;
+    android_dataspace dataspace = dataspaceFromConfig(config);
     ExynosMPP* otfMPP = config.assignedMPP;
-
-    if (dataspace == HAL_DATASPACE_UNKNOWN) {
-        if (isFormatRgb(config.format))
-            dataspace = HAL_DATASPACE_V0_SRGB;
-    }
 
     uint32_t transfer = (dataspace & HAL_DATASPACE_TRANSFER_MASK);
     dpp_hdr_standard ret = DPP_HDR_OFF;
@@ -562,7 +551,6 @@ void ExynosPrimaryDisplayFbInterface::init(ExynosDisplay *exynosDisplay)
 
 int32_t ExynosPrimaryDisplayFbInterface::setPowerMode(int32_t mode)
 {
-    int32_t ret = NO_ERROR;
     int fb_blank = -1;
     if (mode == HWC_POWER_MODE_DOZE ||
         mode == HWC_POWER_MODE_DOZE_SUSPEND) {
@@ -577,6 +565,7 @@ int32_t ExynosPrimaryDisplayFbInterface::setPowerMode(int32_t mode)
         fb_blank = FB_BLANK_UNBLANK;
     }
 
+    int32_t ret = NO_ERROR;
     if (fb_blank >= 0) {
         if ((ret = ioctl(mDisplayFd, FBIOBLANK, fb_blank)) < 0) {
             ALOGE("FB BLANK ioctl failed errno : %d", errno);
@@ -589,7 +578,7 @@ int32_t ExynosPrimaryDisplayFbInterface::setPowerMode(int32_t mode)
         return ret;
     }
 
-    return ret;
+    return 0;
 }
 
 void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
@@ -607,7 +596,7 @@ void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
 
     if (ioctl(mDisplayFd, FBIOGET_VSCREENINFO, &info) == -1) {
         ALOGE("FBIOGET_VSCREENINFO ioctl failed: %s", strerror(errno));
-        goto err_ioctl;
+        return;
     }
 
     if (info.reserved[0] == 0 && info.reserved[1] == 0) {
@@ -616,7 +605,7 @@ void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
 
         if (ioctl(mDisplayFd, FBIOPUT_VSCREENINFO, &info) == -1) {
             ALOGE("FBIOPUT_VSCREENINFO ioctl failed: %s", strerror(errno));
-            goto err_ioctl;
+            return;
         }
     }
 
@@ -625,7 +614,7 @@ void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
 
     if (ioctl(mDisplayFd, EXYNOS_DISP_INFO, &disp_info) == -1) {
         ALOGI("EXYNOS_DISP_INFO ioctl failed: %s", strerror(errno));
-        goto err_ioctl;
+        return;
     } else {
         ALOGI("HWC2: %d, psr_mode : %d", disp_info.ver, disp_info.psr_mode);
     }
@@ -774,7 +763,7 @@ void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
 
     if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
         ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
-        goto err_ioctl;
+        return;
     }
 
 
@@ -794,7 +783,7 @@ void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
     for (int i = 0; i < mPrimaryDisplay->mHdrTypeNum; i += SET_HDR_CAPABILITIES_NUM) {
         if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
             ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
-            goto err_ioctl;
+            return;
         }
         mPrimaryDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
         ALOGE("HWC2: Type(%d)",  mPrimaryDisplay->mHdrTypes[i]);
@@ -803,9 +792,6 @@ void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
     //TODO : shuld be set by valid number
     //mHdrTypes[0] = HAL_HDR_HDR10;
 
-    return;
-
-err_ioctl:
     return;
 }
 
@@ -906,17 +892,21 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
 {
     int ret = 0;
     exynos_displayport_data dp_data;
-    size_t index = 0;
 
     if (outConfigs != NULL) {
-        while (index < *outNumConfigs) {
+        if (mConfigurations.size() != *outNumConfigs){
+            HWC_LOGE(mExternalDisplay, "%s outNumConfigs(%d) is different with the number of configurations(%zu)",
+                    mExternalDisplay->mDisplayName.string(), *outNumConfigs, mConfigurations.size());
+            return -1;
+        }
+
+        for (size_t index = 0; index < *outNumConfigs; index++) {
             outConfigs[index] = mConfigurations[index];
-            index++;
         }
 
         dp_data.timings = mDVTimings[outConfigs[0]];
         dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_PRESET;
-        if(ioctl(this->mDisplayFd, EXYNOS_SET_DISPLAYPORT_CONFIG, &dp_data) <0) {
+        if(ioctl(mDisplayFd, EXYNOS_SET_DISPLAYPORT_CONFIG, &dp_data) <0) {
             HWC_LOGE(mExternalDisplay, "%s fail to send selected config data, %d",
                     mExternalDisplay->mDisplayName.string(), errno);
             return -1;
@@ -938,13 +928,12 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
 
     /* configs store the index of mConfigurations */
     dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_ENUM_PRESET;
-    while (index < SUPPORTED_DV_TIMINGS_NUM) {
+    for (size_t index = 0; index < SUPPORTED_DV_TIMINGS_NUM; index++) {
         dp_data.etimings.index = index;
-        ret = ioctl(this->mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
+        ret = ioctl(mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
         if (ret < 0) {
             if (errno == EINVAL) {
                 HDEBUGLOGD(eDebugExternalDisplay, "%s:: Unmatched config index %zu", __func__, index);
-                index++;
                 continue;
             }
             else if (errno == E2BIG) {
@@ -957,7 +946,6 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
 
         mDVTimings[index] = dp_data.etimings.timings;
         mConfigurations.push_back(index);
-        index++;
     }
 
     if (mConfigurations.size() == 0){
@@ -1084,4 +1072,14 @@ int32_t ExynosExternalDisplayFbInterface::getHdrCapabilities(
         HDEBUGLOGD(eDebugExternalDisplay, "HWC2: Types : %d", mExternalDisplay->mHdrTypes[i]);
     }
     return 0;
+}
+
+android_dataspace ExynosDisplayFbInterface::dataspaceFromConfig(const exynos_win_config_data &config)
+{
+    if (config.dataspace == HAL_DATASPACE_UNKNOWN) {
+        if (isFormatRgb(config.format))
+            return HAL_DATASPACE_V0_SRGB;
+    }
+
+    return config.dataspace;
 }

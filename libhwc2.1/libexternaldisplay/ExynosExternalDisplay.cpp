@@ -99,14 +99,14 @@ void ExynosExternalDisplay::closeExternalDisplay()
 
     setVsyncEnabled(0);
 
-    if (this->mPowerModeState != (hwc2_power_mode_t)HWC_POWER_MODE_OFF) {
+    if (mPowerModeState != (hwc2_power_mode_t)HWC_POWER_MODE_OFF) {
         if (mDisplayInterface->setPowerMode(HWC_POWER_MODE_OFF) < 0) {
             DISPLAY_LOGE("%s: set powermode ioctl failed errno : %d", __func__, errno);
             return;
         }
     }
 
-    this->mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
+    mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
 
     DISPLAY_LOGD(eDebugExternalDisplay, "Close fd for External Display");
 
@@ -431,7 +431,7 @@ int ExynosExternalDisplay::disable()
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    this->mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
+    mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
 
     ALOGI("[ExternalDisplay] %s -", __func__);
 

@@ -57,11 +57,13 @@ class ExynosDisplayFbInterface : public ExynosDisplayInterface {
         virtual uint32_t getMaxWindowNum();
         virtual decon_idma_type getDeconDMAType(ExynosMPP *otfMPP);
     protected:
-        void clearFbWinConfigData(decon_win_config_data &winConfigData);
-        dpp_csc_eq halDataSpaceToDisplayParam(exynos_win_config_data& config);
+        static void clearFbWinConfigData(decon_win_config_data &winConfigData);
+        dpp_csc_eq halDataSpaceToDisplayParam(const exynos_win_config_data& config);
         dpp_hdr_standard halTransferToDisplayParam(exynos_win_config_data& config);
         String8& dumpFbWinConfigInfo(String8 &result,
                 decon_win_config_data &fbConfig, bool debugPrint = false);
+        static android_dataspace dataspaceFromConfig(const exynos_win_config_data &config);
+
     protected:
         /**
          * LCD device member variables

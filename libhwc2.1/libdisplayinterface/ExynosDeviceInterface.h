@@ -20,8 +20,8 @@
 class ExynosDevice;
 class ExynosDeviceInterface {
     protected:
-        ExynosDevice *mExynosDevice;
-        bool mUseQuery;
+        ExynosDevice *mExynosDevice = NULL;
+        bool mUseQuery = false;
     public:
         virtual ~ExynosDeviceInterface(){};
         virtual void init(ExynosDevice *exynosDevice) = 0;

@@ -32,7 +32,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice 
     mNumMaxPriorityAllowed = 5;
 
     /* Initialization */
-    this->mDisplayId = HWC_DISPLAY_PRIMARY;
+    mDisplayId = HWC_DISPLAY_PRIMARY;
     mDisplayName = android::String8("PrimaryDisplay");
 
     // Prepare multi resolution
@@ -93,13 +93,13 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
 
     if (mode == HWC_POWER_MODE_DOZE ||
         mode == HWC_POWER_MODE_DOZE_SUSPEND) {
-        if (this->mPowerModeState != HWC_POWER_MODE_DOZE &&
-            this->mPowerModeState != HWC_POWER_MODE_OFF &&
-            this->mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
+        if (mPowerModeState != HWC_POWER_MODE_DOZE &&
+            mPowerModeState != HWC_POWER_MODE_OFF &&
+            mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
             fb_blank = FB_BLANK_POWERDOWN;
             clearDisplay();
         } else {
-            ALOGE("DOZE or Power off called twice, mPowerModeState : %d", this->mPowerModeState);
+            ALOGE("DOZE or Power off called twice, mPowerModeState : %d", mPowerModeState);
         }
     } else if (mode == HWC_POWER_MODE_OFF) {
         fb_blank = FB_BLANK_POWERDOWN;
@@ -120,7 +120,7 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
     mDevice->checkDynamicRecompositionThread();
 
     mDisplayInterface->setPowerMode(mode);
-    this->mPowerModeState = (hwc2_power_mode_t)mode;
+    mPowerModeState = (hwc2_power_mode_t)mode;
 
     ALOGD("%s:: S3CFB_POWER_MODE mode(%d), blank(%d)", __func__, mode, fb_blank);
 

@@ -215,8 +215,6 @@ void *hwc_eventHndler_thread(void *data) {
 
 ExynosDeviceFbInterface::ExynosDeviceFbInterface(ExynosDevice *exynosDevice)
 {
-    mUseQuery = false;
-    mExynosDevice = exynosDevice;
 }
 
 ExynosDeviceFbInterface::~ExynosDeviceFbInterface()
@@ -230,15 +228,16 @@ void ExynosDeviceFbInterface::init(ExynosDevice *exynosDevice)
     mExynosDevice = exynosDevice;
 
     ExynosDisplay *primaryDisplay = (ExynosDisplay*)mExynosDevice->getDisplay(HWC_DISPLAY_PRIMARY);
-    mDisplayFd = primaryDisplay->mDisplayInterface->getDisplayFd();
-    updateRestrictions();
+    if (primaryDisplay != NULL) {
+        mDisplayFd = primaryDisplay->mDisplayInterface->getDisplayFd();
+        updateRestrictions();
+    }
 
     /** Event handler thread creation **/
     mEventHandlerThread = std::thread(&hwc_eventHndler_thread, this);
 }
 
 int32_t ExynosDeviceFbInterface::makeDPURestrictions() {
-    int i, j, cnt = 0;
     int32_t ret = 0;
 
     struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
@@ -246,12 +245,10 @@ int32_t ExynosDeviceFbInterface::makeDPURestrictions() {
     ExynosResourceManager *resourceManager = mExynosDevice->mResourceManager;
 
     /* format resctriction */
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
+    for (int i = 0; i < dpuInfo->dpp_cnt; i++){
         dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
         HDEBUGLOGD(eDebugDefault, "id : %d, format count : %d", i, r.format_cnt);
     }
-
-    restriction_key_t queried_format_table[1024];
 
     /* Check attribute overlap */
     std::unordered_set<unsigned long> attrs;
@@ -264,31 +261,29 @@ int32_t ExynosDeviceFbInterface::makeDPURestrictions() {
         HDEBUGLOGD(eDebugDefault, "Index : %zu, overlap %d", i, mDPUInfo.overlap[i]);
     }
 
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
+    for (int i = 0; i < dpuInfo->dpp_cnt; i++){
         if (mDPUInfo.overlap[i]) continue;
         dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
         mpp_phycal_type_t hwType = resourceManager->getPhysicalType(i);
-        for (j = 0; j < r.format_cnt; j++){
+        for (int j = 0; j < r.format_cnt; j++){
             if (S3CFormatToHalFormat(r.format[j]) != HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED) {
-                queried_format_table[cnt].hwType = hwType;
-                queried_format_table[cnt].nodeType = NODE_NONE;
-                queried_format_table[cnt].format = S3CFormatToHalFormat(r.format[j]);
-                queried_format_table[cnt].reserved = 0;
-                resourceManager->makeFormatRestrictions(queried_format_table[cnt], r.format[j]);
-                cnt++;
+                restriction_key_t queried_format;
+                queried_format.hwType = hwType;
+                queried_format.nodeType = NODE_NONE;
+                queried_format.format = S3CFormatToHalFormat(r.format[j]);
+                queried_format.reserved = 0;
+                resourceManager->makeFormatRestrictions(queried_format, r.format[j]);
             }
             HDEBUGLOGD(eDebugDefault, "%s : %d", getMPPStr(hwType).string(), r.format[j]);
         }
     }
 
-    /* Size restriction */
-    restriction_size rSize;
-
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
+    for (int i = 0; i < dpuInfo->dpp_cnt; i++){
         if (mDPUInfo.overlap[i]) continue;
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
+        const dpp_restriction &r = dpuInfo->dpp_ch[i].restriction;
 
         /* RGB size restrictions */
+        restriction_size rSize;
         rSize.maxDownScale = r.scale_down;
         rSize.maxUpScale = r.scale_up;
         rSize.maxFullWidth = r.dst_f_w.max;
@@ -325,13 +320,15 @@ int32_t ExynosDeviceFbInterface::makeDPURestrictions() {
 }
 
 int32_t ExynosDeviceFbInterface::updateFeatureTable() {
+    const struct dpp_restrictions_info &dpuInfo = mDPUInfo.dpuInfo;
+    if (mExynosDevice->mResourceManager == NULL)
+        return -1;
 
-    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
-    ExynosResourceManager *resourceManager = mExynosDevice->mResourceManager;
-    uint32_t featureTableCnt = resourceManager->getFeatureTableSize();
-    int attrMapCnt = sizeof(dpu_attr_map_table)/sizeof(dpu_attr_map_t);
-    int dpp_cnt = dpuInfo->dpp_cnt;
-    int32_t ret = 0;
+    const ExynosResourceManager &resourceManager = *(mExynosDevice->mResourceManager);
+    const uint32_t featureTableCnt = resourceManager.getFeatureTableSize();
+
+    const int attrMapCnt = sizeof(dpu_attr_map_table)/sizeof(dpu_attr_map_t);
+    const int dpp_cnt = dpuInfo.dpp_cnt;
 
     HDEBUGLOGD(eDebugDefault, "Before");
     for (uint32_t j = 0; j < featureTableCnt; j++){
@@ -342,10 +339,10 @@ int32_t ExynosDeviceFbInterface::updateFeatureTable() {
 
     // dpp count
     for (int i = 0; i < dpp_cnt; i++){
-        dpp_ch_restriction c_r = dpuInfo->dpp_ch[i];
+        dpp_ch_restriction c_r = dpuInfo.dpp_ch[i];
         if (mDPUInfo.overlap[i]) continue;
         HDEBUGLOGD(eDebugDefault, "DPU attr : (ch:%d), 0x%lx", i, (unsigned long)c_r.attr);
-        mpp_phycal_type_t hwType = resourceManager->getPhysicalType(i);
+        mpp_phycal_type_t hwType = resourceManager.getPhysicalType(i);
         // feature table count
         for (uint32_t j = 0; j < featureTableCnt; j++){
             if (feature_table[j].hwType == hwType) {
@@ -365,29 +362,29 @@ int32_t ExynosDeviceFbInterface::updateFeatureTable() {
             feature_table[j].hwType,
             (unsigned long)feature_table[j].attr);
     }
-    return ret;
+    return 0;
 }
 
 void ExynosDeviceFbInterface::updateRestrictions()
 {
     struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
-    int32_t ret = 0;
 
-    if ((ret = ioctl(mDisplayFd, EXYNOS_DISP_RESTRICTIONS, dpuInfo)) < 0) {
-        ALOGI("EXYNOS_DISP_RESTRICTIONS ioctl failed: %s", strerror(errno));
+    int32_t ret = ioctl(mDisplayFd, EXYNOS_DISP_RESTRICTIONS, dpuInfo);
+    if (ret < 0) {
+        ALOGI("EXYNOS_DISP_RESTRICTIONS ioctl failed: ret= %d, %s", ret, strerror(errno));
         mUseQuery = false;
         return;
     }
-    if ((ret = makeDPURestrictions()) != NO_ERROR) {
+    if (makeDPURestrictions() != NO_ERROR) {
         ALOGE("makeDPURestrictions fail");
-    } else if ((ret = updateFeatureTable()) != NO_ERROR) {
+        mUseQuery = false;
+        return;
+    } else if (updateFeatureTable() != NO_ERROR) {
         ALOGE("updateFeatureTable fail");
+        mUseQuery = false;
+        return;
     }
 
-    if (ret == NO_ERROR)
-        mUseQuery = true;
-    else
-        mUseQuery = false;
-
+    mUseQuery = true;
     return;
 }

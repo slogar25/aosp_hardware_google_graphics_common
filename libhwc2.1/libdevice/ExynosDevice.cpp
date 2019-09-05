@@ -288,7 +288,9 @@ ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
     uint32_t physical_display_num = HWC_NUM_DISPLAY_TYPES - 1;
 
     if (mDisplays.isEmpty()) {
-        goto err;
+        ALOGE("mDisplays.size(%zu), requested display(%d)",
+                mDisplays.size(), display);
+        return NULL;
     }
 
     if ((display <= physical_display_num) && (mDisplays[display]->mDisplayId == display)) {
@@ -300,7 +302,7 @@ ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
             }
         }
     }
-err:
+
     ALOGE("mDisplays.size(%zu), requested display(%d)",
             mDisplays.size(), display);
     return NULL;
@@ -583,7 +585,7 @@ void ExynosDevice::setHWCControl(uint32_t display, uint32_t ctrl, int32_t val)
             break;
         case HWC_CTL_DYNAMIC_RECOMP:
             ALOGI("%s::HWC_CTL_DYNAMIC_RECOMP on/off = %d", __func__, val);
-            this->setDynamicRecomposition((unsigned int)val);
+            setDynamicRecomposition((unsigned int)val);
             break;
         case HWC_CTL_ENABLE_FENCE_TRACER:
             ALOGI("%s::HWC_CTL_ENABLE_FENCE_TRACER on/off=%d", __func__, val);

@@ -46,11 +46,11 @@ int ExynosSortedLayer::compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs
 
 ssize_t ExynosSortedLayer::remove(const ExynosLayer *item)
 {
-    for (size_t i = 0; i < this->size(); i++)
+    for (size_t i = 0; i < size(); i++)
     {
-        if (this->array()[i] == item)
+        if (array()[i] == item)
         {
-            this->removeAt(i);
+            removeAt(i);
             return i;
         }
     }
@@ -59,7 +59,7 @@ ssize_t ExynosSortedLayer::remove(const ExynosLayer *item)
 
 status_t ExynosSortedLayer::vector_sort()
 {
-    return this->sort(compare);
+    return sort(compare);
 }
 
 ExynosLowFpsLayerInfo::ExynosLowFpsLayerInfo()
@@ -301,8 +301,8 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mDisplayControl.adjustDisplayFrame = false;
     mDisplayControl.cursorSupport = false;
 
-    this->mPowerModeState = HWC2_POWER_MODE_OFF;
-    this->mVsyncState = HWC2_VSYNC_DISABLE;
+    mPowerModeState = HWC2_POWER_MODE_OFF;
+    mVsyncState = HWC2_VSYNC_DISABLE;
 
     /* TODO : Exception handling here */
 
@@ -604,7 +604,7 @@ int ExynosDisplay::checkLayerFps() {
  */
 int ExynosDisplay::checkDynamicReCompMode() {
     unsigned int updateFps = 0;
-    unsigned int lcd_size = this->mXres * this->mYres;
+    unsigned int lcd_size = mXres * mYres;
     uint64_t TimeStampDiff;
     uint64_t w = 0, h = 0, incomingPixels = 0;
     uint64_t maxFps = 0, layerFps = 0;
@@ -635,7 +635,7 @@ int ExynosDisplay::checkDynamicReCompMode() {
                 mUpdateCallCnt = 0;
                 mLastModeSwitchTimeStamp = mLastUpdateTimeStamp;
                 DISPLAY_LOGD(eDebugDynamicRecomp, "[DYNAMIC_RECOMP] GLES_2_HWC by video layer");
-                this->setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
+                setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
                 return CLIENT_2_DEVICE;
             }
         }
@@ -656,7 +656,7 @@ int ExynosDisplay::checkDynamicReCompMode() {
             mUpdateCallCnt = 0;
             mLastModeSwitchTimeStamp = mLastUpdateTimeStamp;
             DISPLAY_LOGD(eDebugDynamicRecomp, "[DYNAMIC_RECOMP] GLES_2_HWC by BW check");
-            this->setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
+            setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
             return CLIENT_2_DEVICE;
         }
     }
@@ -697,7 +697,7 @@ int ExynosDisplay::checkDynamicReCompMode() {
         if (mDynamicReCompMode != DEVICE_2_CLIENT) {
             mDynamicReCompMode = DEVICE_2_CLIENT;
             DISPLAY_LOGD(eDebugDynamicRecomp, "[DYNAMIC_RECOMP] DEVICE_2_CLIENT by low FPS(%d)", updateFps);
-            this->setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
+            setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
             return DEVICE_2_CLIENT;
         } else {
             return 0;
@@ -706,7 +706,7 @@ int ExynosDisplay::checkDynamicReCompMode() {
         if (mDynamicReCompMode == DEVICE_2_CLIENT) {
             mDynamicReCompMode = CLIENT_2_DEVICE;
             DISPLAY_LOGD(eDebugDynamicRecomp, "[DYNAMIC_RECOMP] CLIENT_2_HWC by high FPS(%d)", updateFps);
-            this->setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
+            setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
             return CLIENT_2_DEVICE;
         } else {
             return 0;
@@ -763,8 +763,7 @@ int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
 
     /* Store configuration of client target configuration */
     if (compositionInfo.mSkipFlag == false) {
-        memcpy(&compositionInfo.mLastWinConfigData, &config,
-            sizeof(compositionInfo.mLastWinConfigData));
+        compositionInfo.mLastWinConfigData = config;
         DISPLAY_LOGD(eDebugSkipStaicLayer, "config[%d] is stored",
                 compositionInfo.mWindowIndex);
     } else {
@@ -780,16 +779,14 @@ int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
             fence_close(config.acq_fence, this,
                     FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_ALL);
 
-            memcpy(&config, &compositionInfo.mLastWinConfigData, sizeof(compositionInfo.mLastWinConfigData));
+            config = compositionInfo.mLastWinConfigData;
             /* Assigned otfMPP for client target can be changed */
             config.assignedMPP = compositionInfo.mOtfMPP;
             /* acq_fence was closed by DPU driver in the previous frame */
             config.acq_fence = -1;
         } else {
             /* Check target buffer is same with previous frame */
-            if ((config.fd_idma[0] != compositionInfo.mLastWinConfigData.fd_idma[0]) ||
-                (config.fd_idma[1] != compositionInfo.mLastWinConfigData.fd_idma[1]) ||
-                (config.fd_idma[2] != compositionInfo.mLastWinConfigData.fd_idma[2])) {
+            if (!std::equal(config.fd_idma, config.fd_idma+3, compositionInfo.mLastWinConfigData.fd_idma)) {
                 DISPLAY_LOGE("Current config [%d][%d, %d, %d]",
                         compositionInfo.mWindowIndex,
                         config.fd_idma[0], config.fd_idma[1], config.fd_idma[2]);
@@ -1148,7 +1145,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     }
 
     if (layer.mPreprocessedInfo.displayFrame.right > (int)mXres) {
-        unsigned int crop = layer.mPreprocessedInfo.displayFrame.right - this->mXres;
+        unsigned int crop = layer.mPreprocessedInfo.displayFrame.right - mXres;
         DISPLAY_LOGD(eDebugWinConfig, "layer off right side of screen; cropping %u pixels from right edge",
                 crop);
         w -= crop;
@@ -1165,7 +1162,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     }
 
     if (layer.mPreprocessedInfo.displayFrame.bottom > (int)mYres) {
-        int crop = layer.mPreprocessedInfo.displayFrame.bottom - this->mYres;
+        int crop = layer.mPreprocessedInfo.displayFrame.bottom - mYres;
         DISPLAY_LOGD(eDebugWinConfig, "layer off bottom side of screen; cropping %u pixels from bottom edge",
                 crop);
         h -= crop;
@@ -2119,9 +2116,9 @@ int ExynosDisplay::setReleaseFences() {
                 setFenceName(config.rel_fence,
                         this, FENCE_TYPE_DST_ACQUIRE, FENCE_IP_DPP, FENCE_FROM, true);
                 mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(config.rel_fence);
-            }
-            else
+            } else {
                 mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
+            }
 #endif
         }
     }
@@ -2830,8 +2827,7 @@ int32_t ExynosDisplay::setColorTransform(
 
 int32_t ExynosDisplay::setColorMode(
         int32_t /*android_color_mode_t*/ mode) {
-    int ret = mDisplayInterface->setColorMode(mode);
-    if (ret < 0) {
+    if (mDisplayInterface->setColorMode(mode) < 0) {
         if (mode == HAL_COLOR_MODE_NATIVE)
             return HWC2_ERROR_NONE;
 
@@ -2854,7 +2850,7 @@ int32_t ExynosDisplay::setOutputBuffer(
 
 int ExynosDisplay::clearDisplay() {
 
-    int ret = mDisplayInterface->clearDisplay();
+    const int ret = mDisplayInterface->clearDisplay();
 
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mClientCompositionInfo.mSkipFlag = false;
@@ -2893,7 +2889,7 @@ int32_t ExynosDisplay::setPowerMode(
 
     ALOGD("%s:: mode(%d))", __func__, mode);
 
-    this->mPowerModeState = (hwc2_power_mode_t)mode;
+    mPowerModeState = (hwc2_power_mode_t)mode;
 
     if (mode == HWC_POWER_MODE_OFF) {
         /* It should be called from validate() when the screen is on */

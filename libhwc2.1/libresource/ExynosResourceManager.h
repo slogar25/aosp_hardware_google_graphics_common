@@ -111,7 +111,6 @@ class ExynosResourceManager {
         virtual int32_t assignWindow(ExynosDisplay *display);
         int32_t updateResourceState();
         static float getResourceUsedCapa(ExynosMPP &mpp);
-        void printDebugInfo(ExynosDisplay *display);
         int32_t updateExynosComposition(ExynosDisplay *display);
         int32_t updateClientComposition(ExynosDisplay *display);
         int32_t getCandidateM2mMPPOutImages(ExynosDisplay *display,
@@ -134,16 +133,15 @@ class ExynosResourceManager {
 
         void updateRestrictions();
 
-        mpp_phycal_type_t getPhysicalType(int ch);
+        mpp_phycal_type_t getPhysicalType(int ch) const;
         ExynosMPP* getOtfMPPWithChannel(int ch);
-        uint32_t getFeatureTableSize();
+        uint32_t getFeatureTableSize() const;
         const ExynosMPPVector& getOtfMPPs() { return mOtfMPPs; };
 
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,
                 uint32_t layer_index, exynos_image m2m_out_img, ExynosMPP *m2mMPP, ExynosMPP *otfMPP);
 
-        int32_t setDstAllocSize(uint32_t width);
         DstBufMgrThread mDstBufMgrThread;
 
     protected:

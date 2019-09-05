@@ -26,7 +26,7 @@
 /* for restriction query */
 typedef struct dpu_dpp_info {
     struct dpp_restrictions_info dpuInfo;
-    bool overlap[16] = {false, };
+    bool overlap[16] = {false};
 } dpu_dpp_info_t;
 
 class ExynosDevice;

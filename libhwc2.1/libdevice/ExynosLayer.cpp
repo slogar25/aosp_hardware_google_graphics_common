@@ -206,9 +206,9 @@ int32_t ExynosLayer::doPreProcess()
                                 } else {
                                     /* reset dynamic metadata info */
                                     mMetaParcel->eType = (ExynosVideoInfoType)(mMetaParcel->eType & (~VIDEO_INFO_TYPE_HDR_DYNAMIC));
-                                    memcpy(&(metaData->eType), &(mMetaParcel->eType), sizeof(metaData->eType));
-                                    memset(&(mMetaParcel->sHdrDynamicInfo), 0, sizeof(mMetaParcel->sHdrDynamicInfo));
-                                    memset(&(metaData->sHdrDynamicInfo), 0, sizeof(metaData->sHdrDynamicInfo));
+                                    metaData->eType = mMetaParcel->eType;
+                                    mMetaParcel->sHdrDynamicInfo = {};
+                                    metaData->sHdrDynamicInfo = {};
                                 }
                             }
                         }
