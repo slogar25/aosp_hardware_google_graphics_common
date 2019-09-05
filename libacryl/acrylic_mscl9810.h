@@ -33,6 +33,7 @@ public:
     virtual bool execute(int fence[], unsigned int num_fences);
     virtual bool execute(int *handle = NULL);
     virtual bool waitExecution(int handle);
+    virtual bool requestPerformanceQoS(AcrylicPerformanceRequest *request);
 private:
     enum { STATE_REQBUFS = 1, STATE_QBUF = 2, STATE_PROCESSING = STATE_REQBUFS | STATE_QBUF };
 
