@@ -67,11 +67,11 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice 
 
         fclose(maxBrightnessFd);
 
-        mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "wb");
+        mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "w+");
         ALOGI("Trying %s open for brightness control", BRIGHTNESS_NODE_BASE);
 
         if (mBrightnessFd == NULL)
-            ALOGI("%s open failed!", BRIGHTNESS_NODE_BASE);
+            ALOGI("%s open failed! %s", BRIGHTNESS_NODE_BASE, strerror(errno));
 
     } else {
         ALOGI("Brightness node is not opened");

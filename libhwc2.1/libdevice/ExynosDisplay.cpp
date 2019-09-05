@@ -2929,12 +2929,15 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness)
         return HWC2_ERROR_NONE;
 
     char val[4];
-    fread(&val, 4, 1, mBrightnessFd);
     uint32_t scaledBrightness = brightness * mMaxBrightness;
-    HDEBUGLOGD(eDebugWinConfig, "brightness %d -> %d", atoi(val), scaledBrightness);
 
     sprintf(val, "%d", scaledBrightness);
-    fwrite(&val, 4, 1, mBrightnessFd);
+    uint32_t res = fwrite(val, 4, 1, mBrightnessFd);
+    if(res == 0){
+        ALOGE("brightness write failed.");
+    }
+    rewind(mBrightnessFd);
+
     return HWC2_ERROR_NONE;
 }
 
