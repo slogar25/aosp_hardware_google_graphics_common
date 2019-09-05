@@ -44,14 +44,13 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
     mDrmDevice->event_listener()->RegisterHotplugHandler((DrmEventHandler *)&mExynosDrmEventHandler);
 
     ExynosDisplay *primaryDisplay = mExynosDevice->getDisplay(HWC_DISPLAY_PRIMARY);
-    ExynosDisplayDrmInterface *displayInterface = NULL;
     if (primaryDisplay != NULL) {
-        displayInterface = (ExynosDisplayDrmInterface *)primaryDisplay->mDisplayInterface;
+        ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(primaryDisplay->mDisplayInterface.get());
         displayInterface->initDrmDevice(mDrmDevice);
     }
     ExynosDisplay *externalDisplay = mExynosDevice->getDisplay(HWC_DISPLAY_EXTERNAL);
     if (externalDisplay != NULL) {
-        displayInterface = (ExynosDisplayDrmInterface *)externalDisplay->mDisplayInterface;
+        ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(externalDisplay->mDisplayInterface.get());
         displayInterface->initDrmDevice(mDrmDevice);
     }
 

@@ -147,8 +147,8 @@ bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
 void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
 {
     if (interfaceType == INTERFACE_TYPE_DRM)
-        mDisplayInterface = new ExynosDisplayDrmInterface((ExynosDisplay *)this);
+        mDisplayInterface = std::make_unique<ExynosDisplayDrmInterface>((ExynosDisplay *)this);
     else
-        mDisplayInterface = new ExynosPrimaryDisplayFbInterfaceModule((ExynosDisplay *)this);
+        mDisplayInterface = std::make_unique<ExynosPrimaryDisplayFbInterfaceModule>((ExynosDisplay *)this);
     mDisplayInterface->init(this);
 }

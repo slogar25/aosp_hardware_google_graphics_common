@@ -287,8 +287,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mDeviceXres(0),
     mDeviceYres(0),
     mColorMode(HAL_COLOR_MODE_NATIVE),
-    mSkipFrame(false),
-    mDisplayInterface(NULL)
+    mSkipFrame(false)
 {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
@@ -333,8 +332,6 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
 
 ExynosDisplay::~ExynosDisplay()
 {
-    if (mDisplayInterface != NULL)
-        delete mDisplayInterface;
 }
 
 /**
@@ -4112,6 +4109,6 @@ void ExynosDisplay::increaseMPPDstBufIndex() {
 
 void ExynosDisplay::initDisplayInterface(uint32_t __unused interfaceType)
 {
-    mDisplayInterface = new ExynosDisplayInterface();
+    mDisplayInterface = std::make_unique<ExynosDisplayInterface>();
     mDisplayInterface->init(this);
 }

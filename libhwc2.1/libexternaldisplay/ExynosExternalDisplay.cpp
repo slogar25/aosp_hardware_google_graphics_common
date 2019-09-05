@@ -574,8 +574,8 @@ void ExynosExternalDisplay::handleHotplugEvent()
 void ExynosExternalDisplay::initDisplayInterface(uint32_t __unused interfaceType)
 {
     if (interfaceType == INTERFACE_TYPE_DRM)
-        mDisplayInterface = new ExynosDisplayDrmInterface((ExynosDisplay *)this);
+        mDisplayInterface = std::make_unique<ExynosDisplayDrmInterface>((ExynosDisplay *)this);
     else
-        mDisplayInterface = new ExynosExternalDisplayFbInterfaceModule((ExynosDisplay *)this);
+        mDisplayInterface = std::make_unique<ExynosExternalDisplayFbInterfaceModule>((ExynosDisplay *)this);
     mDisplayInterface->init(this);
 }

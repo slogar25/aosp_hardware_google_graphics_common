@@ -143,10 +143,12 @@ ExynosDevice::ExynosDevice()
 
 void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
 {
-    if (interfaceType == INTERFACE_TYPE_DRM)
-        mDeviceInterface = new ExynosDeviceDrmInterface(this);
-    else
-        mDeviceInterface = new ExynosDeviceFbInterface(this);
+    if (interfaceType == INTERFACE_TYPE_DRM) {
+        mDeviceInterface = std::make_unique<ExynosDeviceDrmInterface>(this);
+    } else {
+        mDeviceInterface = std::make_unique<ExynosDeviceFbInterface>(this);
+    }
+
     /*
      * This order should not be changed
      * initDisplayInterface() of each display ->
@@ -169,9 +171,6 @@ ExynosDevice::~ExynosDevice() {
         delete mMapper;
     if (mAllocator != NULL)
         delete mAllocator;
-
-    if (mDeviceInterface != NULL)
-        delete mDeviceInterface;
 
     delete primary_display;
 }

@@ -230,8 +230,7 @@ void ExynosDeviceFbInterface::init(ExynosDevice *exynosDevice)
     mExynosDevice = exynosDevice;
 
     ExynosDisplay *primaryDisplay = (ExynosDisplay*)mExynosDevice->getDisplay(HWC_DISPLAY_PRIMARY);
-    ExynosDisplayInterface *displayInterface = primaryDisplay->mDisplayInterface;
-    mDisplayFd = displayInterface->getDisplayFd();
+    mDisplayFd = primaryDisplay->mDisplayInterface->getDisplayFd();
     updateRestrictions();
 
     /** Event handler thread creation **/
