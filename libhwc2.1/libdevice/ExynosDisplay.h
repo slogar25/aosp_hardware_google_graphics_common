@@ -133,29 +133,8 @@ struct exynos_win_config_data
     bool protection = false;
     bool compression = false;
 
-    void initData(){
-        state = WIN_STATE_DISABLED;
-        color = 0;
-        fd_idma[0] = -1; fd_idma[1] = -1; fd_idma[2] = -1;
-        acq_fence = -1;
-        rel_fence = -1;
-        plane_alpha = 0;
-        blending = HWC2_BLEND_MODE_NONE;
-        assignedMPP = NULL;
-        format = 0;
-        transform = 0;
-        dataspace = HAL_DATASPACE_UNKNOWN;
-        hdr_enable = false;
-        comp_src = DPP_COMP_SRC_NONE;
-        min_luminance = 0;
-        max_luminance = 0;
-        block_area.x = 0; block_area.y = 0; block_area.w = 0; block_area.h = 0;
-        transparent_area.x = 0; transparent_area.y = 0; transparent_area.w = 0; transparent_area.h = 0;
-        opaque_area.x = 0; opaque_area.y = 0; opaque_area.w = 0; opaque_area.h = 0;
-        src.x = 0; src.y = 0; src.w = 0; src.h = 0; src.f_w = 0; src.f_h = 0;
-        dst.x = 0; dst.y = 0; dst.w = 0; dst.h = 0; dst.f_w = 0; dst.f_h = 0;
-        protection = false;
-        compression = false;
+    void reset(){
+        *this = {};
     };
 };
 struct exynos_dpu_data
@@ -165,20 +144,27 @@ struct exynos_dpu_data
     bool enable_win_update = false;
     struct decon_frame win_update_region = {0, 0, 0, 0, 0, 0};
 
-    void initData() {
+    void init(uint32_t configNum) {
+        for(uint32_t i = 0; i < configNum; i++)
+        {
+            exynos_win_config_data config_data;
+            configs.push_back(config_data);
+            configs.push_back(config_data);
+        }
+    };
+
+    void reset() {
         retire_fence = -1;
         for (uint32_t i = 0; i < configs.size(); i++)
-            configs[i].initData();
+            configs[i].reset();
     };
-    exynos_dpu_data& operator =(const exynos_dpu_data configs_data){
+    exynos_dpu_data& operator =(const exynos_dpu_data &configs_data){
         retire_fence = configs_data.retire_fence;
         if (configs.size() != configs_data.configs.size()) {
             HWC_LOGE(NULL, "invalid config, it has different configs size");
             return *this;
         }
-        for (uint32_t i = 0; i < configs.size(); i++) {
-            configs[i] = configs_data.configs[i];
-        }
+        configs = configs_data.configs;
         return *this;
     };
 };

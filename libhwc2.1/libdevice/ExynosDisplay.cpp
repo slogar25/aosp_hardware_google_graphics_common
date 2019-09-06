@@ -316,12 +316,8 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     /* The number of window is same with the number of otfMPP */
     mMaxWindowNum = mResourceManager->getOtfMPPs().size();
 
-    for(uint32_t i = 0; i < mMaxWindowNum; i++)
-    {
-        exynos_win_config_data config_data;
-        mDpuData.configs.push_back(config_data);
-        mLastDpuData.configs.push_back(config_data);
-    }
+    mDpuData.init(mMaxWindowNum);
+    mLastDpuData.init(mMaxWindowNum);
     ALOGI("window configs size(%zu)", mDpuData.configs.size());
 
     mLowFpsLayerInfo.initializeInfos();
@@ -383,8 +379,8 @@ void ExynosDisplay::initDisplay() {
     mDynamicReCompMode = NO_MODE_SWITCH;
     mCursorIndex = -1;
 
-    mDpuData.initData();
-    mLastDpuData.initData();
+    mDpuData.reset();
+    mLastDpuData.reset();
 
     if (mDisplayControl.earlyStartMPP == true) {
         for (size_t i = 0; i < mLayers.size(); i++) {
@@ -1580,7 +1576,7 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
  */
 int ExynosDisplay::setWinConfigData() {
     int ret = NO_ERROR;
-    mDpuData.initData();
+    mDpuData.reset();
 
     if (mClientCompositionInfo.mHasCompositionLayer) {
         if ((ret = configureOverlay(mClientCompositionInfo)) != NO_ERROR)
@@ -2561,7 +2557,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         }
     }
 
-    mDpuData.initData();
+    mDpuData.reset();
 
     if ((mLayers.size() == 0) &&
         (mDisplayId != HWC_DISPLAY_VIRTUAL)) {
@@ -2716,7 +2712,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         printDebugInfos(errString);
     }
 
-    mDpuData.initData();
+    mDpuData.reset();
 
     mRenderingState = RENDERING_STATE_PRESENTED;
 
@@ -2729,12 +2725,12 @@ err:
     mRenderingState = RENDERING_STATE_PRESENTED;
     setGeometryChanged(GEOMETRY_ERROR_CASE);
 
-    mLastDpuData.initData();
+    mLastDpuData.reset();
 
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mExynosCompositionInfo.mSkipStaticInitFlag = false;
 
-    mDpuData.initData();
+    mDpuData.reset();
 
     if (!mDevice->validateFences(this)){
         errString.appendFormat("%s:: validate fence failed. \n", __func__);
@@ -2855,7 +2851,7 @@ int ExynosDisplay::clearDisplay() {
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mClientCompositionInfo.mSkipFlag = false;
 
-    mLastDpuData.initData();
+    mLastDpuData.reset();
 
     /* Update last retire fence */
     mLastRetireFence = fence_close(mLastRetireFence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
