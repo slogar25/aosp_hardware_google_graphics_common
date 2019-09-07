@@ -31,6 +31,11 @@
 #include "ExynosDisplay.h"
 #include "VendorVideoAPI.h"
 
+#ifndef HWC2_HDR10_PLUS_SEI
+/* baseed on android.hardware.composer.2_3 */
+#define HWC2_HDR10_PLUS_SEI 12
+#endif
+
 class ExynosMPP;
 
 enum overlay_priority {

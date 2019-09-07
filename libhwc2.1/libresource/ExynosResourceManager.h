@@ -137,6 +137,7 @@ class ExynosResourceManager {
         ExynosMPP* getOtfMPPWithChannel(int ch);
         uint32_t getFeatureTableSize() const;
         const ExynosMPPVector& getOtfMPPs() { return mOtfMPPs; };
+        virtual bool hasHDR10PlusMPP();
 
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,

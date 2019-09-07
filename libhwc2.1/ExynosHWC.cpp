@@ -918,11 +918,22 @@ int32_t exynos_setLayerPerFrameMetadata(hwc2_device_t *dev, hwc2_display_t displ
 
 int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* __unused dev, hwc2_display_t __unused display,
         uint32_t* outNumKeys, int32_t* /*hwc2_per_frame_metadata_key_t*/ outKeys) {
+
+    ExynosDevice *exynosDevice = checkDevice(dev);
+    ExynosResourceManager *resourceManager = exynosDevice->mResourceManager;
+
+    uint32_t numKeys = 0;
+
+    if (resourceManager->hasHDR10PlusMPP())
+        numKeys = HWC2_HDR10_PLUS_SEI;
+    else
+        numKeys = HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL;
+
     if (outKeys == NULL) {
-        *outNumKeys = HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL + 1;
+        *outNumKeys = numKeys + 1;
         return NO_ERROR;
     } else {
-        if (*outNumKeys != (HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL + 1)) {
+        if (*outNumKeys != (numKeys + 1)) {
             ALOGE("%s:: invalid outNumKeys(%d)", __func__, *outNumKeys);
             return -1;
         }
