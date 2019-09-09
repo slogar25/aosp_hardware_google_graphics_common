@@ -59,10 +59,12 @@ class ExynosDisplayFbInterface : public ExynosDisplayInterface {
     protected:
         static void clearFbWinConfigData(decon_win_config_data &winConfigData);
         dpp_csc_eq halDataSpaceToDisplayParam(const exynos_win_config_data& config);
-        dpp_hdr_standard halTransferToDisplayParam(exynos_win_config_data& config);
+        dpp_hdr_standard halTransferToDisplayParam(const exynos_win_config_data& config);
         String8& dumpFbWinConfigInfo(String8 &result,
                 decon_win_config_data &fbConfig, bool debugPrint = false);
         static android_dataspace dataspaceFromConfig(const exynos_win_config_data &config);
+        int32_t configFromDisplayConfig(decon_win_config &config,
+                const exynos_win_config_data &display_config);
 
     protected:
         /**

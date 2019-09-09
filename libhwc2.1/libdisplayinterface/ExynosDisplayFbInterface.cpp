@@ -235,77 +235,86 @@ decon_idma_type ExynosDisplayFbInterface::getDeconDMAType(ExynosMPP* __unused ot
     return MAX_DECON_DMA_TYPE;
 }
 
+int32_t ExynosDisplayFbInterface::configFromDisplayConfig(decon_win_config &config,
+        const exynos_win_config_data &display_config)
+{
+    if (display_config.state == display_config.WIN_STATE_DISABLED)
+        return NO_ERROR;
+
+    config.dst = display_config.dst;
+    config.plane_alpha = 255;
+    if ((display_config.plane_alpha >= 0) && (display_config.plane_alpha < 255)) {
+        config.plane_alpha = display_config.plane_alpha;
+    }
+    if ((config.blending = halBlendingToS3CBlending(display_config.blending))
+            >= DECON_BLENDING_MAX) {
+        HWC_LOGE(mExynosDisplay, "%s:: config has invalid blending(0x%8x)",
+                __func__, display_config.blending);
+        return -EINVAL;
+    }
+
+    if (display_config.assignedMPP == NULL) {
+        HWC_LOGE(mExynosDisplay, "%s:: config has invalid idma_type, assignedMPP is NULL",
+                __func__);
+        return -EINVAL;
+    } else if ((config.idma_type = getDeconDMAType(display_config.assignedMPP))
+            == MAX_DECON_DMA_TYPE) {
+        HWC_LOGE(mExynosDisplay, "%s:: config has invalid idma_type, assignedMPP(%s)",
+                __func__, display_config.assignedMPP->mName.string());
+        return -EINVAL;
+    }
+
+    if (display_config.state == display_config.WIN_STATE_COLOR) {
+        config.state = config.DECON_WIN_STATE_COLOR;
+        config.color = display_config.color;
+        if (!((display_config.plane_alpha >= 0) && (display_config.plane_alpha <= 255)))
+            config.plane_alpha = 0;
+    } else if ((display_config.state == display_config.WIN_STATE_BUFFER) ||
+            (display_config.state == display_config.WIN_STATE_CURSOR)) {
+        if (display_config.state == display_config.WIN_STATE_BUFFER)
+            config.state = config.DECON_WIN_STATE_BUFFER;
+        else
+            config.state = config.DECON_WIN_STATE_CURSOR;
+
+        config.fd_idma[0] = display_config.fd_idma[0];
+        config.fd_idma[1] = display_config.fd_idma[1];
+        config.fd_idma[2] = display_config.fd_idma[2];
+        config.acq_fence = display_config.acq_fence;
+        config.rel_fence = display_config.rel_fence;
+        if ((config.format = halFormatToS3CFormat(display_config.format))
+                == DECON_PIXEL_FORMAT_MAX) {
+            HWC_LOGE(mExynosDisplay, "%s:: config has invalid format(0x%8x)",
+                    __func__, display_config.format);
+            return -EINVAL;
+        }
+        config.dpp_parm.comp_src = display_config.comp_src;
+        config.dpp_parm.rot = (dpp_rotate)halTransformToS3CRot(display_config.transform);
+        config.dpp_parm.eq_mode = halDataSpaceToDisplayParam(display_config);
+        if (display_config.hdr_enable)
+            config.dpp_parm.hdr_std = halTransferToDisplayParam(display_config);
+        config.dpp_parm.min_luminance = display_config.min_luminance;
+        config.dpp_parm.max_luminance = display_config.max_luminance;
+        config.block_area = display_config.block_area;
+        config.transparent_area = display_config.transparent_area;
+        config.opaque_area = display_config.opaque_area;
+        config.src = display_config.src;
+        config.protection = display_config.protection;
+        config.compression = display_config.compression;
+    }
+    return NO_ERROR;
+}
+
 int32_t ExynosDisplayFbInterface::deliverWinConfigData()
 {
-    int32_t ret = 0;
     android::String8 result;
     clearFbWinConfigData(mFbConfigData);
     struct decon_win_config *config = mFbConfigData.config;
     for (uint32_t i = 0; i < NUM_HW_WINDOWS; i++) {
-        exynos_win_config_data &display_config = mExynosDisplay->mDpuData.configs[i];
-
-        if (display_config.state == display_config.WIN_STATE_DISABLED)
-            continue;
-
-        config[i].dst = display_config.dst;
-        config[i].plane_alpha = 255;
-        if ((display_config.plane_alpha >= 0) && (display_config.plane_alpha < 255)) {
-            config[i].plane_alpha = display_config.plane_alpha;
-        }
-        if ((config[i].blending = halBlendingToS3CBlending(display_config.blending))
-                >= DECON_BLENDING_MAX) {
-            HWC_LOGE(mExynosDisplay, "%s:: config [%d] has invalid blending(0x%8x)",
-                    __func__, i, display_config.blending);
-            return -EINVAL;
-        }
-
-        if (display_config.assignedMPP == NULL) {
-            HWC_LOGE(mExynosDisplay, "%s:: config [%d] has invalid idma_type, assignedMPP is NULL",
-                    __func__, i);
-            return -EINVAL;
-        } else if ((config[i].idma_type = getDeconDMAType(display_config.assignedMPP))
-                == MAX_DECON_DMA_TYPE) {
-            HWC_LOGE(mExynosDisplay, "%s:: config [%d] has invalid idma_type, assignedMPP(%s)",
-                    __func__, i, display_config.assignedMPP->mName.string());
-            return -EINVAL;
-        }
-
-        if (display_config.state == display_config.WIN_STATE_COLOR) {
-            config[i].state = config[i].DECON_WIN_STATE_COLOR;
-            config[i].color = display_config.color;
-            if (!((display_config.plane_alpha >= 0) && (display_config.plane_alpha <= 255)))
-                config[i].plane_alpha = 0;
-        } else if ((display_config.state == display_config.WIN_STATE_BUFFER) ||
-                   (display_config.state == display_config.WIN_STATE_CURSOR)) {
-            if (display_config.state == display_config.WIN_STATE_BUFFER)
-                config[i].state = config[i].DECON_WIN_STATE_BUFFER;
-            else
-                config[i].state = config[i].DECON_WIN_STATE_CURSOR;
-
-            config[i].fd_idma[0] = display_config.fd_idma[0];
-            config[i].fd_idma[1] = display_config.fd_idma[1];
-            config[i].fd_idma[2] = display_config.fd_idma[2];
-            config[i].acq_fence = display_config.acq_fence;
-            config[i].rel_fence = display_config.rel_fence;
-            if ((config[i].format = halFormatToS3CFormat(display_config.format))
-                    == DECON_PIXEL_FORMAT_MAX) {
-                HWC_LOGE(mExynosDisplay, "%s:: config [%d] has invalid format(0x%8x)",
-                        __func__, i, display_config.format);
-                return -EINVAL;
-            }
-            config[i].dpp_parm.comp_src = display_config.comp_src;
-            config[i].dpp_parm.rot = (dpp_rotate)halTransformToS3CRot(display_config.transform);
-            config[i].dpp_parm.eq_mode = halDataSpaceToDisplayParam(display_config);
-            if (display_config.hdr_enable)
-                config[i].dpp_parm.hdr_std = halTransferToDisplayParam(display_config);
-            config[i].dpp_parm.min_luminance = display_config.min_luminance;
-            config[i].dpp_parm.max_luminance = display_config.max_luminance;
-            config[i].block_area = display_config.block_area;
-            config[i].transparent_area = display_config.transparent_area;
-            config[i].opaque_area = display_config.opaque_area;
-            config[i].src = display_config.src;
-            config[i].protection = display_config.protection;
-            config[i].compression = display_config.compression;
+        int32_t ret = configFromDisplayConfig(mFbConfigData.config[i],
+                 mExynosDisplay->mDpuData.configs[i]);
+        if (ret != NO_ERROR) {
+            HWC_LOGE(mExynosDisplay, "configFromDisplayConfig config[%d] fail", i);
+            return ret;
         }
     }
     if (mExynosDisplay->mDpuData.enable_win_update) {
@@ -319,6 +328,7 @@ int32_t ExynosDisplayFbInterface::deliverWinConfigData()
 
     dumpFbWinConfigInfo(result, mFbConfigData, true);
 
+    int32_t ret = 0;
     {
         ATRACE_CALL();
         ret = ioctl(mDisplayFd, S3CFB_WIN_CONFIG, &mFbConfigData);
@@ -328,6 +338,7 @@ int32_t ExynosDisplayFbInterface::deliverWinConfigData()
         result.clear();
         result.appendFormat("WIN_CONFIG ioctl error\n");
         HWC_LOGE(mExynosDisplay, "%s", dumpFbWinConfigInfo(result, mFbConfigData).string());
+        return ret;
     } else {
         mExynosDisplay->mDpuData.retire_fence = mFbConfigData.retire_fence;
         struct decon_win_config *config = mFbConfigData.config;
@@ -336,7 +347,7 @@ int32_t ExynosDisplayFbInterface::deliverWinConfigData()
         }
     }
 
-    return ret;
+    return NO_ERROR;
 }
 
 int32_t ExynosDisplayFbInterface::clearDisplay()
@@ -457,7 +468,7 @@ dpp_csc_eq ExynosDisplayFbInterface::halDataSpaceToDisplayParam(const exynos_win
     return (dpp_csc_eq)cscEQ;
 }
 
-dpp_hdr_standard ExynosDisplayFbInterface::halTransferToDisplayParam(exynos_win_config_data& config)
+dpp_hdr_standard ExynosDisplayFbInterface::halTransferToDisplayParam(const exynos_win_config_data& config)
 {
     android_dataspace dataspace = dataspaceFromConfig(config);
     ExynosMPP* otfMPP = config.assignedMPP;
