@@ -1241,9 +1241,9 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
             if (layer.mBufferHasMetaParcel) {
                 uint32_t parcelFdIndex = getBufferNumOfFormat(layer.mMidImg.format);
                 if (parcelFdIndex > 0) {
-                    if (getBufferNumOfFormat(layer.mLayerBuffer->format) == 1)
+                    if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_2PRIVATE_DATA)
                         cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd1;
-                    else if (getBufferNumOfFormat(layer.mLayerBuffer->format) == 2)
+                    else if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_3PRIVATE_DATA)
                         cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd2;
                 }
             } else {

@@ -168,9 +168,9 @@ int32_t ExynosLayer::doPreProcess()
         ExynosVideoMeta *metaData = NULL;
         int priv_fd = -1;
 
-        if (getBufferNumOfFormat(mLayerBuffer->format) == 1)
+        if (mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_2PRIVATE_DATA)
             priv_fd = mLayerBuffer->fd1;
-        else
+        else if (mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_3PRIVATE_DATA)
             priv_fd = mLayerBuffer->fd2;
 
         if (priv_fd >= 0) {
