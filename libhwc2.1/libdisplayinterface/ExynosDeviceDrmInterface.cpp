@@ -29,6 +29,7 @@ ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice)
 
 ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface()
 {
+    mDrmDevice->event_listener()->UnRegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
 }
 
 void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
