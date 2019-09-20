@@ -67,6 +67,11 @@ void DrmEventListener::RegisterHotplugHandler(DrmEventHandler *handler) {
   hotplug_handler_.reset(handler);
 }
 
+void DrmEventListener::UnRegisterHotplugHandler(DrmEventHandler *handler) {
+    if (handler == hotplug_handler_.get())
+        hotplug_handler_ = NULL;
+}
+
 void DrmEventListener::FlipHandler(int /* fd */, unsigned int /* sequence */,
                                    unsigned int tv_sec, unsigned int tv_usec,
                                    void *user_data) {

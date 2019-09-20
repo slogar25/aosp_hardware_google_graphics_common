@@ -43,6 +43,7 @@ class DrmEventListener : public Worker {
   int Init();
 
   void RegisterHotplugHandler(DrmEventHandler *handler);
+  void UnRegisterHotplugHandler(DrmEventHandler *handler);
 
   static void FlipHandler(int fd, unsigned int sequence, unsigned int tv_sec,
                           unsigned int tv_usec, void *user_data);
