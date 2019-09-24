@@ -23,6 +23,8 @@
 
 using namespace android;
 extern struct exynos_hwc_control exynosHWCControl;
+constexpr float DISPLAY_LUMINANCE_UNIT = 10000;
+constexpr float CONSTANT_FOR_DP_MIN_LUMINANCE = 255.0f * 255.0f / 100.0f;
 
 const size_t NUM_HW_WINDOWS = MAX_DECON_WIN;
 //////////////////////////////////////////////////// ExynosDisplayFbInterface //////////////////////////////////////////////////////////////////
@@ -185,44 +187,38 @@ int32_t ExynosDisplayFbInterface::setCursorPositionAsync(uint32_t x_pos, uint32_
     return ioctl(mDisplayFd, S3CFB_WIN_POSITION, &win_pos);
 }
 
-int32_t ExynosDisplayFbInterface::getHdrCapabilities(uint32_t* outNumTypes,
-        int32_t* outTypes, float* outMaxLuminance,
-        float* outMaxAverageLuminance, float* outMinLuminance)
+int32_t ExynosDisplayFbInterface::updateHdrCapabilities()
 {
+    /* Init member variables */
+    mExynosDisplay->mHdrTypeNum = 0;
+    mExynosDisplay->mMaxLuminance = 0;
+    mExynosDisplay->mMaxAverageLuminance = 0;
+    mExynosDisplay->mMinLuminance = 0;
 
-    if (outTypes == NULL) {
-        struct decon_hdr_capabilities_info outInfo;
-        memset(&outInfo, 0, sizeof(outInfo));
-        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
-            return -1;
-        }
-
-        *outMaxLuminance = (float)outInfo.max_luminance / (float)10000;
-        *outMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
-        *outMinLuminance = (float)outInfo.min_luminance / (float)10000;
-        *outNumTypes = outInfo.out_num;
-        // Save to member variables
-        mExynosDisplay->mHdrTypeNum = *outNumTypes;
-        mExynosDisplay->mMaxLuminance = *outMaxLuminance;
-        mExynosDisplay->mMaxAverageLuminance = *outMaxAverageLuminance;
-        mExynosDisplay->mMinLuminance = *outMinLuminance;
-        ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
-                mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypeNum, mExynosDisplay->mMaxLuminance,
-                mExynosDisplay->mMaxAverageLuminance, mExynosDisplay->mMinLuminance);
-        return 0;
+    struct decon_hdr_capabilities_info outInfo;
+    memset(&outInfo, 0, sizeof(outInfo));
+    if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
+        ALOGE("updateHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
+        return -1;
     }
+
+    // Save to member variables
+    mExynosDisplay->mHdrTypeNum = static_cast<uint32_t>(outInfo.out_num);
+    mExynosDisplay->mMaxLuminance = static_cast<float>(outInfo.max_luminance) / DISPLAY_LUMINANCE_UNIT;
+    mExynosDisplay->mMaxAverageLuminance = static_cast<float>(outInfo.max_average_luminance) / DISPLAY_LUMINANCE_UNIT;
+    mExynosDisplay->mMinLuminance = static_cast<float>(outInfo.min_luminance) / DISPLAY_LUMINANCE_UNIT;
+    ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
+            mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypeNum, mExynosDisplay->mMaxLuminance,
+            mExynosDisplay->mMaxAverageLuminance, mExynosDisplay->mMinLuminance);
 
     struct decon_hdr_capabilities outData;
     memset(&outData, 0, sizeof(outData));
 
-    for (uint32_t i = 0; i < *outNumTypes; i += SET_HDR_CAPABILITIES_NUM) {
+    for (uint32_t i = 0; i < mExynosDisplay->mHdrTypeNum; i += SET_HDR_CAPABILITIES_NUM) {
         if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
+            ALOGE("updateHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
             return -1;
         }
-        for (uint32_t j = 0; j < *outNumTypes - i; j++)
-            outTypes[i+j] = outData.out_types[j];
         // Save to member variables
         mExynosDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
         HDEBUGLOGD(eDebugHWC, "%s HWC2: Types : %d",
@@ -770,36 +766,7 @@ void ExynosPrimaryDisplayFbInterface::getDisplayHWInfo() {
     ALOGI("DSC H_Slice_Num: %d, Y_Slice_Size: %d (for window partial update)",
             mPrimaryDisplay->mDSCHSliceNum, mPrimaryDisplay->mDSCYSliceSize);
 
-    struct decon_hdr_capabilities_info outInfo;
-    memset(&outInfo, 0, sizeof(outInfo));
-
-    if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
-        ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
-        return;
-    }
-
-
-    // Save to member variables
-    mPrimaryDisplay->mHdrTypeNum = outInfo.out_num;
-    mPrimaryDisplay->mMaxLuminance = (float)outInfo.max_luminance / (float)10000;
-    mPrimaryDisplay->mMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
-    mPrimaryDisplay->mMinLuminance = (float)outInfo.min_luminance / (float)10000;
-
-    ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
-            mPrimaryDisplay->mDisplayName.string(), mPrimaryDisplay->mHdrTypeNum,
-            mPrimaryDisplay->mMaxLuminance, mPrimaryDisplay->mMaxAverageLuminance,
-            mPrimaryDisplay->mMinLuminance);
-
-    struct decon_hdr_capabilities outData;
-
-    for (int i = 0; i < mPrimaryDisplay->mHdrTypeNum; i += SET_HDR_CAPABILITIES_NUM) {
-        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
-            return;
-        }
-        mPrimaryDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
-        ALOGE("HWC2: Type(%d)",  mPrimaryDisplay->mHdrTypes[i]);
-    }
+    updateHdrCapabilities();
 
     //TODO : shuld be set by valid number
     //mHdrTypes[0] = HAL_HDR_HDR10;
@@ -1018,67 +985,57 @@ int32_t ExynosExternalDisplayFbInterface::calVsyncPeriod(v4l2_dv_timings dv_timi
     return result;
 }
 
-int32_t ExynosExternalDisplayFbInterface::getHdrCapabilities(
-        uint32_t* outNumTypes, int32_t* outTypes, float* outMaxLuminance,
-        float* outMaxAverageLuminance, float* outMinLuminance)
+int32_t ExynosExternalDisplayFbInterface::updateHdrCapabilities()
 {
+    /* Init member variables */
+    mExternalDisplay->mHdrTypeNum = 0;
+    mExternalDisplay->mMaxLuminance = 0;
+    mExternalDisplay->mMaxAverageLuminance = 0;
+    mExternalDisplay->mMinLuminance = 0;
+
     HDEBUGLOGD(eDebugExternalDisplay, "HWC2: %s, %d", __func__, __LINE__);
-    if (outTypes == NULL) {
-        struct decon_hdr_capabilities_info outInfo;
-        memset(&outInfo, 0, sizeof(outInfo));
+    struct decon_hdr_capabilities_info outInfo;
+    memset(&outInfo, 0, sizeof(outInfo));
 
-        exynos_displayport_data dp_data;
-        memset(&dp_data, 0, sizeof(dp_data));
-        dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_HDR_INFO;
-        int ret = ioctl(mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
-        if (ret < 0) {
-            ALOGE("%s: EXYNOS_DISPLAYPORT_STATE_HDR_INFO ioctl error, %d", __func__, errno);
-        }
+    exynos_displayport_data dp_data;
+    memset(&dp_data, 0, sizeof(dp_data));
+    dp_data.state = dp_data.EXYNOS_DISPLAYPORT_STATE_HDR_INFO;
+    int ret = ioctl(mDisplayFd, EXYNOS_GET_DISPLAYPORT_CONFIG, &dp_data);
+    if (ret < 0) {
+        ALOGE("%s: EXYNOS_DISPLAYPORT_STATE_HDR_INFO ioctl error, %d", __func__, errno);
+    }
 
-        mExternalDisplay->mExternalHdrSupported = dp_data.hdr_support;
-        if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
-            return -1;
-        }
+    mExternalDisplay->mExternalHdrSupported = dp_data.hdr_support;
+    if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES_NUM, &outInfo) < 0) {
+        ALOGE("updateHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES_NUM ioctl failed");
+        return -1;
+    }
 
-        if (mExternalDisplay->mExternalHdrSupported) {
-            *outMaxLuminance = 50 * pow(2.0 ,(double)outInfo.max_luminance / 32);
-            *outMaxAverageLuminance = 50 * pow(2.0 ,(double)outInfo.max_average_luminance / 32);
-            *outMinLuminance = *outMaxLuminance * (float)pow(outInfo.min_luminance, 2.0) / pow(255.0, 2.0) / (float)100;
-        }
-        else {
-            *outMaxLuminance = (float)outInfo.max_luminance / (float)10000;
-            *outMaxAverageLuminance = (float)outInfo.max_average_luminance / (float)10000;
-            *outMinLuminance = (float)outInfo.min_luminance / (float)10000;
-        }
+    if (mExternalDisplay->mExternalHdrSupported) {
+        mExternalDisplay->mMaxLuminance = 50 * pow(2.0 ,(double)outInfo.max_luminance / 32);
+        mExternalDisplay->mMaxAverageLuminance = 50 * pow(2.0 ,(double)outInfo.max_average_luminance / 32);
+        mExternalDisplay->mMinLuminance = mExternalDisplay->mMaxLuminance * static_cast<float>(outInfo.min_luminance * outInfo.min_luminance) / CONSTANT_FOR_DP_MIN_LUMINANCE;
+    }
+    else {
+        mExternalDisplay->mMaxLuminance = (float)outInfo.max_luminance / DISPLAY_LUMINANCE_UNIT;
+        mExternalDisplay->mMaxAverageLuminance = (float)outInfo.max_average_luminance / DISPLAY_LUMINANCE_UNIT;
+        mExternalDisplay->mMinLuminance = (float)outInfo.min_luminance / DISPLAY_LUMINANCE_UNIT;
+    }
 
 #ifndef USES_HDR_GLES_CONVERSION
-        mExternalDisplay->mExternalHdrSupported = 0;
+    mExternalDisplay->mExternalHdrSupported = 0;
 #endif
 
-        *outNumTypes = outInfo.out_num;
-        // Save to member variables
-        mExternalDisplay->mHdrTypeNum = *outNumTypes;
-        mExternalDisplay->mMaxLuminance = *outMaxLuminance;
-        mExternalDisplay->mMaxAverageLuminance = *outMaxAverageLuminance;
-        mExternalDisplay->mMinLuminance = *outMinLuminance;
-        ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f), externalHdrSupported(%d)",
-                mExternalDisplay->mDisplayName.string(), mExternalDisplay->mHdrTypeNum,
-                mExternalDisplay->mMaxLuminance, mExternalDisplay->mMaxAverageLuminance,
-                mExternalDisplay->mMinLuminance, mExternalDisplay->mExternalHdrSupported);
-        return 0;
-    }
+    mExternalDisplay->mHdrTypeNum = outInfo.out_num;
 
     struct decon_hdr_capabilities outData;
     memset(&outData, 0, sizeof(outData));
 
-    for (uint32_t i = 0; i < *outNumTypes; i += SET_HDR_CAPABILITIES_NUM) {
+    for (uint32_t i = 0; i < mExternalDisplay->mHdrTypeNum; i += SET_HDR_CAPABILITIES_NUM) {
         if (ioctl(mDisplayFd, S3CFB_GET_HDR_CAPABILITIES, &outData) < 0) {
-            ALOGE("getHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
+            ALOGE("updateHdrCapabilities: S3CFB_GET_HDR_CAPABILITIES ioctl Failed");
             return -1;
         }
-        for (uint32_t j = 0; j < *outNumTypes - i; j++)
-            outTypes[i+j] = outData.out_types[j];
         // Save to member variables
         mExternalDisplay->mHdrTypes[i] = (android_hdr_t)outData.out_types[i];
         HDEBUGLOGD(eDebugExternalDisplay, "HWC2: Types : %d", mExternalDisplay->mHdrTypes[i]);
