@@ -279,6 +279,10 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mNumMaxPriorityAllowed(1),
     mCursorIndex(-1),
     mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
+    mHdrTypeNum(0),
+    mMaxLuminance(0),
+    mMaxAverageLuminance(0),
+    mMinLuminance(0),
     mHWC1LayerList(NULL),
     /* Support DDI scalser */
     mOldScalerMode(0),
@@ -4073,8 +4077,42 @@ int32_t ExynosDisplay::getHdrCapabilities(uint32_t* outNumTypes,
         float* outMaxAverageLuminance, float* outMinLuminance)
 {
     DISPLAY_LOGD(eDebugHWC, "HWC2: %s, %d", __func__, __LINE__);
-    return mDisplayInterface->getHdrCapabilities(outNumTypes, outTypes,
-                    outMaxLuminance, outMaxAverageLuminance, outMinLuminance);
+
+    if (outNumTypes == NULL || outMaxLuminance == NULL ||
+            outMaxAverageLuminance == NULL || outMinLuminance == NULL) {
+        return HWC2_ERROR_BAD_PARAMETER;
+    }
+
+    if (outTypes == NULL) {
+        /*
+         * This function is always called twice.
+         * outTypes is NULL in the first call and
+         * outType is valid pointer in the second call.
+         * Get information only in the first call.
+         * Use saved information in the second call.
+         */
+        if (mDisplayInterface->updateHdrCapabilities() != NO_ERROR)
+            return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    *outMaxLuminance = mHdrTypeNum;
+    *outMaxAverageLuminance = mMaxAverageLuminance;
+    *outMinLuminance = mMinLuminance;
+
+    if (outTypes == NULL)
+        *outNumTypes = mHdrTypeNum;
+
+    if (outTypes != NULL) {
+        if (*outNumTypes != mHdrTypeNum) {
+            ALOGE("%s:: Invalid parameter (outNumTypes: %d, mHdrTypeNum: %d",
+                    __func__, *outNumTypes, mHdrTypeNum);
+            return HWC2_ERROR_BAD_PARAMETER;
+        }
+        for(uint32_t i = 0; i < mHdrTypeNum; i++) {
+            outTypes[i] = mHdrTypes[i];
+        }
+    }
+    return HWC2_ERROR_NONE;
 }
 
 // Support DDI scalser

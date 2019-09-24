@@ -49,9 +49,7 @@ class ExynosDisplayInterface {
         virtual int32_t getActiveConfig(hwc2_config_t* outConfig);
         virtual int32_t setCursorPositionAsync(uint32_t __unused x_pos,
                 uint32_t __unused y_pos) {return NO_ERROR;};
-        virtual int32_t getHdrCapabilities(uint32_t* outNumTypes,
-                int32_t* outTypes, float* outMaxLuminance,
-                float* outMaxAverageLuminance, float* outMinLuminance);
+        virtual int32_t updateHdrCapabilities();
         virtual int32_t deliverWinConfigData() {return NO_ERROR;};
         virtual int32_t clearDisplay() {return NO_ERROR;};
         virtual int32_t disableSelfRefresh(uint32_t __unused disable) {return NO_ERROR;};

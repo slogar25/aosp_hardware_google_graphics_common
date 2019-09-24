@@ -379,7 +379,7 @@ class ExynosDisplay {
         ExynosLowFpsLayerInfo mLowFpsLayerInfo;
 
         // HDR capabilities
-        int mHdrTypeNum;
+        uint32_t mHdrTypeNum;
         android_hdr_t mHdrTypes[HDR_CAPABILITIES_NUM];
         float mMaxLuminance;
         float mMaxAverageLuminance;

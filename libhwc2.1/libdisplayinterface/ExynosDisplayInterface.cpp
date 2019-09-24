@@ -50,10 +50,7 @@ int32_t ExynosDisplayInterface::getColorModes(
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplayInterface::getHdrCapabilities(uint32_t* outNumTypes,
-        int32_t* outTypes, float* outMaxLuminance,
-        float* outMaxAverageLuminance, float* outMinLuminance)
+int32_t ExynosDisplayInterface::updateHdrCapabilities()
 {
-    *outNumTypes = 0;
     return 0;
 }
