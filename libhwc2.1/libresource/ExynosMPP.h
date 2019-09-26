@@ -239,6 +239,7 @@ typedef enum {
     PPC_FORMAT_YUV2P   =   0,
     PPC_FORMAT_RGB32,
     PPC_FORMAT_YUV8_2,
+    PPC_FORMAT_SBWC,
     PPC_FORMAT_FORMAT_MAX
 } format_index_t;
 
