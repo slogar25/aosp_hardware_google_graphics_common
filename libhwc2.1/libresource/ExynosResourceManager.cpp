@@ -2403,3 +2403,14 @@ float ExynosResourceManager::getAssignedCapacity(uint32_t physicalType)
     }
     return totalCapacity;
 }
+
+float ExynosResourceManager::getM2MCapa(uint32_t physicalType)
+{
+    float ret = 0;
+    for (size_t i = 0; i < mM2mMPPs.size(); i++) {
+        if (mM2mMPPs[i]->mPhysicalType == physicalType)
+            ret = mM2mMPPs[i]->mCapacity;
+    }
+
+    return ret;
+}
