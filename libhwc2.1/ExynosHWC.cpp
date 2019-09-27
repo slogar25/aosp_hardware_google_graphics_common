@@ -173,8 +173,11 @@ int32_t exynos_acceptDisplayChanges(hwc2_device_t *dev, hwc2_display_t display)
 
     if (exynosDevice) {
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, (uint32_t)display);
-        if (exynosDisplay)
-            return exynosDisplay->acceptDisplayChanges();
+        if (exynosDisplay) {
+            int32_t ret = exynosDisplay->acceptDisplayChanges();
+            exynosDisplay->mHWCRenderingState = RENDERING_STATE_ACCEPTED_CHANGE;
+            return ret;
+        }
     }
 
     return HWC2_ERROR_BAD_DISPLAY;
@@ -436,8 +439,20 @@ int32_t exynos_presentDisplay(hwc2_device_t *dev, hwc2_display_t display,
 
     if (exynosDevice) {
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
-        if (exynosDisplay)
-            return exynosDisplay->presentDisplay(outRetireFence);
+        if (exynosDisplay == NULL)
+            return HWC2_ERROR_BAD_DISPLAY;
+
+        if (exynosDisplay->mHWCRenderingState == RENDERING_STATE_VALIDATED) {
+            ALOGI("%s:: acceptDisplayChanges was not called",
+                    exynosDisplay->mDisplayName.string());
+            if (exynosDisplay->acceptDisplayChanges() != HWC2_ERROR_NONE) {
+                ALOGE("%s:: acceptDisplayChanges is failed",
+                        exynosDisplay->mDisplayName.string());
+            }
+        }
+        int32_t ret = exynosDisplay->presentDisplay(outRetireFence);
+        exynosDisplay->mHWCRenderingState = RENDERING_STATE_PRESENTED;
+        return ret;
     }
 
     return HWC2_ERROR_BAD_DISPLAY;
@@ -811,8 +826,11 @@ int32_t exynos_validateDisplay(hwc2_device_t __unused *dev, hwc2_display_t __unu
 
     if (exynosDevice) {
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
-        if (exynosDisplay)
-            return exynosDisplay->validateDisplay(outNumTypes, outNumRequests);
+        if (exynosDisplay == NULL)
+            return HWC2_ERROR_BAD_DISPLAY;
+        int32_t ret = exynosDisplay->validateDisplay(outNumTypes, outNumRequests);
+        exynosDisplay->mHWCRenderingState = RENDERING_STATE_VALIDATED;
+        return ret;
     }
 
     return HWC2_ERROR_BAD_DISPLAY;

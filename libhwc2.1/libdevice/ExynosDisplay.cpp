@@ -261,6 +261,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mExynosCompositionInfo(COMPOSITION_EXYNOS),
     mGeometryChanged(0x0),
     mRenderingState(RENDERING_STATE_NONE),
+    mHWCRenderingState(RENDERING_STATE_NONE),
     mDisplayBW(0),
     mDynamicReCompMode(NO_MODE_SWITCH),
     mDREnable(false),
