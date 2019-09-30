@@ -2926,7 +2926,7 @@ int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
 int32_t ExynosDisplay::setDisplayBrightness(float brightness)
 {
     if (mBrightnessFd == NULL)
-        return HWC2_ERROR_NONE;
+        return HWC2_ERROR_UNSUPPORTED;
 
     char val[4];
     uint32_t scaledBrightness = brightness * mMaxBrightness;
