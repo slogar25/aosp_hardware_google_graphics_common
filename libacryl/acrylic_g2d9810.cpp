@@ -1046,6 +1046,9 @@ bool AcrylicCompositorG2D9810::requestPerformanceQoS(AcrylicPerformanceRequest *
                 data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_SCALING;
             }
 
+            if (layer->mAttribute & AcrylicCanvas::ATTR_COMPRESSED)
+                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_COMPRESSED;
+
             bandwidth += layer_bw;
             ALOGD_TEST("        LAYER[%d]: BW %llu FMT %#x(%u) (%dx%d)@(%dx%d)on(%dx%d) --> (%dx%d)@(%dx%d) TRFM %#x",
                     idx, static_cast<unsigned long long>(layer_bw), layer->mPixFormat, bpp,

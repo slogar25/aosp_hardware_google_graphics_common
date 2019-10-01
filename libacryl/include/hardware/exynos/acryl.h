@@ -1185,6 +1185,7 @@ struct AcrylicPerformanceRequestLayer {
     hw2d_rect_t     mSourceRect;
     hw2d_rect_t     mTargetRect;
     uint32_t        mTransform;
+    uint32_t        mAttribute;
 };
 
 struct AcrylicPerformanceRequestFrame {
@@ -1207,6 +1208,11 @@ struct AcrylicPerformanceRequestFrame {
             mLayers[layer].mSourceDimension.vert = height;
             mLayers[layer].mPixFormat = fmt;
         }
+    }
+
+    void setAttribute(int layer, uint32_t attribute) {
+        if (layer < mNumLayers)
+            mLayers[layer].mAttribute = attribute;
     }
 
     void setTransfer(int layer, hwc_rect_t &src_area, hwc_rect_t &out_area, uint32_t transform) {
