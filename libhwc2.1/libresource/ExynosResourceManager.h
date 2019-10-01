@@ -21,6 +21,7 @@
 #ifndef _EXYNOSRESOURCEMANAGER_H
 #define _EXYNOSRESOURCEMANAGER_H
 
+#include <unordered_map>
 #include "ExynosDevice.h"
 #include "ExynosDisplay.h"
 #include "ExynosHWCHelper.h"
@@ -82,6 +83,8 @@ class ExynosResourceManager {
         uint32_t mSizeRestrictionCnt[RESTRICTION_MAX];
         restriction_key_t mFormatRestrictions[RESTRICTION_CNT_MAX];
         restriction_size_element_t mSizeRestrictions[RESTRICTION_MAX][RESTRICTION_CNT_MAX];
+
+        std::unordered_map<uint32_t /* physical type */, uint64_t /* attribute */> mMPPAttrs;
 
         ExynosResourceManager(ExynosDevice *device);
         virtual ~ExynosResourceManager();
