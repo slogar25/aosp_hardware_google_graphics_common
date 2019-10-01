@@ -2764,9 +2764,13 @@ void ExynosMPP::closeFences()
 
 void ExynosMPP::updateAttr()
 {
+    MPP_LOGD(eDebugAttrSetting, "updateAttr::mPhysicalType(%d), mAttr(0x%" PRIx64 ")",
+            mPhysicalType, mAttr);
     for (int i = 0; i < MPP_P_TYPE_MAX; i++) {
-        if (feature_table[i].hwType == mPhysicalType)
+        if (feature_table[i].hwType == mPhysicalType) {
             mAttr = feature_table[i].attr;
+            MPP_LOGD(eDebugAttrSetting, "After mAttr(0x%" PRIx64 ")", mAttr);
+        }
     }
 }
 
