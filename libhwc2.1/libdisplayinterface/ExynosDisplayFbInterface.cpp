@@ -159,7 +159,7 @@ int32_t ExynosDisplayFbInterface::getColorModes(
 
     if (*outNumModes != colorModeNum) {
         ALOGE("%s:: invalid outNumModes(%d), should be(%d)", __func__, *outNumModes, colorModeNum);
-        return -EINVAL;
+        return HWC2_ERROR_BAD_PARAMETER;
     }
 
     for (uint32_t i= 0 ; i < colorModeNum; i++) {
@@ -829,7 +829,7 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayAttribute(
 {
     if (config >= SUPPORTED_DV_TIMINGS_NUM) {
         HWC_LOGE(mExternalDisplay, "%s:: Invalid config(%d), mConfigurations(%zu)", __func__, config, mConfigurations.size());
-        return -EINVAL;
+        return HWC2_ERROR_BAD_PARAMETER;
     }
 
     v4l2_dv_timings dv_timing = mDVTimings[config];
@@ -899,7 +899,7 @@ int32_t ExynosExternalDisplayFbInterface::getDisplayConfigs(
 
         dumpDisplayConfigs();
 
-        return HWC2_ERROR_NONE;
+        return 0;
     }
 
     memset(&mDVTimings, 0, sizeof(mDVTimings));
