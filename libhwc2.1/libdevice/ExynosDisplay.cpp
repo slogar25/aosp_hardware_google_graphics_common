@@ -3718,7 +3718,6 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex)
         } else if ((layer->mValidateCompositionType == HWC2_COMPOSITION_DEVICE) ||
                    (layer->mValidateCompositionType == HWC2_COMPOSITION_INVALID)) {
             DISPLAY_LOGD(eDebugResourceManager, "\t[%d] layer changed", i);
-            layer->mValidateCompositionType = HWC2_COMPOSITION_EXYNOS;
             layer->mOverlayInfo |= eSandwitchedBetweenEXYNOS;
             layer->resetAssignedResource();
             if ((ret = m2mMPP->assignMPP(this, layer)) != NO_ERROR)
@@ -3728,6 +3727,7 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex)
                 return ret;
             }
             if (layer->mValidateCompositionType == HWC2_COMPOSITION_DEVICE) mWindowNumUsed--;
+            layer->mValidateCompositionType = HWC2_COMPOSITION_EXYNOS;
             mExynosCompositionInfo.mFirstIndex = min(mExynosCompositionInfo.mFirstIndex, (int32_t)i);
             mExynosCompositionInfo.mLastIndex = max(mExynosCompositionInfo.mLastIndex, (int32_t)i);
         } else {
