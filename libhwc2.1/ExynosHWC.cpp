@@ -104,8 +104,13 @@ hwc2_function_pointer_t exynos_function_pointer[] =
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_SET_READBACK_BUFFER
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_GET_READBACK_BUFFER_ATTRIBUTES
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_GET_READBACK_BUFFER_FENCE
+#ifdef HWC_SUPPORT_RENDER_INTENT
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getRenderIntents),            //HWC2_FUNCTION_GET_RENDER_INTENTS
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setColorModeWithRenderIntent),//HWC2_FUNCTION_SET_COLOR_MODE_WITH_RENDER_INTENT
+#else
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_RENDER_INTENTS
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_COLOR_MODE_WITH_RENDER_INTENT
+#endif
 };
 
 inline ExynosDevice* checkDevice(hwc2_device_t *dev)
