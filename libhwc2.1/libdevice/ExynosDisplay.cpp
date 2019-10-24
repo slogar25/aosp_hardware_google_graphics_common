@@ -2745,8 +2745,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             resetFenceCurFlag(this);
             for (size_t i=0; i < mLayers.size(); i++) {
                 // Layer's acquire fence from SF
-                setFenceInfo(mLayers[i]->mAcquireFence, this,
-                        FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, FENCE_FROM);
+                mLayers[i]->setSrcAcquireFence();
             }
             DISPLAY_LOGD(eDebugSkipValidate, "validate is skipped");
         }
