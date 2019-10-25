@@ -29,20 +29,20 @@ static const char *getBufTypeString(unsigned int buftype)
     return "unknown";
 }
 
-bool LibScalerForJpeg::RunStream(int srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen)
+bool LibScalerForJpeg::RunStream(int srcBuf[SCALER_MAX_PLANES], int __unused srcLen[SCALER_MAX_PLANES], int dstBuf, size_t __unused dstLen)
 {
     if (!mSrcImage.begin(V4L2_MEMORY_DMABUF) || !mDstImage.begin(V4L2_MEMORY_DMABUF))
         return false;
 
-    return queue(srcBuf, srcLen, dstBuf, dstLen);
+    return queue(srcBuf, dstBuf);
 }
 
-bool LibScalerForJpeg::RunStream(char *srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen)
+bool LibScalerForJpeg::RunStream(char *srcBuf[SCALER_MAX_PLANES], int __unused srcLen[SCALER_MAX_PLANES], int dstBuf, size_t __unused dstLen)
 {
     if (!mSrcImage.begin(V4L2_MEMORY_USERPTR) || !mDstImage.begin(V4L2_MEMORY_DMABUF))
         return false;
 
-    return queue(srcBuf, srcLen, dstBuf, dstLen);
+    return queue(srcBuf, dstBuf);
 }
 
 bool LibScalerForJpeg::Image::set(unsigned int width, unsigned int height, unsigned int format)
@@ -55,7 +55,7 @@ bool LibScalerForJpeg::Image::set(unsigned int width, unsigned int height, unsig
             return false;
     }
 
-    if (!mDevice.setFormat(bufferType, format, width, height))
+    if (!mDevice.setFormat(bufferType, format, width, height, planeLen))
         return false;
 
     memoryType = 0; // new reqbufs is required.
@@ -127,7 +127,7 @@ bool LibScalerForJpeg::Device::requestBuffers(unsigned int buftype, unsigned int
     return true;
 }
 
-bool LibScalerForJpeg::Device::setFormat(unsigned int buftype, unsigned int format, unsigned int width, unsigned int height)
+bool LibScalerForJpeg::Device::setFormat(unsigned int buftype, unsigned int format, unsigned int width, unsigned int height, unsigned int planelen[SCALER_MAX_PLANES])
 {
     v4l2_format fmt{};
 
@@ -139,6 +139,10 @@ bool LibScalerForJpeg::Device::setFormat(unsigned int buftype, unsigned int form
     if (ioctl(mFd, VIDIOC_S_FMT, &fmt) < 0) {
         ALOGERR("failed S_FMT(%s, fmt=h'%x, %ux%u)", getBufTypeString(buftype), format, width, height);
         return false;
+    }
+
+    for (uint32_t i = 0; i < fmt.fmt.pix_mp.num_planes ; i++) {
+        planelen[i] = fmt.fmt.pix_mp.plane_fmt[i].sizeimage;
     }
 
     return true;
@@ -179,7 +183,7 @@ bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, std::function<v
     return ioctl(mFd, VIDIOC_QBUF, &buffer) >= 0;
 }
 
-bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, int buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES])
+bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, int buf[SCALER_MAX_PLANES], unsigned int len[SCALER_MAX_PLANES])
 {
     if (!queueBuffer(buftype, [buf, len] (v4l2_buffer &buffer) {
                 buffer.memory = V4L2_MEMORY_DMABUF;
@@ -195,7 +199,7 @@ bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, int buf[SCALER_
     return true;
 }
 
-bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, char *buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES])
+bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, char *buf[SCALER_MAX_PLANES], unsigned int len[SCALER_MAX_PLANES])
 {
     if (!queueBuffer(buftype, [buf, len] (v4l2_buffer &buffer) {
                 buffer.memory = V4L2_MEMORY_USERPTR;
@@ -211,16 +215,16 @@ bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, char *buf[SCALE
     return true;
 }
 
-bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, int buf, int len)
+bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, int buf, unsigned int len[SCALER_MAX_PLANES])
 {
     if (!queueBuffer(buftype, [buf, len] (v4l2_buffer &buffer)
                 {
                     buffer.memory = V4L2_MEMORY_DMABUF;
                     buffer.length = 1;
                     buffer.m.planes[0].m.fd = buf;
-                    buffer.m.planes[0].length = len;
+                    buffer.m.planes[0].length = len[0];
                 })) {
-        ALOGERR("failed QBUF(%s, fd=%d, len=%d", getBufTypeString(buftype), buf, len);
+        ALOGERR("failed QBUF(%s, fd=%d, len=%d", getBufTypeString(buftype), buf, len[0]);
         return false;
     }
 

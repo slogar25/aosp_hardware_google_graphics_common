@@ -45,13 +45,13 @@ private:
         Device();
         ~Device();
         bool requestBuffers(unsigned int buftype, unsigned int memtype, unsigned int count);
-        bool setFormat(unsigned int buftype, unsigned int format, unsigned int width, unsigned int height);
+        bool setFormat(unsigned int buftype, unsigned int format, unsigned int width, unsigned int height, unsigned int planelen[SCALER_MAX_PLANES]);
         bool streamOn(unsigned int buftype);
         bool streamOff(unsigned int buftype);
         bool queueBuffer(unsigned int buftype, std::function<void(v4l2_buffer &)> bufferFiller);
-        bool queueBuffer(unsigned int buftype, int buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES]);
-        bool queueBuffer(unsigned int buftype, char *buf[SCALER_MAX_PLANES], int len[SCALER_MAX_PLANES]);
-        bool queueBuffer(unsigned int buftype, int buf, int len);
+        bool queueBuffer(unsigned int buftype, int buf[SCALER_MAX_PLANES], unsigned int len[SCALER_MAX_PLANES]);
+        bool queueBuffer(unsigned int buftype, char *buf[SCALER_MAX_PLANES], unsigned int len[SCALER_MAX_PLANES]);
+        bool queueBuffer(unsigned int buftype, int buf, unsigned int len[SCALER_MAX_PLANES]);
         bool dequeueBuffer(unsigned int buftype, unsigned int memtype);
     };
 
@@ -62,6 +62,7 @@ private:
         unsigned int format;
         unsigned int memoryType = 0;
         const unsigned int bufferType;
+        unsigned int planeLen[SCALER_MAX_PLANES];
 
         Image(Device &dev, unsigned int w, unsigned int h, unsigned int f, unsigned int buftype)
             : mDevice(dev), width(w), height(h), format(f), bufferType(buftype)
@@ -71,19 +72,19 @@ private:
         bool begin(unsigned int memtype);
         bool cancelBuffer();
 
-        template <class tBuf, class tLen>
-        bool queueBuffer(tBuf buf, tLen len) { return mDevice.queueBuffer(bufferType, buf, len); }
+        template <class tBuf>
+        bool queueBuffer(tBuf buf) { return mDevice.queueBuffer(bufferType, buf, planeLen); }
         bool dequeueBuffer() { return mDevice.dequeueBuffer(bufferType, memoryType); }
 
         bool same(unsigned int w, unsigned int h, unsigned int f) { return width == w && height == h && format == f; }
     };
 
     template<class T>
-    bool queue(T srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen) {
-        if (!mSrcImage.queueBuffer(srcBuf, srcLen))
+    bool queue(T srcBuf[SCALER_MAX_PLANES], int dstBuf) {
+        if (!mSrcImage.queueBuffer(srcBuf))
             return false;
 
-        if (!mDstImage.queueBuffer(dstBuf, dstLen)) {
+        if (!mDstImage.queueBuffer(dstBuf)) {
             mSrcImage.cancelBuffer();
             return false;
         }
