@@ -2341,7 +2341,7 @@ bool ExynosMPP::hasEnoughCapa(ExynosDisplay *display, struct exynos_image &src, 
     if (mCapacity >= (totalUsedCapacity + requiredCapacity))
         return true;
     else if ((hasHdrInfo(src)) &&
-             (totalUsedCapacity == 0)) {
+             (totalUsedCapacity == 0) && (requiredCapacity < (mCapacity * 1.2))) {
         /* HDR video will be excepted from G2D capa calculation */
         /* if DRM has assigned before, totalUsedCapacity will be non-zero */
         return true;
