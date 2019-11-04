@@ -77,7 +77,7 @@ int ExynosExternalDisplay::openExternalDisplay()
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
     int ret = 0;
-    setVsyncEnabled(1);
+    setVsyncEnabled(HWC2_VSYNC_ENABLE);
 
     mSkipFrameCount = SKIP_FRAME_COUNT;
     mSkipStartFrame = 0;
@@ -97,7 +97,7 @@ void ExynosExternalDisplay::closeExternalDisplay()
 {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
-    setVsyncEnabled(0);
+    setVsyncEnabled(HWC2_VSYNC_DISABLE);
 
     if (mPowerModeState != (hwc2_power_mode_t)HWC_POWER_MODE_OFF) {
         if (mDisplayInterface->setPowerMode(HWC_POWER_MODE_OFF) < 0) {
@@ -484,22 +484,6 @@ int32_t ExynosExternalDisplay::setPowerMode(
             setGeometryChanged(GEOMETRY_DISPLAY_POWER_ON);
         }
     }
-    return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosExternalDisplay::setVsyncEnabled(
-        int32_t /*hwc2_vsync_t*/ enabled) {
-    __u32 val = !!enabled;
-
-    DISPLAY_LOGD(eDebugExternalDisplay, "enabled : %d", enabled);
-
-    if (mDisplayInterface->setVsyncEnabled(val) < 0) {
-        DISPLAY_LOGI("Vsync ioctl failed errno : %d", errno);
-        return HWC2_ERROR_BAD_DISPLAY;
-    }
-
-    DISPLAY_LOGI("Vsync of external display is %s.", val ? "enabled" : "disabled");
-
     return HWC2_ERROR_NONE;
 }
 

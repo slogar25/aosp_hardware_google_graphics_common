@@ -49,7 +49,6 @@ class ExynosExternalDisplay : public ExynosDisplay {
         virtual int openExternalDisplay();
         virtual void closeExternalDisplay();
         virtual int32_t getActiveConfig(hwc2_config_t* outconfig);
-        virtual int32_t setVsyncEnabled(int32_t /*hwc2_vsync_t*/ enabled);
         virtual int32_t startPostProcessing();
         virtual int32_t setClientTarget(
                 buffer_handle_t target,
