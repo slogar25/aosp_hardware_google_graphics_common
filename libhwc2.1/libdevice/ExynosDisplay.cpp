@@ -1102,7 +1102,6 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     int32_t ret = NO_ERROR;
     private_handle_t *handle = NULL;
     int32_t blending = 0x0100;
-    int32_t planeAlpha = 0;
     uint32_t x = 0, y = 0;
     uint32_t w = WIDTH(layer.mPreprocessedInfo.displayFrame);
     uint32_t h = HEIGHT(layer.mPreprocessedInfo.displayFrame);
@@ -1112,7 +1111,6 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     unsigned int luminanceMax = 0;
 
     blending = layer.mBlending;
-    planeAlpha = (int)(255 * layer.mPlaneAlpha);
     otfMPP = layer.mOtfMPP;
     m2mMPP = layer.mM2mMPP;
 
@@ -1180,10 +1178,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     cfg.dst.f_w = mXres;
     cfg.dst.f_h = mYres;
 
-    cfg.plane_alpha = 255;
-    if ((planeAlpha >= 0) && (planeAlpha < 255)) {
-        cfg.plane_alpha = planeAlpha;
-    }
+    cfg.plane_alpha = layer.mPlaneAlpha;
     cfg.blending = blending;
     cfg.assignedMPP = otfMPP;
 
@@ -1191,9 +1186,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
         cfg.state = cfg.WIN_STATE_COLOR;
         hwc_color_t color = layer.mColor;
         cfg.color = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
-        if (!((planeAlpha >= 0) && (planeAlpha <= 255)))
-            cfg.plane_alpha = 0;
-        DISPLAY_LOGD(eDebugWinConfig, "HWC2: DIM layer is enabled, alpha : %d", cfg.plane_alpha);
+        DISPLAY_LOGD(eDebugWinConfig, "HWC2: DIM layer is enabled, color: %d, alpha : %f",
+                cfg.color, cfg.plane_alpha);
         return ret;
     }
 
@@ -1554,7 +1548,7 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
 
     config.acq_fence =
         hwcCheckFenceDebug(this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP, compositionInfo.mAcquireFence);
-    config.plane_alpha = 255;
+    config.plane_alpha = 1;
     config.dataspace = compositionInfo.mSrcImg.dataSpace;
     config.hdr_enable = true;
 
@@ -1846,7 +1840,7 @@ int ExynosDisplay::checkConfigDstChanged(const exynos_dpu_data &lastConfigsData,
         (lastConfigsData.configs[index].blending != newConfigsData.configs[index].blending) ||
         (lastConfigsData.configs[index].plane_alpha != newConfigsData.configs[index].plane_alpha)) {
         DISPLAY_LOGD(eDebugWindowUpdate, "damage region is skip, but other configuration except dst was changed");
-        DISPLAY_LOGD(eDebugWindowUpdate, "\tstate[%d, %d], fd[%d, %d], format[0x%8x, 0x%8x], blending[%d, %d], plane_alpha[%d, %d]",
+        DISPLAY_LOGD(eDebugWindowUpdate, "\tstate[%d, %d], fd[%d, %d], format[0x%8x, 0x%8x], blending[%d, %d], plane_alpha[%f, %f]",
                 lastConfigsData.configs[index].state, newConfigsData.configs[index].state,
                 lastConfigsData.configs[index].fd_idma[0], newConfigsData.configs[index].fd_idma[0],
                 lastConfigsData.configs[index].format, newConfigsData.configs[index].format,
@@ -3103,13 +3097,13 @@ void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
     DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "\tstate = %u", c.state);
     if (c.state == c.WIN_STATE_COLOR) {
         DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer,
-                "\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %u\n",
+                "\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %f\n",
                 c.dst.x, c.dst.y, c.dst.w, c.dst.h, c.color, c.plane_alpha);
     } else/* if (c.state != c.WIN_STATE_DISABLED) */{
         DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "\t\tfd = (%d, %d, %d), acq_fence = %d, rel_fence = %d "
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
-                "format = %u, pa = %d, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
+                "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
                 "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
                 "block(x:%d, y:%d, w:%d, h:%d)",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
@@ -3143,13 +3137,13 @@ void ExynosDisplay::dumpConfig(String8 &result, const exynos_win_config_data &c)
 {
     result.appendFormat("\tstate = %u\n", c.state);
     if (c.state == c.WIN_STATE_COLOR) {
-        result.appendFormat("\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %u\n",
+        result.appendFormat("\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %f\n",
                 c.dst.x, c.dst.y, c.dst.w, c.dst.h, c.color, c.plane_alpha);
     } else/* if (c.state != c.WIN_STATE_DISABLED) */{
         result.appendFormat("\t\tfd = (%d, %d, %d), acq_fence = %d, rel_fence = %d "
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
-                "format = %u, pa = %d, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
+                "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
                 "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
                 "block(x:%d, y:%d, w:%d, h:%d)\n",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
@@ -3167,13 +3161,13 @@ void ExynosDisplay::printConfig(exynos_win_config_data &c)
 {
     ALOGD("\tstate = %u", c.state);
     if (c.state == c.WIN_STATE_COLOR) {
-        ALOGD("\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %u\n",
+        ALOGD("\t\tx = %d, y = %d, width = %d, height = %d, color = %u, alpha = %f\n",
                 c.dst.x, c.dst.y, c.dst.w, c.dst.h, c.color, c.plane_alpha);
     } else/* if (c.state != c.WIN_STATE_DISABLED) */{
         ALOGD("\t\tfd = (%d, %d, %d), acq_fence = %d, rel_fence = %d "
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
-                "format = %u, pa = %d, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
+                "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
                 "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
                 "block(x:%d, y:%d, w:%d, h:%d)",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
