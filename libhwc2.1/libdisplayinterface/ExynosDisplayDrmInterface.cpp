@@ -723,8 +723,13 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             }
 
             if (plane->alpha_property().id()) {
+                uint64_t min_alpha = 0;
+                uint64_t max_alpha = 0;
+                std::tie(std::ignore, min_alpha) = plane->alpha_property().range_min();
+                std::tie(std::ignore, max_alpha) = plane->alpha_property().range_max();
                 ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->alpha_property().id(), config.plane_alpha) < 0;
+                        plane->alpha_property().id(),
+                        (uint64_t)(((max_alpha - min_alpha) * config.plane_alpha) + 0.5) + min_alpha) < 0;
                 if (ret) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add alpha property %d for plane %d, ret(%d)",
                             __func__, i, plane->alpha_property().id(), plane->id(), ret);
