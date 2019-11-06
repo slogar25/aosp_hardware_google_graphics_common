@@ -138,10 +138,6 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get IN_FENCE_FD property");
 
-  ret = drm_->GetPlaneProperty(*this, "color", &color_property_);
-  if (ret)
-    ALOGI("Could not get color property");
-
   ret = drm_->GetPlaneProperty(*this, "compression source", &compression_source_);
   if (ret)
     ALOGI("Could not get compression source property");
@@ -173,7 +169,6 @@ int DrmPlane::Init() {
   properties_.push_back(&alpha_property_);
   properties_.push_back(&blend_property_);
   properties_.push_back(&in_fence_fd_property_);
-  properties_.push_back(&color_property_);
   properties_.push_back(&compression_source_);
   properties_.push_back(&dataspace_);
   properties_.push_back(&max_luminance_);
@@ -252,10 +247,6 @@ const DrmProperty &DrmPlane::blend_property() const {
 
 const DrmProperty &DrmPlane::in_fence_fd_property() const {
   return in_fence_fd_property_;
-}
-
-const DrmProperty &DrmPlane::color_property() const {
-  return color_property_;
 }
 
 const DrmProperty &DrmPlane::compression_source_property() const {
