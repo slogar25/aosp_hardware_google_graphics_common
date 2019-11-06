@@ -757,7 +757,7 @@ struct tm* getLocalTime(struct timeval tv) {
 
 void setFenceInfo(uint32_t fd, ExynosDisplay* display,
         hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip,
-        uint32_t direction, bool __unused pendingAllowed) {
+        uint32_t direction, bool pendingAllowed) {
 
     if (!fence_valid(fd) || display == NULL) return;
     /* valid but fence will not be traced */
