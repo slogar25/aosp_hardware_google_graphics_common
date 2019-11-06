@@ -335,29 +335,34 @@ int32_t ExynosDisplayDrmInterface::applyDisplayMode()
 
     ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmCrtc->id(),
            mDrmCrtc->active_property().id(), 1);
-
     if (ret < 0) {
-        HWC_LOGE(mExynosDisplay, "Failed to add crtc active to pset\n");
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to add crtc active to pset, ret(%d)",
+                __func__, ret);
         return ret;
     }
 
-    ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmCrtc->id(), mDrmCrtc->mode_property().id(),
-            mModeState.blob_id) < 0 ||
-        drmModeAtomicAddProperty(drmReq.pset(), mDrmConnector->id(),
-                mDrmConnector->crtc_id_property().id(),
-                mDrmCrtc->id()) < 0;
+    ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmCrtc->id(),
+            mDrmCrtc->mode_property().id(), mModeState.blob_id);
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to add mode %d to pset, ret(%d)",
+                __func__, mModeState.blob_id, ret);
+        return ret;
+    }
+
+    ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmConnector->id(),
+            mDrmConnector->crtc_id_property().id(), mDrmCrtc->id());
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to add crtc id %d to pset, ret(%d)",
+                __func__, mDrmCrtc->id(), ret);
+        return ret;
+    }
+
+    uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+    ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
     if (ret) {
-        HWC_LOGE(mExynosDisplay, "Failed to add blob %d to pset", mModeState.blob_id);
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
+                __func__, ret);
         return ret;
-    }
-
-    if (!ret) {
-        uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
-        ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
-        if (ret) {
-            HWC_LOGE(mExynosDisplay, "Failed to commit pset ret=%d in applyDisplayMode()\n", ret);
-            return ret;
-        }
     }
 
     if (mModeState.old_blob_id) {
@@ -371,7 +376,7 @@ int32_t ExynosDisplayDrmInterface::applyDisplayMode()
     mModeState.old_blob_id = mModeState.blob_id;
     mModeState.blob_id = 0;
     mModeState.needs_modeset = false;
-    return ret;
+    return NO_ERROR;
 }
 
 int32_t ExynosDisplayDrmInterface::setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos)
@@ -596,7 +601,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 return ret;
             }
 
-            if (ret != NO_ERROR) {
+            if (ret < 0) {
                 HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add FB, fb_id(%d), ret(%d), f_w: %d, f_h: %d, dst.w: %d, dst.h: %d, "
                         "format: %d, buf_handles[%d, %d, %d, %d], "
                         "pitches[%d, %d, %d, %d], offsets[%d, %d, %d, %d], modifiers[%#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 "]",
@@ -612,34 +617,35 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             fbIds[i] = fb_id;
 
             ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->crtc_property().id(), mDrmCrtc->id()) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->fb_property().id(), fb_id) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->crtc_x_property().id(),
-                    config.dst.x) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->crtc_y_property().id(),
-                    config.dst.y) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->crtc_w_property().id(),
-                    config.dst.w) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->crtc_h_property().id(),
-                    config.dst.h) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->src_x_property().id(),
-                    (int)(config.src.x) << 16) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->src_y_property().id(),
-                    (int)(config.src.y) << 16) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->src_w_property().id(),
-                    (int)(config.src.w) << 16) < 0;
-            ret |= drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->src_h_property().id(),
-                    (int)(config.src.h) << 16) < 0;
-            if (ret) {
+                    plane->crtc_property().id(), mDrmCrtc->id());
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->fb_property().id(), fb_id);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->crtc_x_property().id(), config.dst.x);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->crtc_y_property().id(), config.dst.y);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->crtc_w_property().id(), config.dst.w);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->crtc_h_property().id(), config.dst.h);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->src_x_property().id(), (int)(config.src.x) << 16);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->src_y_property().id(), (int)(config.src.y) << 16);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->src_w_property().id(), (int)(config.src.w) << 16);
+            if (ret >= 0)
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->src_h_property().id(), (int)(config.src.h) << 16);
+            if (ret < 0) {
                 HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add plane %d to set, ret(%d)",
                         __func__, i, plane->id(), ret);
                 drmReq.setError(ret, this);
@@ -691,20 +697,19 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 std::tie(std::ignore, min_zpos) = plane->zpos_property().range_min();
 
                 ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->zpos_property().id(),
-                        i + min_zpos) < 0;
+                        plane->zpos_property().id(), i + min_zpos);
                 if (ret < 0) {
                     ALOGE("Failed to add zpos property %d to plane %d, ret(%d)",
                             plane->zpos_property().id(), plane->id(), ret);
-                    break;
+                    drmReq.setError(ret, this);
+                    return ret;
                 }
             }
 
             if (plane->rotation_property().id()) {
                 ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->rotation_property().id(),
-                        rotation) < 0;
-                if (ret) {
+                        plane->rotation_property().id(), rotation);
+                if (ret < 0) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add rotation property %d for plane %d, ret(%d)",
                             __func__, i, plane->rotation_property().id(), plane->id(), ret);
                     drmReq.setError(ret, this);
@@ -713,8 +718,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             }
             if (plane->blend_property().id()) {
                 ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->blend_property().id(), blend) < 0;
-                if (ret) {
+                        plane->blend_property().id(), blend);
+                if (ret < 0) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add pixel blend mode property %d for plane %d, ret(%d)",
                             __func__, i, plane->blend_property().id(), plane->id(), ret);
                     drmReq.setError(ret, this);
@@ -729,8 +734,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 std::tie(std::ignore, max_alpha) = plane->alpha_property().range_max();
                 ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
                         plane->alpha_property().id(),
-                        (uint64_t)(((max_alpha - min_alpha) * config.plane_alpha) + 0.5) + min_alpha) < 0;
-                if (ret) {
+                        (uint64_t)(((max_alpha - min_alpha) * config.plane_alpha) + 0.5) + min_alpha);
+                if (ret < 0) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add alpha property %d for plane %d, ret(%d)",
                             __func__, i, plane->alpha_property().id(), plane->id(), ret);
                     drmReq.setError(ret, this);
@@ -745,8 +750,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                             __func__, i, plane->id());
                     break;
                 }
-                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(), prop_id, config.acq_fence) < 0;
-                if (ret) {
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(), prop_id, config.acq_fence);
+                if (ret < 0) {
                     HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add IN_FENCE_FD property to pset for plane %d, ret(%d)",
                             __func__, i, plane->id(), ret);
                     drmReq.setError(ret, this);
@@ -834,36 +839,37 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 continue;
 #endif
             ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->crtc_property().id(), 0) < 0 ||
-                drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->fb_property().id(), 0) < 0;
-            if (ret) {
-                HWC_LOGE(mExynosDisplay, "%s:: Failed to add plane %d disable to pset",
-                        __func__, plane->id());
+                    plane->crtc_property().id(), 0);
+            if (ret < 0) {
+                HWC_LOGE(mExynosDisplay, "%s:: Failed to disable plane %d, failed to add crtc ret(%d)",
+                        __func__, plane->id(), ret);
+                drmReq.setError(ret, this);
+                return ret;
+            }
+
+            ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                    plane->fb_property().id(), 0);
+            if (ret < 0) {
+                HWC_LOGE(mExynosDisplay, "%s:: Failed to disable plane %d, failed to add fb ret(%d)",
+                        __func__, plane->id(), ret);
                 drmReq.setError(ret, this);
                 return ret;
             }
         }
     }
 
-    if (!ret) {
-        uint32_t flags = 0;
-        ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
-        dumpAtomicCommitInfo(result, drmReq.pset(), true);
+    uint32_t flags = 0;
+    ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
+    dumpAtomicCommitInfo(result, drmReq.pset(), true);
 
-        for (size_t i = 0; i < getMaxWindowNum(); i++) {
-            if (mOldFbIds[i])
-                drmModeRmFB(mDrmDevice->fd(), mOldFbIds[i]);
-            mOldFbIds[i] = fbIds[i];
-        }
+    for (size_t i = 0; i < getMaxWindowNum(); i++) {
+        if (mOldFbIds[i])
+            drmModeRmFB(mDrmDevice->fd(), mOldFbIds[i]);
+        mOldFbIds[i] = fbIds[i];
+    }
 
-        if (ret) {
-            HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset, ret(%d)", __func__, ret);
-            drmReq.setError(ret, this);
-            return ret;
-        }
-    } else {
-        HWC_LOGE(mExynosDisplay, "%s:: There was error to set properties for commit, ret(%d)", __func__, ret);
+    if (ret) {
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset, ret(%d)", __func__, ret);
         drmReq.setError(ret, this);
         return ret;
     }
@@ -882,7 +888,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
-    return ret;
+    return NO_ERROR;
 }
 
 int32_t ExynosDisplayDrmInterface::clearDisplay()
@@ -901,21 +907,30 @@ int32_t ExynosDisplayDrmInterface::clearDisplay()
             continue;
 #endif
         ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                plane->crtc_property().id(), 0) < 0 ||
-            drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                    plane->fb_property().id(), 0) < 0;
-        if (ret) {
-            HWC_LOGE(mExynosDisplay, "Failed to add plane %d disable to pset", plane->id());
-            break;
+                plane->crtc_property().id(), 0);
+        if (ret < 0) {
+            HWC_LOGE(mExynosDisplay, "%s:: Failed to disable plane %d, failed to add crtc ret(%d)",
+                    __func__, plane->id(), ret);
+            return ret;
+        }
+        ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                plane->fb_property().id(), 0);
+        if (ret < 0) {
+            HWC_LOGE(mExynosDisplay, "%s:: Failed to disable plane %d, failed to add fb ret(%d)",
+                    __func__, plane->id(), ret);
+            return ret;
         }
     }
 
-    if (!ret) {
-        uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
-        ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
+    uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+    ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
+    if (ret) {
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in clearDisplay()\n",
+                __func__, ret);
+        return ret;
     }
 
-    return ret;
+    return NO_ERROR;
 }
 
 int32_t ExynosDisplayDrmInterface::disableSelfRefresh(uint32_t disable)
