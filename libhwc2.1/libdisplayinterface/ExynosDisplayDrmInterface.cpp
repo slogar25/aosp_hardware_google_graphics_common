@@ -18,6 +18,7 @@
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosDisplay.h"
 #include "ExynosHWCDebug.h"
+#include <drm/drm_fourcc.h>
 
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
@@ -579,8 +580,9 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
                         drmFormat, buf_handles, pitches, offsets, modifiers, &fb_id, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
             } else if (config.state == config.WIN_STATE_COLOR) {
+                modifiers[0] = DRM_FORMAT_MOD_SAMSUNG_COLORMAP;
                 drmFormat = DRM_FORMAT_BGRA8888;
-                buf_handles[0] = 0xffff;
+                buf_handles[0] = config.color;
                 bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
                 pitches[0] = config.dst.w * bpp;
                 config.src.w = config.dst.w;
@@ -644,17 +646,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                         __func__, i, plane->id(), ret);
                 drmReq.setError(ret, this);
                 return ret;
-            }
-
-            if (config.state == config.WIN_STATE_COLOR) {
-                ret =  drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->color_property().id(), config.color) < 0;
-                if (ret) {
-                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to set color(%d) for plane %d, ret(%d)",
-                            __func__, i, config.color, plane->id(), ret);
-                    drmReq.setError(ret, this);
-                    return ret;
-                }
             }
 
             uint64_t rotation = halTransformToDrmRot(config.transform);
