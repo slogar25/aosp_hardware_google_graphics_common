@@ -49,9 +49,25 @@ int DrmCrtc::Init() {
     return ret;
   }
 
+  if (drm_->GetCrtcProperty(*this, "partial_x", &partial_x_property_))
+    ALOGE("Failed to get partial_x property");
+
+  if (drm_->GetCrtcProperty(*this, "partial_y", &partial_y_property_))
+    ALOGE("Failed to get partial_y property");
+
+  if (drm_->GetCrtcProperty(*this, "partial_w", &partial_w_property_))
+    ALOGE("Failed to get partial_w property");
+
+  if (drm_->GetCrtcProperty(*this, "partial_h", &partial_h_property_))
+    ALOGE("Failed to get partial_h property");
+
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
   properties_.push_back(&out_fence_ptr_property_);
+  properties_.push_back(&partial_x_property_);
+  properties_.push_back(&partial_y_property_);
+  properties_.push_back(&partial_w_property_);
+  properties_.push_back(&partial_h_property_);
 
   return 0;
 }
@@ -86,5 +102,21 @@ const DrmProperty &DrmCrtc::mode_property() const {
 
 const DrmProperty &DrmCrtc::out_fence_ptr_property() const {
   return out_fence_ptr_property_;
+}
+
+const DrmProperty &DrmCrtc::partial_x_property() const {
+  return partial_x_property_;
+}
+
+const DrmProperty &DrmCrtc::partial_y_property() const {
+  return partial_y_property_;
+}
+
+const DrmProperty &DrmCrtc::partial_w_property() const {
+  return partial_w_property_;
+}
+
+const DrmProperty &DrmCrtc::partial_h_property() const {
+  return partial_h_property_;
 }
 }  // namespace android
