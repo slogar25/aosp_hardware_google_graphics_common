@@ -3795,8 +3795,8 @@ int ExynosDisplay::handleWindowUpdate()
         else if (excp == eDamageRegionFull) {
             damageRect.left = mLayers[i]->mDisplayFrame.left;
             damageRect.top = mLayers[i]->mDisplayFrame.top;
-            damageRect.right = mLayers[i]->mDisplayFrame.left + mLayers[i]->mDisplayFrame.right;
-            damageRect.bottom = mLayers[i]->mDisplayFrame.top + mLayers[i]->mDisplayFrame.bottom;
+            damageRect.right = mLayers[i]->mDisplayFrame.right;
+            damageRect.bottom = mLayers[i]->mDisplayFrame.bottom;
             DISPLAY_LOGD(eDebugWindowUpdate, "Full layer update : %d, %d, %d, %d", mLayers[i]->mDisplayFrame.left,
                     mLayers[i]->mDisplayFrame.top, mLayers[i]->mDisplayFrame.right, mLayers[i]->mDisplayFrame.bottom);
             mergedRect = expand(mergedRect, damageRect);
