@@ -3740,6 +3740,11 @@ int ExynosDisplay::handleWindowUpdate()
     unsigned int excp;
 
     mDpuData.enable_win_update = false;
+    /* Init with full size */
+    mDpuData.win_update_region.x = 0;
+    mDpuData.win_update_region.w = mXres;
+    mDpuData.win_update_region.y = 0;
+    mDpuData.win_update_region.h = mYres;
 
     if (exynosHWCControl.windowUpdate != 1) return 0;
 
