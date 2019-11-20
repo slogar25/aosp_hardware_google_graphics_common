@@ -203,6 +203,20 @@ bool isFormatYUV420(int format)
     return false;
 }
 
+bool isFormatYUV8_2(int format)
+{
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].halFormat == format) {
+            if ((exynos_format_desc[i].type & YUV420) &&
+                (exynos_format_desc[i].type & BIT8_2))
+                return true;
+            else
+                return false;
+        }
+    }
+    return false;
+}
+
 bool isFormat10BitYUV420(int format)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
