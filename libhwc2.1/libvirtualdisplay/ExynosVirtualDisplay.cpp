@@ -35,7 +35,6 @@ ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t __unused type, ExynosDevice 
     /* Initialization */
     mDisplayId = HWC_DISPLAY_VIRTUAL;
     mDisplayName = android::String8("VirtualDisplay");
-    mDisplayFd = hwcFdClose(mDisplayFd);
 
     mOutputBufferAcquireFenceFd = -1;
     mOutputBufferReleaseFenceFd = -1;
@@ -64,6 +63,7 @@ ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t __unused type, ExynosDevice 
     mDisplayControl.enableExynosCompositionOptimization = false;
     mDisplayControl.enableClientCompositionOptimization = false;
     mDisplayControl.handleLowFpsLayers = false;
+    mMaxWindowNum = 0;
 }
 
 ExynosVirtualDisplay::~ExynosVirtualDisplay()
@@ -189,12 +189,6 @@ int ExynosVirtualDisplay::setVDSGlesFormat(int format)
 {
     DISPLAY_LOGD(eDebugVirtualDisplay, "setVDSGlesFormat: 0x%x", format);
     mGLESFormat = format;
-    return HWC2_ERROR_NONE;
-}
-
-int32_t ExynosVirtualDisplay::getDisplayAttribute(
-    hwc2_config_t __unused config, int32_t __unused attribute, int32_t* __unused outValue)
-{
     return HWC2_ERROR_NONE;
 }
 
@@ -329,7 +323,7 @@ int32_t ExynosVirtualDisplay::validateWinConfigData()
 
 int ExynosVirtualDisplay::deliverWinConfigData()
 {
-    mWinConfigData->retire_fence = -1;
+    mDpuData.retire_fence = -1;
     return 0;
 }
 
@@ -519,4 +513,16 @@ void ExynosVirtualDisplay::handleAcquireFence()
     mOutputBufferReleaseFenceFd = mOutputBufferAcquireFenceFd;
     mOutputBufferAcquireFenceFd = -1;
     DISPLAY_LOGD(eDebugVirtualDisplay, "handleAcquireFence()");
+}
+
+int32_t ExynosVirtualDisplay::getHdrCapabilities(uint32_t* outNumTypes,
+        int32_t* outTypes, float* outMaxLuminance,
+        float* outMaxAverageLuminance, float* outMinLuminance)
+{
+    if (outTypes == NULL) {
+        *outNumTypes = 1;
+        return 0;
+    }
+    outTypes[0] = HAL_HDR_HDR10;
+    return 0;
 }

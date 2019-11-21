@@ -18,12 +18,13 @@
 
 #include <utils/String8.h>
 #include <hardware/hwcomposer2.h>
+#include <drm/drm_fourcc.h>
 #ifdef GRALLOC_VERSION1
 #include "gralloc1_priv.h"
 #else
 #include "gralloc_priv.h"
 #endif
-#include "DeconHeader.h"
+#include "DeconCommonHeader.h"
 #include "VendorVideoAPI.h"
 #include "exynos_sync.h"
 
@@ -55,6 +56,16 @@ class ExynosDisplay;
 
 using namespace android;
 
+enum {
+    EXYNOS_HWC_DIM_LAYER = 0x00000001,
+};
+
+enum {
+    INTERFACE_TYPE_NONE = 0,
+    INTERFACE_TYPE_FB   = 1,
+    INTERFACE_TYPE_DRM  = 2,
+};
+
 typedef enum format_type {
 
     /* format */
@@ -76,6 +87,7 @@ typedef enum format_type {
 typedef struct format_description {
     int halFormat;
     decon_pixel_format s3cFormat;
+    int drmFormat;
     uint32_t bufferNum;
     uint8_t bpp;
     uint32_t type;
@@ -85,73 +97,74 @@ typedef struct format_description {
 } format_description_t;
 
 #define HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED 0
+#define DRM_FORMAT_UNDEFINED 0
 const format_description_t exynos_format_desc[] = {
     /* RGB */
-    {HAL_PIXEL_FORMAT_RGBA_8888,
-        DECON_PIXEL_FORMAT_RGBA_8888, 1, 32, RGB|BIT8, true, String8("RGBA_8888"), 0},
-    {HAL_PIXEL_FORMAT_RGBX_8888,
-        DECON_PIXEL_FORMAT_RGBX_8888, 1, 32, RGB|BIT8, false, String8("RGBx_8888"), 0},
-    {HAL_PIXEL_FORMAT_RGB_888,
-        DECON_PIXEL_FORMAT_MAX, 1, 32, RGB|BIT8, false, String8("RGB_888"), 0},
-    {HAL_PIXEL_FORMAT_RGB_565,
-        DECON_PIXEL_FORMAT_RGB_565, 1, 16, RGB|UNDEF_BIT, false, String8("RGB_565"), 0},
-    {HAL_PIXEL_FORMAT_BGRA_8888,
-        DECON_PIXEL_FORMAT_BGRA_8888, 1, 32, RGB|BIT8, true, String8("BGRA_8888"), 0},
-    {HAL_PIXEL_FORMAT_RGBA_1010102,
-        DECON_PIXEL_FORMAT_ABGR_2101010, 1, 32, RGB|BIT10, true, String8("RGBA_1010102"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_ARGB_8888,
-        DECON_PIXEL_FORMAT_MAX, 1, 32, RGB|BIT8, true, String8("EXYNOS_ARGB_8888"), 0},
+    {HAL_PIXEL_FORMAT_RGBA_8888, DECON_PIXEL_FORMAT_RGBA_8888, DRM_FORMAT_RGBA8888,
+        1, 32, RGB|BIT8, true, String8("RGBA_8888"), 0},
+    {HAL_PIXEL_FORMAT_RGBX_8888, DECON_PIXEL_FORMAT_RGBX_8888, DRM_FORMAT_RGBX8888,
+        1, 32, RGB|BIT8, false, String8("RGBx_8888"), 0},
+    {HAL_PIXEL_FORMAT_RGB_888, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_RGB888,
+        1, 32, RGB|BIT8, false, String8("RGB_888"), 0},
+    {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_BGR565,
+        1, 16, RGB|UNDEF_BIT, false, String8("RGB_565"), 0},
+    {HAL_PIXEL_FORMAT_BGRA_8888, DECON_PIXEL_FORMAT_BGRA_8888, DRM_FORMAT_BGRA8888,
+        1, 32, RGB|BIT8, true, String8("BGRA_8888"), 0},
+    {HAL_PIXEL_FORMAT_RGBA_1010102, DECON_PIXEL_FORMAT_ABGR_2101010, DRM_FORMAT_RGBA1010102,
+        1, 32, RGB|BIT10, true, String8("RGBA_1010102"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_ARGB_8888, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_ARGB8888,
+        1, 32, RGB|BIT8, true, String8("EXYNOS_ARGB_8888"), 0},
 
     /* YUV 420 */
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,
-        DECON_PIXEL_FORMAT_YUV420M, 3, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_P_M"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,
-        DECON_PIXEL_FORMAT_NV12M, 2, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP_M"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED,
-        DECON_PIXEL_FORMAT_MAX, 2, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP_M_TILED"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,
-        DECON_PIXEL_FORMAT_YVU420M, 3, 12, YUV420|BIT8, false, String8("EXYNOS_YV12_M"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,
-        DECON_PIXEL_FORMAT_NV21M, 2, 12, YUV420|BIT8, false, String8("EXYNOS_YCrCb_420_SP_M"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,
-        DECON_PIXEL_FORMAT_NV21M, 2, 12, YUV420|BIT8, false, String8("EXYNOS_YCrCb_420_SP_M_FULL"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,
-        DECON_PIXEL_FORMAT_MAX, 1, 0, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_P"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,
-        DECON_PIXEL_FORMAT_MAX, 1, 0, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,
-        DECON_PIXEL_FORMAT_NV12M, 2, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP_M_PRIV"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,
-        DECON_PIXEL_FORMAT_MAX, 1, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_PN"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,
-        DECON_PIXEL_FORMAT_NV12N, 1, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SPN"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_TILED,
-        DECON_PIXEL_FORMAT_MAX, 1, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SPN_TILED"), 0},
-    {HAL_PIXEL_FORMAT_YCrCb_420_SP,
-        DECON_PIXEL_FORMAT_NV21, 1, 12, YUV420|BIT8, false, String8("YCrCb_420_SP"), 0},
-    {HAL_PIXEL_FORMAT_YV12,
-        DECON_PIXEL_FORMAT_MAX, 1, 12, YUV420|BIT8, false, String8("YV12"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,
-        DECON_PIXEL_FORMAT_NV12M_S10B, 2, 12, YUV420|BIT10, false, String8("EXYNOS_YCbCr_420_SP_M_S10B"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,
-        DECON_PIXEL_FORMAT_NV12N_10B, 1, 12, YUV420|BIT10, false, String8("EXYNOS_YCbCr_420_SPN_S10B"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
-        DECON_PIXEL_FORMAT_NV12M_P010, 2, 24, YUV420|BIT10, false, String8("EXYNOS_YCbCr_P010_M"), 0},
-    {HAL_PIXEL_FORMAT_YCBCR_P010,
-        DECON_PIXEL_FORMAT_NV12_P010, 1, 24, YUV420|BIT10, false, String8("EXYNOS_YCbCr_P010"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M, DECON_PIXEL_FORMAT_YUV420M, DRM_FORMAT_UNDEFINED,
+        3, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_P_M"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M, DECON_PIXEL_FORMAT_NV12M, DRM_FORMAT_NV12,
+        2, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP_M"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        2, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP_M_TILED"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YV12_M, DECON_PIXEL_FORMAT_YVU420M, DRM_FORMAT_UNDEFINED,
+        3, 12, YUV420|BIT8, false, String8("EXYNOS_YV12_M"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M, DECON_PIXEL_FORMAT_NV21M, DRM_FORMAT_NV21,
+        2, 12, YUV420|BIT8, false, String8("EXYNOS_YCrCb_420_SP_M"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL, DECON_PIXEL_FORMAT_NV21M, DRM_FORMAT_NV21,
+        2, 12, YUV420|BIT8, false, String8("EXYNOS_YCrCb_420_SP_M_FULL"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        1, 0, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_P"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        1, 0, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV, DECON_PIXEL_FORMAT_NV12M, DRM_FORMAT_NV12,
+        2, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SP_M_PRIV"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        1, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_PN"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN, DECON_PIXEL_FORMAT_NV12N, DRM_FORMAT_NV12,
+        1, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SPN"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_TILED, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        1, 12, YUV420|BIT8, false, String8("EXYNOS_YCbCr_420_SPN_TILED"), 0},
+    {HAL_PIXEL_FORMAT_YCrCb_420_SP, DECON_PIXEL_FORMAT_NV21, DRM_FORMAT_NV21,
+        1, 12, YUV420|BIT8, false, String8("YCrCb_420_SP"), 0},
+    {HAL_PIXEL_FORMAT_YV12, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        1, 12, YUV420|BIT8, false, String8("YV12"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, DECON_PIXEL_FORMAT_NV12M_S10B, DRM_FORMAT_UNDEFINED,
+        2, 12, YUV420|BIT10, false, String8("EXYNOS_YCbCr_420_SP_M_S10B"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B, DECON_PIXEL_FORMAT_NV12N_10B, DRM_FORMAT_UNDEFINED,
+        1, 12, YUV420|BIT10, false, String8("EXYNOS_YCbCr_420_SPN_S10B"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M, DECON_PIXEL_FORMAT_NV12M_P010, DRM_FORMAT_UNDEFINED,
+        2, 24, YUV420|BIT10, false, String8("EXYNOS_YCbCr_P010_M"), 0},
+    {HAL_PIXEL_FORMAT_YCBCR_P010, DECON_PIXEL_FORMAT_NV12_P010, DRM_FORMAT_UNDEFINED,
+        1, 24, YUV420|BIT10, false, String8("EXYNOS_YCbCr_P010"), 0},
 
     /* YUV 422 */
-    {HAL_PIXEL_FORMAT_EXYNOS_CbYCrY_422_I,
-        DECON_PIXEL_FORMAT_MAX, 0, 0, YUV422|BIT8, false, String8("EXYNOS_CbYCrY_422_I"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_SP,
-        DECON_PIXEL_FORMAT_MAX, 0, 0, YUV422|BIT8, false, String8("EXYNOS_YCrCb_422_SP"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,
-        DECON_PIXEL_FORMAT_MAX, 0, 0, YUV422|BIT8, false, String8("EXYNOS_YCrCb_422_I"), 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_CrYCbY_422_I,
-        DECON_PIXEL_FORMAT_MAX, 0, 0, YUV422|BIT8, false, String8("EXYNOS_CrYCbY_422_I"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_CbYCrY_422_I, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        0, 0, YUV422|BIT8, false, String8("EXYNOS_CbYCrY_422_I"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_SP, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        0, 0, YUV422|BIT8, false, String8("EXYNOS_YCrCb_422_SP"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        0, 0, YUV422|BIT8, false, String8("EXYNOS_YCrCb_422_I"), 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_CrYCbY_422_I, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        0, 0, YUV422|BIT8, false, String8("EXYNOS_CrYCbY_422_I"), 0},
 
-    {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
-        DECON_PIXEL_FORMAT_MAX, 0, 0, UNDEF, false, String8("ImplDef"), 0}
+    {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
+        0, 0, UNDEF, false, String8("ImplDef"), 0}
 };
 
 #define FORMAT_MAX_CNT sizeof(exynos_format_desc)/sizeof(format_description)
@@ -254,31 +267,37 @@ enum {
  * member of bufferHandle. This means bufferHandle should be reallocated.
  * */
 typedef struct exynos_image {
-    uint32_t fullWidth;
-    uint32_t fullHeight;
-    uint32_t x;
-    uint32_t y;
-    uint32_t w;
-    uint32_t h;
-    uint32_t format;
-    uint64_t usageFlags;
-    uint32_t layerFlags;
+    uint32_t fullWidth = 0;
+    uint32_t fullHeight = 0;
+    uint32_t x = 0;
+    uint32_t y = 0;
+    uint32_t w = 0;
+    uint32_t h = 0;
+    uint32_t format= 0;
+    uint64_t usageFlags = 0;
+    uint32_t layerFlags = 0;
     int acquireFenceFd = -1;
     int releaseFenceFd = -1;
-    private_handle_t *bufferHandle;
-    android_dataspace dataSpace;
-    uint32_t blending;
-    uint32_t transform;
-    uint32_t compressed;
-    float planeAlpha;
+    private_handle_t *bufferHandle = NULL;
+    android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
+    uint32_t blending = 0;
+    uint32_t transform = 0;
+    uint32_t compressed = 0;
+    float planeAlpha = 0;
     uint32_t zOrder = 0;
     /* refer
      * frameworks/native/include/media/hardware/VideoAPI.h
      * frameworks/native/include/media/hardware/HardwareAPI.h */
     ExynosHdrStaticInfo hdrStaticInfo;
     ExynosHdrDynamicInfo hdrDynamicInfo;
-    ExynosVideoInfoType metaType;
+    ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
     bool needDegamma = false;
+    bool isDimLayer()
+    {
+        if (layerFlags & EXYNOS_HWC_DIM_LAYER)
+            return true;
+        return false;
+    };
 } exynos_image_t;
 
 uint32_t getHWC1CompType(int32_t /*hwc2_composition_t*/ type);
@@ -294,8 +313,13 @@ inline int HEIGHT(const hwc_frect_t &rect) { return (int)(rect.bottom - rect.top
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space);
 enum decon_pixel_format halFormatToS3CFormat(int format);
 uint32_t S3CFormatToHalFormat(int format);
+int halFormatToDrmFormat(int format, bool compressed);
 uint8_t formatToBpp(int format);
 uint8_t DeconFormatToBpp(decon_pixel_format format);
+enum decon_blending halBlendingToS3CBlending(int32_t blending);
+enum dpp_rotate halTransformToS3CRot(uint32_t halTransform);
+uint64_t halTransformToDrmRot(uint32_t halTransform);
+
 bool isFormatRgb(int format);
 bool isFormatYUV(int format);
 bool isFormatYUV420(int format);
@@ -319,6 +343,7 @@ String8 getFormatStr(int format);
 String8 getMPPStr(int typeId);
 void adjustRect(hwc_rect_t &rect, int32_t width, int32_t height);
 uint32_t getBufferNumOfFormat(int format);
+uint32_t getPlaneNumOfFormat(int format);
 
 int fence_close(int fence, ExynosDisplay* display,
         hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip);
@@ -347,6 +372,7 @@ inline int pixel_align(int x, int a) {
     return x;
 }
 
+uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format);
 int getBufLength(private_handle_t *handle, uint32_t planer_num, size_t *length, int format, uint32_t width, uint32_t height);
 
 //class hwc_fence_info(sync_fence_info_data* data, sync_pt_info* info) {

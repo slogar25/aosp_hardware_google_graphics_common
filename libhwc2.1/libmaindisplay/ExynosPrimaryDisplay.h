@@ -17,16 +17,11 @@
 #define EXYNOS_PRIMARY_DISPLAY_H
 
 #include "../libdevice/ExynosDisplay.h"
+#include "ExynosDisplayFbInterface.h"
 
 class ExynosMPPModule;
 
 class ExynosPrimaryDisplay : public ExynosDisplay {
-
-    void getDisplayHWInfo();
-
-    // Prepare multi resolution
-    ResolutionInfo mResolutionInfo;
-
     public:
         /* Methods */
         ExynosPrimaryDisplay(uint32_t type, ExynosDevice *device);
@@ -34,12 +29,14 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
 
-        virtual ExynosMPP* getExynosMPPForDma(decon_idma_type idma);
-        virtual decon_idma_type getDeconDMAType(ExynosMPP *otfMPP);
+        virtual void initDisplayInterface(uint32_t interfaceType);
     protected:
         virtual int32_t setPowerMode(
                 int32_t /*hwc2_power_mode_t*/ mode);
         virtual bool getHDRException(ExynosLayer* __unused layer);
+    public:
+        // Prepare multi resolution
+        ResolutionInfo mResolutionInfo;
 };
 
 #endif

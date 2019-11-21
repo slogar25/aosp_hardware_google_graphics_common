@@ -61,7 +61,6 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
     mZOrder(0),
     mDataSpace(HAL_DATASPACE_UNKNOWN),
     mLayerFlag(0x0),
-    mIsDimLayer(false),
     mNeedDegamma(false),
     mIsHdrLayer(false),
     mBufferHasMetaParcel(false),
@@ -141,17 +140,11 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.displayFrame = mDisplayFrame;
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
 
-    // FIXME: HWC_DIM_LAYER is not defined in AOSP
-    //        HWC guys should fix this.
-#if 0
-    if (!!(mLayerFlag & HWC_DIM_LAYER) || (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR)) {
-        mIsDimLayer = true;
-        mLayerFlag |= HWC_DIM_LAYER;
+    if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
+        mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
     } else {
-        mIsDimLayer = false;
-        mLayerFlag &= ~(HWC_DIM_LAYER);
+        mLayerFlag &= ~(EXYNOS_HWC_DIM_LAYER);
     }
-#endif
 
     if (mLayerBuffer == NULL) {
         if (mOverlayPriority != priority)
@@ -204,9 +197,19 @@ int32_t ExynosLayer::doPreProcess()
                                         mMetaParcel->sHdrStaticInfo.sType1.mMaxDisplayLuminance);
                             }
                             if (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC) {
-                                /* Reserved field for dynamic meta data */
-                                /* Currently It's not be used not only HWC but also OMX */
-                                HDEBUGLOGD(eDebugLayer, "HWC2: Layer has dynamic metadata");
+                                 /* Resources for dynamic metadata are limited,
+                                    so primary display only supports dynamic metadata. */
+                                if (mDisplay->mType == HWC_DISPLAY_PRIMARY) {
+                                    /* Reserved field for dynamic meta data */
+                                    /* Currently It's not be used not only HWC but also OMX */
+                                    HDEBUGLOGD(eDebugLayer, "HWC2: Layer has dynamic metadata");
+                                } else {
+                                    /* reset dynamic metadata info */
+                                    mMetaParcel->eType = (ExynosVideoInfoType)(mMetaParcel->eType & (~VIDEO_INFO_TYPE_HDR_DYNAMIC));
+                                    metaData->eType = mMetaParcel->eType;
+                                    mMetaParcel->sHdrDynamicInfo = {};
+                                    metaData->sHdrDynamicInfo = {};
+                                }
                             }
                         }
                     }
@@ -406,6 +409,9 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
             mLayerBuffer, mDataSpace, mAcquireFence, mCompressed,
             internal_format);
 
+    /* Update fps */
+    checkFps();
+
     return 0;
 }
 
@@ -567,22 +573,6 @@ int32_t ExynosLayer::setLayerZOrder(uint32_t z) {
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosLayer::setLayerFlag(int32_t /*user define*/ flag)
-{
-    if (mLayerFlag != flag) {
-        setGeometryChanged(GEOMETRY_LAYER_FLAG_CHANGED);
-        mLayerFlag = flag;
-    }
-    // FIXME: HWC_DIM_LAYER is not defined in AOSP
-    //        HWC guys should fix this.
-#if 0
-    mIsDimLayer = !!(mLayerFlag & HWC_DIM_LAYER);
-#endif
-    mIsDimLayer = false;
-
-    return HWC2_ERROR_NONE;
-}
-
 int32_t ExynosLayer::setLayerPerFrameMetadata(uint32_t numElements,
         const int32_t* /*hw2_per_frame_metadata_key_t*/ keys, const float* metadata)
 {
@@ -662,7 +652,7 @@ void ExynosLayer::resetValidateData()
 int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
 {
     private_handle_t *handle = mLayerBuffer;
-    if (mIsDimLayer) {
+    if (isDimLayer()) {
         src_img->format = HAL_PIXEL_FORMAT_RGBA_8888;
         src_img->usageFlags = 0xb00;
         src_img->bufferHandle = 0;
@@ -765,7 +755,7 @@ int32_t ExynosLayer::setDstExynosImage(exynos_image *dst_img)
 #endif
     }
 
-    if (mIsDimLayer) {
+    if (isDimLayer()) {
         dst_img->usageFlags = 0xb00;
     }
 
@@ -994,4 +984,11 @@ int ExynosLayer::allocMetaParcel()
     }
 
     return NO_ERROR;
+}
+
+bool ExynosLayer::isDimLayer()
+{
+    if (mLayerFlag & EXYNOS_HWC_DIM_LAYER)
+        return true;
+    return false;
 }

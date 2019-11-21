@@ -183,7 +183,7 @@ int ExynosHWCService::getExternalDisplayConfigs()
         (ExynosExternalDisplay *)mHWCCtx->device->getDisplay(HWC_DISPLAY_EXTERNAL);
 
     if (external_display->mHpdStatus == true) {
-        external_display->dumpConfigurations();
+        external_display->mDisplayInterface->dumpDisplayConfigs();
     }
 
     return NO_ERROR;

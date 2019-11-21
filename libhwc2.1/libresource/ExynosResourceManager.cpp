@@ -31,6 +31,7 @@
 #include "ExynosPrimaryDisplayModule.h"
 #include "ExynosVirtualDisplay.h"
 #include "ExynosExternalDisplay.h"
+#include "ExynosDeviceInterface.h"
 
 /* Basic supported features */
 feature_support_t feature_table[] =
@@ -71,7 +72,7 @@ feature_support_t feature_table[] =
 
     {MPP_G2D,
         MPP_ATTR_AFBC | MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V | MPP_ATTR_ROT_90 | MPP_ATTR_ROT_180 | MPP_ATTR_ROT_270 |
-        MPP_ATTR_HDR10 | MPP_ATTR_USE_CAPA | MPP_ATTR_DEGAMMA
+        MPP_ATTR_HDR10 | MPP_ATTR_USE_CAPA
     }
 };
 
@@ -136,7 +137,6 @@ ExynosResourceManager::ExynosResourceManager(ExynosDevice *device)
     mDevice(device),
     hasHdrLayer(false),
     hasDrmLayer(false),
-    mUseQuery(false),
     mFormatRestrictionCnt(0),
     mDstBufMgrThread(this),
     mResourceReserved(0x0)
@@ -550,14 +550,16 @@ int32_t ExynosResourceManager::setResourcePriority(ExynosDisplay *display)
             if (check_ret < 0) {
                 HWC_LOGE(display, "Fail to set exynoscomposition priority(%d)", ret);
             } else {
-                uint32_t firstIndex = (uint32_t)display->mExynosCompositionInfo.mFirstIndex;
-                uint32_t lastIndex = (uint32_t)display->mExynosCompositionInfo.mLastIndex;
-                for (uint32_t i = firstIndex; i <= lastIndex; i++) {
-                    ExynosLayer *layer = display->mLayers[i];
-                    layer->resetAssignedResource();
-                    layer->mOverlayInfo |= eResourcePendingWork;
-                    layer->mValidateCompositionType = HWC2_COMPOSITION_DEVICE;
-                    layer->mCheckMPPFlag[m2mMPP->mLogicalType] = eMPPHWBusy;
+                if (display->mExynosCompositionInfo.mFirstIndex >= 0) {
+                    uint32_t firstIndex = (uint32_t)display->mExynosCompositionInfo.mFirstIndex;
+                    uint32_t lastIndex = (uint32_t)display->mExynosCompositionInfo.mLastIndex;
+                    for (uint32_t i = firstIndex; i <= lastIndex; i++) {
+                        ExynosLayer *layer = display->mLayers[i];
+                        layer->resetAssignedResource();
+                        layer->mOverlayInfo |= eResourcePendingWork;
+                        layer->mValidateCompositionType = HWC2_COMPOSITION_DEVICE;
+                        layer->mCheckMPPFlag[m2mMPP->mLogicalType] = eMPPHWBusy;
+                    }
                 }
                 compositionInfo.initializeInfos(display);
                 ret = EXYNOS_ERROR_CHANGED;
@@ -580,6 +582,24 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
     int retry_count = 0;
 
     Mutex::Autolock lock(mDstBufMgrThread.mStateMutex);
+
+    /*
+     * First add layers that SF requested HWC2_COMPOSITION_CLIENT type
+     * to client composition
+     */
+    for (uint32_t i = 0; i < display->mLayers.size(); i++) {
+        ExynosLayer *layer = display->mLayers[i];
+        if (layer->mCompositionType == HWC2_COMPOSITION_CLIENT) {
+            layer->mOverlayInfo |= eSkipLayer;
+            layer->mValidateCompositionType = HWC2_COMPOSITION_CLIENT;
+            if (((ret = display->addClientCompositionLayer(i)) != NO_ERROR) &&
+                 (ret != EXYNOS_ERROR_CHANGED)) {
+                HWC_LOGE(display, "Handle HWC2_COMPOSITION_CLIENT type layers, but addClientCompositionLayer failed (%d)", ret);
+                return ret;
+            }
+        }
+    }
+
     do {
         HDEBUGLOGD(eDebugResourceManager, "%s:: retry_count(%d)", __func__, retry_count);
         if ((ret = resetAssignedResources(display)) != NO_ERROR)
@@ -597,7 +617,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
             } else {
                 HWC_LOGE(display, "%s:: Fail to assign resource for ePriorityMax layer",
                         __func__);
-                goto err;
+                return ret;
             }
         }
 
@@ -608,7 +628,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
             } else {
                 HWC_LOGE(display, "%s:: Fail to assign resource for ePriorityHigh layer",
                         __func__);
-                goto err;
+                return ret;
             }
         }
 
@@ -627,13 +647,13 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
                     if (((ret = display->addClientCompositionLayer(i)) != NO_ERROR) &&
                         (ret != EXYNOS_ERROR_CHANGED)) {
                         HWC_LOGE(display, "Change compositionTypes to HWC2_COMPOSITION_CLIENT, but addClientCompositionLayer failed (%d)", ret);
-                        goto err;
+                        return ret;
                     }
                 }
                 display->mExynosCompositionInfo.initializeInfos(display);
                 ret = EXYNOS_ERROR_CHANGED;
             } else {
-                goto err;
+                return ret;
             }
         }
 
@@ -642,7 +662,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
                 if ((ret = assignLayers(display, i)) == EXYNOS_ERROR_CHANGED)
                     break;
                 if (ret != NO_ERROR)
-                    goto err;
+                    return ret;
             }
         }
 
@@ -656,7 +676,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
     if (retry_count == ASSIGN_RESOURCE_TRY_COUNT) {
         HWC_LOGE(display, "%s:: assign resources fail", __func__);
         ret = eUnknown;
-        goto err;
+        return ret;
     } else {
         if ((ret = updateExynosComposition(display)) != NO_ERROR)
             return ret;
@@ -674,8 +694,6 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
             }
         }
     }
-    return ret;
-err:
     return ret;
 }
 int32_t ExynosResourceManager::updateExynosComposition(ExynosDisplay *display)
@@ -1062,8 +1080,6 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         (display->mDynamicReCompMode == DEVICE_2_CLIENT))
         return eDynamicRecomposition;
 
-    if (layer->mLayerFlag & HWC_SKIP_LAYER)
-        return eSkipLayer;
     if ((layer->mLayerBuffer != NULL) &&
             (display->mDisplayId == HWC_DISPLAY_PRIMARY) &&
             (mForceReallocState != DST_REALLOC_DONE)) {
@@ -1074,11 +1090,6 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
     if (layer->mCompositionType == HWC2_COMPOSITION_CLIENT)
         return eSkipLayer;
 
-    /* If display is virtual/external and layer has HWC_SKIP_LAYER, HWC skips it */
-    if ((layer != NULL) && (layer->mLayerFlag & HWC_SKIP_LAYER) && (display != NULL) &&
-        (display->mDisplayId == HWC_DISPLAY_VIRTUAL || display->mDisplayId == HWC_DISPLAY_EXTERNAL))
-        return eSkipLayer;
-
     if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY)
         return eUnSupportedColorTransform;
 
@@ -1087,7 +1098,7 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         ((int32_t)index <= display->mLowFpsLayerInfo.mLastIndex))
         return eLowFpsLayer;
 
-    if(layer->mIsDimLayer && layer->mLayerBuffer == NULL) {
+    if(layer->isDimLayer() && layer->mLayerBuffer == NULL) {
         return eDimLayer;
     }
 
@@ -1283,7 +1294,13 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     if (isFormatYUV(src_img.format) && !hasHdrInfo(src_img)) {
         /* Check RGB format */
         dst_img.format = DEFAULT_MPP_DST_FORMAT;
-        dst_img.dataSpace = colorModeToDataspace(display->mColorMode);
+        if (display->mColorMode == HAL_COLOR_MODE_NATIVE) {
+            /* Bypass dataSpace */
+            dst_img.dataSpace = src_img.dataSpace;
+        } else {
+            /* Covert data space */
+            dst_img.dataSpace = colorModeToDataspace(display->mColorMode);
+        }
         image_lists[index++] = dst_img;
     }
 
@@ -1309,7 +1326,8 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
     layer->setExynosMidImage(dst_img);
 
     validateFlag = validateLayer(layer_index, display, layer);
-    if (display->mWindowNumUsed >= display->mMaxWindowNum)
+    if ((display->mUseDecon) &&
+        (display->mWindowNumUsed >= display->mMaxWindowNum))
         validateFlag |= eInsufficientWindow;
 
     HDEBUGLOGD(eDebugResourceManager, "\t[%d] layer: validateFlag(0x%8x), supportedMPPFlag(0x%8x)",
@@ -1843,7 +1861,7 @@ int32_t ExynosResourceManager::preProcessLayer(ExynosDisplay * display)
 
     /* Check to need degamma */
     if ((display->mDisplayId == HWC_DISPLAY_EXTERNAL) &&
-        (display->mHdrTypes[0] == HAL_HDR_HDR10) && (hasHdrLayer)) {
+            (((ExynosExternalDisplay *)display)->mExternalHdrSupported) && (hasHdrLayer)) {
         for (uint32_t i = 0; i < display->mLayers.size(); i++) {
             ExynosLayer *layer = display->mLayers[i];
             if(!layer->mIsHdrLayer)
@@ -1913,6 +1931,17 @@ int32_t ExynosResourceManager::updateResourceState()
     return NO_ERROR;
 }
 
+/*
+ * This function is called every frame.
+ * This base function does nothing.
+ * Module that supports setting frame rate should implement this function
+ * in the module source code (hardware/samsung_slsi/graphics/exynos...).
+ */
+void ExynosResourceManager::setFrameRateForPerformance(ExynosMPP __unused &mpp,
+        AcrylicPerformanceRequestFrame __unused *frame)
+{
+}
+
 int32_t ExynosResourceManager::deliverPerformanceInfo()
 {
     int ret = NO_ERROR;
@@ -1975,6 +2004,8 @@ int32_t ExynosResourceManager::deliverPerformanceInfo()
                     HWC_LOGE(NULL,"%d frame reset fail (%zu)", assignedInstanceIndex, mpp->mAssignedSources.size());
                     break;
                 }
+                setFrameRateForPerformance(*mpp, frame);
+
                 for (uint32_t j = 0; j < mpp->mAssignedSources.size(); j++) {
                     ExynosMPPSource* mppSource = mpp->mAssignedSources[j];
                     frame->setSourceDimension(j,
@@ -2171,106 +2202,10 @@ void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table, int 
     mFormatRestrictionCnt++;
 }
 
-bool ExynosResourceManager::makeDPURestrictions(int fd) {
-
-    int i, j, cnt = 0;
-
-    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
-
-    if (ioctl(fd, EXYNOS_DISP_RESTRICTIONS, dpuInfo) == -1) {
-        ALOGE("EXYNOS_DISP_RESTRICTIONS ioctl failed: %s", strerror(errno));
-        goto err;
-    }
-
-    HDEBUGLOGD(eDebugDefault, "DPP ver : %d, cnt : %d", dpuInfo->ver, dpuInfo->dpp_cnt);
-
-    /* format resctriction */
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
-        HDEBUGLOGD(eDebugDefault, "id : %d, format count : %d", i, r.format_cnt);
-    }
-
-    restriction_key_t queried_format_table[1024];
-
-    /* Check attribute overlap */
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        for (j = 0; j < dpuInfo->dpp_cnt; j++){
-            if (i >= j) continue;
-            dpp_ch_restriction r1 = dpuInfo->dpp_ch[i];
-            dpp_ch_restriction r2 = dpuInfo->dpp_ch[j];
-            /* If attribute is same, will not be added to table */
-            if (r1.attr == r2.attr) {
-                mDPUInfo.overlap[j] = true;
-            }
-        }
-        HDEBUGLOGD(eDebugDefault, "Index : %d, overlap %d", i, mDPUInfo.overlap[i]);
-    }
-
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        if (mDPUInfo.overlap[i]) continue;
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
-        for (j = 0; j < r.format_cnt; j++){
-            if (S3CFormatToHalFormat(r.format[j]) != HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED) {
-                queried_format_table[cnt].hwType = getPhysicalType(i);
-                queried_format_table[cnt].nodeType = NODE_NONE;
-                queried_format_table[cnt].format = S3CFormatToHalFormat(r.format[j]);
-                queried_format_table[cnt].reserved = 0;
-                makeFormatRestrictions(queried_format_table[cnt], r.format[j]);
-                cnt++;
-            }
-            HDEBUGLOGD(eDebugDefault, "%s : %d", getMPPStr(getPhysicalType(i)).string(), r.format[j]);
-        }
-    }
-
-    /* Size restriction */
-    restriction_size rSize;
-
-    for (i = 0; i < dpuInfo->dpp_cnt; i++){
-        if (mDPUInfo.overlap[i]) continue;
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
-
-        /* RGB size restrictions */
-        rSize.maxDownScale = r.scale_down;
-        rSize.maxUpScale = r.scale_up;
-        rSize.maxFullWidth = r.dst_f_w.max;
-        rSize.maxFullHeight = r.dst_f_h.max;
-        rSize.minFullWidth = r.dst_f_w.min;
-        rSize.minFullHeight = r.dst_f_h.min;;
-        rSize.fullWidthAlign = r.dst_x_align;
-        rSize.fullHeightAlign = r.dst_y_align;;
-        rSize.maxCropWidth = r.src_w.max;
-        rSize.maxCropHeight = r.src_h.max;
-        rSize.minCropWidth = r.src_w.min;
-        rSize.minCropHeight = r.src_h.min;
-        rSize.cropXAlign = r.src_x_align;
-        rSize.cropYAlign = r.src_y_align;
-        rSize.cropWidthAlign = r.blk_x_align;
-        rSize.cropHeightAlign = r.blk_y_align;
-
-        makeSizeRestrictions(getPhysicalType(i), rSize, RESTRICTION_RGB);
-
-        /* YUV size restrictions */
-        rSize.fullWidthAlign = max(r.dst_x_align, YUV_CHROMA_H_SUBSAMPLE);
-        rSize.fullHeightAlign = max(r.dst_y_align, YUV_CHROMA_V_SUBSAMPLE);
-        rSize.cropXAlign = max(r.src_x_align, YUV_CHROMA_H_SUBSAMPLE);
-        rSize.cropYAlign = max(r.src_y_align, YUV_CHROMA_V_SUBSAMPLE);
-        rSize.cropWidthAlign = max(r.blk_x_align, YUV_CHROMA_H_SUBSAMPLE);
-        rSize.cropHeightAlign = max(r.blk_y_align, YUV_CHROMA_V_SUBSAMPLE);
-
-        makeSizeRestrictions(getPhysicalType(i), rSize, RESTRICTION_YUV);
-    }
-    return true;
-
-err:
-    return false;
-}
-
 void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
 
     Acrylic *arc = NULL;
     const HW2DCapability *cap;
-//    restriction_key queried_format_table[128];
-    int cnt=0;
 
     if (type == MPP_MSC)
         arc = Acrylic::createScaler();
@@ -2283,18 +2218,16 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
 
     cap = &arc->getCapabilities();
 
-    restriction_key_t queried_format_table[1024];
-
     /* format restriction */
     for (uint32_t i = 0; i < FORMAT_MAX_CNT; i++) {
         if (cap->isFormatSupported(exynos_format_desc[i].halFormat)) {
-            queried_format_table[cnt].hwType = type;
-            queried_format_table[cnt].nodeType = NODE_NONE;
-            queried_format_table[cnt].format = exynos_format_desc[i].halFormat;
-            queried_format_table[cnt].reserved = 0;
-            makeFormatRestrictions(queried_format_table[cnt],
-                    queried_format_table[cnt].format);
-            cnt++;
+            restriction_key_t queried_format;
+            queried_format.hwType = type;
+            queried_format.nodeType = NODE_NONE;
+            queried_format.format = exynos_format_desc[i].halFormat;
+            queried_format.reserved = 0;
+            makeFormatRestrictions(queried_format,
+                    queried_format.format);
         }
     }
 
@@ -2338,7 +2271,7 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
     delete arc;
 }
 
-mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) {
+mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) const {
 
     for (int i=0; i < MAX_DECON_DMA_TYPE; i++){
         if(IDMA_CHANNEL_MAP[i].channel == ch)
@@ -2348,52 +2281,24 @@ mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) {
     return MPP_P_TYPE_MAX;
 }
 
-void ExynosResourceManager::updateFeatureTable() {
+ExynosMPP* ExynosResourceManager::getOtfMPPWithChannel(int ch)
+{
+    ExynosMPP *otfMPP = NULL;
 
-    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
-    int featureTableCnt =  sizeof(feature_table)/sizeof(feature_support_t);
-    int attrMapCnt = sizeof(dpu_attr_map_table)/sizeof(dpu_attr_map_t);
-    int dpp_cnt = dpuInfo->dpp_cnt;
-
-    HDEBUGLOGD(eDebugDefault, "Before");
-    for (int j = 0; j < featureTableCnt; j++){
-        HDEBUGLOGD(eDebugDefault, "type : %d, feature : 0x%lx",
-            feature_table[j].hwType,
-            (unsigned long)feature_table[j].attr);
-    }
-
-    // dpp count
-    for (int i = 0; i < dpp_cnt; i++){
-        dpp_ch_restriction c_r = dpuInfo->dpp_ch[i];
-        if (mDPUInfo.overlap[i]) continue;
-        HDEBUGLOGD(eDebugDefault, "DPU attr : (ch:%d), 0x%lx", i, (unsigned long)c_r.attr);
-        // feature table count
-        for (int j = 0; j < featureTableCnt; j++){
-            if (feature_table[j].hwType == getPhysicalType(i)) {
-                // dpp attr count
-                for (int k = 0; k < attrMapCnt; k++) {
-                    if (c_r.attr & (1 << dpu_attr_map_table[k].dpp_attr)) {
-                        feature_table[j].attr |= dpu_attr_map_table[k].hwc_attr;
-                    }
-                }
-            }
+    for (int i=0; i < MAX_DECON_DMA_TYPE; i++){
+        if(IDMA_CHANNEL_MAP[i].channel == ch) {
+            otfMPP = getExynosMPP(IDMA_CHANNEL_MAP[i].type, IDMA_CHANNEL_MAP[i].index);
+            break;
         }
     }
-
-    HDEBUGLOGD(eDebugDefault, "After");
-    for (int j = 0; j < featureTableCnt; j++){
-        HDEBUGLOGD(eDebugDefault, "type : %d, feature : 0x%lx",
-            feature_table[j].hwType,
-            (unsigned long)feature_table[j].attr);
-    }
+    return otfMPP;
 }
 
-void ExynosResourceManager::updateRestrictions(int displayFd) {
+void ExynosResourceManager::updateRestrictions() {
 
-    if ((mUseQuery = makeDPURestrictions(displayFd)) == true) {
+    if (mDevice->mDeviceInterface->getUseQuery() == true) {
         makeAcrylRestrictions(MPP_MSC);
         makeAcrylRestrictions(MPP_G2D);
-        updateFeatureTable();
     } else {
         mFormatRestrictionCnt = sizeof(restriction_format_table)/sizeof(restriction_key);
         for (uint32_t i = 0 ; i < mFormatRestrictionCnt; i++) {
@@ -2425,4 +2330,9 @@ void ExynosResourceManager::updateRestrictions(int displayFd) {
         mM2mMPPs[i]->updateAttr();
         mM2mMPPs[i]->setupRestriction();
     }
+}
+
+uint32_t ExynosResourceManager::getFeatureTableSize() const
+{
+    return sizeof(feature_table)/sizeof(feature_support_t);
 }

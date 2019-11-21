@@ -18,9 +18,6 @@
 #define _EXYNOSDEVICE_H
 
 #include <unistd.h>
-#include <pthread.h>
-#include <poll.h>
-
 #include <hardware_legacy/uevent.h>
 
 #include <utils/Vector.h>
@@ -30,6 +27,9 @@
 #include <sys/stat.h>
 #include <sys/resource.h>
 #include <cutils/atomic.h>
+
+#include <thread>
+#include <atomic>
 
 #include <hardware/hwcomposer2.h>
 
@@ -52,6 +52,10 @@
 
 #ifndef DOZE_VSYNC_PERIOD
 #define DOZE_VSYNC_PERIOD 33333333 // 30fps
+#endif
+
+#ifndef DRM_DEVICE_PATH
+#define DRM_DEVICE_PATH "/dev/dri/card0"
 #endif
 
 namespace android {
@@ -142,8 +146,11 @@ enum {
     GEOMETRY_ERROR_CASE                     = 1ULL << 63,
 };
 
+
+class ExynosDevice;
 class ExynosDisplay;
 class ExynosResourceManager;
+class ExynosDeviceInterface;
 
 class ExynosDevice {
     public:
@@ -170,18 +177,12 @@ class ExynosDevice {
         uint64_t mGeometryChanged;
 
         /**
-         * Kernel event handling thread (e.g.) Vsync, hotplug, TUI enable events.
-         */
-        pthread_t mEventHandlerThread;
-
-        /**
          * If Panel has not self-refresh feature, dynamic recomposition will be enabled.
          */
-        pthread_t mDRThread;
+        std::thread mDRThread;
         volatile int32_t mDRThreadStatus;
-        bool mDRLoopStatus;
+        std::atomic<bool> mDRLoopStatus;
         bool mPrimaryBlank;
-
 
         /**
          * Callback informations those are used by SurfaceFlinger.
@@ -207,6 +208,13 @@ class ExynosDevice {
 
         // Variable for fence tracer
         hwc_fence_info mFenceInfo[MAX_FD_NUM];
+
+        /**
+         * This will be initialized with differnt class
+         * that inherits ExynosDeviceInterface according to
+         * interface type.
+         */
+        std::unique_ptr<ExynosDeviceInterface> mDeviceInterface;
 
         // Con/Destructors
         ExynosDevice();
@@ -286,6 +294,11 @@ class ExynosDevice {
         void compareVsyncPeriod();
         bool isDynamicRecompositionThreadAlive();
         void checkDynamicRecompositionThread();
+
+    protected:
+        void initDeviceInterface(uint32_t interfaceType);
+    protected:
+        uint32_t mInterfaceType;
 };
 
 #endif //_EXYNOSDEVICE_H

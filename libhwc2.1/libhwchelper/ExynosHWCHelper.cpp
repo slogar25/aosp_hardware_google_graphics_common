@@ -292,6 +292,18 @@ uint32_t S3CFormatToHalFormat(int format)
     return HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED;
 }
 
+int halFormatToDrmFormat(int format, bool compressed)
+{
+    if (compressed && (format == HAL_PIXEL_FORMAT_RGB_565))
+        return DRM_FORMAT_RGB565;
+
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].halFormat == format)
+            return exynos_format_desc[i].drmFormat;
+    }
+    return DRM_FORMAT_UNDEFINED;
+}
+
 android_dataspace colorModeToDataspace(android_color_mode_t mode)
 {
     android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
@@ -330,6 +342,73 @@ android_dataspace colorModeToDataspace(android_color_mode_t mode)
             break;
     }
     return dataSpace;
+}
+
+enum decon_blending halBlendingToS3CBlending(int32_t blending)
+{
+    switch (blending) {
+    case HWC2_BLEND_MODE_NONE:
+        return DECON_BLENDING_NONE;
+    case HWC2_BLEND_MODE_PREMULTIPLIED:
+        return DECON_BLENDING_PREMULT;
+    case HWC2_BLEND_MODE_COVERAGE:
+        return DECON_BLENDING_COVERAGE;
+
+    default:
+        return DECON_BLENDING_MAX;
+    }
+}
+
+enum dpp_rotate halTransformToS3CRot(uint32_t halTransform)
+{
+    switch (halTransform) {
+    case HAL_TRANSFORM_FLIP_H:
+        return DPP_ROT_YFLIP;
+    case HAL_TRANSFORM_FLIP_V:
+        return DPP_ROT_XFLIP;
+    case HAL_TRANSFORM_ROT_180:
+        return DPP_ROT_180;
+    case HAL_TRANSFORM_ROT_90:
+        return DPP_ROT_90;
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
+        /*
+         * HAL: HAL_TRANSFORM_FLIP_H -> HAL_TRANSFORM_ROT_90
+         * VPP: ROT_90 -> XFLIP
+         */
+        return DPP_ROT_90_XFLIP;
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
+        /*
+         * HAL: HAL_TRANSFORM_FLIP_V -> HAL_TRANSFORM_ROT_90
+         * VPP: ROT_90 -> YFLIP
+         */
+        return DPP_ROT_90_YFLIP;
+    case HAL_TRANSFORM_ROT_270:
+        return DPP_ROT_270;
+    default:
+        return DPP_ROT_NORMAL;
+    }
+}
+
+uint64_t halTransformToDrmRot(uint32_t halTransform)
+{
+    switch (halTransform) {
+    case HAL_TRANSFORM_FLIP_H:
+        return DRM_MODE_REFLECT_X|DRM_MODE_ROTATE_0;
+    case HAL_TRANSFORM_FLIP_V:
+        return DRM_MODE_REFLECT_Y|DRM_MODE_ROTATE_0;
+    case HAL_TRANSFORM_ROT_180:
+        return DRM_MODE_ROTATE_180;
+    case HAL_TRANSFORM_ROT_90:
+        return DRM_MODE_ROTATE_90;
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
+        return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_X);
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
+        return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_Y);
+    case HAL_TRANSFORM_ROT_270:
+        return DRM_MODE_ROTATE_270;
+    default:
+        return DRM_MODE_ROTATE_0;
+    }
 }
 
 void dumpHandle(uint32_t type, private_handle_t *h)
@@ -474,6 +553,37 @@ uint32_t getBufferNumOfFormat(int format)
     return 0;
 }
 
+uint32_t getPlaneNumOfFormat(int format)
+{
+    if (isFormatRgb(format))
+        return 1;
+    switch (format) {
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_TILED:
+        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M:
+        case HAL_PIXEL_FORMAT_YCBCR_P010:
+            return 2;
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YV12_M:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P:
+        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN:
+        case HAL_PIXEL_FORMAT_YV12:
+            return 3;
+        /* Not supported format */
+        default:
+            return 0;
+    }
+}
+
 void setFenceName(int fenceFd, hwc_fence_type fenceType)
 {
     if (fenceFd >= 3)
@@ -510,12 +620,16 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B:
         HDEBUGLOGD(eDebugMPP, "8bit size(Y) : %d, extra size : %d", NV12M_Y_SIZE(width, height), NV12M_Y_2B_SIZE(width, height));
         return NV12M_Y_SIZE(width, height) + NV12M_Y_2B_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B:
+        return NV12N_10B_Y_8B_SIZE(width, height) + NV12N_10B_Y_2B_SIZE(width, height);
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M:
         HDEBUGLOGD(eDebugMPP, "size(Y) : %d", P010M_Y_SIZE(width, height));
         return P010M_Y_SIZE(width, height);
     case HAL_PIXEL_FORMAT_YCBCR_P010:
         HDEBUGLOGD(eDebugMPP, "size(Y) : %d", P010_Y_SIZE(width, height));
         return P010_Y_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
+        return YUV420N_Y_SIZE(width, height);
     }
 
     return NV12M_Y_SIZE(width, height) + ((width % 128) == 0 ? 0 : 256);

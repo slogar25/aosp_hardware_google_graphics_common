@@ -23,6 +23,9 @@
 #include "ExynosVirtualDisplayModule.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
+#include "ExynosDeviceFbInterface.h"
+#include "ExynosDeviceDrmInterface.h"
+#include <unistd.h>
 
 /**
  * ExynosDevice implementation
@@ -43,201 +46,22 @@ char fence_names[FENCE_MAX][32];
 GrallocWrapper::Mapper* ExynosDevice::mMapper = NULL;
 GrallocWrapper::Allocator* ExynosDevice::mAllocator = NULL;
 
-void handle_vsync_event(ExynosDevice *dev) {
-
-    int err = 0;
-
-    if ((dev == NULL) || (dev->mCallbackInfos[HWC2_CALLBACK_VSYNC].funcPointer == NULL))
-        return;
-
-    dev->compareVsyncPeriod();
-
-    hwc2_callback_data_t callbackData =
-        dev->mCallbackInfos[HWC2_CALLBACK_VSYNC].callbackData;
-    HWC2_PFN_VSYNC callbackFunc =
-        (HWC2_PFN_VSYNC)dev->mCallbackInfos[HWC2_CALLBACK_VSYNC].funcPointer;
-
-    err = lseek(dev->mVsyncFd, 0, SEEK_SET);
-
-    if (err < 0 ) {
-        ExynosDisplay *display = (ExynosDisplay*)dev->getDisplay(HWC_DISPLAY_PRIMARY);
-        if (display != NULL) {
-            if (display->mVsyncState == HWC2_VSYNC_ENABLE)
-                ALOGE("error seeking to vsync timestamp: %s", strerror(errno));
-        }
-        return;
-    }
-
-    if (callbackData != NULL && callbackFunc != NULL) {
-        /** Vsync read **/
-        char buf[4096];
-        err = read(dev->mVsyncFd , buf, sizeof(buf));
-        if (err < 0) {
-            ALOGE("error reading vsync timestamp: %s", strerror(errno));
-            return;
-        }
-
-        if (dev->mVsyncDisplay != HWC_DISPLAY_PRIMARY) {
-            // Vsync of primary display is not used
-            return;
-        }
-
-        dev->mTimestamp = strtoull(buf, NULL, 0);
-
-        gettimeofday(&updateTimeInfo.lastUeventTime, NULL);
-        /** Vsync callback **/
-        callbackFunc(callbackData, HWC_DISPLAY_PRIMARY, dev->mTimestamp);
-    }
-}
-
-void handle_external_vsync_event(ExynosDevice *dev) {
-
-    int err = 0;
-
-    if ((dev == NULL) || (dev->mCallbackInfos[HWC2_CALLBACK_VSYNC].funcPointer == NULL))
-        return;
-
-    dev->compareVsyncPeriod();
-
-    hwc2_callback_data_t callbackData =
-        dev->mCallbackInfos[HWC2_CALLBACK_VSYNC].callbackData;
-    HWC2_PFN_VSYNC callbackFunc =
-        (HWC2_PFN_VSYNC)dev->mCallbackInfos[HWC2_CALLBACK_VSYNC].funcPointer;
-
-    err = lseek(dev->mExtVsyncFd, 0, SEEK_SET);
-
-    if(err < 0 ) {
-        ExynosExternalDisplay *display = (ExynosExternalDisplay*)dev->getDisplay(HWC_DISPLAY_EXTERNAL);
-        if (display->mHpdStatus) {
-            ALOGE("error seeking to vsync timestamp: %s", strerror(errno));
-        }
-        return;
-    }
-
-    if (callbackData != NULL && callbackFunc != NULL) {
-        /** Vsync read **/
-        char buf[4096];
-        err = read(dev->mExtVsyncFd , buf, sizeof(buf));
-        if (err < 0) {
-            ALOGE("error reading vsync timestamp: %s", strerror(errno));
-            return;
-        }
-
-        if (dev->mVsyncDisplay != HWC_DISPLAY_EXTERNAL) {
-            // Vsync of external display is not used
-            return;
-        }
-        dev->mTimestamp = strtoull(buf, NULL, 0);
-
-        /** Vsync callback **/
-        callbackFunc(callbackData, HWC_DISPLAY_PRIMARY, dev->mTimestamp);
-    }
-}
-
-void *hwc_eventHndler_thread(void *data) {
-
-    /** uevent init **/
-    char uevent_desc[4096];
-    memset(uevent_desc, 0, sizeof(uevent_desc));
-
-    ExynosDevice *dev = (ExynosDevice*)data;
-
-    setpriority(PRIO_PROCESS, 0, HAL_PRIORITY_URGENT_DISPLAY);
-
-    uevent_init();
-
-    /** Vsync init. **/
-    char devname[MAX_DEV_NAME + 1];
-    devname[MAX_DEV_NAME] = '\0';
-
-    strncpy(devname, VSYNC_DEV_PREFIX, MAX_DEV_NAME);
-    strlcat(devname, VSYNC_DEV_NAME, MAX_DEV_NAME);
-
-    dev->mVsyncFd = open(devname, O_RDONLY);
-
-    char devname_ext[MAX_DEV_NAME + 1];
-    devname_ext[MAX_DEV_NAME] = '\0';
-
-    strncpy(devname_ext, VSYNC_DEV_PREFIX, MAX_DEV_NAME);
-    strlcat(devname_ext, VSYNC_DEV_NAME_EXT, MAX_DEV_NAME);
-
-    dev->mExtVsyncFd = open(devname_ext, O_RDONLY);
-
-    char ueventname_ext[MAX_DEV_NAME + 1];
-    ueventname_ext[MAX_DEV_NAME] = '\0';
-    sprintf(ueventname_ext, DP_UEVENT_NAME, DP_LINK_NAME);
-    ALOGI("uevent name of ext: %s", ueventname_ext);
-
-    if (dev->mVsyncFd < 0) {
-        ALOGI("Failed to open vsync attribute at %s", devname);
-        devname[strlen(VSYNC_DEV_PREFIX)] = '\0';
-        strlcat(devname, VSYNC_DEV_MIDDLE, MAX_DEV_NAME);
-        strlcat(devname, VSYNC_DEV_NAME, MAX_DEV_NAME);
-        ALOGI("Retrying with %s", devname);
-        dev->mVsyncFd = open(devname, O_RDONLY);
-        ALOGI("dev->mVsyncFd %d", dev->mVsyncFd);
-    }
-
-    if (dev->mExtVsyncFd < 0) {
-        ALOGI("Failed to open vsync attribute at %s", devname_ext);
-        devname_ext[strlen(VSYNC_DEV_PREFIX)] = '\0';
-        strlcat(devname_ext, VSYNC_DEV_MIDDLE, MAX_DEV_NAME);
-        strlcat(devname_ext, VSYNC_DEV_NAME_EXT, MAX_DEV_NAME);
-        ALOGI("Retrying with %s", devname_ext);
-        dev->mExtVsyncFd = open(devname_ext, O_RDONLY);
-        ALOGI("dev->mExtVsyncFd %d", dev->mExtVsyncFd);
-    }
-    /** Poll definitions **/
-    /** TODO : Hotplug here **/
-
-    struct pollfd fds[3];
-
-    fds[0].fd = dev->mVsyncFd;
-    fds[0].events = POLLPRI;
-    fds[1].fd = uevent_get_fd();
-    fds[1].events = POLLIN;
-    fds[2].fd = dev->mExtVsyncFd;
-    fds[2].events = POLLPRI;
-
-    /** Polling events **/
-    while (true) {
-        int err = poll(fds, 3, -1);
-
-        if (err > 0) {
-            if (fds[0].revents & POLLPRI) {
-                handle_vsync_event((ExynosDevice*)dev);
-            }
-            else if (fds[1].revents & POLLIN) {
-                uevent_next_event(uevent_desc, sizeof(uevent_desc) - 2);
-
-                bool dp_status = !strcmp(uevent_desc, ueventname_ext);
-
-                if (dp_status) {
-                    ExynosExternalDisplayModule *display = (ExynosExternalDisplayModule*)dev->getDisplay(HWC_DISPLAY_EXTERNAL);
-                    display->handleHotplugEvent();
-                }
-            }
-            else if (fds[2].revents & POLLPRI) {
-                handle_external_vsync_event((ExynosDevice*)dev);
-            }
-        }
-        else if (err == -1) {
-            if (errno == EINTR)
-                break;
-            ALOGE("error in vsync thread: %s", strerror(errno));
-        }
-    }
-    return NULL;
+uint32_t getDeviceInterfaceType()
+{
+    if (access(DRM_DEVICE_PATH, F_OK) == NO_ERROR)
+        return INTERFACE_TYPE_DRM;
+    else
+        return INTERFACE_TYPE_FB;
 }
 
 ExynosDevice::ExynosDevice()
     : mGeometryChanged(0),
-    mDRThread(0),
     mVsyncFd(-1),
     mExtVsyncFd(-1),
     mVsyncDisplay(HWC_DISPLAY_PRIMARY),
     mTimestamp(0),
-    mDisplayMode(0)
+    mDisplayMode(0),
+    mInterfaceType(INTERFACE_TYPE_FB)
 {
     exynosHWCControl.forceGpu = false;
     exynosHWCControl.windowUpdate = true;
@@ -255,9 +79,9 @@ ExynosDevice::ExynosDevice()
     exynosHWCControl.fenceTracer = 0;
     exynosHWCControl.sysFenceLogging = false;
 
-    ALOGD("HWC2 : %s : %d ", __func__, __LINE__);
-    int ret = 0;
+    mInterfaceType = getDeviceInterfaceType();
 
+    ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
     mResourceManager = new ExynosResourceManagerModule(this);
 
     ExynosPrimaryDisplayModule *primary_display = new ExynosPrimaryDisplayModule(HWC_DISPLAY_PRIMARY, this);
@@ -273,10 +97,9 @@ ExynosDevice::ExynosDevice()
     }
 
     ExynosExternalDisplayModule *external_display = new ExynosExternalDisplayModule(HWC_DISPLAY_EXTERNAL, this);
+
     ExynosVirtualDisplayModule *virtual_display = new ExynosVirtualDisplayModule(HWC_DISPLAY_VIRTUAL, this);
     mNumVirtualDisplay = 0;
-
-    mResourceManager->updateRestrictions(primary_display->mDisplayFd);
 
     mDisplays.add((ExynosDisplay*) primary_display);
     mDisplays.add((ExynosDisplay*) external_display);
@@ -292,14 +115,6 @@ ExynosDevice::ExynosDevice()
 
     dynamicRecompositionThreadCreate();
 
-    /** Event handler thread creation **/
-    /* TODO : Check last argument */
-    ret = pthread_create(&mEventHandlerThread, NULL, hwc_eventHndler_thread, this);
-    if (ret) {
-        ALOGE("failed to start vsync thread: %s", strerror(ret));
-        ret = -ret;
-    }
-
     hwcDebug = 0;
     for (uint32_t i = 0; i < FENCE_IP_ALL; i++)
         hwcFenceDebug[i] = 0;
@@ -313,17 +128,42 @@ ExynosDevice::ExynosDevice()
     saveString.appendFormat("ExynosDevice is initialized");
     uint32_t errFileSize = saveErrorLog(saveString);
     ALOGI("Initial errlog size: %d bytes\n", errFileSize);
+
+    /*
+     * This order should not be changed
+     * new ExynosResourceManager ->
+     * create displays and add them to the list ->
+     * initDeviceInterface() ->
+     * ExynosResourceManager::updateRestrictions()
+     */
+    initDeviceInterface(mInterfaceType);
+    mResourceManager->updateRestrictions();
+}
+
+void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
+{
+    if (interfaceType == INTERFACE_TYPE_DRM) {
+        mDeviceInterface = std::make_unique<ExynosDeviceDrmInterface>(this);
+    } else {
+        mDeviceInterface = std::make_unique<ExynosDeviceFbInterface>(this);
+    }
+
+    /*
+     * This order should not be changed
+     * initDisplayInterface() of each display ->
+     * ExynosDeviceInterface::init()
+     */
+    for (uint32_t i = 0; i < mDisplays.size(); i++)
+        mDisplays[i]->initDisplayInterface(interfaceType);
+    mDeviceInterface->init(this);
 }
 
 ExynosDevice::~ExynosDevice() {
 
     ExynosDisplay *primary_display = getDisplay(HWC_DISPLAY_PRIMARY);
 
-    /* TODO kill threads here */
-    pthread_kill(mEventHandlerThread, SIGTERM);
-    pthread_join(mEventHandlerThread, NULL);
-    pthread_kill(mDRThread, SIGTERM);
-    pthread_join(mDRThread, NULL);
+    mDRLoopStatus = false;
+    mDRThread.join();
 
     if (mMapper != NULL)
         delete mMapper;
@@ -387,20 +227,15 @@ void ExynosDevice::checkDynamicRecompositionThread()
                 return;
         }
         mDRLoopStatus = false;
-        pthread_join(mDRThread, 0);
+        mDRThread.join();
     }
 }
 
 void ExynosDevice::dynamicRecompositionThreadCreate()
 {
     if (exynosHWCControl.useDynamicRecomp == true) {
-        /* pthread_create shouldn't have been failed. But, ignore if some error was occurred */
-        if (pthread_create(&mDRThread, NULL, dynamicRecompositionThreadLoop, this) != 0) {
-            ALOGE("%s: failed to start hwc_dynamicrecomp_thread thread:", __func__);
-            mDRLoopStatus = false;
-        } else {
-            mDRLoopStatus = true;
-        }
+        mDRLoopStatus = true;
+        mDRThread = std::thread(&dynamicRecompositionThreadLoop, this);
     }
 }
 
@@ -453,7 +288,9 @@ ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
     uint32_t physical_display_num = HWC_NUM_DISPLAY_TYPES - 1;
 
     if (mDisplays.isEmpty()) {
-        goto err;
+        ALOGE("mDisplays.size(%zu), requested display(%d)",
+                mDisplays.size(), display);
+        return NULL;
     }
 
     if ((display <= physical_display_num) && (mDisplays[display]->mDisplayId == display)) {
@@ -465,7 +302,7 @@ ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
             }
         }
     }
-err:
+
     ALOGE("mDisplays.size(%zu), requested display(%d)",
             mDisplays.size(), display);
     return NULL;
@@ -748,7 +585,7 @@ void ExynosDevice::setHWCControl(uint32_t display, uint32_t ctrl, int32_t val)
             break;
         case HWC_CTL_DYNAMIC_RECOMP:
             ALOGI("%s::HWC_CTL_DYNAMIC_RECOMP on/off = %d", __func__, val);
-            this->setDynamicRecomposition((unsigned int)val);
+            setDynamicRecomposition((unsigned int)val);
             break;
         case HWC_CTL_ENABLE_FENCE_TRACER:
             ALOGI("%s::HWC_CTL_ENABLE_FENCE_TRACER on/off=%d", __func__, val);
@@ -789,7 +626,7 @@ uint32_t ExynosDevice::checkConnection(uint32_t display)
         case HWC_DISPLAY_PRIMARY:
             return 1;
         case HWC_DISPLAY_EXTERNAL:
-            if (external_display->mDisplayFd > 0)
+            if (external_display->mPlugState)
                 return 1;
             else
                 return 0;

@@ -58,6 +58,8 @@ class Allocator;
 #define G2D_MAX_SRC_NUM 15
 #endif
 
+#define G2D_JUSTIFIED_DST_ALIGN     16
+
 #define NUM_MPP_SRC_BUFS G2D_MAX_SRC_NUM
 
 #ifndef G2D_RESTRICTIVE_SRC_NUM
@@ -249,12 +251,6 @@ typedef enum {
 typedef struct g2d_ppc_list_for_scaling {
     float ppcList[PPC_SCALE_MAX];
 } g2d_ppc_list_for_scaling_t;
-
-/* for restriction query */
-typedef struct dpu_dpp_info {
-    struct dpp_restrictions_info dpuInfo;
-    bool overlap[16] = {false, };
-} dpu_dpp_info_t;
 
 enum
 {
@@ -604,7 +600,7 @@ public:
     uint32_t getSrcCropWidthAlign(uint32_t idx);
     uint32_t getSrcCropHeightAlign(struct exynos_image &src);
     uint32_t getSrcCropHeightAlign(uint32_t idx);
-    bool isSrcFormatSupported(struct exynos_image &src);
+    virtual bool isSrcFormatSupported(struct exynos_image &src);
     virtual bool isDimLayerSupported();
     int32_t isSupportThis(uint32_t mSupportAttr);
 
@@ -615,14 +611,14 @@ public:
     virtual uint32_t getDstWidthAlign(struct exynos_image &dst);
     uint32_t getDstHeightAlign(struct exynos_image &dst);
     uint32_t getOutBufAlign();
-    bool isDstFormatSupported(struct exynos_image &src);
+    virtual bool isDstFormatSupported(struct exynos_image &dst);
     uint32_t getSrcMaxBlendingNum(struct exynos_image &src, struct exynos_image &dst);
     uint32_t getAssignedSourceNum();
 
     /* Based on multi-resolution support */
     void setDstAllocSize(uint32_t width, uint32_t height);
     dst_alloc_buf_size_t getDstAllocSize();
-    bool needPreAllocation();
+    virtual bool needPreAllocation();
 
     int32_t resetMPP();
     int32_t resetAssignedState();
