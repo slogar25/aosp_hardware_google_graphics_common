@@ -129,6 +129,13 @@ int32_t exynos_getRenderIntents(hwc2_device_t* device, hwc2_display_t display, i
 int32_t exynos_setColorModeWithRenderIntent(hwc2_device_t* device, hwc2_display_t display,
         int32_t /*android_color_mode_t*/ mode,
         int32_t /*android_render_intent_v1_1_t */ intent);
+int32_t exynos_getReadbackBufferAttributes(hwc2_device_t *dev, hwc2_display_t display,
+        int32_t* /*android_pixel_format_t*/ outFormat,
+        int32_t* /*android_dataspace_t*/ outDataspace);
+int32_t exynos_setReadbackBuffer(hwc2_device_t *dev, hwc2_display_t display,
+        buffer_handle_t buffer, int32_t releaseFence);
+int32_t exynos_getReadbackBufferFence(hwc2_device_t *dev, hwc2_display_t display,
+        int32_t* outFence);
 
 enum {
     NO_DRM = 0,

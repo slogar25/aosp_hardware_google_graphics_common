@@ -101,9 +101,9 @@ hwc2_function_pointer_t exynos_function_pointer[] =
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_LAYER_FLOAT_COLOR
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setLayerPerFrameMetadata),    //HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getPerFrameMetadataKeys),     //HWC2_FUNCTION_GET_PER_FRAME_METADATA_KEYS
-    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_SET_READBACK_BUFFER
-    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_GET_READBACK_BUFFER_ATTRIBUTES
-    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               // HWC2_FUNCTION_GET_READBACK_BUFFER_FENCE
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setReadbackBuffer),           //HWC2_FUNCTION_SET_READBACK_BUFFER
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getReadbackBufferAttributes), //HWC2_FUNCTION_GET_READBACK_BUFFER_ATTRIBUTES
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getReadbackBufferFence),      //HWC2_FUNCTION_GET_READBACK_BUFFER_FENCE
 #ifdef HWC_SUPPORT_RENDER_INTENT
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getRenderIntents),            //HWC2_FUNCTION_GET_RENDER_INTENTS
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setColorModeWithRenderIntent),//HWC2_FUNCTION_SET_COLOR_MODE_WITH_RENDER_INTENT
@@ -498,6 +498,8 @@ int32_t exynos_presentDisplay(hwc2_device_t *dev, hwc2_display_t display,
             }
         }
         int32_t ret = exynosDisplay->presentDisplay(outRetireFence);
+        if (ret != HWC2_ERROR_NOT_VALIDATED)
+            exynosDisplay->presentPostProcessing();
         exynosDisplay->mHWCRenderingState = RENDERING_STATE_PRESENTED;
         return ret;
     }
@@ -917,6 +919,46 @@ int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* __unused dev, hwc2_display
         }
     }
     return NO_ERROR;
+}
+
+int32_t exynos_getReadbackBufferAttributes(hwc2_device_t *dev, hwc2_display_t display,
+        int32_t* /*android_pixel_format_t*/ outFormat,
+        int32_t* /*android_dataspace_t*/ outDataspace) {
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->getReadbackBufferAttributes(outFormat, outDataspace);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_setReadbackBuffer(hwc2_device_t *dev, hwc2_display_t display,
+        buffer_handle_t buffer, int32_t releaseFence) {
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->setReadbackBuffer(buffer, releaseFence);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_getReadbackBufferFence(hwc2_device_t *dev, hwc2_display_t display,
+        int32_t* outFence) {
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->getReadbackBufferFence(outFence);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
 }
  /* ************************************************************************************/
 

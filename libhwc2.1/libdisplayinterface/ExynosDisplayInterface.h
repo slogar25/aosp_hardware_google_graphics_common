@@ -51,7 +51,7 @@ class ExynosDisplayInterface {
                 uint32_t __unused y_pos) {return NO_ERROR;};
         virtual int32_t updateHdrCapabilities();
         virtual int32_t deliverWinConfigData() {return NO_ERROR;};
-        virtual int32_t clearDisplay() {return NO_ERROR;};
+        virtual int32_t clearDisplay(bool __unused readback = false) {return NO_ERROR;};
         virtual int32_t disableSelfRefresh(uint32_t __unused disable) {return NO_ERROR;};
         virtual int32_t setForcePanic() {return NO_ERROR;};
         virtual int getDisplayFd() {return -1;};
@@ -61,6 +61,8 @@ class ExynosDisplayInterface {
         virtual int32_t getRenderIntents(int32_t __unused mode, uint32_t* __unused outNumIntents,
                 int32_t* __unused outIntents) {return 0;}
         virtual int32_t setColorModeWithRenderIntent(int32_t __unused mode, int32_t __unused intent) {return 0;}
+        virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
+                int32_t* /*android_dataspace_t*/ outDataspace);
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

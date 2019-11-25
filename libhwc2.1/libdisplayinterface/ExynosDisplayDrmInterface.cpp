@@ -934,7 +934,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::clearDisplay()
+int32_t ExynosDisplayDrmInterface::clearDisplay(bool __unused readback)
 {
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);

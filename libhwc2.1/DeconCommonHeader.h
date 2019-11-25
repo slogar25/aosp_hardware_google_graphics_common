@@ -18,13 +18,10 @@
  ****************************************************************************/
 #ifndef _DECON_COMMON_HELPER_H
 #define _DECON_COMMON_HELPER_H
-
 #define HDR_CAPABILITIES_NUM 4
 #define MAX_FMT_CNT 64
 #define MAX_DPP_CNT 7
-
 typedef unsigned int u32;
-
 enum decon_psr_mode {
   DECON_VIDEO_MODE = 0,
   DECON_DP_PSR_MODE = 1,
@@ -160,7 +157,6 @@ struct dpp_size_range {
   u32 max;
   u32 align;
 };
-
 struct dpp_restriction {
   struct dpp_size_range src_f_w;
   struct dpp_size_range src_f_h;
@@ -185,14 +181,12 @@ struct dpp_restriction {
   u32 scale_up;
   u32 reserved[6];
 };
-
 struct dpp_ch_restriction {
   int id;
   unsigned long attr;
   struct dpp_restriction restriction;
   u32 reserved[4];
 };
-
 struct dpp_restrictions_info {
   u32 ver;
   struct dpp_ch_restriction dpp_ch[MAX_DPP_CNT];

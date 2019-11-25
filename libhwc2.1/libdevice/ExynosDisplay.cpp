@@ -1998,6 +1998,12 @@ int ExynosDisplay::setReleaseFences() {
             fence_close(mDpuData.configs[i].acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
         mDpuData.configs[i].acq_fence = -1;
     }
+    // DPU doesn't close rel_fence of readback buffer, HWC should close it
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+    }
 
     for (size_t i = 0; i < mLayers.size(); i++) {
         if ((mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT) ||
@@ -2565,7 +2571,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     if ((mLayers.size() == 0) &&
         (mDisplayId != HWC_DISPLAY_VIRTUAL)) {
-        clearDisplay();
+        clearDisplay(mDpuData.enable_readback);
         *outRetireFence = -1;
         mLastRetireFence = fence_close(mLastRetireFence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP);
@@ -2750,6 +2756,13 @@ not_validated:
     return HWC2_ERROR_NOT_VALIDATED;
 }
 
+int32_t ExynosDisplay::presentPostProcessing()
+{
+    setReadbackBufferInternal(NULL, -1);
+    mDpuData.enable_readback = false;
+    return NO_ERROR;
+}
+
 int32_t ExynosDisplay::setActiveConfig(
         hwc2_config_t config) {
     return mDisplayInterface->setActiveConfig(config);
@@ -2872,9 +2885,9 @@ int32_t ExynosDisplay::setOutputBuffer(
     return 0;
 }
 
-int ExynosDisplay::clearDisplay() {
+int ExynosDisplay::clearDisplay(bool readback) {
 
-    const int ret = mDisplayInterface->clearDisplay();
+    const int ret = mDisplayInterface->clearDisplay(readback);
     if (ret)
         DISPLAY_LOGE("fail to clear display");
 
@@ -3985,6 +3998,17 @@ void ExynosDisplay::closeFencesForSkipFrame(rendering_state renderingState)
         }
     }
 
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+    }
+    if (mDpuData.readback_info.acq_fence >= 0) {
+        mDpuData.readback_info.acq_fence =
+            fence_close(mDpuData.readback_info.acq_fence, this,
+                    FENCE_TYPE_READBACK_ACQUIRE, FENCE_IP_DPP);
+    }
+
     if (renderingState >= RENDERING_STATE_VALIDATED) {
         if (mDisplayControl.earlyStartMPP == true) {
             if (mExynosCompositionInfo.mHasCompositionLayer) {
@@ -4079,6 +4103,17 @@ void ExynosDisplay::closeFences()
     mDpuData.retire_fence = -1;
 
     mLastRetireFence = fence_close(mLastRetireFence, this,  FENCE_TYPE_RETIRE, FENCE_IP_DPP);
+
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+    }
+    if (mDpuData.readback_info.acq_fence >= 0) {
+        mDpuData.readback_info.acq_fence =
+            fence_close(mDpuData.readback_info.acq_fence, this,
+                    FENCE_TYPE_READBACK_ACQUIRE, FENCE_IP_DPP);
+    }
 }
 
 void ExynosDisplay::setHWCControl(uint32_t ctrl, int32_t val)
@@ -4171,6 +4206,101 @@ void ExynosDisplay::increaseMPPDstBufIndex() {
         (mExynosCompositionInfo.mM2mMPP != NULL)) {
         mExynosCompositionInfo.mM2mMPP->increaseDstBuffIndex();
     }
+}
+
+int32_t ExynosDisplay::getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
+        int32_t* /*android_dataspace_t*/ outDataspace)
+{
+    int32_t ret = mDisplayInterface->getReadbackBufferAttributes(outFormat, outDataspace);
+    if (ret == NO_ERROR) {
+        mDisplayControl.readbackSupport = true;
+        ALOGI("readback info: format(0x%8x), dataspace(0x%8x)", *outFormat, *outDataspace);
+    } else {
+        mDisplayControl.readbackSupport = false;
+        ALOGI("readback is not supported, ret(%d)", ret);
+        ret = HWC2_ERROR_UNSUPPORTED;
+    }
+    return ret;
+}
+
+int32_t ExynosDisplay::setReadbackBuffer(buffer_handle_t buffer, int32_t releaseFence)
+{
+    int32_t ret = NO_ERROR;
+
+    if (buffer == nullptr)
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    if (mDisplayControl.readbackSupport) {
+        mDpuData.enable_readback = true;
+    } else {
+        DISPLAY_LOGE("readback is not supported but setReadbackBuffer is called, buffer(%p), releaseFence(%d)",
+                buffer, releaseFence);
+        if (releaseFence >= 0)
+            releaseFence = fence_close(releaseFence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+        mDpuData.enable_readback = false;
+        ret = HWC2_ERROR_UNSUPPORTED;
+    }
+    setReadbackBufferInternal(buffer, releaseFence);
+    return ret;
+}
+
+void ExynosDisplay::setReadbackBufferInternal(buffer_handle_t buffer, int32_t releaseFence)
+{
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+        DISPLAY_LOGE("previous readback release fence is not delivered to display device");
+    }
+    if (releaseFence >= 0) {
+        setFenceInfo(releaseFence, this, FENCE_TYPE_READBACK_RELEASE,
+                FENCE_IP_FB, FENCE_FROM);
+    }
+    mDpuData.readback_info.rel_fence = releaseFence;
+
+    private_handle_t *handle = NULL;
+    if (buffer != NULL)
+        handle = private_handle_t::dynamicCast(buffer);
+    mDpuData.readback_info.handle = handle;
+}
+
+int32_t ExynosDisplay::getReadbackBufferFence(int32_t* outFence)
+{
+    /*
+     * acq_fence was not set or
+     * it was already closed by error or frame skip
+     */
+    if (mDpuData.readback_info.acq_fence < 0) {
+        *outFence = -1;
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    *outFence = mDpuData.readback_info.acq_fence;
+    /* Fence will be closed by caller of this function */
+    mDpuData.readback_info.acq_fence = -1;
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplay::setReadbackBufferAcqFence(int32_t acqFence) {
+    if (mDpuData.readback_info.acq_fence >= 0) {
+        mDpuData.readback_info.acq_fence =
+            fence_close(mDpuData.readback_info.acq_fence, this,
+                    FENCE_TYPE_READBACK_ACQUIRE, FENCE_IP_DPP);
+        DISPLAY_LOGE("previous readback out fence is not delivered to framework");
+    }
+    mDpuData.readback_info.acq_fence = acqFence;
+    if (acqFence >= 0) {
+        /*
+         * Requtester of readback will get acqFence after presentDisplay
+         * so validateFences should not check this fence
+         * in presentDisplay so this function sets pendingAllowed parameter.
+         */
+        setFenceInfo(acqFence, this, FENCE_TYPE_READBACK_ACQUIRE,
+                FENCE_IP_DPP, FENCE_FROM, true);
+    }
+
+    return NO_ERROR;
 }
 
 void ExynosDisplay::initDisplayInterface(uint32_t __unused interfaceType)

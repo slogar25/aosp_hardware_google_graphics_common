@@ -180,7 +180,9 @@ typedef enum hwc_fdebug_fence_type_t {
     FENCE_TYPE_FREE_ACQUIRE = 6,
     FENCE_TYPE_HW_STATE = 7,
     FENCE_TYPE_RETIRE = 8,
-    FENCE_TYPE_ALL = 9,
+    FENCE_TYPE_READBACK_ACQUIRE = 9,
+    FENCE_TYPE_READBACK_RELEASE = 10,
+    FENCE_TYPE_ALL = 11,
     FENCE_TYPE_UNDEFINED = 100
 } hwc_fdebug_fence_type;
 

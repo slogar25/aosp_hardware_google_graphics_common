@@ -100,7 +100,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         virtual int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
         virtual int32_t updateHdrCapabilities();
         virtual int32_t deliverWinConfigData();
-        virtual int32_t clearDisplay();
+        virtual int32_t clearDisplay(bool readback = false);
         virtual int32_t disableSelfRefresh(uint32_t disable);
         virtual int32_t setForcePanic();
         virtual int getDisplayFd() { return mDrmDevice->fd(); };

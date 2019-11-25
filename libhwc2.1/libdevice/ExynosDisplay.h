@@ -101,6 +101,20 @@ struct ExynosFrameInfo
     exynos_image dstInfo[NUM_SKIP_STATIC_LAYER];
 };
 
+struct exynos_readback_info
+{
+    private_handle_t *handle = NULL;
+    /* release sync fence file descriptor,
+     * which will be signaled when it is safe to write to the output buffer.
+     */
+    int rel_fence = -1;
+    /* acquire sync fence file descriptor which will signal when the
+     * buffer provided to setReadbackBuffer has been filled by the device and is
+     * safe for the client to read.
+     */
+    int acq_fence = -1;
+};
+
 struct exynos_win_config_data
 {
     enum {
@@ -142,7 +156,9 @@ struct exynos_dpu_data
     int retire_fence = -1;
     std::vector<exynos_win_config_data> configs;
     bool enable_win_update = false;
+    bool enable_readback = false;
     struct decon_frame win_update_region = {0, 0, 0, 0, 0, 0};
+    struct exynos_readback_info readback_info;
 
     void init(uint32_t configNum) {
         for(uint32_t i = 0; i < configNum; i++)
@@ -157,6 +173,11 @@ struct exynos_dpu_data
         retire_fence = -1;
         for (uint32_t i = 0; i < configs.size(); i++)
             configs[i].reset();
+
+        /*
+         * Should not initialize readback_info
+         * readback_info should be initialized after present
+         */
     };
     exynos_dpu_data& operator =(const exynos_dpu_data &configs_data){
         retire_fence = configs_data.retire_fence;
@@ -250,6 +271,8 @@ struct DisplayControl {
     bool adjustDisplayFrame;
     /** setCursorPosition support **/
     bool cursorSupport;
+    /** readback support **/
+    bool readbackSupport = false;
 };
 
 class ExynosDisplay {
@@ -588,6 +611,7 @@ class ExynosDisplay {
          * HWC2_PFN_PRESENT_DISPLAY
          */
         virtual int32_t presentDisplay(int32_t* outRetireFence);
+        virtual int32_t presentPostProcessing();
 
         /* setActiveConfig(..., config)
          * Descriptor: HWC2_FUNCTION_SET_ACTIVE_CONFIG
@@ -626,7 +650,7 @@ class ExynosDisplay {
                 buffer_handle_t buffer,
                 int32_t releaseFence);
 
-        virtual int clearDisplay();
+        virtual int clearDisplay(bool readback = false);
 
         /* setPowerMode(..., mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
@@ -663,6 +687,14 @@ class ExynosDisplay {
 
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
+
+        int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
+                int32_t* /*android_dataspace_t*/ outDataspace);
+        int32_t setReadbackBuffer(buffer_handle_t buffer, int32_t releaseFence);
+        void setReadbackBufferInternal(buffer_handle_t buffer, int32_t releaseFence);
+        int32_t getReadbackBufferFence(int32_t* outFence);
+        /* This function is called by ExynosDisplayInterface class to set acquire fence*/
+        int32_t setReadbackBufferAcqFence(int32_t acqFence);
 
         void dump(String8& result);
 
