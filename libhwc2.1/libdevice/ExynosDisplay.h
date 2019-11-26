@@ -129,7 +129,7 @@ struct exynos_win_config_data
     int fd_idma[3] = {-1, -1, -1};
     int acq_fence = -1;
     int rel_fence = -1;
-    float plane_alpha = 0;
+    float plane_alpha = 1;
     int32_t blending = HWC2_BLEND_MODE_NONE;
     ExynosMPP* assignedMPP = NULL;
     int format = 0;
