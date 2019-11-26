@@ -320,6 +320,7 @@ uint32_t DpuFormatToHalFormat(int format);
 int halFormatToDrmFormat(int format, bool compressed);
 #define MAX_SAME_HAL_PIXEL_FORMAT 10
 uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat, uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT]);
+int drmFormatToHalFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DpuFormatToBpp(decon_pixel_format format);
 enum decon_blending halBlendingToDpuBlending(int32_t blending);
