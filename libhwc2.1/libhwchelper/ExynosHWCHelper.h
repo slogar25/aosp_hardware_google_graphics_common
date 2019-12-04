@@ -77,6 +77,7 @@ typedef enum format_type {
     RGB             = 0x00000001,
     YUV420          = 0x00000002,
     YUV422          = 0x00000004,
+    P010            = 0x00000008,
 
     /* bit */
     BIT_SHIFT       = 12,
@@ -171,9 +172,9 @@ const format_description_t exynos_format_desc[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B, DECON_PIXEL_FORMAT_NV12N_10B, DRM_FORMAT_UNDEFINED,
         2, 1, 12, YUV420|BIT10|BIT8_2, false, String8("EXYNOS_YCbCr_420_SPN_S10B"), 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M, DECON_PIXEL_FORMAT_NV12M_P010, DRM_FORMAT_P010,
-        2, 2, 24, YUV420|BIT10, false, String8("EXYNOS_YCbCr_P010_M"), 0},
+        2, 2, 24, YUV420|BIT10|P010, false, String8("EXYNOS_YCbCr_P010_M"), 0},
     {HAL_PIXEL_FORMAT_YCBCR_P010, DECON_PIXEL_FORMAT_NV12_P010, DRM_FORMAT_P010,
-        2, 1, 24, YUV420|BIT10, false, String8("EXYNOS_YCbCr_P010"), 0},
+        2, 1, 24, YUV420|BIT10|P010, false, String8("EXYNOS_YCbCr_P010"), 0},
 
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_NV12,
         2, 1, 12, YUV420|BIT8, false, String8("GOOGLE_YCrCb_420_SP"), 0},
@@ -400,6 +401,7 @@ bool isFormatYUV8_2(int format);
 bool isFormat10BitYUV420(int format);
 bool isFormatLossy(int format);
 bool isFormatSBWC(int format);
+bool isFormatP010(int format);
 bool formatHasAlphaChannel(int format);
 unsigned int isNarrowRgb(int format, android_dataspace data_space);
 bool isCompressed(const private_handle_t *handle);
@@ -504,4 +506,5 @@ bool fenceWarn(ExynosDisplay *display, uint32_t threshold);
 void printLeakFds(ExynosDisplay *display);
 bool validateFencePerFrame(ExynosDisplay *display);
 android_dataspace colorModeToDataspace(android_color_mode_t mode);
+bool hasPPC(uint32_t physicalType, uint32_t formatIndex, uint32_t rotIndex);
 #endif
