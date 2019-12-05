@@ -750,6 +750,39 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 }
             }
 
+            if (plane->standard_property().id()) {
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->standard_property().id(), dataspaceToPlaneStandard(config.dataspace, *plane));
+                if (ret < 0) {
+                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add standard property to pset for plane %d, ret(%d)",
+                            __func__, i, plane->id(), ret);
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
+            }
+
+            if (plane->transfer_property().id()) {
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->transfer_property().id(), dataspaceToPlaneTransfer(config.dataspace, *plane));
+                if (ret < 0) {
+                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add transfer property to pset for plane %d, ret(%d)",
+                            __func__, i, plane->id(), ret);
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
+            }
+
+            if (plane->range_property().id()) {
+                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
+                        plane->range_property().id(), dataspaceToPlaneRange(config.dataspace, *plane));
+                if (ret < 0) {
+                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add range property to pset for plane %d, ret(%d)",
+                            __func__, i, plane->id(), ret);
+                    drmReq.setError(ret, this);
+                    return ret;
+                }
+            }
+
             if (hasHdrInfo(config.dataspace)) {
                 int min_luminance_prop_id = plane->min_luminance_property().id();
                 int max_luminance_prop_id = plane->max_luminance_property().id();
@@ -1037,4 +1070,149 @@ uint32_t ExynosDisplayDrmInterface::getBytePerPixelOfPrimaryPlane(int format)
         return 1;
     else
         return 0;
+}
+
+uint64_t ExynosDisplayDrmInterface::dataspaceToPlaneStandard(
+        const android_dataspace dataspace, const DrmPlane& plane)
+{
+    int ret = NO_ERROR;
+    uint32_t standard = dataspace & HAL_DATASPACE_STANDARD_MASK;
+    uint64_t planeStandard = 0;
+    switch(standard) {
+        case HAL_DATASPACE_STANDARD_BT709:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT709");
+            break;
+        case HAL_DATASPACE_STANDARD_BT601_625:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT601_625");
+            break;
+        case HAL_DATASPACE_STANDARD_BT601_625_UNADJUSTED:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT601_625_UNADJUSTED");
+            break;
+        case HAL_DATASPACE_STANDARD_BT601_525:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT601_525");
+            break;
+        case HAL_DATASPACE_STANDARD_BT601_525_UNADJUSTED:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT601_525_UNADJUSTED");
+            break;
+        case HAL_DATASPACE_STANDARD_BT2020:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT2020");
+            break;
+        case HAL_DATASPACE_STANDARD_BT2020_CONSTANT_LUMINANCE:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT2020_CONSTANT_LUMINANCE");
+            break;
+        case HAL_DATASPACE_STANDARD_BT470M:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "BT470M");
+            break;
+        case HAL_DATASPACE_STANDARD_FILM:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "FILM");
+            break;
+        case HAL_DATASPACE_STANDARD_DCI_P3:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "DCI_P3");
+            break;
+        case HAL_DATASPACE_STANDARD_ADOBE_RGB:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "Adobe RGB");
+            break;
+        default:
+            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
+                    "Unspecified");
+            break;
+    }
+    if (ret) {
+        HWC_LOGE(NULL, "failed to get plane standard, datapsace(0x%8x), standard(0x%8x), ret(%d)",
+                dataspace, standard, ret);
+    }
+    return planeStandard;
+}
+
+uint64_t ExynosDisplayDrmInterface::dataspaceToPlaneTransfer(
+        const android_dataspace dataspace, const DrmPlane& plane)
+{
+    int ret = NO_ERROR;
+    uint32_t transfer = dataspace & HAL_DATASPACE_TRANSFER_MASK;
+    uint64_t planeTransfer = 0;
+    switch(transfer) {
+        case HAL_DATASPACE_TRANSFER_LINEAR:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "Linear");
+            break;
+        case HAL_DATASPACE_TRANSFER_SRGB:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "sRGB");
+            break;
+        case HAL_DATASPACE_TRANSFER_SMPTE_170M:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "SMPTE 170M");
+            break;
+        case HAL_DATASPACE_TRANSFER_GAMMA2_2:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "Gamma 2.2");
+            break;
+        case HAL_DATASPACE_TRANSFER_GAMMA2_6:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "Gamma 2.6");
+            break;
+        case HAL_DATASPACE_TRANSFER_GAMMA2_8:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "Gamma 2.8");
+            break;
+        case HAL_DATASPACE_TRANSFER_ST2084:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "ST2084");
+            break;
+        case HAL_DATASPACE_TRANSFER_HLG:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "HLG");
+            break;
+        default:
+            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
+                    "Unspecified");
+            break;
+    }
+    if (ret) {
+        HWC_LOGE(NULL, "failed to get plane transfer, datapsace(0x%8x), transfer(0x%8x), ret(%d)",
+                dataspace, transfer, ret);
+    }
+    return planeTransfer;
+}
+
+uint64_t ExynosDisplayDrmInterface::dataspaceToPlaneRange(
+        const android_dataspace dataspace, const DrmPlane& plane)
+{
+    int ret = NO_ERROR;
+    uint32_t range = dataspace & HAL_DATASPACE_RANGE_MASK;
+    uint64_t planeRange = 0;
+    switch(range) {
+        case HAL_DATASPACE_RANGE_FULL:
+            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
+                    "Full");
+            break;
+        case HAL_DATASPACE_RANGE_LIMITED:
+            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
+                    "Limited");
+            break;
+        case HAL_DATASPACE_RANGE_EXTENDED:
+            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
+                    "Extended");
+            break;
+        default:
+            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
+                    "Unspecified");
+            break;
+    }
+    if (ret) {
+        HWC_LOGE(NULL, "failed to get plane range, datapsace(0x%8x), range(0x%8x), ret(%d)",
+                dataspace, range, ret);
+    }
+    return planeRange;
 }

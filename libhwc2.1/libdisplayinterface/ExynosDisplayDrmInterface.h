@@ -78,6 +78,9 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         uint32_t getBytePerPixelOfPrimaryPlane(int format);
+        static uint64_t dataspaceToPlaneStandard(const android_dataspace dataspace, const DrmPlane& plane);
+        static uint64_t dataspaceToPlaneTransfer(const android_dataspace dataspace, const DrmPlane& plane);
+        static uint64_t dataspaceToPlaneRange(const android_dataspace dataspace, const DrmPlane& plane);
     protected:
         struct ModeState {
             bool needs_modeset = false;
