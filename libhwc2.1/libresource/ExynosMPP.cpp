@@ -2475,21 +2475,13 @@ float ExynosMPP::getAssignedCapacity()
         uint32_t srcResolution = mAssignedSources[i]->mSrcImg.w * mAssignedSources[i]->mSrcImg.h;
         uint32_t dstResolution = mAssignedSources[i]->mMidImg.w * mAssignedSources[i]->mMidImg.h;
         uint32_t maxResolution = max(srcResolution, dstResolution);
-        uint32_t tmpRotIndex = 0;
-        uint32_t formatIndex = 0;
-        uint32_t scaleIndex = 0;
         float PPC = 0;
 
         if (mAssignedSources[i]->mSrcImg.layerFlags & EXYNOS_HWC_DIM_LAYER) {
             PPC = G2D_BASE_PPC_COLORFILL;
         } else {
-            getPPCIndex(mAssignedSources[i]->mSrcImg,
-                    mAssignedSources[i]->mMidImg,
-                    formatIndex, tmpRotIndex, scaleIndex, mAssignedSources[i]->mSrcImg);
-
-            if (ppc_table_map.count(PPC_IDX(mPhysicalType, formatIndex, rotIndex)) != 0) {
-                PPC = ppc_table_map.at(PPC_IDX(mPhysicalType, formatIndex, rotIndex)).ppcList[scaleIndex];
-            }
+            PPC = getPPC(mAssignedSources[i]->mSrcImg, mAssignedSources[i]->mMidImg, mAssignedSources[i]->mSrcImg,
+                    &mAssignedSources[i]->mSrcImg, &mAssignedSources[i]->mMidImg);
         }
         srcCycles = maxResolution/PPC;
 
