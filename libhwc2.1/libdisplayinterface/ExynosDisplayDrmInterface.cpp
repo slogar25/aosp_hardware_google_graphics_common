@@ -750,16 +750,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 }
             }
 
-            if (plane->dataspace_property().id()) {
-                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(), plane->dataspace_property().id(), config.dataspace);
-                if (ret < 0) {
-                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add dataspace property to pset for plane %d, ret(%d)",
-                            __func__, i, plane->id(), ret);
-                    drmReq.setError(ret, this);
-                    return ret;
-                }
-            }
-
             if (hasHdrInfo(config.dataspace)) {
                 int min_luminance_prop_id = plane->min_luminance_property().id();
                 int max_luminance_prop_id = plane->max_luminance_property().id();
