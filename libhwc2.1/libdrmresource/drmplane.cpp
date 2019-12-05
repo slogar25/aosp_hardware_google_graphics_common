@@ -142,6 +142,18 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get compression source property");
 
+  ret = drm_->GetPlaneProperty(*this, "standard", &standard_);
+  if (ret)
+    ALOGI("Could not get standard property");
+
+  ret = drm_->GetPlaneProperty(*this, "transfer", &transfer_);
+  if (ret)
+    ALOGI("Could not get transfer property");
+
+  ret = drm_->GetPlaneProperty(*this, "range", &range_);
+  if (ret)
+    ALOGI("Could not get range property");
+
   ret = drm_->GetPlaneProperty(*this, "max_luminance", &max_luminance_);
   if (ret)
     ALOGI("Could not get max_luminance property");
@@ -166,6 +178,9 @@ int DrmPlane::Init() {
   properties_.push_back(&blend_property_);
   properties_.push_back(&in_fence_fd_property_);
   properties_.push_back(&compression_source_);
+  properties_.push_back(&standard_);
+  properties_.push_back(&transfer_);
+  properties_.push_back(&range_);
   properties_.push_back(&max_luminance_);
   properties_.push_back(&min_luminance_);
 
@@ -246,6 +261,18 @@ const DrmProperty &DrmPlane::in_fence_fd_property() const {
 
 const DrmProperty &DrmPlane::compression_source_property() const {
   return compression_source_;
+}
+
+const DrmProperty &DrmPlane::standard_property() const {
+  return standard_;
+}
+
+const DrmProperty &DrmPlane::transfer_property() const {
+  return transfer_;
+}
+
+const DrmProperty &DrmPlane::range_property() const {
+  return range_;
 }
 
 const DrmProperty &DrmPlane::max_luminance_property() const {
