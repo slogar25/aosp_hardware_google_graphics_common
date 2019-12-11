@@ -806,38 +806,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                     return ret;
                 }
             }
-
-            if (plane->compression_source_property().id()) {
-                uint64_t compression_source = 0;
-                switch (config.comp_src) {
-                    case DPP_COMP_SRC_NONE:
-                        std::tie(compression_source, ret) = plane->compression_source_property().GetEnumValueWithName(
-                                "None");
-                        break;
-                    case DPP_COMP_SRC_G2D:
-                        std::tie(compression_source, ret) = plane->compression_source_property().GetEnumValueWithName(
-                                "G2D");
-                        break;
-                    case DPP_COMP_SRC_GPU:
-                        std::tie(compression_source, ret) = plane->compression_source_property().GetEnumValueWithName(
-                                "GPU");
-                        break;
-                    default:
-                        HWC_LOGE(mExynosDisplay, "%s:: config[%zu] unknown copression source (%d)",
-                                __func__, i, config.comp_src);
-                        ret = -EINVAL;
-                        drmReq.setError(ret, this);
-                        return ret;
-                }
-                ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                        plane->compression_source_property().id(), compression_source);
-                if (ret < 0) {
-                    HWC_LOGE(mExynosDisplay, "%s:: config[%zu]: Failed to add compression source property %d for plane %d, ret(%d)",
-                            __func__, i, plane->compression_source_property().id(), plane->id(), ret);
-                    drmReq.setError(ret, this);
-                    return ret;
-                }
-            }
         }
     }
 
