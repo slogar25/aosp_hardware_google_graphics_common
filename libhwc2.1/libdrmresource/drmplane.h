@@ -57,7 +57,6 @@ class DrmPlane {
   const DrmProperty &alpha_property() const;
   const DrmProperty &blend_property() const;
   const DrmProperty &in_fence_fd_property() const;
-  const DrmProperty &compression_source_property() const;
   const DrmProperty &standard_property() const;
   const DrmProperty &transfer_property() const;
   const DrmProperty &range_property() const;
@@ -91,7 +90,6 @@ class DrmPlane {
   DrmProperty alpha_property_;
   DrmProperty blend_property_;
   DrmProperty in_fence_fd_property_;
-  DrmProperty compression_source_;
   DrmProperty standard_;
   DrmProperty transfer_;
   DrmProperty range_;
