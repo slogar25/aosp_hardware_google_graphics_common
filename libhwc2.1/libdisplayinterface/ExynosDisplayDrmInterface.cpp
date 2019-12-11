@@ -626,8 +626,20 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
             }
         }
 
-        if (config.compression)
-            modifiers[0] = DRM_FORMAT_MOD_ARM_AFBC(AFBC_FORMAT_MOD_BLOCK_SIZE_16x16);
+        if (config.compression) {
+            uint64_t compressed_modifier = AFBC_FORMAT_MOD_BLOCK_SIZE_16x16;
+            switch (config.comp_src) {
+                case DPP_COMP_SRC_G2D:
+                    compressed_modifier |= AFBC_FORMAT_MOD_SOURCE_G2D;
+                    break;
+                case DPP_COMP_SRC_GPU:
+                    compressed_modifier |= AFBC_FORMAT_MOD_SOURCE_GPU;
+                    break;
+                default:
+                    break;
+            }
+            modifiers[0] = DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
+        }
 
         ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
                 drmFormat, buf_handles, pitches, offsets, modifiers, &fbId, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
