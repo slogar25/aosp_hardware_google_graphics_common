@@ -62,6 +62,100 @@ void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
     mActiveConfig = -1;
 }
 
+void ExynosDisplayDrmInterface::parseEnums(const DrmProperty& property,
+        const std::vector<std::pair<uint32_t, const char *>> &enums,
+        std::unordered_map<uint32_t, uint64_t> &out_enums)
+{
+    uint64_t value;
+    int ret;
+    for (auto &e : enums) {
+        std::tie(value, ret) = property.GetEnumValueWithName(e.second);
+        if (ret == NO_ERROR)
+            out_enums[e.first] = value;
+        else
+            ALOGE("Fail to find enum value with name %s", e.second);
+    }
+}
+
+void ExynosDisplayDrmInterface::parseBlendEnums(const DrmProperty& property)
+{
+    const std::vector<std::pair<uint32_t, const char *>> blendEnums = {
+        {HWC2_BLEND_MODE_NONE, "None"},
+        {HWC2_BLEND_MODE_PREMULTIPLIED, "Pre-multiplied"},
+        {HWC2_BLEND_MODE_COVERAGE, "Coverage"},
+    };
+
+    ALOGD("Init blend enums");
+    parseEnums(property, blendEnums, mBlendEnums);
+    for (auto &e : mBlendEnums) {
+        ALOGD("blend [hal: %d, drm: %" PRId64 "]", e.first, e.second);
+    }
+}
+
+void ExynosDisplayDrmInterface::parseStandardEnums(const DrmProperty& property)
+{
+    const std::vector<std::pair<uint32_t, const char *>> standardEnums = {
+        {HAL_DATASPACE_STANDARD_UNSPECIFIED, "Unspecified"},
+        {HAL_DATASPACE_STANDARD_BT709, "BT709"},
+        {HAL_DATASPACE_STANDARD_BT601_625, "BT601_625"},
+        {HAL_DATASPACE_STANDARD_BT601_625_UNADJUSTED, "BT601_625_UNADJUSTED"},
+        {HAL_DATASPACE_STANDARD_BT601_525, "BT601_525"},
+        {HAL_DATASPACE_STANDARD_BT601_525_UNADJUSTED, "BT601_525_UNADJUSTED"},
+        {HAL_DATASPACE_STANDARD_BT2020, "BT2020"},
+        {HAL_DATASPACE_STANDARD_BT2020_CONSTANT_LUMINANCE, "BT2020_CONSTANT_LUMINANCE"},
+        {HAL_DATASPACE_STANDARD_BT470M, "BT470M"},
+        {HAL_DATASPACE_STANDARD_FILM, "FILM"},
+        {HAL_DATASPACE_STANDARD_DCI_P3, "DCI-P3"},
+        {HAL_DATASPACE_STANDARD_ADOBE_RGB, "Adobe RGB"},
+    };
+
+    ALOGD("Init standard enums");
+    parseEnums(property, standardEnums, mStandardEnums);
+    for (auto &e : mStandardEnums) {
+        ALOGD("standard [hal: %d, drm: %" PRId64 "]",
+                e.first >> HAL_DATASPACE_STANDARD_SHIFT, e.second);
+    }
+}
+
+void ExynosDisplayDrmInterface::parseTransferEnums(const DrmProperty& property)
+{
+    const std::vector<std::pair<uint32_t, const char *>> transferEnums = {
+        {HAL_DATASPACE_TRANSFER_UNSPECIFIED, "Unspecified"},
+        {HAL_DATASPACE_TRANSFER_LINEAR, "Linear"},
+        {HAL_DATASPACE_TRANSFER_SRGB, "sRGB"},
+        {HAL_DATASPACE_TRANSFER_SMPTE_170M, "SMPTE 170M"},
+        {HAL_DATASPACE_TRANSFER_GAMMA2_2, "Gamma 2.2"},
+        {HAL_DATASPACE_TRANSFER_GAMMA2_6, "Gamma 2.6"},
+        {HAL_DATASPACE_TRANSFER_GAMMA2_8, "Gamma 2.8"},
+        {HAL_DATASPACE_TRANSFER_ST2084, "ST2084"},
+        {HAL_DATASPACE_TRANSFER_HLG, "HLG"},
+    };
+
+    ALOGD("Init transfer enums");
+    parseEnums(property, transferEnums, mTransferEnums);
+    for (auto &e : mTransferEnums) {
+        ALOGD("transfer [hal: %d, drm: %" PRId64 "]",
+                e.first >> HAL_DATASPACE_TRANSFER_SHIFT, e.second);
+    }
+}
+
+void ExynosDisplayDrmInterface::parseRangeEnums(const DrmProperty& property)
+{
+    const std::vector<std::pair<uint32_t, const char *>> rangeEnums = {
+        {HAL_DATASPACE_RANGE_UNSPECIFIED, "Unspecified"},
+        {HAL_DATASPACE_RANGE_FULL, "Full"},
+        {HAL_DATASPACE_RANGE_LIMITED, "Limited"},
+        {HAL_DATASPACE_RANGE_EXTENDED, "Extended"},
+    };
+
+    ALOGD("Init range enums");
+    parseEnums(property, rangeEnums, mRangeEnums);
+    for (auto &e : mRangeEnums) {
+        ALOGD("range [hal: %d, drm: %" PRId64 "]",
+                e.first >> HAL_DATASPACE_RANGE_SHIFT, e.second);
+    }
+}
+
 void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 {
     if (mExynosDisplay == NULL) {
@@ -104,6 +198,14 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     mVsyncCallbak.init(mExynosDisplay->mDevice, mExynosDisplay);
     mDrmVSyncWorker.Init(mDrmDevice, mExynosDisplay->mDisplayId);
     mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(&mVsyncCallbak));
+
+    if (!mDrmDevice->planes().empty()) {
+        auto &plane = mDrmDevice->planes().front();
+        parseBlendEnums(plane->blend_property());
+        parseStandardEnums(plane->standard_property());
+        parseTransferEnums(plane->transfer_property());
+        parseRangeEnums(plane->range_property());
+    }
 
     chosePreferredConfig();
 
@@ -611,32 +713,15 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
             halTransformToDrmRot(config.transform), true)) < 0)
         return ret;
 
-    uint64_t blend = 0;
-    if (plane->blend_property().id()) {
-        switch (config.blending) {
-            case HWC2_BLEND_MODE_PREMULTIPLIED:
-                std::tie(blend, ret) = plane->blend_property().GetEnumValueWithName(
-                        "Pre-multiplied");
-                break;
-            case HWC2_BLEND_MODE_COVERAGE:
-                std::tie(blend, ret) = plane->blend_property().GetEnumValueWithName(
-                        "Coverage");
-                break;
-            case HWC2_BLEND_MODE_NONE:
-            default:
-                std::tie(blend, ret) = plane->blend_property().GetEnumValueWithName(
-                        "None");
-                break;
-        }
-        if (ret) {
-            HWC_LOGE(mExynosDisplay, "%s:: Failed to get blend for plane %d, blend(%" PRId64 "), ret(%d)",
-                    __func__, plane->id(), blend, ret);
-            return ret;
-        }
-        if ((ret = drmReq.atomicAddProperty(plane->id(),
-                        plane->blend_property(), blend, true)) < 0)
-            return ret;
+    uint64_t drmEnum = 0;
+    std::tie(drmEnum, ret) = halToDrmEnum(config.blending, mBlendEnums);
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "Fail to convert blend(%d)", config.blending);
+        return ret;
     }
+    if ((ret = drmReq.atomicAddProperty(plane->id(),
+                    plane->blend_property(), drmEnum, true)) < 0)
+        return ret;
 
     if (plane->zpos_property().id() &&
         !plane->zpos_property().is_immutable()) {
@@ -667,19 +752,38 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
             return ret;
     }
 
+    std::tie(drmEnum, ret) =
+        halToDrmEnum(config.dataspace & HAL_DATASPACE_STANDARD_MASK, mStandardEnums);
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "Fail to convert standard(%d)",
+                config.dataspace & HAL_DATASPACE_STANDARD_MASK);
+        return ret;
+    }
     if ((ret = drmReq.atomicAddProperty(plane->id(),
                     plane->standard_property(),
-                    dataspaceToPlaneStandard(config.dataspace, *plane), true)) < 0)
+                    drmEnum, true)) < 0)
         return ret;
 
+    std::tie(drmEnum, ret) =
+        halToDrmEnum(config.dataspace & HAL_DATASPACE_TRANSFER_MASK, mTransferEnums);
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "Fail to convert transfer(%d)",
+                config.dataspace & HAL_DATASPACE_TRANSFER_MASK);
+        return ret;
+    }
     if ((ret = drmReq.atomicAddProperty(plane->id(),
-                    plane->transfer_property(),
-                    dataspaceToPlaneTransfer(config.dataspace, *plane), true)) < 0)
+                    plane->transfer_property(), drmEnum, true)) < 0)
         return ret;
 
+    std::tie(drmEnum, ret) =
+        halToDrmEnum(config.dataspace & HAL_DATASPACE_RANGE_MASK, mRangeEnums);
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "Fail to convert range(%d)",
+                config.dataspace & HAL_DATASPACE_RANGE_MASK);
+        return ret;
+    }
     if ((ret = drmReq.atomicAddProperty(plane->id(),
-                    plane->range_property(),
-                    dataspaceToPlaneRange(config.dataspace, *plane), true)) < 0)
+                    plane->range_property(), drmEnum, true)) < 0)
         return ret;
 
     if (hasHdrInfo(config.dataspace)) {
@@ -997,147 +1101,15 @@ uint32_t ExynosDisplayDrmInterface::getBytePerPixelOfPrimaryPlane(int format)
         return 0;
 }
 
-uint64_t ExynosDisplayDrmInterface::dataspaceToPlaneStandard(
-        const android_dataspace dataspace, const DrmPlane& plane)
+std::tuple<uint64_t, int> ExynosDisplayDrmInterface::halToDrmEnum(
+        const int32_t halData, const DrmPropertyMap &drmEnums)
 {
-    int ret = NO_ERROR;
-    uint32_t standard = dataspace & HAL_DATASPACE_STANDARD_MASK;
-    uint64_t planeStandard = 0;
-    switch(standard) {
-        case HAL_DATASPACE_STANDARD_BT709:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT709");
-            break;
-        case HAL_DATASPACE_STANDARD_BT601_625:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT601_625");
-            break;
-        case HAL_DATASPACE_STANDARD_BT601_625_UNADJUSTED:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT601_625_UNADJUSTED");
-            break;
-        case HAL_DATASPACE_STANDARD_BT601_525:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT601_525");
-            break;
-        case HAL_DATASPACE_STANDARD_BT601_525_UNADJUSTED:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT601_525_UNADJUSTED");
-            break;
-        case HAL_DATASPACE_STANDARD_BT2020:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT2020");
-            break;
-        case HAL_DATASPACE_STANDARD_BT2020_CONSTANT_LUMINANCE:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT2020_CONSTANT_LUMINANCE");
-            break;
-        case HAL_DATASPACE_STANDARD_BT470M:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "BT470M");
-            break;
-        case HAL_DATASPACE_STANDARD_FILM:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "FILM");
-            break;
-        case HAL_DATASPACE_STANDARD_DCI_P3:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "DCI_P3");
-            break;
-        case HAL_DATASPACE_STANDARD_ADOBE_RGB:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "Adobe RGB");
-            break;
-        default:
-            std::tie(planeStandard, ret) = plane.standard_property().GetEnumValueWithName(
-                    "Unspecified");
-            break;
+    auto it = drmEnums.find(halData);
+    if (it != drmEnums.end()) {
+        return std::make_tuple(it->second, 0);
+    } else {
+        HWC_LOGE(NULL, "%s::Failed to find standard enum(%d)",
+                __func__, halData);
+        return std::make_tuple(0, -EINVAL);
     }
-    if (ret) {
-        HWC_LOGE(NULL, "failed to get plane standard, datapsace(0x%8x), standard(0x%8x), ret(%d)",
-                dataspace, standard, ret);
-    }
-    return planeStandard;
-}
-
-uint64_t ExynosDisplayDrmInterface::dataspaceToPlaneTransfer(
-        const android_dataspace dataspace, const DrmPlane& plane)
-{
-    int ret = NO_ERROR;
-    uint32_t transfer = dataspace & HAL_DATASPACE_TRANSFER_MASK;
-    uint64_t planeTransfer = 0;
-    switch(transfer) {
-        case HAL_DATASPACE_TRANSFER_LINEAR:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "Linear");
-            break;
-        case HAL_DATASPACE_TRANSFER_SRGB:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "sRGB");
-            break;
-        case HAL_DATASPACE_TRANSFER_SMPTE_170M:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "SMPTE 170M");
-            break;
-        case HAL_DATASPACE_TRANSFER_GAMMA2_2:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "Gamma 2.2");
-            break;
-        case HAL_DATASPACE_TRANSFER_GAMMA2_6:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "Gamma 2.6");
-            break;
-        case HAL_DATASPACE_TRANSFER_GAMMA2_8:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "Gamma 2.8");
-            break;
-        case HAL_DATASPACE_TRANSFER_ST2084:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "ST2084");
-            break;
-        case HAL_DATASPACE_TRANSFER_HLG:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "HLG");
-            break;
-        default:
-            std::tie(planeTransfer, ret) = plane.transfer_property().GetEnumValueWithName(
-                    "Unspecified");
-            break;
-    }
-    if (ret) {
-        HWC_LOGE(NULL, "failed to get plane transfer, datapsace(0x%8x), transfer(0x%8x), ret(%d)",
-                dataspace, transfer, ret);
-    }
-    return planeTransfer;
-}
-
-uint64_t ExynosDisplayDrmInterface::dataspaceToPlaneRange(
-        const android_dataspace dataspace, const DrmPlane& plane)
-{
-    int ret = NO_ERROR;
-    uint32_t range = dataspace & HAL_DATASPACE_RANGE_MASK;
-    uint64_t planeRange = 0;
-    switch(range) {
-        case HAL_DATASPACE_RANGE_FULL:
-            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
-                    "Full");
-            break;
-        case HAL_DATASPACE_RANGE_LIMITED:
-            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
-                    "Limited");
-            break;
-        case HAL_DATASPACE_RANGE_EXTENDED:
-            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
-                    "Extended");
-            break;
-        default:
-            std::tie(planeRange, ret) = plane.range_property().GetEnumValueWithName(
-                    "Unspecified");
-            break;
-    }
-    if (ret) {
-        HWC_LOGE(NULL, "failed to get plane range, datapsace(0x%8x), range(0x%8x), ret(%d)",
-                dataspace, range, ret);
-    }
-    return planeRange;
 }

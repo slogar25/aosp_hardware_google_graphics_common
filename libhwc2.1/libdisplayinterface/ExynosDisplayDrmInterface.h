@@ -35,6 +35,7 @@
 #endif
 
 using namespace android;
+using DrmPropertyMap = std::unordered_map<uint32_t, uint64_t>;
 
 class ExynosDevice;
 class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
@@ -98,9 +99,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         uint32_t getBytePerPixelOfPrimaryPlane(int format);
-        static uint64_t dataspaceToPlaneStandard(const android_dataspace dataspace, const DrmPlane& plane);
-        static uint64_t dataspaceToPlaneTransfer(const android_dataspace dataspace, const DrmPlane& plane);
-        static uint64_t dataspaceToPlaneRange(const android_dataspace dataspace, const DrmPlane& plane);
+        static std::tuple<uint64_t, int> halToDrmEnum(
+                const int32_t halData, const DrmPropertyMap &drmEnums);
         int32_t addFBFromDisplayConfig(const exynos_win_config_data &config,
                 uint32_t &fbId);
         /*
@@ -112,6 +112,14 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                 const uint32_t configIndex,
                 const std::unique_ptr<DrmPlane> &plane,
                 uint32_t &fbId);
+
+        static void parseEnums(const DrmProperty& property,
+                const std::vector<std::pair<uint32_t, const char *>> &enums,
+                DrmPropertyMap &out_enums);
+        void parseBlendEnums(const DrmProperty& property);
+        void parseStandardEnums(const DrmProperty& property);
+        void parseTransferEnums(const DrmProperty& property);
+        void parseRangeEnums(const DrmProperty& property);
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -130,6 +138,11 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;
         /* TODO: Temporary variable to manage fb id */
         std::vector<uint32_t> mOldFbIds;
+
+        DrmPropertyMap mBlendEnums;
+        DrmPropertyMap mStandardEnums;
+        DrmPropertyMap mTransferEnums;
+        DrmPropertyMap mRangeEnums;
 };
 
 #endif
