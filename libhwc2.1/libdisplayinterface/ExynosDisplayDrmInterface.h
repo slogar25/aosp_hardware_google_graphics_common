@@ -55,10 +55,19 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                         uint64_t value, bool optional = false);
                 String8& dumpAtomicCommitInfo(String8 &result, bool debugPrint = false);
                 int commit(uint32_t flags, bool loggingForDebug = false);
+                void removeFbs(std::vector<uint32_t> &fbs);
+                void moveTrackedFbs(std::vector<uint32_t> &fbs);
+                int addFB2WithModifiers(
+                        uint32_t width, uint32_t height,
+                        uint32_t pixel_format, const uint32_t bo_handles[4],
+                        const uint32_t pitches[4], const uint32_t offsets[4],
+                        const uint64_t modifier[4], uint32_t *buf_id,
+                        uint32_t flags);
             private:
                 drmModeAtomicReqPtr mPset;
                 int mError = 0;
                 ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
+                std::vector<uint32_t> mFbIds;
         };
         class ExynosVsyncCallback: public VsyncCallback {
             public:
@@ -101,7 +110,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         uint32_t getBytePerPixelOfPrimaryPlane(int format);
         static std::tuple<uint64_t, int> halToDrmEnum(
                 const int32_t halData, const DrmPropertyMap &drmEnums);
-        int32_t addFBFromDisplayConfig(const exynos_win_config_data &config,
+        int32_t addFBFromDisplayConfig(DrmModeAtomicReq &drmReq,
+                const exynos_win_config_data &config,
                 uint32_t &fbId);
         /*
          * This function adds FB and gets new fb id if fbId is 0,

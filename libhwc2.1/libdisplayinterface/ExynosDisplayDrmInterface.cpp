@@ -580,6 +580,7 @@ int ExynosDisplayDrmInterface::getDeconChannel(ExynosMPP *otfMPP)
 }
 
 int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
+        DrmModeAtomicReq &drmReq,
         const exynos_win_config_data &config, uint32_t &fbId)
 {
     int ret = NO_ERROR;
@@ -641,7 +642,7 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
             modifiers[0] = DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
         }
 
-        ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.src.f_w, config.src.f_h,
+        ret = drmReq.addFB2WithModifiers(config.src.f_w, config.src.f_h,
                 drmFormat, buf_handles, pitches, offsets, modifiers, &fbId, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
     } else if (config.state == config.WIN_STATE_COLOR) {
         modifiers[0] = DRM_FORMAT_MOD_SAMSUNG_COLORMAP;
@@ -650,7 +651,7 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
         bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
         pitches[0] = config.dst.w * bpp;
 
-        ret = drmModeAddFB2WithModifiers(mDrmDevice->fd(), config.dst.w, config.dst.h,
+        ret = drmReq.addFB2WithModifiers(config.dst.w, config.dst.h,
                 drmFormat, buf_handles, pitches, offsets, modifiers, &fbId, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
     } else {
         HWC_LOGE(mExynosDisplay, "%s:: known config state(%d)",
@@ -682,10 +683,12 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
 {
     int ret = NO_ERROR;
 
-    if ((fbId == 0) && (ret = addFBFromDisplayConfig(config, fbId)) < 0) {
-        HWC_LOGE(mExynosDisplay, "%s:: Failed to add FB, fbId(%d), ret(%d)",
-                __func__, fbId, ret);
-        return ret;
+    if (fbId == 0) {
+        if ((ret = addFBFromDisplayConfig(drmReq, config, fbId)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s:: Failed to add FB, fbId(%d), ret(%d)",
+                    __func__, fbId, ret);
+            return ret;
+        }
     }
 
     if ((ret = drmReq.atomicAddProperty(plane->id(),
@@ -815,7 +818,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
-    std::vector<uint32_t> fbIds(getMaxWindowNum(), 0);
     android::String8 result;
 
     uint64_t out_fences[mDrmDevice->crtcs().size()];
@@ -846,7 +848,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 config.src.h = config.dst.h;
             }
             auto &plane = mDrmDevice->planes().at(channelId);
-            if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbIds[i])) < 0) {
+            uint32_t fbId = 0;
+            if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
                 HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
                 return ret;
             }
@@ -882,11 +885,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         return ret;
     }
 
-    for (size_t i = 0; i < getMaxWindowNum(); i++) {
-        if (mOldFbIds[i])
-            drmModeRmFB(mDrmDevice->fd(), mOldFbIds[i]);
-        mOldFbIds[i] = fbIds[i];
-    }
+    drmReq.removeFbs(mOldFbIds);
+    drmReq.moveTrackedFbs(mOldFbIds);
 
     mExynosDisplay->mDpuData.retire_fence = (int)out_fences[mDrmCrtc->pipe()];
     /*
@@ -978,11 +978,14 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::DrmModeAtomicReq(ExynosDisplayDrmIn
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
 {
-    if ((mError != 0) && (mDrmDisplayInterface != NULL)) {
-        android::String8 result;
-        result.appendFormat("atomic commit error\n");
-        dumpAtomicCommitInfo(result);
-        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.string());
+    if (mDrmDisplayInterface != NULL) {
+        removeFbs(mFbIds);
+        if (mError != 0) {
+            android::String8 result;
+            result.appendFormat("atomic commit error\n");
+            dumpAtomicCommitInfo(result);
+            HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.string());
+        }
     }
     if(mPset)
         drmModeAtomicFree(mPset);
@@ -1098,6 +1101,35 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
         dumpAtomicCommitInfo(result, true);
     if (ret < 0)
         setError(ret);
+    return ret;
+}
+
+void ExynosDisplayDrmInterface::DrmModeAtomicReq::removeFbs(std::vector<uint32_t> &fbs)
+{
+    for (auto &fb : fbs) {
+        drmModeRmFB(mDrmDisplayInterface->mDrmDevice->fd(), fb);
+    }
+}
+
+void ExynosDisplayDrmInterface::DrmModeAtomicReq::moveTrackedFbs(std::vector<uint32_t> &fbs)
+{
+    fbs = mFbIds;
+    mFbIds.clear();
+}
+
+int ExynosDisplayDrmInterface::DrmModeAtomicReq::addFB2WithModifiers(
+        uint32_t width, uint32_t height,
+        uint32_t pixel_format, const uint32_t bo_handles[4],
+        const uint32_t pitches[4], const uint32_t offsets[4],
+        const uint64_t modifier[4], uint32_t *buf_id,
+        uint32_t flags)
+{
+    int ret = drmModeAddFB2WithModifiers(mDrmDisplayInterface->mDrmDevice->fd(),
+            width, height, pixel_format, bo_handles, pitches,
+            offsets, modifier, buf_id, flags);
+    if (!ret)
+        mFbIds.push_back(*buf_id);
+
     return ret;
 }
 
