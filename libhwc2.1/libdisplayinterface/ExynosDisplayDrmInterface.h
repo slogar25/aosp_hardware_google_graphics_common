@@ -52,6 +52,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                 int32_t atomicAddProperty(const uint32_t id,
                         const DrmProperty &property,
                         uint64_t value, bool optional = false);
+                String8& dumpAtomicCommitInfo(String8 &result, bool debugPrint = false);
+                int commit(uint32_t flags, bool loggingForDebug = false);
             private:
                 drmModeAtomicReqPtr mPset;
                 int mError = 0;
@@ -93,7 +95,6 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         inline virtual uint32_t getMaxWindowNum();
     protected:
         int32_t applyDisplayMode();
-        String8& dumpAtomicCommitInfo(String8 &result, drmModeAtomicReqPtr pset, bool debugPrint = false);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         uint32_t getBytePerPixelOfPrimaryPlane(int format);

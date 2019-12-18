@@ -321,7 +321,9 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config)
     mModeState.blob_id = id;
     mModeState.needs_modeset = true;
 
-    applyDisplayMode();
+    if (applyDisplayMode() < 0)
+        HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
+                __func__);
     return 0;
 }
 
@@ -333,32 +335,19 @@ int32_t ExynosDisplayDrmInterface::applyDisplayMode()
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);
 
-    ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmCrtc->id(),
-           mDrmCrtc->active_property().id(), 1);
-    if (ret < 0) {
-        HWC_LOGE(mExynosDisplay, "%s:: Failed to add crtc active to pset, ret(%d)",
-                __func__, ret);
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+           mDrmCrtc->active_property(), 1)) < 0)
         return ret;
-    }
 
-    ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmCrtc->id(),
-            mDrmCrtc->mode_property().id(), mModeState.blob_id);
-    if (ret < 0) {
-        HWC_LOGE(mExynosDisplay, "%s:: Failed to add mode %d to pset, ret(%d)",
-                __func__, mModeState.blob_id, ret);
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+            mDrmCrtc->mode_property(), mModeState.blob_id)) < 0)
         return ret;
-    }
 
-    ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmConnector->id(),
-            mDrmConnector->crtc_id_property().id(), mDrmCrtc->id());
-    if (ret < 0) {
-        HWC_LOGE(mExynosDisplay, "%s:: Failed to add crtc id %d to pset, ret(%d)",
-                __func__, mDrmCrtc->id(), ret);
+    if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+            mDrmConnector->crtc_id_property(), mDrmCrtc->id())) < 0)
         return ret;
-    }
 
-    uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
-    ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
+    ret = drmReq.commit(DRM_MODE_ATOMIC_ALLOW_MODESET, true);
     if (ret) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
                 __func__, ret);
@@ -717,7 +706,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
                     mDrmCrtc->out_fence_ptr_property(),
                     (uint64_t)&out_fences[mDrmCrtc->pipe()], true)) < 0) {
-        drmReq.setError(ret);
         return ret;
     }
 
@@ -734,7 +722,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 HWC_LOGE(mExynosDisplay, "%s:: Failed to get channel id (%d)",
                         __func__, channelId);
                 ret = -EINVAL;
-                drmReq.setError(ret);
                 return ret;
             }
             /* src size should be set even in dim layer */
@@ -745,7 +732,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             auto &plane = mDrmDevice->planes().at(channelId);
             if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbIds[i])) < 0) {
                 HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
-                drmReq.setError(ret);
                 return ret;
             }
             /* Set this plane is enabled */
@@ -774,20 +760,16 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
-    uint32_t flags = 0;
-    ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
-    dumpAtomicCommitInfo(result, drmReq.pset(), true);
+    if ((ret = drmReq.commit(0, true)) < 0) {
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in deliverWinConfigData()\n",
+                __func__, ret);
+        return ret;
+    }
 
     for (size_t i = 0; i < getMaxWindowNum(); i++) {
         if (mOldFbIds[i])
             drmModeRmFB(mDrmDevice->fd(), mOldFbIds[i]);
         mOldFbIds[i] = fbIds[i];
-    }
-
-    if (ret) {
-        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset, ret(%d)", __func__, ret);
-        drmReq.setError(ret);
-        return ret;
     }
 
     mExynosDisplay->mDpuData.retire_fence = (int)out_fences[mDrmCrtc->pipe()];
@@ -823,24 +805,16 @@ int32_t ExynosDisplayDrmInterface::clearDisplay()
             (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mType))
             continue;
 #endif
-        ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                plane->crtc_property().id(), 0);
-        if (ret < 0) {
-            HWC_LOGE(mExynosDisplay, "%s:: Failed to disable plane %d, failed to add crtc ret(%d)",
-                    __func__, plane->id(), ret);
+        if ((ret = drmReq.atomicAddProperty(plane->id(),
+                plane->crtc_property(), 0)) < 0)
             return ret;
-        }
-        ret = drmModeAtomicAddProperty(drmReq.pset(), plane->id(),
-                plane->fb_property().id(), 0);
-        if (ret < 0) {
-            HWC_LOGE(mExynosDisplay, "%s:: Failed to disable plane %d, failed to add fb ret(%d)",
-                    __func__, plane->id(), ret);
+
+        if ((ret = drmReq.atomicAddProperty(plane->id(),
+                plane->fb_property(), 0)) < 0)
             return ret;
-        }
     }
 
-    uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
-    ret = drmModeAtomicCommit(mDrmDevice->fd(), drmReq.pset(), flags, mDrmDevice);
+    ret = drmReq.commit(DRM_MODE_ATOMIC_ALLOW_MODESET, true);
     if (ret) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in clearDisplay()\n",
                 __func__, ret);
@@ -875,77 +849,6 @@ int32_t ExynosDisplayDrmInterface::setForcePanic()
     return 0;
 }
 
-String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmModeAtomicReqPtr pset, bool debugPrint)
-{
-    /* print log only if eDebugDisplayInterfaceConfig flag is set when debugPrint is true */
-    if (debugPrint &&
-        (hwcCheckDebugMessages(eDebugDisplayInterfaceConfig) == false))
-        return result;
-
-    for (uint32_t i = 0; i < (uint32_t)drmModeAtomicGetCursor(pset); i++) {
-        const DrmProperty *property = NULL;
-        String8 objectName;
-        /* Check crtc properties */
-        if (pset->items[i].object_id == mDrmCrtc->id()) {
-            for (auto property_ptr : mDrmCrtc->properties()) {
-                if (pset->items[i].property_id == property_ptr->id()){
-                    property = property_ptr;
-                    objectName.appendFormat("Crtc");
-                    break;
-                }
-            }
-            if (property == NULL) {
-                HWC_LOGE(mExynosDisplay, "%s:: object id is crtc but there is no matched property",
-                        __func__);
-            }
-        } else if (pset->items[i].object_id == mDrmConnector->id()) {
-            for (auto property_ptr : mDrmConnector->properties()) {
-                if (pset->items[i].property_id == property_ptr->id()){
-                    property = property_ptr;
-                    objectName.appendFormat("Connector");
-                    break;
-                }
-            }
-            if (property == NULL) {
-                HWC_LOGE(mExynosDisplay, "%s:: object id is connector but there is no matched property",
-                        __func__);
-            }
-        } else {
-            uint32_t channelId = 0;
-            for (auto &plane : mDrmDevice->planes()) {
-                if (pset->items[i].object_id == plane->id()) {
-                    for (auto property_ptr : plane->properties()) {
-                        if (pset->items[i].property_id == property_ptr->id()){
-                            property = property_ptr;
-                            objectName.appendFormat("Plane[%d]", channelId);
-                            break;
-                        }
-                    }
-                    if (property == NULL) {
-                        HWC_LOGE(mExynosDisplay, "%s:: object id is plane but there is no matched property",
-                                __func__);
-                    }
-                }
-                channelId++;
-            }
-        }
-        if (property == NULL) {
-            HWC_LOGE(mExynosDisplay, "%s:: Fail to get property[%d] (object_id: %d, property_id: %d, value: %" PRId64 ")",
-                    __func__, i, pset->items[i].object_id, pset->items[i].property_id,
-                    pset->items[i].value);
-            continue;
-        }
-
-        if (debugPrint)
-            ALOGD("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
-                    i, objectName.string(), pset->items[i].object_id, pset->items[i].property_id, property->name().c_str(), pset->items[i].value);
-        else
-            result.appendFormat("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
-                i,  objectName.string(), pset->items[i].object_id, pset->items[i].property_id, property->name().c_str(), pset->items[i].value);
-    }
-    return result;
-}
-
 inline uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
 {
         return mDrmDevice->planes().size();
@@ -962,7 +865,7 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
     if ((mError != 0) && (mDrmDisplayInterface != NULL)) {
         android::String8 result;
         result.appendFormat("atomic commit error\n");
-        mDrmDisplayInterface->dumpAtomicCommitInfo(result, mPset);
+        dumpAtomicCommitInfo(result);
         HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.string());
     }
     if(mPset)
@@ -993,6 +896,94 @@ int32_t ExynosDisplayDrmInterface::DrmModeAtomicReq::atomicAddProperty(
     return NO_ERROR;
 }
 
+String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
+        String8 &result, bool debugPrint)
+{
+    /* print log only if eDebugDisplayInterfaceConfig flag is set when debugPrint is true */
+    if (debugPrint &&
+        (hwcCheckDebugMessages(eDebugDisplayInterfaceConfig) == false))
+        return result;
+
+    for (int i = 0; i < drmModeAtomicGetCursor(mPset); i++) {
+        const DrmProperty *property = NULL;
+        String8 objectName;
+        /* Check crtc properties */
+        if (mPset->items[i].object_id == mDrmDisplayInterface->mDrmCrtc->id()) {
+            for (auto property_ptr : mDrmDisplayInterface->mDrmCrtc->properties()) {
+                if (mPset->items[i].property_id == property_ptr->id()){
+                    property = property_ptr;
+                    objectName.appendFormat("Crtc");
+                    break;
+                }
+            }
+            if (property == NULL) {
+                HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                        "%s:: object id is crtc but there is no matched property",
+                        __func__);
+            }
+        } else if (mPset->items[i].object_id == mDrmDisplayInterface->mDrmConnector->id()) {
+            for (auto property_ptr : mDrmDisplayInterface->mDrmConnector->properties()) {
+                if (mPset->items[i].property_id == property_ptr->id()){
+                    property = property_ptr;
+                    objectName.appendFormat("Connector");
+                    break;
+                }
+            }
+            if (property == NULL) {
+                HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                        "%s:: object id is connector but there is no matched property",
+                        __func__);
+            }
+        } else {
+            uint32_t channelId = 0;
+            for (auto &plane : mDrmDisplayInterface->mDrmDevice->planes()) {
+                if (mPset->items[i].object_id == plane->id()) {
+                    for (auto property_ptr : plane->properties()) {
+                        if (mPset->items[i].property_id == property_ptr->id()){
+                            property = property_ptr;
+                            objectName.appendFormat("Plane[%d]", channelId);
+                            break;
+                        }
+                    }
+                    if (property == NULL) {
+                        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                                "%s:: object id is plane but there is no matched property",
+                                __func__);
+                    }
+                }
+                channelId++;
+            }
+        }
+        if (property == NULL) {
+            HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                    "%s:: Fail to get property[%d] (object_id: %d, property_id: %d, value: %" PRId64 ")",
+                    __func__, i, mPset->items[i].object_id, mPset->items[i].property_id,
+                    mPset->items[i].value);
+            continue;
+        }
+
+        if (debugPrint)
+            ALOGD("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
+                    i, objectName.string(), mPset->items[i].object_id, mPset->items[i].property_id, property->name().c_str(), mPset->items[i].value);
+        else
+            result.appendFormat("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
+                i,  objectName.string(), mPset->items[i].object_id, mPset->items[i].property_id, property->name().c_str(), mPset->items[i].value);
+    }
+    return result;
+}
+
+
+int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool loggingForDebug)
+{
+    android::String8 result;
+    int ret = drmModeAtomicCommit(mDrmDisplayInterface->mDrmDevice->fd(),
+            mPset, flags, mDrmDisplayInterface->mDrmDevice);
+    if (loggingForDebug)
+        dumpAtomicCommitInfo(result, true);
+    if (ret < 0)
+        setError(ret);
+    return ret;
+}
 
 uint32_t ExynosDisplayDrmInterface::getBytePerPixelOfPrimaryPlane(int format)
 {
