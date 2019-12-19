@@ -91,7 +91,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
     protected:
         class DrmModeAtomicReq {
             public:
-                DrmModeAtomicReq() { mPset = drmModeAtomicAlloc(); };
+                DrmModeAtomicReq(ExynosDisplayDrmInterface *displayInterface);
                 ~DrmModeAtomicReq();
 
                 DrmModeAtomicReq(const DrmModeAtomicReq&) = delete;

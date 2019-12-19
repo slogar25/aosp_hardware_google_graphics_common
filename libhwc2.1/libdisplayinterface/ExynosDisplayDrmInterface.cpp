@@ -332,7 +332,7 @@ int32_t ExynosDisplayDrmInterface::applyDisplayMode()
         return NO_ERROR;
 
     int ret = NO_ERROR;
-    DrmModeAtomicReq drmReq;
+    DrmModeAtomicReq drmReq(this);
 
     ret = drmModeAtomicAddProperty(drmReq.pset(), mDrmCrtc->id(),
            mDrmCrtc->active_property().id(), 1);
@@ -492,7 +492,7 @@ int ExynosDisplayDrmInterface::getDeconChannel(ExynosMPP *otfMPP)
 int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 {
     int ret = NO_ERROR;
-    DrmModeAtomicReq drmReq;
+    DrmModeAtomicReq drmReq(this);
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
     std::vector<uint32_t> fbIds(getMaxWindowNum(), 0);
     android::String8 result;
@@ -876,7 +876,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 int32_t ExynosDisplayDrmInterface::clearDisplay()
 {
     int ret = NO_ERROR;
-    DrmModeAtomicReq drmReq;
+    DrmModeAtomicReq drmReq(this);
 
     /* Disable all planes */
     for (auto &plane : mDrmDevice->planes()) {
@@ -1014,6 +1014,12 @@ String8& ExynosDisplayDrmInterface::dumpAtomicCommitInfo(String8 &result, drmMod
 inline uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
 {
         return mDrmDevice->planes().size();
+}
+
+ExynosDisplayDrmInterface::DrmModeAtomicReq::DrmModeAtomicReq(ExynosDisplayDrmInterface *displayInterface)
+    : mDrmDisplayInterface(displayInterface)
+{
+    mPset = drmModeAtomicAlloc();
 }
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
