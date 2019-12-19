@@ -23,6 +23,7 @@
 #include "drmconnector.h"
 #include "vsyncworker.h"
 #include "ExynosMPP.h"
+#include "ExynosDisplay.h"
 #include <unordered_map>
 #include <xf86drmMode.h>
 
@@ -38,6 +39,24 @@ using namespace android;
 class ExynosDevice;
 class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
     public:
+        class DrmModeAtomicReq {
+            public:
+                DrmModeAtomicReq(ExynosDisplayDrmInterface *displayInterface);
+                ~DrmModeAtomicReq();
+
+                DrmModeAtomicReq(const DrmModeAtomicReq&) = delete;
+                DrmModeAtomicReq& operator=(const DrmModeAtomicReq&) = delete;
+
+                drmModeAtomicReqPtr pset() { return mPset; };
+                void setError(int err) { mError = err; };
+                int32_t atomicAddProperty(const uint32_t id,
+                        const DrmProperty &property,
+                        uint64_t value, bool optional = false);
+            private:
+                drmModeAtomicReqPtr mPset;
+                int mError = 0;
+                ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
+        };
         class ExynosVsyncCallback: public VsyncCallback {
             public:
                 void Callback(int display, int64_t timestamp) override;
@@ -81,6 +100,17 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         static uint64_t dataspaceToPlaneStandard(const android_dataspace dataspace, const DrmPlane& plane);
         static uint64_t dataspaceToPlaneTransfer(const android_dataspace dataspace, const DrmPlane& plane);
         static uint64_t dataspaceToPlaneRange(const android_dataspace dataspace, const DrmPlane& plane);
+        int32_t addFBFromDisplayConfig(const exynos_win_config_data &config,
+                uint32_t &fbId);
+        /*
+         * This function adds FB and gets new fb id if fbId is 0,
+         * if fbId is not 0, this reuses fbId.
+         */
+        int32_t setupCommitFromDisplayConfig(DrmModeAtomicReq &drmReq,
+                const exynos_win_config_data &config,
+                const uint32_t configIndex,
+                const std::unique_ptr<DrmPlane> &plane,
+                uint32_t &fbId);
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -89,21 +119,6 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
             uint32_t old_blob_id = 0;
         };
     protected:
-        class DrmModeAtomicReq {
-            public:
-                DrmModeAtomicReq(ExynosDisplayDrmInterface *displayInterface);
-                ~DrmModeAtomicReq();
-
-                DrmModeAtomicReq(const DrmModeAtomicReq&) = delete;
-                DrmModeAtomicReq& operator=(const DrmModeAtomicReq&) = delete;
-
-                drmModeAtomicReqPtr pset() { return mPset; };
-                void setError(int err, ExynosDisplayDrmInterface *drmDisplayInterface) { mError = err; };
-            private:
-                drmModeAtomicReqPtr mPset;
-                int mError = 0;
-                ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
-        };
         DrmDevice *mDrmDevice;
         DrmCrtc *mDrmCrtc;
         DrmConnector *mDrmConnector;
