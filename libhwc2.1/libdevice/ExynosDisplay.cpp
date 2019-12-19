@@ -2850,6 +2850,8 @@ int32_t ExynosDisplay::setOutputBuffer(
 int ExynosDisplay::clearDisplay() {
 
     const int ret = mDisplayInterface->clearDisplay();
+    if (ret)
+        DISPLAY_LOGE("fail to clear display");
 
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mClientCompositionInfo.mSkipFlag = false;
