@@ -827,6 +827,28 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
     android::String8 result;
 
+    if (mDrmCrtc->partial_x_property().id() &&
+        mDrmCrtc->partial_y_property().id() &&
+        mDrmCrtc->partial_w_property().id() &&
+        mDrmCrtc->partial_h_property().id()) {
+        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                        mDrmCrtc->partial_x_property(),
+                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.x, true)) < 0)
+            return ret;
+        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                        mDrmCrtc->partial_y_property(),
+                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.y, true)) < 0)
+            return ret;
+        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                        mDrmCrtc->partial_w_property(),
+                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.w, true)) < 0)
+            return ret;
+        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                        mDrmCrtc->partial_h_property(),
+                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.h, true)) < 0)
+            return ret;
+    }
+
     uint64_t out_fences[mDrmDevice->crtcs().size()];
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
                     mDrmCrtc->out_fence_ptr_property(),
