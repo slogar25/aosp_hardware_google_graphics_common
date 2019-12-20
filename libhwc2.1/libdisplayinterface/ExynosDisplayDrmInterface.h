@@ -57,6 +57,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                 int commit(uint32_t flags, bool loggingForDebug = false);
                 void removeFbs(std::vector<uint32_t> &fbs);
                 void moveTrackedFbs(std::vector<uint32_t> &fbs);
+                void moveTrackedLastFb(uint32_t &fb);
                 int addFB2WithModifiers(
                         uint32_t width, uint32_t height,
                         uint32_t pixel_format, const uint32_t bo_handles[4],
@@ -106,6 +107,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         virtual int getDisplayFd() { return mDrmDevice->fd(); };
         virtual void initDrmDevice(DrmDevice *drmDevice);
         inline virtual uint32_t getMaxWindowNum();
+        virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
+                int32_t* /*android_dataspace_t*/ outDataspace);
     protected:
         int32_t applyDisplayMode();
         int32_t chosePreferredConfig();
@@ -133,6 +136,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         void parseStandardEnums(const DrmProperty& property);
         void parseTransferEnums(const DrmProperty& property);
         void parseRangeEnums(const DrmProperty& property);
+
+        int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -141,6 +146,35 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
             uint32_t old_blob_id = 0;
         };
     protected:
+        class DrmReadbackInfo {
+            public:
+                void init(DrmDevice *drmDevice, uint32_t displayId);
+                ~DrmReadbackInfo() {
+                    if (mDrmDevice == NULL)
+                        return;
+                    if (mOldFbId > 0)
+                        drmModeRmFB(mDrmDevice->fd(), mOldFbId);
+                    if (mFbId > 0)
+                        drmModeRmFB(mDrmDevice->fd(), mFbId);
+                }
+                DrmConnector* getWritebackConnector() { return mWritebackConnector; };
+                void setFbId(uint32_t fbId) {
+                    if ((mDrmDevice != NULL) && (mOldFbId > 0))
+                        drmModeRmFB(mDrmDevice->fd(), mOldFbId);
+                    mOldFbId = mFbId;
+                    mFbId = fbId;
+                }
+                void pickFormatDataspace(int32_t colorMode);
+                uint32_t mReadbackFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+                uint32_t mReadbackDataspace = HAL_DATASPACE_UNKNOWN;
+            private:
+                DrmDevice *mDrmDevice = NULL;
+                DrmConnector *mWritebackConnector = NULL;
+                uint32_t mFbId = 0;
+                uint32_t mOldFbId = 0;
+                std::vector<uint32_t> mSupportedFormats;
+                std::vector<uint32_t> mSupportedDataspaces;
+        };
         DrmDevice *mDrmDevice;
         DrmCrtc *mDrmCrtc;
         DrmConnector *mDrmConnector;
@@ -156,6 +190,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         DrmPropertyMap mStandardEnums;
         DrmPropertyMap mTransferEnums;
         DrmPropertyMap mRangeEnums;
+
+        DrmReadbackInfo mReadbackInfo;
 };
 
 #endif
