@@ -295,8 +295,6 @@ class ExynosDisplay {
 
         int                     mPanelType;
         int                     mPsrMode;
-        int32_t                 mDSCHSliceNum;
-        int32_t                 mDSCYSliceSize;
 
         /* Constructor */
         ExynosDisplay(uint32_t type, ExynosDevice *device);
