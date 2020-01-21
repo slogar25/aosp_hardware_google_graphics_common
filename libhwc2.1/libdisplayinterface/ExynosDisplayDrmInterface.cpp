@@ -1018,9 +1018,9 @@ int32_t ExynosDisplayDrmInterface::setForcePanic()
     return 0;
 }
 
-inline uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
+uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
 {
-        return mDrmDevice->planes().size();
+    return mDrmDevice->planes().size();
 }
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::DrmModeAtomicReq(ExynosDisplayDrmInterface *displayInterface)

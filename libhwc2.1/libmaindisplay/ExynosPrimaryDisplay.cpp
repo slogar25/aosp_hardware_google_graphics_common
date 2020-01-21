@@ -21,6 +21,7 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosExternalDisplay.h"
 #include "ExynosDisplayDrmInterface.h"
+#include "ExynosDisplayDrmInterfaceModule.h"
 
 extern struct exynos_hwc_control exynosHWCControl;
 
@@ -185,7 +186,7 @@ bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
 void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
 {
     if (interfaceType == INTERFACE_TYPE_DRM)
-        mDisplayInterface = std::make_unique<ExynosDisplayDrmInterface>((ExynosDisplay *)this);
+        mDisplayInterface = std::make_unique<ExynosPrimaryDisplayDrmInterfaceModule>((ExynosDisplay *)this);
     else
         LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
                 __func__, interfaceType);
