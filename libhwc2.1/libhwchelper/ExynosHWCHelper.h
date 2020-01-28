@@ -56,8 +56,6 @@ class ExynosDisplay;
 
 using namespace android;
 
-#define HAL_COLOR_TRANSFORM_ERROR   100
-
 enum {
     EXYNOS_HWC_DIM_LAYER = 0x00000001,
 };

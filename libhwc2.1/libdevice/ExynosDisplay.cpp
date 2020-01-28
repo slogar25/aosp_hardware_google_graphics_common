@@ -2840,7 +2840,7 @@ int32_t ExynosDisplay::setColorTransform(
 #ifdef HWC_SUPPORT_COLOR_TRANSFORM
     int ret = mDisplayInterface->setColorTransform(matrix, hint);
     if (ret < 0)
-        mColorTransformHint = HAL_COLOR_TRANSFORM_ERROR;
+        mColorTransformHint = ret;
     return ret;
 #else
     return HWC2_ERROR_NONE;
