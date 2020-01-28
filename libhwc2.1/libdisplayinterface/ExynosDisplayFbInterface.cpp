@@ -19,6 +19,7 @@
 #include "ExynosExternalDisplay.h"
 #include "ExynosHWCDebug.h"
 #include "displayport_for_hwc.h"
+#include "DeconFbHeader.h"
 #include <math.h>
 
 using namespace android;

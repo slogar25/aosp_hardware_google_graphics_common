@@ -21,6 +21,7 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosHWCDebug.h"
 #include <unordered_set>
+#include "DeconFbHeader.h"
 
 extern update_time_info updateTimeInfo;
 extern feature_support_t feature_table[];

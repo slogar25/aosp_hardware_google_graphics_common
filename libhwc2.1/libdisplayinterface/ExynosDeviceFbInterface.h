@@ -21,7 +21,6 @@
 #include <thread>
 #include <poll.h>
 #include "ExynosDeviceInterface.h"
-#include "DeconCommonHeader.h"
 
 /* for restriction query */
 typedef struct dpu_dpp_info {
