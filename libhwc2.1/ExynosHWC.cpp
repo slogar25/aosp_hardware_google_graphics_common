@@ -162,12 +162,13 @@ inline ExynosLayer* checkLayer(ExynosDisplay *exynosDisplay, hwc2_layer_t layer)
 hwc2_function_pointer_t exynos_getFunction(struct hwc2_device *dev,
         int32_t descriptor)
 {
+    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS)
+        return NULL;
+
     ExynosDevice *exynosDevice = checkDevice(dev);
     if (!exynosDevice)
         return NULL;
 
-    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS)
-        return NULL;
     return exynos_function_pointer[descriptor];
 }
 
@@ -328,11 +329,11 @@ int32_t exynos_getColorModes(hwc2_device_t *dev, hwc2_display_t display, uint32_
 int32_t exynos_getRenderIntents(hwc2_device_t* dev, hwc2_display_t display, int32_t mode,
                 uint32_t* outNumIntents, int32_t* /*android_render_intent_v1_1_t*/ outIntents)
 {
-    ExynosDevice *exynosDevice = checkDevice(dev);
-    ALOGD("%s:: mode(%d)", __func__, mode);
-
     if (mode < 0)
         return HWC2_ERROR_BAD_PARAMETER;
+
+    ExynosDevice *exynosDevice = checkDevice(dev);
+    ALOGD("%s:: mode(%d)", __func__, mode);
 
     if (exynosDevice) {
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
