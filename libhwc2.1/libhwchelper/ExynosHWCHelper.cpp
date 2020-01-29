@@ -23,7 +23,7 @@
 #include "ExynosHWC.h"
 #include "ExynosLayer.h"
 #include "exynos_sync.h"
-#include "videodev2_exynos_media.h"
+#include <linux/videodev2_exynos_media.h>
 #include "VendorVideoAPI.h"
 
 #define AFBC_MAGIC  0xafbc
