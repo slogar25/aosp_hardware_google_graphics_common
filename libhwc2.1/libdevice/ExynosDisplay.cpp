@@ -2937,15 +2937,21 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness)
     if (mBrightnessFd == NULL)
         return HWC2_ERROR_UNSUPPORTED;
 
-    char val[4];
-    uint32_t scaledBrightness = brightness * mMaxBrightness;
+    char val[MAX_BRIGHTNESS_LEN]= {0};
+    uint32_t scaledBrightness = static_cast<uint32_t>(round(brightness * mMaxBrightness));
 
-    sprintf(val, "%d", scaledBrightness);
-    uint32_t res = fwrite(val, 4, 1, mBrightnessFd);
-    if(res == 0){
-        ALOGE("brightness write failed.");
+    int32_t ret = 0;
+    if ((ret = snprintf(val, MAX_BRIGHTNESS_LEN, "%d", scaledBrightness)) > 0) {
+        fwrite(val, sizeof(val), 1, mBrightnessFd);
+        if (ferror(mBrightnessFd)){
+            ALOGE("brightness write failed");
+            clearerr(mBrightnessFd);
+        }
+        rewind(mBrightnessFd);
+    } else {
+        ALOGE("Fail to set brightness, ret(%d), brightness(%f, %d)",
+                ret, brightness, scaledBrightness);
     }
-    rewind(mBrightnessFd);
 
     return HWC2_ERROR_NONE;
 }
