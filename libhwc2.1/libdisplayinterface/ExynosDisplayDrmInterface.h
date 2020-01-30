@@ -63,11 +63,14 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                         const uint32_t pitches[4], const uint32_t offsets[4],
                         const uint64_t modifier[4], uint32_t *buf_id,
                         uint32_t flags);
+                uint32_t getBufHandleFromFd(int fd);
+                void freeBufHandle(uint32_t handle);
             private:
                 drmModeAtomicReqPtr mPset;
                 int mError = 0;
                 ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
                 std::vector<uint32_t> mFbIds;
+                int drmFd() const { return mDrmDisplayInterface->mDrmDevice->fd(); }
         };
         class ExynosVsyncCallback: public VsyncCallback {
             public:

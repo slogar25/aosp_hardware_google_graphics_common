@@ -18,6 +18,7 @@
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosHWCDebug.h"
 #include <drm/drm_fourcc.h>
+#include <xf86drm.h>
 
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
@@ -614,7 +615,8 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
         }
         for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
             pitches[bufferIndex] = config.src.f_w * bpp;
-            buf_handles[bufferIndex] = static_cast<uint32_t>(config.fd_idma[bufferIndex]);
+
+            buf_handles[bufferIndex] = drmReq.getBufHandleFromFd(config.fd_idma[bufferIndex]);
         }
         if ((bufferNum == 1) && (planeNum > bufferNum)) {
             /* offset for cbcr */
@@ -644,6 +646,11 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
 
         ret = drmReq.addFB2WithModifiers(config.src.f_w, config.src.f_h,
                 drmFormat, buf_handles, pitches, offsets, modifiers, &fbId, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
+
+        for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
+            /* framebuffer already holds a reference, remove ours */
+            drmReq.freeBufHandle(buf_handles[bufferIndex]);
+        }
     } else if (config.state == config.WIN_STATE_COLOR) {
         modifiers[0] = DRM_FORMAT_MOD_SAMSUNG_COLORMAP;
         drmFormat = DRM_FORMAT_BGRA8888;
@@ -1102,6 +1109,32 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
     if (ret < 0)
         setError(ret);
     return ret;
+}
+
+uint32_t ExynosDisplayDrmInterface::DrmModeAtomicReq::getBufHandleFromFd(int fd)
+{
+    uint32_t gem_handle = 0;
+
+    int ret = drmPrimeFDToHandle(drmFd(), fd, &gem_handle);
+    if (ret) {
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                 "drmPrimeFDToHandle failed with error %d", ret);
+        return ret;
+    }
+
+    return gem_handle;
+}
+
+void ExynosDisplayDrmInterface::DrmModeAtomicReq::freeBufHandle(uint32_t handle)
+{
+  struct drm_gem_close gem_close {
+      .handle = handle
+  };
+  int ret = drmIoctl(drmFd(), DRM_IOCTL_GEM_CLOSE, &gem_close);
+  if (ret) {
+      HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+               "Failed to close gem handle with error %d\n", ret);
+  }
 }
 
 void ExynosDisplayDrmInterface::DrmModeAtomicReq::removeFbs(std::vector<uint32_t> &fbs)
