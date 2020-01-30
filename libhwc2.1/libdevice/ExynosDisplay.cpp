@@ -2907,7 +2907,7 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
     }
     if (capabilityNum != *outNumCapabilities) {
         ALOGE("%s:: invalid outNumCapabilities(%d), should be(%d)", __func__, *outNumCapabilities, capabilityNum);
-        return HWC2_ERROR_NONE;
+        return HWC2_ERROR_BAD_PARAMETER;
     }
 
     uint32_t index = 0;
