@@ -198,6 +198,202 @@ private:
     unsigned int mMatrixTargetIndex;
 };
 
+#define G2D_FILTER_COEF_BASE 0x6000
+#define G2D_FILTER_COEF_REG(idx) (0x6000 + (idx) * 0x400)
+#define G2D_FILTER_C_OFFSET 0x200
+#define G2D_SCALE_FACTOR(from, to) ((static_cast<uint32_t>(from) << G2D_SCALEFACTOR_FRACBITS) / (to))
+
+#define SI11(v)                              static_cast<uint32_t>((v) & 0x7FF)
+#define FILTER_HCOEF(a, b, c, d, e, f, g, h) {SI11(a), SI11(b), SI11(c), SI11(d), SI11(e), SI11(f), SI11(g), SI11(h)}
+#define FILTER_VCOEF(a, b, c, d)             {SI11(a), SI11(b), SI11(c), SI11(d)}
+
+#define NUM_HORI_COEFFICIENTS 8
+#define NUM_VERT_COEFFICIENTS 4
+#define NUM_FILTER_PHASE 9
+#define NUM_FILTER_COEF_SETS 7
+
+#define NUM_VERT_COEF_REGS (NUM_FILTER_PHASE * NUM_VERT_COEFFICIENTS)
+#define NUM_HORI_COEF_REGS (NUM_FILTER_PHASE * NUM_HORI_COEFFICIENTS)
+
+static uint32_t g2dHoriFilterCoef[NUM_FILTER_COEF_SETS][NUM_FILTER_PHASE][NUM_HORI_COEFFICIENTS] = {
+    { // Upsampling
+        FILTER_HCOEF(   0,   0,   0, 512,   0,   0,   0,   0), FILTER_HCOEF(  -2,   8, -25, 509,  30,  -9,   2,  -1), FILTER_HCOEF(  -4,  14, -46, 499,  64, -19,   5,  -1),
+        FILTER_HCOEF(  -5,  20, -62, 482, 101, -30,   8,  -2), FILTER_HCOEF(  -5,  23, -73, 458, 142, -41,  12,  -3), FILTER_HCOEF(  -6,  25, -80, 429, 185, -53,  15,  -3),
+        FILTER_HCOEF(  -6,  26, -83, 395, 228, -63,  19,  -4), FILTER_HCOEF(  -6,  25, -82, 357, 273, -71,  21,  -5), FILTER_HCOEF(  -5,  23, -78, 316, 316, -78,  23,  -5),
+    }, { // x7/8 Downsampling
+        FILTER_HCOEF(  12, -32,  56, 444,  52, -32,  12,   0), FILTER_HCOEF(   9, -24,  29, 445,  82, -39,  13,  -3), FILTER_HCOEF(   7, -16,   6, 438, 112, -46,  14,  -3),
+        FILTER_HCOEF(   5,  -9, -14, 426, 144, -52,  15,  -3), FILTER_HCOEF(   3,  -3, -30, 410, 177, -58,  16,  -3), FILTER_HCOEF(   2,   2, -43, 390, 211, -63,  16,  -3),
+        FILTER_HCOEF(   1,   7, -53, 365, 244, -66,  16,  -2), FILTER_HCOEF(   0,  10, -60, 338, 277, -66,  15,  -2), FILTER_HCOEF(  -1,  13, -65, 309, 309, -65,  13,  -1),
+    }, { // x6/8 Downsampling
+        FILTER_HCOEF(   8, -44, 100, 384, 100, -44,   8,   0), FILTER_HCOEF(   9, -40,  77, 382, 123, -47,   8,   0), FILTER_HCOEF(   8, -36,  57, 377, 147, -49,   7,   1),
+        FILTER_HCOEF(   8, -32,  38, 369, 171, -49,   5,   2), FILTER_HCOEF(   8, -27,  20, 358, 196, -48,   3,   2), FILTER_HCOEF(   7, -22,   5, 344, 221, -47,   1,   3),
+        FILTER_HCOEF(   7, -18,  -9, 329, 245, -43,  -2,   3), FILTER_HCOEF(   5, -13, -20, 310, 268, -37,  -5,   4), FILTER_HCOEF(   5,  -9, -30, 290, 290, -30,  -9,   5),
+    }, { // x5/8 Downsampling
+        FILTER_HCOEF(  -3, -31, 130, 320, 130, -31,  -3,   0), FILTER_HCOEF(  -3, -32, 113, 319, 147, -29,  -6,   3), FILTER_HCOEF(  -1, -33,  97, 315, 165, -26,  -8,   3),
+        FILTER_HCOEF(   0, -32,  81, 311, 182, -22, -11,   3), FILTER_HCOEF(   1, -31,  66, 304, 199, -17, -13,   3), FILTER_HCOEF(   2, -30,  52, 296, 216, -11, -16,   3),
+        FILTER_HCOEF(   2, -28,  38, 286, 232,  -3, -18,   3), FILTER_HCOEF(   3, -25,  26, 274, 247,   5, -21,   3), FILTER_HCOEF(   3, -23,  15, 261, 261,  15, -23,   3),
+    }, { // x4/8 Downsampling
+        FILTER_HCOEF( -11,   0, 140, 255, 140,   0, -12,   0), FILTER_HCOEF( -10,  -4, 129, 254, 151,   5, -13,   0), FILTER_HCOEF(  -9,  -7, 117, 253, 163,  10, -14,  -1),
+        FILTER_HCOEF(  -8, -10, 106, 250, 174,  16, -15,  -1), FILTER_HCOEF(  -7, -12,  95, 246, 185,  22, -16,  -1), FILTER_HCOEF(  -6, -14,  85, 241, 195,  29, -16,  -2),
+        FILTER_HCOEF(  -5, -15,  74, 236, 204,  37, -17,  -2), FILTER_HCOEF(  -5, -16,  64, 229, 214,  46, -17,  -3), FILTER_HCOEF(  -4, -17,  55, 222, 222,  55, -17,  -4),
+    }, { // x3/8 Downsampling
+        FILTER_HCOEF(  -5,  31, 133, 195, 133,  31,  -6,   0), FILTER_HCOEF(  -5,  27, 126, 195, 139,  37,  -4,  -3), FILTER_HCOEF(  -5,  23, 119, 194, 146,  41,  -3,  -3),
+        FILTER_HCOEF(  -5,  19, 112, 193, 152,  47,  -2,  -4), FILTER_HCOEF(  -5,  16, 105, 191, 158,  53,  -2,  -4), FILTER_HCOEF(  -5,  12,  98, 189, 163,  59,   0,  -4),
+        FILTER_HCOEF(  -5,  10,  91, 185, 169,  65,   1,  -4), FILTER_HCOEF(  -5,   7,  84, 182, 174,  71,   3,  -4), FILTER_HCOEF(  -5,   5,  78, 178, 178,  78,   5,  -5),
+    }, { // x2/8 Downsampling
+        FILTER_HCOEF(  10,  52, 118, 152, 118,  52,  10,   0), FILTER_HCOEF(   9,  48, 114, 152, 122,  56,  11,   0), FILTER_HCOEF(   7,  45, 110, 151, 125,  60,  13,   1),
+        FILTER_HCOEF(   6,  41, 106, 150, 129,  64,  15,   1), FILTER_HCOEF(   5,  38, 102, 149, 132,  68,  17,   1), FILTER_HCOEF(   4,  35,  98, 148, 135,  72,  19,   1),
+        FILTER_HCOEF(   4,  31,  94, 146, 138,  77,  21,   1), FILTER_HCOEF(   3,  29,  89, 145, 140,  81,  23,   2), FILTER_HCOEF(   2,  26,  85, 143, 143,  85,  26,   2),
+    }
+};
+
+static uint32_t g2dVertFilterCoef[NUM_FILTER_COEF_SETS][NUM_FILTER_PHASE][NUM_VERT_COEFFICIENTS] = {
+    {    // Upsampling
+        FILTER_VCOEF(   0, 512,   0,   0), FILTER_VCOEF( -15, 508,  20,  -1), FILTER_VCOEF( -25, 495,  45,  -3),
+        FILTER_VCOEF( -31, 473,  75,  -5), FILTER_VCOEF( -33, 443, 110,  -8), FILTER_VCOEF( -33, 408, 148, -11),
+        FILTER_VCOEF( -31, 367, 190, -14), FILTER_VCOEF( -27, 324, 234, -19), FILTER_VCOEF( -23, 279, 279, -23),
+    }, { // x7/8 Downsampling
+        FILTER_VCOEF(  32, 448,  32,   0), FILTER_VCOEF(  17, 446,  55,  -6), FILTER_VCOEF(   3, 437,  79,  -7),
+        FILTER_VCOEF(  -7, 421, 107,  -9), FILTER_VCOEF( -14, 399, 138, -11), FILTER_VCOEF( -18, 373, 170, -13),
+        FILTER_VCOEF( -20, 343, 204, -15), FILTER_VCOEF( -20, 310, 240, -18), FILTER_VCOEF( -19, 275, 275, -19),
+    }, { // x6/8 Downsampling
+        FILTER_VCOEF(  61, 390,  61,   0), FILTER_VCOEF(  46, 390,  83,  -7), FILTER_VCOEF(  31, 383, 106,  -8),
+        FILTER_VCOEF(  19, 371, 130,  -8), FILTER_VCOEF(   9, 356, 156,  -9), FILTER_VCOEF(   2, 337, 183, -10),
+        FILTER_VCOEF(  -3, 315, 210, -10), FILTER_VCOEF(  -7, 291, 238, -10), FILTER_VCOEF(  -9, 265, 265,  -9),
+    }, { // x5/8 Downsampling
+        FILTER_VCOEF(  85, 341,  86,   0), FILTER_VCOEF(  71, 341, 105,  -5), FILTER_VCOEF(  56, 336, 124,  -4),
+        FILTER_VCOEF(  43, 328, 145,  -4), FILTER_VCOEF(  32, 317, 166,  -3), FILTER_VCOEF(  23, 304, 187,  -2),
+        FILTER_VCOEF(  16, 288, 209,  -1), FILTER_VCOEF(   9, 271, 231,   1), FILTER_VCOEF(   5, 251, 251,   5),
+    }, { // x4/8 Downsampling
+        FILTER_VCOEF( 104, 304, 104,   0), FILTER_VCOEF(  89, 302, 120,   1), FILTER_VCOEF(  76, 298, 136,   2),
+        FILTER_VCOEF(  63, 293, 153,   3), FILTER_VCOEF(  52, 285, 170,   5), FILTER_VCOEF(  42, 275, 188,   7),
+        FILTER_VCOEF(  33, 264, 205,  10), FILTER_VCOEF(  26, 251, 221,  14), FILTER_VCOEF(  20, 236, 236,  20),
+    }, { // x3/8 Downsampling
+        FILTER_VCOEF( 118, 276, 118,   0), FILTER_VCOEF( 103, 273, 129,   7), FILTER_VCOEF(  90, 270, 143,   9),
+        FILTER_VCOEF(  78, 266, 157,  11), FILTER_VCOEF(  67, 260, 171,  14), FILTER_VCOEF(  57, 253, 185,  17),
+        FILTER_VCOEF(  48, 244, 199,  21), FILTER_VCOEF(  40, 234, 211,  27), FILTER_VCOEF(  33, 223, 223,  33),
+    }, { // x2/8 Downsampling
+        FILTER_VCOEF( 127, 258, 127,   0), FILTER_VCOEF( 111, 252, 135,  14), FILTER_VCOEF( 100, 250, 147,  15),
+        FILTER_VCOEF(  88, 247, 159,  18), FILTER_VCOEF(  78, 242, 171,  21), FILTER_VCOEF(  68, 237, 182,  25),
+        FILTER_VCOEF(  59, 230, 193,  30), FILTER_VCOEF(  50, 222, 204,  36), FILTER_VCOEF(  43, 213, 213,  43),
+    }
+};
+
+static unsigned int findFilterCoefficientsIndex(uint32_t factor)
+{
+    static uint32_t choicetable[NUM_FILTER_COEF_SETS] = {
+        G2D_SCALE_FACTOR(8, 8), G2D_SCALE_FACTOR(8, 7), G2D_SCALE_FACTOR(8, 6), G2D_SCALE_FACTOR(8, 5),
+        G2D_SCALE_FACTOR(8, 4), G2D_SCALE_FACTOR(8, 3), G2D_SCALE_FACTOR(8, 2),
+    };
+
+    for (unsigned int i = 0; i < NUM_FILTER_COEF_SETS; i++)
+        if (factor <= choicetable[i])
+            return i;
+    // if i == NUM_FILTER_COEF_SETS, the downsampling factor is larger than 4.0 which is not supported by the filter.
+    return NUM_FILTER_COEF_SETS - 1;
+}
+
+template<typename CoefT>
+static unsigned int __writeFilterCoefficients(CoefT &coef_set, unsigned int index, uint32_t base, g2d_reg regs[])
+{
+    // The default value of filter coefficients are values of 8:8/zoom-in
+    // So, do not update redundantly.
+    if (index == 0)
+        return 0;
+
+    unsigned int cnt = 0;
+
+    for (auto &coef_table: coef_set[index]) {
+        uint32_t coef_base = base;
+        // register offsets of filter coeffcients are ordered by phase number then tab index
+        // while values are ordered by tab index then phase number in the above coefficients array.
+        // So register offset is increased by the number of tabs instead of 1.
+        // The coefficients array is specified in the order of tab index due to readability
+        // because the coefficient values are also specified in the same order in UM.
+        for (auto coef: coef_table) {
+            regs[cnt].offset = coef_base;
+            regs[cnt].value = coef;
+            coef_base += (sizeof(coef_set[index]) / sizeof(coef_table)) * sizeof(coef_table[0]);
+            cnt++;
+        }
+        base += sizeof(uint32_t);
+    }
+
+    return cnt;
+}
+
+void getChromaScaleFactor(uint32_t colormode, unsigned int *hfactor, unsigned int *vfactor)
+{
+    switch (colormode & G2D_DATAFMT_MASK) {
+        case G2D_DATAFMT_YUV420SP:
+        case G2D_DATAFMT_YUV420P:
+            *hfactor /= 2;
+            [[fallthrough]];
+        case G2D_DATAFMT_YUV422SP:
+        case G2D_DATAFMT_YUV422I:
+            *vfactor /= 2;
+            break;
+        default:
+            break;
+    }
+}
+
+static unsigned int writeFilterCoefficients(uint32_t hfactor, uint32_t vfactor, uint32_t colormode,
+                                            unsigned layer_index, g2d_reg regs[])
+{
+    unsigned int hindex = findFilterCoefficientsIndex(hfactor);
+    unsigned int vindex = findFilterCoefficientsIndex(vfactor);
+    // Filter coefficients of 1:1 and upsampling are configured to the filter by default (reset value)
+    if ((hindex == 0) && (vindex == 0))
+        return 0;
+
+    unsigned int base = G2D_FILTER_COEF_REG(layer_index);
+    unsigned int cnt = 0;
+    // Y Coefficients
+    cnt += __writeFilterCoefficients(g2dVertFilterCoef, vindex, base, regs);
+    cnt += __writeFilterCoefficients(g2dHoriFilterCoef, hindex, base + sizeof(g2dVertFilterCoef[0]), regs + cnt);
+    if (IS_YUV(colormode)) {
+        // C Coefficients
+        getChromaScaleFactor(colormode, &hfactor, &vfactor);
+
+        hindex = findFilterCoefficientsIndex(hfactor);
+        vindex = findFilterCoefficientsIndex(vfactor);
+        base += G2D_FILTER_C_OFFSET;
+        cnt += __writeFilterCoefficients(g2dVertFilterCoef, vindex, base, regs + cnt);
+        cnt += __writeFilterCoefficients(g2dHoriFilterCoef, hindex, base + sizeof(g2dVertFilterCoef[0]), regs + cnt);
+    }
+
+    return cnt;
+}
+
+static unsigned int getFilterCoefficientCount(uint32_t *src_cmds[], unsigned int layer_count)
+{
+    unsigned int count = 0;
+
+
+    for (unsigned int i = 0; i < layer_count; i++) {
+        unsigned int layer_coef_cnt = 0;
+        unsigned int hfactor = src_cmds[i][G2DSFR_SRC_XSCALE];
+        unsigned int vfactor = src_cmds[i][G2DSFR_SRC_YSCALE];
+
+        if (hfactor > G2D_SCALE_FACTOR(8, 8))
+            layer_coef_cnt += NUM_HORI_COEF_REGS;
+        if (vfactor > G2D_SCALE_FACTOR(8, 8))
+            layer_coef_cnt += NUM_VERT_COEF_REGS;
+        if (IS_YUV(src_cmds[i][G2DSFR_IMG_COLORMODE])) {
+            getChromaScaleFactor(src_cmds[i][G2DSFR_IMG_COLORMODE], &hfactor, &vfactor);
+            if (hfactor > G2D_SCALE_FACTOR(8, 8))
+                layer_coef_cnt += NUM_HORI_COEF_REGS;
+            if (vfactor > G2D_SCALE_FACTOR(8, 8))
+                layer_coef_cnt += NUM_VERT_COEF_REGS;
+        }
+
+        count += layer_coef_cnt;
+    }
+
+    return count;
+}
+
 static void show_g2d_layer(const char *title, int idx, const g2d_layer &layer)
 {
     ALOGD("%s%d: flags %#x, fence %d, buffer_type %d, num_buffers %d", title, idx,
@@ -270,11 +466,11 @@ static g2d_fmt __halfmt_to_g2dfmt_9810[] = {
     {HAL_PIXEL_FORMAT_RGBA_1010102,               G2D_FMT_ABGR2101010, 1, 4},
     {HAL_PIXEL_FORMAT_RGB_888,                    G2D_FMT_RGB888,    1, 3},
     {HAL_PIXEL_FORMAT_RGB_565,                    G2D_FMT_RGB565,    1, 2},
-    {HAL_PIXEL_FORMAT_YV12,                       G2D_FMT_YV12,      1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,              G2D_FMT_YV12,      3, 0},
-//  {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,         X,                 1, 0},
-//  {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,        X,                 1, 0},
-//  {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,       X,                 3, 0},
+//  {HAL_PIXEL_FORMAT_YV12,                       G2D_FMT_YV12,      1, 0},
+//  {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,              G2D_FMT_YV12,      3, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,         G2D_FMT_YV12,      1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,        G2D_FMT_YV12,      1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,       G2D_FMT_YV12,      3, 0},
     {HAL_PIXEL_FORMAT_YCrCb_420_SP,               G2D_FMT_NV21,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,      G2D_FMT_NV21,      2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL, G2D_FMT_NV21,      2, 0},
@@ -301,9 +497,9 @@ static g2d_fmt __halfmt_to_g2dfmt_9820[] = {
     {HAL_PIXEL_FORMAT_RGB_565,                    G2D_FMT_RGB565,    1, 2},
     {HAL_PIXEL_FORMAT_YV12,                       G2D_FMT_YV12,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,              G2D_FMT_YV12,      3, 0},
-//  {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,         X,                 1, 0},
-//  {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,        X,                 1, 0},
-//  {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,       X,                 3, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,         G2D_FMT_YUV420P,   1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,        G2D_FMT_YUV420P,   1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,       G2D_FMT_YUV420P,   3, 0},
     {HAL_PIXEL_FORMAT_YCrCb_420_SP,               G2D_FMT_NV21,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,      G2D_FMT_NV21,      2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL, G2D_FMT_NV21,      2, 0},
@@ -354,6 +550,8 @@ AcrylicCompositorG2D9810::AcrylicCompositorG2D9810(const HW2DCapability &capabil
     halfmt_to_g2dfmt_tbl = newcolormode ? __halfmt_to_g2dfmt_9820 : __halfmt_to_g2dfmt_9810;
     len_halfmt_to_g2dfmt_tbl = newcolormode ? ARRSIZE(__halfmt_to_g2dfmt_9820) : ARRSIZE(__halfmt_to_g2dfmt_9810);
 
+    mUsePolyPhaseFilter = getCapabilities().supportedMinDecimation() == hw2d_coord_t{4, 4};
+
     ALOGD_TEST("Created a new Acrylic for G2D 9810 on %p", this);
 }
 
@@ -365,6 +563,22 @@ AcrylicCompositorG2D9810::~AcrylicCompositorG2D9810()
         delete [] mTask.commands.source[i];
 
     ALOGD_TEST("Deleting Acrylic for G2D 9810 on %p", this);
+}
+
+unsigned int AcrylicCompositorG2D9810::updateFilterCoefficients(unsigned int layercount, g2d_reg regs[])
+{
+    if (!mUsePolyPhaseFilter)
+        return 0;
+
+    unsigned int cnt = 0;
+
+    for (unsigned int i = 0; i < layercount; i++)
+        cnt += writeFilterCoefficients(mTask.commands.source[i][G2DSFR_SRC_XSCALE],
+                                       mTask.commands.source[i][G2DSFR_SRC_YSCALE],
+                                       mTask.commands.source[i][G2DSFR_IMG_COLORMODE],
+                                       i, regs + cnt);
+
+    return cnt;
 }
 
 #define SBWC_BLOCK_WIDTH 32
@@ -521,8 +735,6 @@ bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_lay
     return true;
 }
 
-#define G2D_SCALE_FACTOR(from, to) ((static_cast<uint32_t>(from) << G2D_SCALEFACTOR_FRACBITS) / (to))
-
 static void setSolidLayer(struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t xy)
 {
     image.flags = G2D_LAYERFLAG_COLORFILL;
@@ -583,7 +795,7 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
     return true;
 }
 
-bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size, int index)
+bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size, unsigned int index)
 {
     hw2d_coord_t xy = layer.getImageDimension();
 
@@ -630,10 +842,10 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d
 }
 
 bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[],
-                                             hw2d_coord_t target_size, int index)
+                                             hw2d_coord_t target_size, unsigned int index, unsigned int image_index)
 {
     if (layer.isSolidColor()) {
-        prepareSolidLayer(layer, image, cmd, target_size, index);
+        prepareSolidLayer(layer, image, cmd, target_size, image_index);
 
         return true;
     }
@@ -678,13 +890,15 @@ bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_lay
 
     cmd[G2DSFR_SRC_XSCALE] = G2D_SCALE_FACTOR(crop.size.hori, window.size.hori);
     cmd[G2DSFR_SRC_YSCALE] = G2D_SCALE_FACTOR(crop.size.vert, window.size.vert);
-    // Configure bilinear interpolation only if it is required.
+    // Configure interpolation only if it is required.
     // Otherwise, G2D needs more bandwidth because it interpolates pixels
     // even though it is not required.
-    if ((cmd[G2DSFR_SRC_XSCALE] | cmd[G2DSFR_SRC_YSCALE]) != G2D_SCALE_FACTOR(1, 1))
-	    cmd[G2DSFR_SRC_SCALECONTROL] = G2D_SCALECONTROL_BILINEAR;
+    if ((cmd[G2DSFR_SRC_XSCALE] | cmd[G2DSFR_SRC_YSCALE]) == G2D_SCALE_FACTOR(1, 1))
+        cmd[G2DSFR_SRC_SCALECONTROL] = 0;
+    else if (mUsePolyPhaseFilter)
+        cmd[G2DSFR_SRC_SCALECONTROL] = (index << G2D_SCALECONTROL_FILTERCOEF_SHIFT) | G2D_SCALECONTROL_POLYPHASE;
     else
-	    cmd[G2DSFR_SRC_SCALECONTROL] = 0;
+        cmd[G2DSFR_SRC_SCALECONTROL] = G2D_SCALECONTROL_BILINEAR;
 
     // TODO: Configure initial phases according to the scale factors
      cmd[G2DSFR_SRC_XPHASE] = 0;
@@ -705,7 +919,7 @@ bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_lay
     cmd[G2DSFR_SRC_COMMAND] = G2D_LAYERCMD_VALID;
 
     /* bottom layer always is opaque */
-    if (index == 0) {
+    if (image_index == 0) {
        cmd[G2DSFR_SRC_COMMAND] |= G2D_LAYERCMD_OPAQUE;
        if (alpha < 255)
            cmd[G2DSFR_SRC_COMMAND] |= G2D_LAYERCMD_PREMULT_GLOBALALPHA;
@@ -859,7 +1073,7 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
 
         if (!prepareSource(layer, mTask.source[i],
                            mTask.commands.source[i], getCanvas().getImageDimension(),
-                           i - baseidx)) {
+                           i, i - baseidx)) {
             ALOGE("Failed to configure source layer %u", i - baseidx);
             return false;
         }
@@ -895,12 +1109,18 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
     mTask.num_release_fences = num_fences;
     mTask.release_fence = reinterpret_cast<int *>(alloca(sizeof(int) * num_fences));
 
-    mTask.commands.num_extra_regs = cscMatrixWriter.getRegisterCount() + mHdrWriter.getCommandCount();
+    mTask.commands.num_extra_regs = cscMatrixWriter.getRegisterCount() +
+                                    mHdrWriter.getCommandCount() +
+                                    getFilterCoefficientCount(mTask.commands.source, layercount);
     mTask.commands.extra = reinterpret_cast<g2d_reg *>(alloca(sizeof(g2d_reg) * mTask.commands.num_extra_regs));
 
-    unsigned int count = cscMatrixWriter.write(mTask.commands.extra);
+    g2d_reg *regs = mTask.commands.extra;
 
-    mHdrWriter.write(mTask.commands.extra + count);
+    regs += cscMatrixWriter.write(regs);
+
+    regs += updateFilterCoefficients(layercount, regs);
+
+    mHdrWriter.write(regs);
 
     debug_show_g2d_task(mTask);
 
