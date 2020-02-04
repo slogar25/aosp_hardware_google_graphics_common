@@ -1092,8 +1092,10 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         return eSkipLayer;
 
 #ifndef HWC_SUPPORT_COLOR_TRANSFORM
-    if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY)
+    if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY) {
+        HWC_LOGE(display, "unsupported color transform");
         return eUnSupportedColorTransform;
+    }
 #else
     if ((display->mColorTransformHint < 0) &&
         (layer->mOverlayPriority < ePriorityHigh))
