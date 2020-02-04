@@ -116,6 +116,8 @@ const format_description_t exynos_format_desc[] = {
         1, 32, RGB|BIT8, false, String8("RGB_888"), 0},
     {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_BGR565,
         1, 16, RGB, false, String8("RGB_565"), 0},
+    {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_RGB565,
+        1, 16, RGB|AFBC, false, String8("RGB_565_AFBC"), 0},
     {HAL_PIXEL_FORMAT_BGRA_8888, DECON_PIXEL_FORMAT_BGRA_8888, DRM_FORMAT_BGRA8888,
         1, 32, RGB|BIT8, true, String8("BGRA_8888"), 0},
     {HAL_PIXEL_FORMAT_RGBA_1010102, DECON_PIXEL_FORMAT_ABGR_2101010, DRM_FORMAT_RGBA1010102,
@@ -323,7 +325,7 @@ inline int HEIGHT(const hwc_frect_t &rect) { return (int)(rect.bottom - rect.top
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space);
 enum decon_pixel_format halFormatToDpuFormat(int format);
 uint32_t DpuFormatToHalFormat(int format);
-int halFormatToDrmFormat(int format, bool compressed);
+int halFormatToDrmFormat(int format, uint32_t compressType);
 int32_t drmFormatToHalFormats(int format, std::vector<uint32_t> *halFormats);
 int drmFormatToHalFormat(int format);
 uint8_t formatToBpp(int format);

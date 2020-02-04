@@ -292,14 +292,13 @@ uint32_t DpuFormatToHalFormat(int format)
     return HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED;
 }
 
-int halFormatToDrmFormat(int format, bool compressed)
+int halFormatToDrmFormat(int format, uint32_t compressType)
 {
-    if (compressed && (format == HAL_PIXEL_FORMAT_RGB_565))
-        return DRM_FORMAT_RGB565;
-
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if (exynos_format_desc[i].halFormat == format)
-            return exynos_format_desc[i].drmFormat;
+        if ((exynos_format_desc[i].halFormat == format) &&
+            (exynos_format_desc[i].getCompression() == compressType)) {
+                return exynos_format_desc[i].drmFormat;
+        }
     }
     return DRM_FORMAT_UNDEFINED;
 }
@@ -320,9 +319,6 @@ int32_t drmFormatToHalFormats(int format, std::vector<uint32_t> *halFormats)
 
 int drmFormatToHalFormat(int format)
 {
-    if (format == DRM_FORMAT_RGB565)
-        return HAL_PIXEL_FORMAT_RGB_565;
-
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].drmFormat == format)
             return exynos_format_desc[i].halFormat;

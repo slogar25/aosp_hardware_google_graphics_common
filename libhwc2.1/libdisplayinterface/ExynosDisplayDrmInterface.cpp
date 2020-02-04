@@ -594,7 +594,8 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
     uint32_t bufferNum, planeNum = 0;
 
     if (config.state == config.WIN_STATE_BUFFER) {
-        drmFormat = halFormatToDrmFormat(config.format, config.compression);
+        drmFormat = halFormatToDrmFormat(config.format,
+                config.compression ? AFBC : 0);
         if (drmFormat == DRM_FORMAT_UNDEFINED) {
             HWC_LOGE(mExynosDisplay, "%s:: known drm format (%d)",
                     __func__, config.format);
