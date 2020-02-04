@@ -67,24 +67,32 @@ enum {
 };
 
 typedef enum format_type {
+    TYPE_UNDEF      = 0,
 
     /* format */
+    FORMAT_SHIFT    = 0,
+    FORMAT_MASK     = 0x00000fff,
     RGB             = 0x00000001,
     YUV420          = 0x00000002,
     YUV422          = 0x00000004,
-    UNDEF_FORMAT    = 0x00008000,
 
     /* bit */
-    BIT8            = 0x00010000,
-    BIT10           = 0x00020000,
-    UNDEF_BIT       = 0x08000000,
+    BIT_SHIFT       = 12,
+    BIT_MASK        = 0x000ff000,
+    BIT8            = 0x00001000,
+    BIT10           = 0x00002000,
 
-    /* undefined */
-    UNDEF           = 0x80000000,
+    /* compression */
+    COMP_SHIFT      = 20,
+    COMP_MASK       = 0x0ff00000,
+    AFBC            = 0x00100000,
 
 } format_type_t;
 
 typedef struct format_description {
+    inline uint32_t getFormat() const { return type & FORMAT_MASK; }
+    inline uint32_t getBit() const { return type & BIT_MASK; }
+    inline uint32_t getCompression() const { return type & COMP_MASK; }
     int halFormat;
     decon_pixel_format s3cFormat;
     int drmFormat;
@@ -107,7 +115,7 @@ const format_description_t exynos_format_desc[] = {
     {HAL_PIXEL_FORMAT_RGB_888, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_RGB888,
         1, 32, RGB|BIT8, false, String8("RGB_888"), 0},
     {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_BGR565,
-        1, 16, RGB|UNDEF_BIT, false, String8("RGB_565"), 0},
+        1, 16, RGB, false, String8("RGB_565"), 0},
     {HAL_PIXEL_FORMAT_BGRA_8888, DECON_PIXEL_FORMAT_BGRA_8888, DRM_FORMAT_BGRA8888,
         1, 32, RGB|BIT8, true, String8("BGRA_8888"), 0},
     {HAL_PIXEL_FORMAT_RGBA_1010102, DECON_PIXEL_FORMAT_ABGR_2101010, DRM_FORMAT_RGBA1010102,
@@ -164,7 +172,7 @@ const format_description_t exynos_format_desc[] = {
         0, 0, YUV422|BIT8, false, String8("EXYNOS_CrYCbY_422_I"), 0},
 
     {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
-        0, 0, UNDEF, false, String8("ImplDef"), 0}
+        0, 0, TYPE_UNDEF, false, String8("ImplDef"), 0}
 };
 
 #define FORMAT_MAX_CNT sizeof(exynos_format_desc)/sizeof(format_description)
