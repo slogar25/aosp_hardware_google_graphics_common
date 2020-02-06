@@ -641,14 +641,16 @@ int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const i
             if (allocMetaParcel() == NO_ERROR) {
                 ExynosHdrDynamicInfo *info = &(mMetaParcel->sHdrDynamicInfo);
                 Exynos_parsing_user_data_registered_itu_t_t35(info, (void *)&metadata[i]);
-            } else ALOGE("Layer has no metaParcel!");
+            } else {
+                ALOGE("Layer has no metaParcel!");
+                return HWC2_ERROR_UNSUPPORTED;
+            }
             break;
         default:
-            return HWC2_ERROR_UNSUPPORTED;
+            return HWC2_ERROR_BAD_PARAMETER;
         }
     }
-
-    return NO_ERROR;
+    return HWC2_ERROR_NONE;
 }
 
 void ExynosLayer::resetValidateData()
