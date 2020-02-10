@@ -2325,7 +2325,7 @@ void ExynosResourceManager::updateRestrictions() {
             mSizeRestrictionCnt[i] = restriction_tables[i].table_element_size;
             for (uint32_t j = 0; j < mSizeRestrictionCnt[i]; j++) {
                 memcpy(&mSizeRestrictions[i][j], &restriction_tables[i].table[j],
-                        sizeof(restriction_size_element_t));
+                        sizeof(mSizeRestrictions[i][j]));
             }
         }
     }
