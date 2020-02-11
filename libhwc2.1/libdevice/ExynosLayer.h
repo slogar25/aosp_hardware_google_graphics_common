@@ -32,7 +32,7 @@
 #include "VendorVideoAPI.h"
 
 #ifndef HWC2_HDR10_PLUS_SEI
-/* baseed on android.hardware.composer.2_3 */
+/* based on android.hardware.composer.2_3 */
 #define HWC2_HDR10_PLUS_SEI 12
 #endif
 

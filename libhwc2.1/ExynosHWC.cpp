@@ -916,10 +916,13 @@ int32_t exynos_setLayerPerFrameMetadata(hwc2_device_t *dev, hwc2_display_t displ
     return HWC2_ERROR_BAD_DISPLAY;
 }
 
-int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* __unused dev, hwc2_display_t __unused display,
+int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* dev, hwc2_display_t __unused display,
         uint32_t* outNumKeys, int32_t* /*hwc2_per_frame_metadata_key_t*/ outKeys) {
 
     ExynosDevice *exynosDevice = checkDevice(dev);
+    if (exynosDevice == NULL)
+        return HWC2_ERROR_BAD_DISPLAY;
+
     ExynosResourceManager *resourceManager = exynosDevice->mResourceManager;
 
     uint32_t numKeys = 0;
