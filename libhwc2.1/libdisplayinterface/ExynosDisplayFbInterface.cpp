@@ -240,8 +240,10 @@ int32_t ExynosDisplayFbInterface::configFromDisplayConfig(decon_win_config &conf
 
     config.dst = display_config.dst;
     config.plane_alpha = 255;
-    if ((display_config.plane_alpha >= 0) && (display_config.plane_alpha < 255)) {
-        config.plane_alpha = display_config.plane_alpha;
+
+    int32_t planeAlpha = (int)((255 * display_config.plane_alpha) + 0.5);
+    if ((planeAlpha >= 0) && (planeAlpha < 255)) {
+        config.plane_alpha = planeAlpha;
     }
     if ((config.blending = halBlendingToS3CBlending(display_config.blending))
             >= DECON_BLENDING_MAX) {
@@ -264,7 +266,7 @@ int32_t ExynosDisplayFbInterface::configFromDisplayConfig(decon_win_config &conf
     if (display_config.state == display_config.WIN_STATE_COLOR) {
         config.state = config.DECON_WIN_STATE_COLOR;
         config.color = display_config.color;
-        if (!((display_config.plane_alpha >= 0) && (display_config.plane_alpha <= 255)))
+        if (!((planeAlpha >= 0) && (planeAlpha <= 255)))
             config.plane_alpha = 0;
     } else if ((display_config.state == display_config.WIN_STATE_BUFFER) ||
             (display_config.state == display_config.WIN_STATE_CURSOR)) {

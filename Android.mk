@@ -18,7 +18,8 @@ build_dirs :=  \
     libscaler  \
     libgscaler \
     libacryl \
-    libmemtrack
+    libmemtrack \
+    libv4l2
 
 ifdef BOARD_HWC_VERSION
 build_dirs += $(BOARD_HWC_VERSION)

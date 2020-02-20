@@ -848,7 +848,7 @@ void ExynosLayer::dump(String8& result)
     result.appendFormat("+---------------+------------+------+------+------------+-----------+---------+------------+--------+------------------------+-----+----------+--------------------+\n");
     result.appendFormat("|     handle    |     fd     |  tr  | AFBC | dataSpace  |  format   |  blend  | planeAlpha | zOrder |          color         | fps | priority | windowIndex        | \n");
     result.appendFormat("+---------------+------------+------+------+------------+-----------+---------+------------+--------+------------------------+-----+----------+--------------------+\n");
-    result.appendFormat("|  %8p | %d, %d, %d | 0x%2x |   %1d  | 0x%8x | %s | 0x%4x  |     %3.1f    |    %d   | 0x%2x, 0x%2x, 0x%2x, 0x%2x |  %2d |    %2d    |    %d               |\n",
+    result.appendFormat("|  %8p | %d, %d, %d | 0x%2x |   %1d  | 0x%8x | %s | 0x%4x  |    %1.3f    |    %d   | 0x%2x, 0x%2x, 0x%2x, 0x%2x |  %2d |    %2d    |    %d               |\n",
             mLayerBuffer, fd, fd1, fd2, mTransform, mCompressed, mDataSpace, getFormatStr(format).string(),
             mBlending, mPlaneAlpha, mZOrder, mColor.r, mColor.g, mColor.b, mColor.a, mFps, mOverlayPriority, mWindowIndex);
     result.appendFormat("|               +------------+------+------+------+-----+-----------+--------++-----+------+-----+--+-----------+------------++----+----------+--------------------+ \n");
