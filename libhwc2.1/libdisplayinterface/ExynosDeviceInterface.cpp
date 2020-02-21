@@ -55,6 +55,9 @@ void ExynosDeviceInterface::printDppRestriction(struct dpp_ch_restriction res)
 }
 
 int32_t ExynosDeviceInterface::makeDPURestrictions() {
+#ifdef DISABLE_READ_RESTRICTIONS
+    return -EINVAL;
+#endif
     int32_t ret = 0;
 
     struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
