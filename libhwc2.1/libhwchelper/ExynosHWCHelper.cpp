@@ -304,19 +304,18 @@ int halFormatToDrmFormat(int format, bool compressed)
     return DRM_FORMAT_UNDEFINED;
 }
 
-uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat,
-        uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT])
+int32_t drmFormatToHalFormats(int format, std::vector<uint32_t> *halFormats)
 {
-    *numFormat = 0;
+    if (halFormats == NULL)
+        return -EINVAL;
+
+    halFormats->clear();
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].drmFormat == format) {
-            halFormats[*numFormat] = exynos_format_desc[i].halFormat;
-            *numFormat = *numFormat + 1;
+            halFormats->push_back(exynos_format_desc[i].halFormat);
         }
-        if (*numFormat >= MAX_SAME_HAL_PIXEL_FORMAT)
-            break;
     }
-    return *numFormat;
+    return NO_ERROR;
 }
 
 int drmFormatToHalFormat(int format)

@@ -123,14 +123,15 @@ void ExynosDeviceDrmInterface::updateRestrictions()
         }
         /* Set supported format information */
         for (auto format : plane->formats()) {
-            uint32_t halFormatNum = 0;
-            uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT];
-
+            std::vector<uint32_t> halFormats;
+            if (drmFormatToHalFormats(format, &halFormats) != NO_ERROR) {
+                ALOGE("Fail to convert drm format(%d)", format);
+                continue;
+            }
             int &formatIndex = mDPUInfo.dpuInfo.dpp_ch[channelId].restriction.format_cnt;
-            drmFormatToHalFormats(format, &halFormatNum, halFormats);
-            for (uint32_t i = 0; i < halFormatNum; i++) {
+            for (auto halFormat : halFormats) {
                 mDPUInfo.dpuInfo.dpp_ch[channelId].restriction.format[formatIndex] =
-                    halFormats[i];
+                    halFormat;
                 formatIndex++;
             }
         }
