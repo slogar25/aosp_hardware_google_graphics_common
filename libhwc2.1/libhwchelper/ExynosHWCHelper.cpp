@@ -593,6 +593,8 @@ uint32_t getPlaneNumOfFormat(int format)
         case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B:
         case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M:
         case HAL_PIXEL_FORMAT_YCBCR_P010:
+        case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP:
+        case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B:
             return 2;
         case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M:
         case HAL_PIXEL_FORMAT_EXYNOS_YV12_M:
@@ -652,6 +654,10 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
         return P010_Y_SIZE(width, height);
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
         return YUV420N_Y_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B:
+        return 2 * __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8);
+    case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP:
+        return __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8);
     }
 
     return NV12M_Y_SIZE(width, height) + ((width % 128) == 0 ? 0 : 256);
@@ -676,6 +682,10 @@ uint32_t getExynosBufferCbCrLength(uint32_t width, uint32_t height, int format)
     case HAL_PIXEL_FORMAT_YCBCR_P010:
         HDEBUGLOGD(eDebugMPP, "size(CbCr) : %d", P010_CBCR_SIZE(width, height));
         return P010_CBCR_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B:
+        return __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8);
+    case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP:
+        return __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8) / 2;
     }
 
     return NV12M_CBCR_SIZE(width, height);
