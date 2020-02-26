@@ -319,6 +319,11 @@ class ExynosDisplay {
         rendering_state  mRenderingState;
 
         /**
+         * Rendering step information that is called by client
+         */
+        rendering_state  mHWCRenderingState;
+
+        /**
          * Window total bandwidth by enabled window, It's used as dynamic re-composition enable/disable.
          */
         uint32_t  mDisplayBW;

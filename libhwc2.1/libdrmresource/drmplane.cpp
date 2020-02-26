@@ -138,17 +138,17 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get IN_FENCE_FD property");
 
-  ret = drm_->GetPlaneProperty(*this, "color", &color_property_);
+  ret = drm_->GetPlaneProperty(*this, "standard", &standard_);
   if (ret)
-    ALOGI("Could not get color property");
+    ALOGI("Could not get standard property");
 
-  ret = drm_->GetPlaneProperty(*this, "compression source", &compression_source_);
+  ret = drm_->GetPlaneProperty(*this, "transfer", &transfer_);
   if (ret)
-    ALOGI("Could not get compression source property");
+    ALOGI("Could not get transfer property");
 
-  ret = drm_->GetPlaneProperty(*this, "dataspace", &dataspace_);
+  ret = drm_->GetPlaneProperty(*this, "range", &range_);
   if (ret)
-    ALOGI("Could not get dataspace property");
+    ALOGI("Could not get range property");
 
   ret = drm_->GetPlaneProperty(*this, "max_luminance", &max_luminance_);
   if (ret)
@@ -173,9 +173,9 @@ int DrmPlane::Init() {
   properties_.push_back(&alpha_property_);
   properties_.push_back(&blend_property_);
   properties_.push_back(&in_fence_fd_property_);
-  properties_.push_back(&color_property_);
-  properties_.push_back(&compression_source_);
-  properties_.push_back(&dataspace_);
+  properties_.push_back(&standard_);
+  properties_.push_back(&transfer_);
+  properties_.push_back(&range_);
   properties_.push_back(&max_luminance_);
   properties_.push_back(&min_luminance_);
 
@@ -254,16 +254,16 @@ const DrmProperty &DrmPlane::in_fence_fd_property() const {
   return in_fence_fd_property_;
 }
 
-const DrmProperty &DrmPlane::color_property() const {
-  return color_property_;
+const DrmProperty &DrmPlane::standard_property() const {
+  return standard_;
 }
 
-const DrmProperty &DrmPlane::compression_source_property() const {
-  return compression_source_;
+const DrmProperty &DrmPlane::transfer_property() const {
+  return transfer_;
 }
 
-const DrmProperty &DrmPlane::dataspace_property() const {
-  return dataspace_;
+const DrmProperty &DrmPlane::range_property() const {
+  return range_;
 }
 
 const DrmProperty &DrmPlane::max_luminance_property() const {

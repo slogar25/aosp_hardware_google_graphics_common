@@ -57,9 +57,9 @@ class DrmPlane {
   const DrmProperty &alpha_property() const;
   const DrmProperty &blend_property() const;
   const DrmProperty &in_fence_fd_property() const;
-  const DrmProperty &color_property() const;
-  const DrmProperty &compression_source_property() const;
-  const DrmProperty &dataspace_property() const;
+  const DrmProperty &standard_property() const;
+  const DrmProperty &transfer_property() const;
+  const DrmProperty &range_property() const;
   const DrmProperty &max_luminance_property() const;
   const DrmProperty &min_luminance_property() const;
 
@@ -90,9 +90,9 @@ class DrmPlane {
   DrmProperty alpha_property_;
   DrmProperty blend_property_;
   DrmProperty in_fence_fd_property_;
-  DrmProperty color_property_;
-  DrmProperty compression_source_;
-  DrmProperty dataspace_;
+  DrmProperty standard_;
+  DrmProperty transfer_;
+  DrmProperty range_;
   DrmProperty max_luminance_;
   DrmProperty min_luminance_;
   std::vector<DrmProperty *> properties_;
