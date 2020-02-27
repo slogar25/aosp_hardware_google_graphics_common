@@ -20,7 +20,6 @@
 #include "ExynosDevice.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosExternalDisplay.h"
-#include "ExynosDisplayFbInterfaceModule.h"
 #include "ExynosDisplayDrmInterface.h"
 
 extern struct exynos_hwc_control exynosHWCControl;
@@ -154,6 +153,7 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
     if (interfaceType == INTERFACE_TYPE_DRM)
         mDisplayInterface = std::make_unique<ExynosDisplayDrmInterface>((ExynosDisplay *)this);
     else
-        mDisplayInterface = std::make_unique<ExynosPrimaryDisplayFbInterfaceModule>((ExynosDisplay *)this);
+        LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
+                __func__, interfaceType);
     mDisplayInterface->init(this);
 }

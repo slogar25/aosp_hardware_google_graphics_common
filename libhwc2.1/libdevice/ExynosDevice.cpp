@@ -23,7 +23,6 @@
 #include "ExynosVirtualDisplayModule.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
-#include "ExynosDeviceFbInterface.h"
 #include "ExynosDeviceDrmInterface.h"
 #include <unistd.h>
 
@@ -145,7 +144,8 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
     if (interfaceType == INTERFACE_TYPE_DRM) {
         mDeviceInterface = std::make_unique<ExynosDeviceDrmInterface>(this);
     } else {
-        mDeviceInterface = std::make_unique<ExynosDeviceFbInterface>(this);
+        LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
+                __func__, interfaceType);
     }
 
     /*
