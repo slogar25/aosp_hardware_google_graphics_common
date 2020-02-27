@@ -27,7 +27,7 @@
 
 #include "hwjpeg-internal.h"
 #include "AppMarkerWriter.h"
-#include "LibScalerForJpeg.h"
+#include "ThumbnailScaler.h"
 #include "IFDWriter.h"
 
 // Data length written by H/W without the scan data.
@@ -102,6 +102,10 @@ ExynosJpegEncoderForCamera::ExynosJpegEncoderForCamera(bool bBTBComp)
     // compression, it should not be configured.
     if (IsBTBCompressionSupported())
         SetState(STATE_THUMBSIZE_CHANGED);
+
+    m_extraInfo.appInfo = m_appInfo;
+
+    mThumbnailScaler.reset(ThumbnailScaler::createInstance());
 
     ALOGD("ExynosJpegEncoderForCamera Created: %p, ION %d", this, m_fdIONClient);
 }
@@ -219,7 +223,7 @@ void *ExynosJpegEncoderForCamera::tCompressThumbnail(void *p)
 
 bool ExynosJpegEncoderForCamera::ProcessExif(char *base, size_t limit,
                                              exif_attribute_t *exifInfo,
-                                             debug_attribute_t *debuginfo)
+                                             extra_appinfo_t *extra)
 {
     // PREREQUISITES: The main and the thumbnail image size should be configured before.
 
@@ -252,7 +256,7 @@ bool ExynosJpegEncoderForCamera::ProcessExif(char *base, size_t limit,
     if (!!(GetDeviceCapabilities() & V4L2_CAP_EXYNOS_JPEG_NO_STREAMBASE_ALIGN))
         align = 1;
 
-    m_pAppWriter->PrepareAppWriter(base + JPEG_MARKER_SIZE, exifInfo, debuginfo);
+    m_pAppWriter->PrepareAppWriter(base + JPEG_MARKER_SIZE, exifInfo, extra);
 
     if (limit <= (m_pAppWriter->CalculateAPPSize(0) + NECESSARY_JPEG_LENGTH)) {
         ALOGE("Too small JPEG stream buffer size, %zu bytes", limit);
@@ -332,6 +336,23 @@ int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
                                        int fdJpegBuffer, char** pcJpegBuffer,
                                        debug_attribute_t *debugInfo)
 {
+    if ((!debugInfo) || (debugInfo->num_of_appmarker == 0)) {
+        extra_appinfo_t *extra = NULL;
+        return encode(size, exifInfo, fdJpegBuffer, pcJpegBuffer, extra);
+    }
+
+    m_extraInfo.num_of_appmarker = 0;
+    memset(m_appInfo, 0, sizeof(m_appInfo));
+
+    ExtractDebugAttributeInfo(debugInfo, &m_extraInfo);
+
+    return encode(size, exifInfo, fdJpegBuffer, pcJpegBuffer, &m_extraInfo);
+}
+
+int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
+                                       int fdJpegBuffer, char** pcJpegBuffer,
+                                       extra_appinfo_t *appInfo)
+{
     if (!(*pcJpegBuffer)) {
         ALOGE("Target stream buffer is not specified");
         return -1;
@@ -348,13 +369,13 @@ int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
     char *jpeg_base = m_pStreamBase;
 
     ALOGI_IF(!exifInfo, "Exif is not specified. Skipping writing APP1 marker");
-    ALOGI_IF(!debugInfo,
+    ALOGI_IF(!appInfo,
             "Debugging information is not specified. Skipping writing APP4 marker");
     ALOGD("Given stream buffer size: %d bytes", *size);
 
     CStopWatch stopwatch(true);
 
-    if (!ProcessExif(jpeg_base, m_nStreamSize, exifInfo, debugInfo))
+    if (!ProcessExif(jpeg_base, m_nStreamSize, exifInfo, appInfo))
         return -1;
 
     int offset = PTR_DIFF(m_pStreamBase, m_pAppWriter->GetMainStreamBase());
@@ -562,47 +583,47 @@ bool ExynosJpegEncoderForCamera::GenerateThumbnailImage()
     ALOGD("Generating thumbnail image: %dx%d -> %dx%d",
           main_width, main_height, m_nThumbWidth, m_nThumbHeight);
 
-    int len_srcbufs[3] = {0, 0, 0};
-    void *srcbufs[3] = {NULL, NULL, NULL};
-    int memtype;
+    if (!mThumbnailScaler) {
+        ALOGE("Thumbnail scaler is not prepared");
+        return false;
+    }
+
+    if (!mThumbnailScaler->SetSrcImage(main_width, main_height, v4l2Format)) {
+        ALOGE("Failed to configure the main image to the thumbnail scaler");
+        return false;
+    }
+
+
+    if (!mThumbnailScaler->SetDstImage(m_nThumbWidth, m_nThumbHeight, GetThumbnailFormat(v4l2Format))) {
+        ALOGE("Failed to configure the target image to the thumbnail scaler");
+        return false;
+    }
+
+    bool okay = false;
 
     if (checkInBufType() == JPEG_BUF_TYPE_USER_PTR) {
-        char *bufs[3];
-        if (getInBuf(bufs, len_srcbufs, 3) < 0) {
+        char *bufs[ThumbnailScaler::SCALER_MAX_PLANES];
+        int len_srcbufs[ThumbnailScaler::SCALER_MAX_PLANES];
+
+        if (getInBuf(bufs, len_srcbufs, ThumbnailScaler::SCALER_MAX_PLANES) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
-        memtype = V4L2_MEMORY_USERPTR;
-        srcbufs[0] = reinterpret_cast<void *>(bufs[0]);
-        srcbufs[1] = reinterpret_cast<void *>(bufs[1]);
-        srcbufs[2] = reinterpret_cast<void *>(bufs[2]);
+
+        okay = mThumbnailScaler->RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
     } else { // mainbuftype == JPEG_BUF_TYPE_DMA_BUF
-        int bufs[3];
-        if (getInBuf(bufs, len_srcbufs, 3) < 0) {
+        int bufs[ThumbnailScaler::SCALER_MAX_PLANES];
+        int len_srcbufs[ThumbnailScaler::SCALER_MAX_PLANES];
+
+        if (getInBuf(bufs, len_srcbufs, ThumbnailScaler::SCALER_MAX_PLANES) < 0) {
             ALOGE("Failed to retrieve the main image buffers");
             return false;
         }
-        memtype = V4L2_MEMORY_DMABUF;
-        srcbufs[0] = reinterpret_cast<void *>(bufs[0]);
-        srcbufs[1] = reinterpret_cast<void *>(bufs[1]);
-        srcbufs[2] = reinterpret_cast<void *>(bufs[2]);
+        okay = mThumbnailScaler->RunStream(bufs, len_srcbufs, m_fdIONThumbImgBuffer, m_szIONThumbImgBuffer);
     }
 
-    void *dstbuf[3] = {NULL, NULL, NULL};
-    dstbuf[0] = reinterpret_cast<void *>(m_fdIONThumbImgBuffer);
-
-    if (!m_pLibScaler.SetSrcImage(main_width, main_height, v4l2Format, srcbufs, memtype)) {
-        ALOGE("Failed to configure the main image format to LibScalerForJpeg");
-        return false;
-    }
-    if (!m_pLibScaler.SetDstImage(m_nThumbWidth, m_nThumbHeight,
-                GetThumbnailFormat(v4l2Format), dstbuf, V4L2_MEMORY_DMABUF)) {
-        ALOGE("Failed to configure the target image format to LibScalerForJpeg");
-        return false;
-    }
-
-    if (!m_pLibScaler.RunStream()) {
-        ALOGE("Failed to convert the main image to thumbnail with LibScalerForJpeg");
+    if (!okay) {
+        ALOGE("Failed to convert the main image to thumbnail with the thumbnail scaler");
         return false;
     }
 

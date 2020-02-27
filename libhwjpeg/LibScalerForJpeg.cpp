@@ -18,253 +18,236 @@
 #include "hwjpeg-internal.h"
 #include "LibScalerForJpeg.h"
 
-LibScalerForJpeg::LibScalerForJpeg()
+#define SCALER_DEV_NODE "/dev/video50"
+
+static const char *getBufTypeString(unsigned int buftype)
 {
-    memset(&m_srcFmt, 0, sizeof(m_srcFmt));
-    memset(&m_dstFmt, 0, sizeof(m_dstFmt));
-    memset(&m_srcBuf, 0, sizeof(m_srcBuf));
-    memset(&m_dstBuf, 0, sizeof(m_dstBuf));
-    memset(&m_srcPlanes, 0, sizeof(m_srcPlanes));
-    memset(&m_dstPlanes, 0, sizeof(m_dstPlanes));
-
-    m_srcFmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-    m_dstFmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-    m_srcBuf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-    m_dstBuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-
-    m_srcBuf.m.planes = m_srcPlanes;
-    m_dstBuf.m.planes = m_dstPlanes;
-
-    m_fdScaler = open(SCALER_DEV_NODE, O_RDWR);
-
-    if (m_fdScaler < 0) {
-        ALOGE("Failed to open %s", SCALER_DEV_NODE);
-        return;
-    }
-
-    m_needReqbuf = true;
-
-    ALOGD("LibScalerForJpeg Created: %p", this);
+    if (buftype == V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE)
+        return "destination";
+    if (buftype == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE)
+        return "source";
+    return "unknown";
 }
 
-LibScalerForJpeg::~LibScalerForJpeg()
+bool LibScalerForJpeg::RunStream(int srcBuf[SCALER_MAX_PLANES], int __unused srcLen[SCALER_MAX_PLANES], int dstBuf, size_t __unused dstLen)
 {
-    if (m_fdScaler > 0)
-        close(m_fdScaler);
+    if (!mSrcImage.begin(V4L2_MEMORY_DMABUF) || !mDstImage.begin(V4L2_MEMORY_DMABUF))
+        return false;
 
-    m_fdScaler = -1;
-
-    ALOGD("LibScalerForJpeg Destroyed: %p", this);
+    return queue(srcBuf, dstBuf);
 }
 
-bool LibScalerForJpeg::SetImage(
-        v4l2_format &m_fmt, v4l2_buffer &m_buf, v4l2_plane m_planes[SCALER_MAX_PLANES],
-        unsigned int width, unsigned int height, unsigned int v4l2_format,
-        void *addrs[SCALER_MAX_PLANES], int mem_type)
+bool LibScalerForJpeg::RunStream(char *srcBuf[SCALER_MAX_PLANES], int __unused srcLen[SCALER_MAX_PLANES], int dstBuf, size_t __unused dstLen)
 {
-    /* Format information update*/
-    if ((m_needReqbuf == true) ||
-            (m_fmt.fmt.pix_mp.pixelformat != v4l2_format ||
-            m_fmt.fmt.pix_mp.width != width ||
-            m_fmt.fmt.pix_mp.height != height ||
-            m_buf.memory != static_cast<v4l2_memory>(mem_type))) {
-        m_fmt.fmt.pix_mp.pixelformat = v4l2_format;
-        m_fmt.fmt.pix_mp.width  = width;
-        m_fmt.fmt.pix_mp.height = height;
-        m_buf.memory = static_cast<v4l2_memory>(mem_type);
+    if (!mSrcImage.begin(V4L2_MEMORY_USERPTR) || !mDstImage.begin(V4L2_MEMORY_DMABUF))
+        return false;
 
-        // The driver returns the number and length of planes through TRY_FMT.
-        if (ioctl(m_fdScaler, VIDIOC_TRY_FMT, &m_fmt) < 0) {
-            ALOGE("Failed to TRY_FMT for source");
-            m_needReqbuf = true;
+    return queue(srcBuf, dstBuf);
+}
+
+bool LibScalerForJpeg::Image::set(unsigned int width, unsigned int height, unsigned int format)
+{
+    if (same(width, height, format))
+        return true;
+
+    if (memoryType != 0) {
+        if (!mDevice.requestBuffers(bufferType, memoryType, 0))
             return false;
+    }
+
+    if (!mDevice.setFormat(bufferType, format, width, height, planeLen))
+        return false;
+
+    memoryType = 0; // new reqbufs is required.
+
+    return true;
+}
+
+bool LibScalerForJpeg::Image::begin(unsigned int memtype)
+{
+    if (memoryType != memtype) {
+        if (memoryType != 0) {
+            if (!mDevice.requestBuffers(bufferType, memoryType, 0))
+                return false;
         }
-        m_needReqbuf = true;
+
+        if (!mDevice.requestBuffers(bufferType, memtype, 1))
+            return false;
+
+        if (!mDevice.streamOn(bufferType))
+            return false;
+
+        memoryType = memtype;
     }
-
-    /* Buffer information update*/
-    m_buf.index = 0;
-    m_buf.length = m_fmt.fmt.pix_mp.num_planes;
-
-    for (unsigned long i = 0; i < m_buf.length; i++) {
-        m_planes[i].length = m_fmt.fmt.pix_mp.plane_fmt[i].sizeimage;
-        m_planes[i].bytesused = m_planes[i].length;
-        if (m_buf.memory == V4L2_MEMORY_DMABUF)
-            m_planes[i].m.fd = static_cast<__s32>(reinterpret_cast<long>(addrs[i]));
-        else
-            m_planes[i].m.userptr = reinterpret_cast<unsigned long>(addrs[i]);
-    }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
 
-bool LibScalerForJpeg::SetFormat()
+bool LibScalerForJpeg::Image::cancelBuffer()
 {
-    if (ioctl(m_fdScaler, VIDIOC_S_FMT, &m_srcFmt) < 0) {
-        ALOGE("Failed to S_FMT for the source");
+    if (!mDevice.streamOff(bufferType))
         return false;
-    }
 
-    if (ioctl(m_fdScaler, VIDIOC_S_FMT, &m_dstFmt) < 0) {
-        ALOGE("Failed to S_FMT for the target");
+    if (!mDevice.streamOn(bufferType))
         return false;
-    }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
 
-bool LibScalerForJpeg::ReqBufs(int count)
+LibScalerForJpeg::Device::Device()
 {
-    v4l2_requestbuffers reqbufs;
+    mFd = ::open(SCALER_DEV_NODE, O_RDWR);
+    if (mFd < 0)
+        ALOGERR("failed to open %s", SCALER_DEV_NODE);
+}
 
-    memset(&reqbufs, 0, sizeof(reqbufs));
-    reqbufs.type    = m_srcBuf.type;
-    reqbufs.memory  = m_srcBuf.memory;
+LibScalerForJpeg::Device::~Device()
+{
+    if (mFd >= 0)
+        ::close(mFd);
+}
+
+bool LibScalerForJpeg::Device::requestBuffers(unsigned int buftype, unsigned int memtype, unsigned int count)
+{
+    // count==0 means this port should be reconfigured and it is successful under streaming is finished.
+    if (!count)
+        streamOff(buftype);
+
+    v4l2_requestbuffers reqbufs{};
+
+    reqbufs.type    = buftype;
+    reqbufs.memory  = memtype;
     reqbufs.count   = count;
 
-    if (ioctl(m_fdScaler, VIDIOC_REQBUFS, &reqbufs) < 0) {
-        ALOGE("Failed to REQBUFS for the source buffer");
+    if (ioctl(mFd, VIDIOC_REQBUFS, &reqbufs) < 0) {
+        ALOGERR("failed REQBUFS(%s, mem=%d, count=%d)", getBufTypeString(buftype), memtype, count);
         return false;
     }
-
-    memset(&reqbufs, 0, sizeof(reqbufs));
-    reqbufs.type    = m_dstBuf.type;
-    reqbufs.memory  = m_dstBuf.memory;
-    reqbufs.count   = count;
-
-    if (ioctl(m_fdScaler, VIDIOC_REQBUFS, &reqbufs) < 0) {
-        ALOGE("Failed to REQBUFS for the target buffer");
-        // rolling back the reqbufs for the source image
-        reqbufs.type    = m_srcBuf.type;
-        reqbufs.memory  = m_srcBuf.memory;
-        reqbufs.count   = 0;
-        ioctl(m_fdScaler, VIDIOC_REQBUFS, &reqbufs);
-        return false;
-    }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
 
-bool LibScalerForJpeg::StreamOn()
+bool LibScalerForJpeg::Device::setFormat(unsigned int buftype, unsigned int format, unsigned int width, unsigned int height, unsigned int planelen[SCALER_MAX_PLANES])
 {
-    if (ioctl(m_fdScaler, VIDIOC_STREAMON, &m_srcBuf.type) < 0) {
-        ALOGE("Failed StreamOn for the source buffer");
+    v4l2_format fmt{};
+
+    fmt.type = buftype;
+    fmt.fmt.pix_mp.pixelformat = format;
+    fmt.fmt.pix_mp.width  = width;
+    fmt.fmt.pix_mp.height = height;
+
+    if (ioctl(mFd, VIDIOC_S_FMT, &fmt) < 0) {
+        ALOGERR("failed S_FMT(%s, fmt=h'%x, %ux%u)", getBufTypeString(buftype), format, width, height);
         return false;
     }
 
-    if (ioctl(m_fdScaler, VIDIOC_STREAMON, &m_dstBuf.type) < 0) {
-        ALOGE("Failed StreamOn for the target buffer");
-        // cancel the streamon for the source image
-        ioctl(m_fdScaler, VIDIOC_STREAMOFF, &m_srcBuf.type);
-        return false;
+    for (uint32_t i = 0; i < fmt.fmt.pix_mp.num_planes ; i++) {
+        planelen[i] = fmt.fmt.pix_mp.plane_fmt[i].sizeimage;
     }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
 
-bool LibScalerForJpeg::QBuf()
+bool LibScalerForJpeg::Device::streamOn(unsigned int buftype)
 {
-    if (ioctl(m_fdScaler, VIDIOC_QBUF, &m_srcBuf) < 0) {
-        ALOGE("Failed to QBUF for the source buffer");
+    if (ioctl(mFd, VIDIOC_STREAMON, &buftype) < 0) {
+        ALOGERR("failed STREAMON for %s", getBufTypeString(buftype));
         return false;
     }
-
-    if (ioctl(m_fdScaler, VIDIOC_QBUF, &m_dstBuf) < 0) {
-        ALOGE("Failed to QBUF for the target buffer");
-        // cancel the previous queued buffer
-        StopStreaming();
-        return false;
-    }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
 
-bool LibScalerForJpeg::StreamOff()
+bool LibScalerForJpeg::Device::streamOff(unsigned int buftype)
 {
-    if (ioctl(m_fdScaler, VIDIOC_STREAMOFF, &m_srcBuf.type) < 0) {
-        ALOGE("Failed STREAMOFF for the source");
+    if (ioctl(mFd, VIDIOC_STREAMOFF, &buftype) < 0) {
+        ALOGERR("failed STREAMOFF for %s", getBufTypeString(buftype));
         return false;
     }
-
-    if (ioctl(m_fdScaler, VIDIOC_STREAMOFF, &m_dstBuf.type) < 0) {
-        ALOGE("Failed STREAMOFF for the target");
-        return false;
-    }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
 
-bool LibScalerForJpeg::StopStreaming()
+bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, std::function<void(v4l2_buffer &)> bufferFiller)
 {
-    if (!StreamOff())
-        return false;
+    v4l2_buffer buffer{};
+    v4l2_plane plane[SCALER_MAX_PLANES];
 
-    if (!ReqBufs(0))
-        return false;
+    memset(&plane, 0, sizeof(plane));
 
-    SC_LOGD("%s Success", __func__);
+    buffer.type = buftype;
+    buffer.m.planes = plane;
+
+    bufferFiller(buffer);
+
+    return ioctl(mFd, VIDIOC_QBUF, &buffer) >= 0;
+}
+
+bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, int buf[SCALER_MAX_PLANES], unsigned int len[SCALER_MAX_PLANES])
+{
+    if (!queueBuffer(buftype, [buf, len] (v4l2_buffer &buffer) {
+                buffer.memory = V4L2_MEMORY_DMABUF;
+                buffer.length = SCALER_MAX_PLANES;
+                for (unsigned int i = 0; i < SCALER_MAX_PLANES; i++) {
+                    buffer.m.planes[i].m.fd = buf[i];
+                    buffer.m.planes[i].length = len[i];
+                } })) {
+        ALOGERR("failed QBUF(%s, fd[]=%d %d, len[0]=%d %d)", getBufTypeString(buftype), buf[0], buf[1], len[0], len[1]);
+        return false;
+    }
 
     return true;
 }
 
-bool LibScalerForJpeg::DQBuf()
+bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, char *buf[SCALER_MAX_PLANES], unsigned int len[SCALER_MAX_PLANES])
 {
-    if (ioctl(m_fdScaler, VIDIOC_DQBUF, &m_srcBuf) < 0 ) {
-        ALOGE("Failed to DQBuf the source buffer");
+    if (!queueBuffer(buftype, [buf, len] (v4l2_buffer &buffer) {
+                buffer.memory = V4L2_MEMORY_USERPTR;
+                buffer.length = SCALER_MAX_PLANES;
+                for (unsigned int i = 0; i < SCALER_MAX_PLANES; i++) {
+                    buffer.m.planes[i].m.userptr = reinterpret_cast<unsigned long>(buf[i]);
+                    buffer.m.planes[i].length = len[i];
+                } })) {
+        ALOGERR("failed QBUF(%s, ptr[]=%p %p, len[0]=%d %d)", getBufTypeString(buftype), buf[0], buf[1], len[0], len[1]);
         return false;
     }
-
-    if (ioctl(m_fdScaler, VIDIOC_DQBUF, &m_dstBuf) < 0 ) {
-        ALOGE("Failed to DQBuf the target buffer");
-        return false;
-    }
-
-    SC_LOGD("%s Success", __func__);
 
     return true;
 }
 
-bool LibScalerForJpeg::RunStream()
+bool LibScalerForJpeg::Device::queueBuffer(unsigned int buftype, int buf, unsigned int len[SCALER_MAX_PLANES])
 {
-    if (m_needReqbuf == true) {
-        if (!StopStreaming())
-            goto err;
-
-        if (!SetFormat())
-            goto err;
-
-        if (!ReqBufs())
-            goto err;
-
-        if (!StreamOn())
-            goto err;
+    if (!queueBuffer(buftype, [buf, len] (v4l2_buffer &buffer)
+                {
+                    buffer.memory = V4L2_MEMORY_DMABUF;
+                    buffer.length = 1;
+                    buffer.m.planes[0].m.fd = buf;
+                    buffer.m.planes[0].length = len[0];
+                })) {
+        ALOGERR("failed QBUF(%s, fd=%d, len=%d", getBufTypeString(buftype), buf, len[0]);
+        return false;
     }
 
-    if (!QBuf())
-        goto err;
+    return true;
+}
 
-    if (!DQBuf())
-        goto err;
+bool LibScalerForJpeg::Device::dequeueBuffer(unsigned int buftype, unsigned int memtype)
+{
+    v4l2_buffer buffer{};
+    v4l2_plane plane[SCALER_MAX_PLANES];
 
-    m_needReqbuf = false;
+    memset(&plane, 0, sizeof(plane));
 
-    SC_LOGD("%s Success", __func__);
+    buffer.type = buftype;
+    buffer.memory = memtype;
+    buffer.length = SCALER_MAX_PLANES;
+
+    buffer.m.planes = plane;
+
+    if (ioctl(mFd, VIDIOC_DQBUF, &buffer) < 0 ) {
+        ALOGERR("failed DQBUF(%s)", getBufTypeString(buftype));
+        return false;
+    }
 
     return true;
-
-err:
-    m_needReqbuf = true;
-    return false;
 }

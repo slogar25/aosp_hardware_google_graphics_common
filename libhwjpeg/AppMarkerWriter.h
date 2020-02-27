@@ -18,6 +18,7 @@
 #define __HARDWARE_SAMSUNG_SLSI_EXYNOS_APPMARKER_WRITER_H__
 
 #include <ExynosExif.h>
+#include "include/hardware/exynos/ExynosExif.h"
 
 #define JPEG_MAX_SEGMENT_SIZE ((1 << 16) - 1)
 #define JPEG_MARKER_SIZE 2
@@ -55,7 +56,7 @@ class CAppMarkerWriter {
     uint16_t m_nExifIFDFields;
     uint16_t m_nGPSIFDFields;
     exif_attribute_t *m_pExif;
-    debug_attribute_t *m_pDebug;
+    extra_appinfo_t *m_pExtra;
 
     uint32_t m_szMake;
     uint32_t m_szSoftware;
@@ -85,7 +86,7 @@ public:
 
     ~CAppMarkerWriter() { }
 
-    void PrepareAppWriter(char *base, exif_attribute_t *exif, debug_attribute_t *debug);
+    void PrepareAppWriter(char *base, exif_attribute_t *exif, extra_appinfo_t *info);
 
     char *GetMainStreamBase() { return m_pMainBase; }
     char *GetThumbStreamBase() { return m_pThumbBase; }
@@ -101,9 +102,9 @@ public:
         size_t appsize = 0;
         if (m_szApp1 > 0)
             appsize += m_szApp1 + JPEG_MARKER_SIZE;
-        if (m_pDebug) {
-            for (int idx = 0; idx < m_pDebug->num_of_appmarker; idx++)
-                appsize += m_pDebug->debugSize[m_pDebug->idx[idx][0]]
+        if (m_pExtra) {
+            for (int idx = 0; idx < m_pExtra->num_of_appmarker; idx++)
+                appsize += m_pExtra->appInfo[idx].dataSize +
                            + JPEG_MARKER_SIZE + JPEG_SEGMENT_LENFIELD_SIZE;
         }
         if (IsThumbSpaceReserved())
