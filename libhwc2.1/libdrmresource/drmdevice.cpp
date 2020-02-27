@@ -463,6 +463,9 @@ int DrmDevice::GetProperty(uint32_t obj_id, uint32_t obj_type,
     drmModeFreeProperty(p);
   }
 
+  if (!found)
+      property->SetName(prop_name);
+
   drmModeFreeObjectProperties(props);
   return found ? 0 : -ENOENT;
 }

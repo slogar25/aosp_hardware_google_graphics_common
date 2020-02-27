@@ -41,6 +41,7 @@ class DrmProperty {
   DrmProperty &operator=(const DrmProperty &) = delete;
 
   void Init(drmModePropertyPtr p, uint64_t value);
+  void SetName(std::string name) { name_ = name; };
   std::tuple<uint64_t, int> GetEnumValueWithName(std::string name) const;
 
   uint32_t id() const;

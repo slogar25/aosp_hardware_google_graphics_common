@@ -20,6 +20,7 @@
 #define V4L2_CID_CONTENT_PROTECTION (EXYNOS_CID_BASE + 201)
 #define V4L2_CID_CSC_EQ             (EXYNOS_CID_BASE + 101)
 #define V4L2_CID_CSC_RANGE          (EXYNOS_CID_BASE + 102)
+#define SC_CID_FRAMERATE            (EXYNOS_CID_BASE + 110)
 
 static const char *__dirname[AcrylicCompositorMSCL9810::NUM_IMAGES] = {"source", "target"};
 
@@ -593,8 +594,7 @@ bool AcrylicCompositorMSCL9810::dequeueBuffer(BUFDIRECTION dir, v4l2_buffer *buf
             ALOGERR("Failed VIDIOC_DQBUF: type=%d, memory=%d", buffer->type, buffer->memory);
             return false;
         } else if (!!(buffer->flags & V4L2_BUF_FLAG_ERROR)) {
-            ALOGE("Error during streaming: type=%d, memory=%d", buffer->type, buffer->memory);
-            return false;
+            ALOGI("Error during streaming: type=%d, memory=%d", buffer->type, buffer->memory);
         }
 
         clearDeviceState(dir, STATE_QBUF);
@@ -614,4 +614,35 @@ bool AcrylicCompositorMSCL9810::dequeueBuffer(BUFDIRECTION dir, v4l2_buffer *buf
 bool AcrylicCompositorMSCL9810::waitExecution(int __unused handle)
 {
     return dequeueBuffer();
+}
+
+bool AcrylicCompositorMSCL9810::requestPerformanceQoS(AcrylicPerformanceRequest *request)
+{
+    uint32_t framerate;
+
+    if (!request || (request->getFrameCount() == 0))
+        framerate = 0;
+    else
+        framerate = request->getFrame(0)->mFrameRate;
+
+    v4l2_control ctrl;
+
+    ctrl.id = SC_CID_FRAMERATE;
+    ctrl.value = framerate;
+
+    if (mDev.ioctl(VIDIOC_S_CTRL, &ctrl) < 0) {
+        /*
+         * It doesn't return EINVAL by value.
+         * But in case of not supporting SC_CID_FRAMERATE it returns EINVAL.
+         * Some chips don't support this feature.So, just keep running.
+         */
+        if (errno != EINVAL) {
+            ALOGERR("Failed VIDIOC_S_CTRL: framerate=%d", ctrl.value);
+            return false;
+        }
+    }
+
+    ALOGD_TEST("VIDIOC_S_CTRL: framerate=%d", ctrl.value);
+
+    return true;
 }

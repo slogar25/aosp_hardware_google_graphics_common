@@ -433,7 +433,7 @@ bool AcrylicCompositorM2M1SHOT2_G2D::executeG2D(int fence[], unsigned int num_fe
 
     unsigned int layercount = layerCount();
 
-    if (hasDefaultColor()) {
+    if (hasBackgroundColor()) {
         layercount++;
 
         if (layercount > getCapabilities().maxLayerCount()) {
@@ -467,10 +467,10 @@ bool AcrylicCompositorM2M1SHOT2_G2D::executeG2D(int fence[], unsigned int num_fe
 
     unsigned int baseidx = 0;
 
-    if (hasDefaultColor()) {
+    if (hasBackgroundColor()) {
         uint16_t a, r, g, b;
 
-        getDefaultColor(&r, &g, &b, &a);
+        getBackgroundColor(&r, &g, &b, &a);
 
         memset(&mDesc.sources[0], 0, sizeof(mDesc.sources[0]));
 
@@ -822,17 +822,17 @@ bool AcrylicCompositorM2M1SHOT2_G2D::requestPerformanceQoS(AcrylicPerformanceReq
         bandwidth >>= ((bpp == 12) && src_yuv420 && src_rotate) ? 12 : 13;
         data.frame[i].bandwidth_write = static_cast<uint32_t>(bandwidth);
 
-        if (frame->mHasSolidColorLayer)
+        if (frame->mHasBackgroundLayer)
             data.frame[i].frame_attr |= M2M1SHOT2_PERF_FRAME_SOLIDCOLORFILL;
 
         data.frame[i].num_layers = frame->getLayerCount();
         data.frame[i].target_pixelcount = frame->mTargetDimension.vert * frame->mTargetDimension.hori;
         data.frame[i].frame_rate = frame->mFrameRate;
 
-        ALOGD_TEST("    FRAME[%d]: BW:(%u, %u) Layercount %d, Framerate %d, Target %dx%d, FMT %#x Solid fill? %d",
+        ALOGD_TEST("    FRAME[%d]: BW:(%u, %u) Layercount %d, Framerate %d, Target %dx%d, FMT %#x Background? %d",
             i, data.frame[i].bandwidth_read, data.frame[i].bandwidth_write, data.frame[i].num_layers, frame->mFrameRate,
             frame->mTargetDimension.hori, frame->mTargetDimension.vert, frame->mTargetPixFormat,
-            frame->mHasSolidColorLayer);
+            frame->mHasBackgroundLayer);
     }
 
     data.num_frames = request->getFrameCount();

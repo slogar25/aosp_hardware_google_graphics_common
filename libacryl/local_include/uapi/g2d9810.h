@@ -36,6 +36,10 @@ extern "C" {
 #define G2D_YUV_YC             (0 << 25)
 #define G2D_YUV_CY             (1 << 25)
 
+#define G2D_DATAFORMAT_AFBC    (1 << 20)
+#define G2D_DATAFORMAT_UORDER  (1 << 21)
+#define G2D_DATAFORMAT_SBWC    (1 << 22)
+
 #define G2D_DATAFMT_SHIFT      16
 #define G2D_DATAFMT_MASK       (0xF << G2D_DATAFMT_SHIFT)
 
@@ -45,6 +49,7 @@ extern "C" {
 #define G2D_DATAFMT_888        (3 << G2D_DATAFMT_SHIFT)
 #define G2D_DATAFMT_1555       (4 << G2D_DATAFMT_SHIFT)
 #define G2D_DATAFMT_5551       (5 << G2D_DATAFMT_SHIFT)
+#define G2D_DATAFMT_RGB8_MAX   (5 << G2D_DATAFMT_SHIFT)
 #define G2D_DATAFMT_8          (6 << G2D_DATAFMT_SHIFT)
 #define G2D_DATAFMT_RESERVED   (7 << G2D_DATAFMT_SHIFT)
 #define G2D_DATAFMT_YUV_MIN    (8 << G2D_DATAFMT_SHIFT)
@@ -72,6 +77,7 @@ extern "C" {
 #define G2D_FMT_RGB888         (G2D_DATAFMT_888 | G2D_SWZ_xRGB)
 #define G2D_FMT_NV12           (G2D_DATAFMT_YUV420SP | G2D_YUV_UV)
 #define G2D_FMT_NV21           (G2D_DATAFMT_YUV420SP | G2D_YUV_VU)
+#define G2D_FMT_YUV420P        (G2D_DATAFMT_YUV420P | G2D_YUV_UV)
 #define G2D_FMT_YV12           (G2D_DATAFMT_YUV420P | G2D_YUV_VU)
 #define G2D_FMT_YUYV           (G2D_DATAFMT_YUV422I | G2D_YUV_YC | G2D_YUV_UV)
 #define G2D_FMT_YVYU           (G2D_DATAFMT_YUV422I | G2D_YUV_YC | G2D_YUV_VU)
@@ -90,14 +96,15 @@ extern "C" {
 #define G2D_FMT_NV16_P210_9820 (G2D_DATAFMT_YUV422SP | G2D_FMT_YCBCR_10BIT | G2D_YUV_UV)
 #define G2D_FMT_NV61_P210_9820 (G2D_DATAFMT_YUV422SP | G2D_FMT_YCBCR_10BIT | G2D_YUV_VU)
 #define G2D_FMT_ABGR2101010    (G2D_DATAFMT_ABGR2101010 | G2D_SWZ_ABGR)
-
-#define G2D_DATAFORMAT_AFBC    (1 << 20)
-#define G2D_DATAFORMAT_UORDER  (1 << 21)
+#define G2D_FMT_NV12_SBWC      (G2D_FMT_NV12 | G2D_DATAFORMAT_SBWC)
+#define G2D_FMT_NV21_SBWC      (G2D_FMT_NV21 | G2D_DATAFORMAT_SBWC)
+#define G2D_FMT_NV12_SBWC_10B  (G2D_FMT_NV12_P010_9820 | G2D_DATAFORMAT_SBWC)
+#define G2D_FMT_NV21_SBWC_10B  (G2D_FMT_NV21_P010_9820 | G2D_DATAFORMAT_SBWC)
 
 #define G2D_YCBCRMODE_DITHER   (1 << 2)
 
-#define IS_YUV(fmt)            (((fmt) & G2D_DATAFMT_MASK) > G2D_DATAFMT_RESERVED)
-#define IS_RGB(fmt)            (((fmt) & G2D_DATAFMT_MASK) < G2D_DATAFMT_8)
+#define IS_YUV(fmt) ((((fmt) & G2D_DATAFMT_MASK) >= G2D_DATAFMT_YUV_MIN) && (((fmt) & G2D_DATAFMT_MASK) <= G2D_DATAFMT_YUV_MAX))
+#define IS_RGB(fmt) ((((fmt) & G2D_DATAFMT_MASK) <= G2D_DATAFMT_RGB8_MAX) || (((fmt) & G2D_DATAFMT_MASK) > G2D_DATAFMT_YUV_MAX))
 
 #define G2D_IMGFMT(value) ((value) & \
             (G2D_DATAFMT_MASK | G2D_YUVORDER_MASK | G2D_SWZ_MASK))
@@ -121,8 +128,12 @@ extern "C" {
 #define G2D_LAYERSEL_COLORFILL   1
 
 #define G2D_LAYER_YCBCRMODE_WIDE (1 << 4)
+#define G2D_LAYER_YCBCRMODE_OFFX (2 << 8)
+#define G2D_LAYER_YCBCRMODE_OFFY (2 << 12)
 
 #define G2D_SCALECONTROL_BILINEAR 2
+#define G2D_SCALECONTROL_POLYPHASE 3
+#define G2D_SCALECONTROL_FILTERCOEF_SHIFT 4
 #define G2D_SCALEFACTOR_FRACBITS  16
 
 #define G2D_LAYER_HDRMODE_DEMULT_ALPHA (1 << 12)
@@ -145,6 +156,10 @@ enum g2dsfr_img_register {
     G2DSFR_IMG_FIELD_COUNT,
 };
 
+/*
+ * The order of command list should be fixed.
+ * The new command item must be added from the bottom.
+ */
 enum g2dsfr_src_register {
     G2DSFR_SRC_COMMAND = G2DSFR_IMG_FIELD_COUNT,
     G2DSFR_SRC_SELECT,
@@ -163,12 +178,25 @@ enum g2dsfr_src_register {
     G2DSFR_SRC_BLEND,
     G2DSFR_SRC_YCBCRMODE,
     G2DSFR_SRC_HDRMODE,
+    G2DSFR_SRC_Y_HEADER_STRIDE,
+    G2DSFR_SRC_Y_PAYLOAD_STRIDE,
+    G2DSFR_SRC_C_HEADER_STRIDE,
+    G2DSFR_SRC_C_PAYLOAD_STRIDE,
+    G2DSFR_SRC_SBWCINFO,
 
     G2DSFR_SRC_FIELD_COUNT
 };
 
 enum g2dsfr_dst_register {
     G2DSFR_DST_YCBCRMODE = G2DSFR_IMG_FIELD_COUNT,
+
+    G2DSFR_DST_COMPAT_FIELD_COUNT,
+
+    G2DSFR_DST_Y_HEADER_STRIDE = G2DSFR_DST_COMPAT_FIELD_COUNT,
+    G2DSFR_DST_Y_PAYLOAD_STRIDE,
+    G2DSFR_DST_C_HEADER_STRIDE,
+    G2DSFR_DST_C_PAYLOAD_STRIDE,
+    G2DSFR_DST_SBWCINFO,
 
     G2DSFR_DST_FIELD_COUNT,
 };
@@ -180,8 +208,8 @@ enum g2dsfr_dst_register {
 #define G2D_MAX_PRIORITY       3
 #define G2D_MAX_RELEASE_FENCES (G2D_MAX_IMAGES + 1)
 
-struct g2d_commands {
-    uint32_t       target[G2DSFR_DST_FIELD_COUNT];
+struct g2d_compat_commands {
+    uint32_t       target[G2DSFR_DST_COMPAT_FIELD_COUNT];
     uint32_t       *source[G2D_MAX_IMAGES];
     struct g2d_reg *extra;
     uint32_t       num_extra_regs;
@@ -226,6 +254,30 @@ struct g2d_layer {
 #define G2D_FLAG_APB      (1 << 4)
 #define G2D_FLAG_ERROR    (1 << 5)
 
+struct g2d_compat_task {
+    uint32_t            version;
+    uint32_t            flags;
+    uint32_t            laptime_in_usec;
+    uint32_t            priority;
+    uint32_t            num_source;
+    uint32_t            num_release_fences;
+    int32_t             *release_fence;
+    struct g2d_layer    target;
+    struct g2d_layer    *source;
+    struct g2d_compat_commands commands;
+};
+
+/*
+ * Commands must be flexible because it may change according to H/W changes.
+ * The commands must be written in the promised order as version.
+ */
+struct g2d_commands {
+    uint32_t       *target;
+    uint32_t       *source[G2D_MAX_IMAGES];
+    struct g2d_reg *extra;
+    uint32_t       num_extra_regs;
+};
+
 struct g2d_task {
     uint32_t            version;
     uint32_t            flags;
@@ -243,6 +295,7 @@ struct g2d_task {
 #define G2D_PERF_LAYER_SCALING    (1 << 1)
 #define G2D_PERF_LAYER_YUV2P      (1 << 4)
 #define G2D_PERF_LAYER_YUV2P_82   (1 << 5)
+#define G2D_PERF_LAYER_COMPRESSED (1 << 6)
 
 struct g2d_performance_layer {
     uint16_t crop_width;
@@ -282,9 +335,11 @@ enum g2d_priority {
     G2D_PRIORITY_END
 };
 
-#define G2D_IOC_PROCESS        _IOWR('M', 4, struct g2d_task)
+#define G2D_IOC_PROCESS        _IOWR('M', 3, struct g2d_task)
+#define G2D_IOC_COMPAT_PROCESS _IOWR('M', 4, struct g2d_compat_task)
 #define G2D_IOC_PRIORITY       _IOR('M', 5, int32_t)
 #define G2D_IOC_PERFORMANCE    _IOR('M', 6, struct g2d_performance)
+#define G2D_IOC_VERSION		_IOR('M', 7, uint32_t)
 
 #ifdef __cplusplus
 }

@@ -261,6 +261,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mExynosCompositionInfo(COMPOSITION_EXYNOS),
     mGeometryChanged(0x0),
     mRenderingState(RENDERING_STATE_NONE),
+    mHWCRenderingState(RENDERING_STATE_NONE),
     mDisplayBW(0),
     mDynamicReCompMode(NO_MODE_SWITCH),
     mDREnable(false),
@@ -2391,7 +2392,11 @@ int32_t ExynosDisplay::getDisplayType(
 
 int32_t ExynosDisplay::getDozeSupport(
         int32_t* outSupport) {
+#ifdef USES_DOZEMODE
+    *outSupport = 1;
+#else
     *outSupport = 0;
+#endif
     return 0;
 }
 
@@ -2564,7 +2569,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         mLastRetireFence = fence_close(mLastRetireFence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP);
         mRenderingState = RENDERING_STATE_PRESENTED;
-        return ret;
+        return 0;
     }
 
     if (!checkFrameValidation()) {
@@ -2845,6 +2850,8 @@ int32_t ExynosDisplay::setOutputBuffer(
 int ExynosDisplay::clearDisplay() {
 
     const int ret = mDisplayInterface->clearDisplay();
+    if (ret)
+        DISPLAY_LOGE("fail to clear display");
 
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mClientCompositionInfo.mSkipFlag = false;
@@ -2860,6 +2867,11 @@ int ExynosDisplay::clearDisplay() {
 int32_t ExynosDisplay::setPowerMode(
         int32_t /*hwc2_power_mode_t*/ mode) {
     Mutex::Autolock lock(mDisplayMutex);
+
+#ifndef USES_DOZEMODE
+    if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND))
+        return HWC2_ERROR_UNSUPPORTED;
+#endif
 
     if (mode == HWC_POWER_MODE_OFF) {
         mDevice->mPrimaryBlank = true;
@@ -3783,8 +3795,8 @@ int ExynosDisplay::handleWindowUpdate()
         else if (excp == eDamageRegionFull) {
             damageRect.left = mLayers[i]->mDisplayFrame.left;
             damageRect.top = mLayers[i]->mDisplayFrame.top;
-            damageRect.right = mLayers[i]->mDisplayFrame.left + mLayers[i]->mDisplayFrame.right;
-            damageRect.bottom = mLayers[i]->mDisplayFrame.top + mLayers[i]->mDisplayFrame.bottom;
+            damageRect.right = mLayers[i]->mDisplayFrame.right;
+            damageRect.bottom = mLayers[i]->mDisplayFrame.bottom;
             DISPLAY_LOGD(eDebugWindowUpdate, "Full layer update : %d, %d, %d, %d", mLayers[i]->mDisplayFrame.left,
                     mLayers[i]->mDisplayFrame.top, mLayers[i]->mDisplayFrame.right, mLayers[i]->mDisplayFrame.bottom);
             mergedRect = expand(mergedRect, damageRect);

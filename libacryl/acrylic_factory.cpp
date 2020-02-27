@@ -70,6 +70,93 @@ static uint32_t all_fimg2d_hdr_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
 };
 
+static uint32_t all_fimg2d_sbwc_lossy_formats[] = {
+    HAL_PIXEL_FORMAT_RGBA_8888,
+    HAL_PIXEL_FORMAT_BGRA_8888,
+    HAL_PIXEL_FORMAT_RGBA_1010102,
+    HAL_PIXEL_FORMAT_RGBX_8888,
+    HAL_PIXEL_FORMAT_RGB_888,
+    HAL_PIXEL_FORMAT_RGB_565,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP,                  // NV21 (YVU420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,         // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,    // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           // NV12 (YUV420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,          // NV12 with MFC alignment constraints
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,         // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,    // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,     // NV12 10-bit with MFC alignment constraints
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,    // NV12 10-bit multi-buffer
+    HAL_PIXEL_FORMAT_YCbCr_422_I,                   // YUYV
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,            // YVYU
+    HAL_PIXEL_FORMAT_YCbCr_422_SP,                  // YUV422 2P (YUV422 semi-planar)
+    HAL_PIXEL_FORMAT_YCBCR_P010,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50,      // SBWC Lossy 64 block
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40,  // SBWC Lossy 64 block with 10 bit
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80,  // SBWC Lossy 128 block with 10 bit
+};
+
+static uint32_t all_fimg2d_sbwc_formats[] = {
+    HAL_PIXEL_FORMAT_RGBA_8888,
+    HAL_PIXEL_FORMAT_BGRA_8888,
+    HAL_PIXEL_FORMAT_RGBA_1010102,
+    HAL_PIXEL_FORMAT_RGBX_8888,
+    HAL_PIXEL_FORMAT_RGB_888,
+    HAL_PIXEL_FORMAT_RGB_565,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP,                  // NV21 (YVU420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,         // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,    // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           // NV12 (YUV420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,          // NV12 with MFC alignment constraints
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,         // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,    // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,     // NV12 10-bit with MFC alignment constraints
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,    // NV12 10-bit multi-buffer
+    HAL_PIXEL_FORMAT_YCbCr_422_I,                   // YUYV
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,            // YVYU
+    HAL_PIXEL_FORMAT_YCbCr_422_SP,                  // YUV422 2P (YUV422 semi-planar)
+    HAL_PIXEL_FORMAT_YCBCR_P010,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC,
+};
+
+static uint32_t all_fimg2d_gs101_formats[] = {
+    HAL_PIXEL_FORMAT_RGBA_8888,
+    HAL_PIXEL_FORMAT_BGRA_8888,
+    HAL_PIXEL_FORMAT_RGBA_1010102,
+    HAL_PIXEL_FORMAT_RGBX_8888,
+    HAL_PIXEL_FORMAT_RGB_888,
+    HAL_PIXEL_FORMAT_RGB_565,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP,                  // NV21 (YVU420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,         // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,    // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           // NV12 (YUV420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,          // NV12 with MFC alignment constraints
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,         // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,    // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_YCbCr_422_SP,                  // YUV422 2P (YUV422 semi-planar)
+    HAL_PIXEL_FORMAT_YCBCR_P010,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC,
+};
+
 static uint32_t all_mscl_formats[] = {
     HAL_PIXEL_FORMAT_RGBA_8888,
     HAL_PIXEL_FORMAT_BGRA_8888,
@@ -94,6 +181,39 @@ static uint32_t all_mscl_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,            // YVYU
     HAL_PIXEL_FORMAT_YCbCr_422_SP,                  // YUV422 2P (YUV422 semi-planar)
 };
+
+static uint32_t all_mscl_sbwc_formats[] = {
+    HAL_PIXEL_FORMAT_RGBA_8888,
+    HAL_PIXEL_FORMAT_BGRA_8888,
+    HAL_PIXEL_FORMAT_RGBX_8888,
+    HAL_PIXEL_FORMAT_RGBA_1010102,
+    HAL_PIXEL_FORMAT_RGB_565,
+    HAL_PIXEL_FORMAT_YV12,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,
+    HAL_PIXEL_FORMAT_EXYNOS_YV12_M,
+    HAL_PIXEL_FORMAT_YCrCb_420_SP,                  // NV21 (YVU420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,         // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,    // NV21 on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           // NV12 (YUV420 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,          // NV12 with MFC alignment constraints
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,         // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,    // NV12M with MFC alignment constraints on multi-buffer
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,     // NV12 10-bit with MFC alignment constraints
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,    // NV12 10-bit multi-buffer
+    HAL_PIXEL_FORMAT_YCBCR_P010,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
+    HAL_PIXEL_FORMAT_YCbCr_422_I,                   // YUYV
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,            // YVYU
+    HAL_PIXEL_FORMAT_YCbCr_422_SP,                  // YUV422 2P (YUV422 semi-planar)
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
+    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,
+};
+
 static uint32_t rgb_formats[] = {
     HAL_PIXEL_FORMAT_RGBA_8888,
     HAL_PIXEL_FORMAT_BGRA_8888,
@@ -244,6 +364,78 @@ const static stHW2DCapability __capability_fimg2d_9810_blter = {
     .base_align = 1,
 };
 
+const static stHW2DCapability __capability_fimg2d_L16FSBWC = {
+    .max_upsampling_num = {32767, 32767},
+    .max_downsampling_factor = {31767, 32767},
+    .max_upsizing_num = {32767, 32767},
+    .max_downsizing_factor = {32767, 32767},
+    .min_src_dimension = {1, 1},
+    .max_src_dimension = {8192, 8192},
+    .min_dst_dimension = {1, 1},
+    .max_dst_dimension = {8192, 8192},
+    .min_pix_align = {1, 1},
+    .rescaling_count = 0,
+    .compositing_mode = HW2DCapability::BLEND_NONE | HW2DCapability::BLEND_SRC_COPY | HW2DCapability::BLEND_SRC_OVER,
+    .transform_type = HW2DCapability::TRANSFORM_ALL,
+    .auxiliary_feature = HW2DCapability::FEATURE_PLANE_ALPHA | HW2DCapability::FEATURE_UORDER_WRITE
+                         | HW2DCapability::FEATURE_AFBC_ENCODE | HW2DCapability::FEATURE_AFBC_DECODE
+                         | HW2DCapability::FEATURE_OTF_WRITE | HW2DCapability::FEATURE_SOLIDCOLOR,
+    .num_formats = ARRSIZE(all_fimg2d_sbwc_formats),
+    .num_dataspaces = ARRSIZE(all_hwc_dataspaces),
+    .max_layers = 16,
+    .pixformats = all_fimg2d_sbwc_formats,
+    .dataspaces = all_hwc_dataspaces,
+    .base_align = 1,
+};
+
+const static stHW2DCapability __capability_fimg2d_L8FSBWCL = {
+    .max_upsampling_num = {32767, 32767},
+    .max_downsampling_factor = {31767, 32767},
+    .max_upsizing_num = {32767, 32767},
+    .max_downsizing_factor = {32767, 32767},
+    .min_src_dimension = {1, 1},
+    .max_src_dimension = {8192, 8192},
+    .min_dst_dimension = {1, 1},
+    .max_dst_dimension = {8192, 8192},
+    .min_pix_align = {1, 1},
+    .rescaling_count = 0,
+    .compositing_mode = HW2DCapability::BLEND_NONE | HW2DCapability::BLEND_SRC_COPY | HW2DCapability::BLEND_SRC_OVER,
+    .transform_type = HW2DCapability::TRANSFORM_ALL,
+    .auxiliary_feature = HW2DCapability::FEATURE_PLANE_ALPHA | HW2DCapability::FEATURE_UORDER_WRITE
+                         | HW2DCapability::FEATURE_AFBC_ENCODE | HW2DCapability::FEATURE_AFBC_DECODE
+                         | HW2DCapability::FEATURE_OTF_WRITE | HW2DCapability::FEATURE_SOLIDCOLOR,
+    .num_formats = ARRSIZE(all_fimg2d_sbwc_lossy_formats),
+    .num_dataspaces = ARRSIZE(all_hwc_dataspaces),
+    .max_layers = 8,
+    .pixformats = all_fimg2d_sbwc_lossy_formats,
+    .dataspaces = all_hwc_dataspaces,
+    .base_align = 1,
+};
+
+const static stHW2DCapability __capability_fimg2d_gs101 = {
+    .max_upsampling_num = {8, 8},
+    .max_downsampling_factor = {4, 4},
+    .max_upsizing_num = {8, 8},
+    .max_downsizing_factor = {4, 4},
+    .min_src_dimension = {1, 1},
+    .max_src_dimension = {8192, 8192},
+    .min_dst_dimension = {1, 1},
+    .max_dst_dimension = {8192, 8192},
+    .min_pix_align = {1, 1},
+    .rescaling_count = 0,
+    .compositing_mode = HW2DCapability::BLEND_NONE | HW2DCapability::BLEND_SRC_COPY | HW2DCapability::BLEND_SRC_OVER,
+    .transform_type = HW2DCapability::TRANSFORM_ALL,
+    .auxiliary_feature = HW2DCapability::FEATURE_PLANE_ALPHA | HW2DCapability::FEATURE_UORDER_WRITE
+                         | HW2DCapability::FEATURE_AFBC_ENCODE | HW2DCapability::FEATURE_AFBC_DECODE
+                         | HW2DCapability::FEATURE_SOLIDCOLOR,
+    .num_formats = ARRSIZE(all_fimg2d_gs101_formats),
+    .num_dataspaces = ARRSIZE(all_hwc_dataspaces),
+    .max_layers = 4,
+    .pixformats = all_fimg2d_gs101_formats,
+    .dataspaces = all_hwc_dataspaces,
+    .base_align = 1,
+};
+
 const static stHW2DCapability __capability_fimg2d_8890 = {
     .max_upsampling_num = {32767, 32767},
     .max_downsampling_factor = {2, 2},
@@ -289,12 +481,39 @@ const static stHW2DCapability __capability_mscl_9810 = {
     .base_align = 4,
 };
 
+const static stHW2DCapability __capability_mscl_9830 = {
+    .max_upsampling_num = {64, 64},
+    .max_downsampling_factor = {16, 16},
+    .max_upsizing_num = {64, 64},
+    .max_downsizing_factor = {16, 16},
+    .min_src_dimension = {16, 16},
+    .max_src_dimension = {8192, 8192},
+    .min_dst_dimension = {4, 4},
+    .max_dst_dimension = {8192, 8192},
+    .min_pix_align = {1, 1},
+    .rescaling_count = 0,
+    // MSCL does not perform alpha compositing but it is required to specify all to pass composit mode test
+    .compositing_mode = HW2DCapability::BLEND_NONE | HW2DCapability::BLEND_SRC_COPY | HW2DCapability::BLEND_SRC_OVER,
+    .transform_type = HW2DCapability::TRANSFORM_ALL,
+    .auxiliary_feature = 0,
+    .num_formats = ARRSIZE(all_mscl_sbwc_formats),
+    .num_dataspaces = ARRSIZE(all_hwc_dataspaces),
+    .max_layers = 1,
+    .pixformats = all_mscl_sbwc_formats,
+    .dataspaces = all_hwc_dataspaces,
+    .base_align = 4,
+};
+
 static const HW2DCapability capability_fimg2d_8895(__capability_fimg2d_8895);
 static const HW2DCapability capability_fimg2d_8890(__capability_fimg2d_8890);
 static const HW2DCapability capability_fimg2d_9610(__capability_fimg2d_9610);
 static const HW2DCapability capability_fimg2d_9810(__capability_fimg2d_9810);
+static const HW2DCapability capability_fimg2d_L16FSBWC(__capability_fimg2d_L16FSBWC);
+static const HW2DCapability capability_fimg2d_L8FSBWCL(__capability_fimg2d_L8FSBWCL);
+static const HW2DCapability capability_fimg2d_gs101(__capability_fimg2d_gs101);
 static const HW2DCapability capability_fimg2d_9810_blter(__capability_fimg2d_9810_blter);
 static const HW2DCapability capability_mscl_9810(__capability_mscl_9810);
+static const HW2DCapability capability_mscl_9830(__capability_mscl_9830);
 
 Acrylic *Acrylic::createInstance(const char *spec)
 {
@@ -314,8 +533,16 @@ Acrylic *Acrylic::createInstance(const char *spec)
         compositor = new AcrylicCompositorG2D9810(capability_fimg2d_9810_blter, false);
     } else if (strcmp(spec, "fimg2d_9820") == 0) {
         compositor = new AcrylicCompositorG2D9810(capability_fimg2d_9810, true);
+    } else if (strcmp(spec, "fimg2d_L8FSBWCL") == 0) {
+        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_L8FSBWCL, true);
+    } else if (strcmp(spec, "fimg2d_L16FSBWC") == 0) {
+        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_L16FSBWC, true);
+    } else if (strcmp(spec, "fimg2d_gs101") == 0) {
+        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_gs101, true);
     } else if (strcmp(spec, "mscl_9810") == 0) {
         compositor = new AcrylicCompositorMSCL9810(capability_mscl_9810);
+    } else if (strcmp(spec, "mscl_9830") == 0) {
+        compositor = new AcrylicCompositorMSCL9810(capability_mscl_9830);
     } else if (strcmp(spec, "dummy") == 0) {
         compositor = new AcrylicCompositorDummy(capability_fimg2d_8895);
     } else {

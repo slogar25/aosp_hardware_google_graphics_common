@@ -571,7 +571,7 @@ void ExynosExternalDisplay::handleHotplugEvent()
     ALOGI("HPD status changed to %s", mHpdStatus ? "enabled" : "disabled");
 }
 
-void ExynosExternalDisplay::initDisplayInterface(uint32_t __unused interfaceType)
+void ExynosExternalDisplay::initDisplayInterface(uint32_t interfaceType)
 {
     if (interfaceType == INTERFACE_TYPE_DRM)
         mDisplayInterface = std::make_unique<ExynosDisplayDrmInterface>((ExynosDisplay *)this);

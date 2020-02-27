@@ -19,6 +19,7 @@
 #define __HARDWARE_EXYNOS_ACRYLIC_INTERNAL_H__
 
 #include <cerrno>
+#include <cstring>
 
 #include <hardware/exynos/acryl.h>
 

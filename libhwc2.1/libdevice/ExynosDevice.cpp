@@ -313,7 +313,7 @@ ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
  */
 
 int32_t ExynosDevice::createVirtualDisplay(
-        uint32_t __unused width, uint32_t __unused height, int32_t* /*android_pixel_format_t*/ __unused format, ExynosDisplay* __unused display) {
+        uint32_t width, uint32_t height, int32_t* /*android_pixel_format_t*/ format, ExynosDisplay* display) {
     ((ExynosVirtualDisplay*)display)->createVirtualDisplay(width, height, format);
     return 0;
 }
@@ -322,7 +322,7 @@ int32_t ExynosDevice::createVirtualDisplay(
  * @param *display
  * @return int32_t
  */
-int32_t ExynosDevice::destroyVirtualDisplay(ExynosDisplay* __unused display) {
+int32_t ExynosDevice::destroyVirtualDisplay(ExynosDisplay* display) {
     ((ExynosVirtualDisplay *)display)->destroyVirtualDisplay();
     return 0;
 }

@@ -24,18 +24,38 @@
 
 #include "acrylic_internal.h"
 
-#define V4L2_PIX_FMT_NV12N      v4l2_fourcc('N', 'N', '1', '2')
-#define V4L2_PIX_FMT_NV12N_10B  v4l2_fourcc('B', 'N', '1', '2')
-#define V4L2_PIX_FMT_YUV420N    v4l2_fourcc('Y', 'N', '1', '2')
-#define V4L2_PIX_FMT_NV12M_S10B v4l2_fourcc('B', 'M', '1', '2')
-#define V4L2_PIX_FMT_NV21M_S10B v4l2_fourcc('B', 'M', '2', '1')
-#define V4L2_PIX_FMT_NV16M_S10B v4l2_fourcc('B', 'M', '1', '6')
-#define V4L2_PIX_FMT_NV61M_S10B v4l2_fourcc('B', 'M', '6', '1')
-#define V4L2_PIX_FMT_NV12M_P010 v4l2_fourcc('P', 'M', '1', '2')
-#define V4L2_PIX_FMT_NV21M_P010 v4l2_fourcc('P', 'M', '2', '1')
-#define V4L2_PIX_FMT_NV16M_P210 v4l2_fourcc('P', 'M', '1', '6')
-#define V4L2_PIX_FMT_NV61M_P210 v4l2_fourcc('P', 'M', '6', '1')
-#define V4L2_PIX_FMT_NV12_P010  v4l2_fourcc('P', 'N', '1', '2')
+#define V4L2_PIX_FMT_NV12N             v4l2_fourcc('N', 'N', '1', '2')
+#define V4L2_PIX_FMT_NV12N_10B         v4l2_fourcc('B', 'N', '1', '2')
+#define V4L2_PIX_FMT_YUV420N           v4l2_fourcc('Y', 'N', '1', '2')
+#define V4L2_PIX_FMT_NV12M_S10B        v4l2_fourcc('B', 'M', '1', '2')
+#define V4L2_PIX_FMT_NV21M_S10B        v4l2_fourcc('B', 'M', '2', '1')
+#define V4L2_PIX_FMT_NV16M_S10B        v4l2_fourcc('B', 'M', '1', '6')
+#define V4L2_PIX_FMT_NV61M_S10B        v4l2_fourcc('B', 'M', '6', '1')
+#define V4L2_PIX_FMT_NV12M_P010        v4l2_fourcc('P', 'M', '1', '2')
+#define V4L2_PIX_FMT_NV21M_P010        v4l2_fourcc('P', 'M', '2', '1')
+#define V4L2_PIX_FMT_NV16M_P210        v4l2_fourcc('P', 'M', '1', '6')
+#define V4L2_PIX_FMT_NV61M_P210        v4l2_fourcc('P', 'M', '6', '1')
+#define V4L2_PIX_FMT_NV12_P010         v4l2_fourcc('P', 'N', '1', '2')
+#define V4L2_PIX_FMT_ARGB2101010       v4l2_fourcc('A', 'B', '1', '0')
+#define V4L2_PIX_FMT_ABGR2101010       v4l2_fourcc('A', 'R', '1', '0')
+#define V4L2_PIX_FMT_RGBA1010102       v4l2_fourcc('R', 'A', '1', '0')
+#define V4L2_PIX_FMT_BGRA1010102       v4l2_fourcc('B', 'A', '1', '0')
+
+/* 12 Y/CbCr 4:2:0 SBWC */
+#define V4L2_PIX_FMT_NV12M_SBWC_8B     v4l2_fourcc('M', '1', 'S', '8')
+#define V4L2_PIX_FMT_NV12M_SBWC_10B    v4l2_fourcc('M', '1', 'S', '1')
+/* 21 Y/CrCb 4:2:0 SBWC */
+#define V4L2_PIX_FMT_NV21M_SBWC_8B     v4l2_fourcc('M', '2', 'S', '8')
+#define V4L2_PIX_FMT_NV21M_SBWC_10B    v4l2_fourcc('M', '2', 'S', '1')
+/* 12 Y/CbCr 4:2:0 SBWC single */
+#define V4L2_PIX_FMT_NV12N_SBWC_8B     v4l2_fourcc('N', '1', 'S', '8')
+#define V4L2_PIX_FMT_NV12N_SBWC_10B    v4l2_fourcc('N', '1', 'S', '1')
+/* 12 Y/CbCr 4:2:0 SBWC Lossy */
+#define V4L2_PIX_FMT_NV12M_SBWCL_8B    v4l2_fourcc('M', '1', 'L', '8')
+#define V4L2_PIX_FMT_NV12M_SBWCL_10B   v4l2_fourcc('M', '1', 'L', '1')
+/* 12 Y/CbCr 4:2:0 SBWC Lossy single */
+#define V4L2_PIX_FMT_NV12N_SBWCL_8B    v4l2_fourcc('N', '1', 'L', '8')
+#define V4L2_PIX_FMT_NV12N_SBWCL_10B   v4l2_fourcc('N', '1', 'L', '1')
 
 
 static uint32_t __halfmt_to_v4l2_rgb[][2] = {
@@ -50,33 +70,40 @@ static uint32_t __halfmt_to_v4l2_rgb[][2] = {
 // But the legacy mscl driver and libhwcutils requires them.
 // The HAL format conversion to the deprecated V4L2 formats are prepared for mscl_9810
 static uint32_t __halfmt_to_v4l2_rgb_deprecated[][2] = {
-    {HAL_PIXEL_FORMAT_RGBA_8888,                    V4L2_PIX_FMT_RGB32    },
-    {HAL_PIXEL_FORMAT_BGRA_8888,                    V4L2_PIX_FMT_BGR32    },
-    {HAL_PIXEL_FORMAT_RGBX_8888,                    V4L2_PIX_FMT_RGB32    },
-    {HAL_PIXEL_FORMAT_RGB_888,                      V4L2_PIX_FMT_RGB24    },
-    {HAL_PIXEL_FORMAT_RGB_565,                      V4L2_PIX_FMT_RGB565   },
+    {HAL_PIXEL_FORMAT_RGBA_8888,                    V4L2_PIX_FMT_RGB32       },
+    {HAL_PIXEL_FORMAT_BGRA_8888,                    V4L2_PIX_FMT_BGR32       },
+    {HAL_PIXEL_FORMAT_RGBX_8888,                    V4L2_PIX_FMT_RGB32       },
+    {HAL_PIXEL_FORMAT_RGB_888,                      V4L2_PIX_FMT_RGB24       },
+    {HAL_PIXEL_FORMAT_RGB_565,                      V4L2_PIX_FMT_RGB565      },
+    {HAL_PIXEL_FORMAT_RGBA_1010102,                 V4L2_PIX_FMT_ABGR2101010 },
 };
 
 static uint32_t __halfmt_to_v4l2_ycbcr[][2] = {
-    {HAL_PIXEL_FORMAT_YV12,                         V4L2_PIX_FMT_YVU420   },
-    {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,                V4L2_PIX_FMT_YVU420M  },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,           V4L2_PIX_FMT_YUV420   },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,          V4L2_PIX_FMT_YUV420N  },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,         V4L2_PIX_FMT_YUV420M  },
-    {HAL_PIXEL_FORMAT_YCrCb_420_SP,                 V4L2_PIX_FMT_NV21     },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,        V4L2_PIX_FMT_NV21M    },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,   V4L2_PIX_FMT_NV21M    },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,          V4L2_PIX_FMT_NV12     },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,         V4L2_PIX_FMT_NV12N    },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,        V4L2_PIX_FMT_NV12M    },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,   V4L2_PIX_FMT_NV12M    },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,    V4L2_PIX_FMT_NV12N_10B},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,   V4L2_PIX_FMT_NV12M_S10B},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,          V4L2_PIX_FMT_NV12M_P010},
-    {HAL_PIXEL_FORMAT_YCBCR_P010,                   V4L2_PIX_FMT_NV12_P010},
-    {HAL_PIXEL_FORMAT_YCbCr_422_I,                  V4L2_PIX_FMT_YUYV     },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,           V4L2_PIX_FMT_YVYU     },
-    {HAL_PIXEL_FORMAT_YCbCr_422_SP,                 V4L2_PIX_FMT_NV16     },
+    {HAL_PIXEL_FORMAT_YV12,                           V4L2_PIX_FMT_YVU420         },
+    {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,                  V4L2_PIX_FMT_YVU420M        },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,             V4L2_PIX_FMT_YUV420         },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,            V4L2_PIX_FMT_YUV420N        },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,           V4L2_PIX_FMT_YUV420M        },
+    {HAL_PIXEL_FORMAT_YCrCb_420_SP,                   V4L2_PIX_FMT_NV21           },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,          V4L2_PIX_FMT_NV21M          },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,     V4L2_PIX_FMT_NV21M          },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,            V4L2_PIX_FMT_NV12           },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,           V4L2_PIX_FMT_NV12N          },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,          V4L2_PIX_FMT_NV12M          },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,     V4L2_PIX_FMT_NV12M          },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,      V4L2_PIX_FMT_NV12N_10B      },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,     V4L2_PIX_FMT_NV12M_S10B     },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,            V4L2_PIX_FMT_NV12M_P010     },
+    {HAL_PIXEL_FORMAT_YCBCR_P010,                     V4L2_PIX_FMT_NV12_P010      },
+    {HAL_PIXEL_FORMAT_YCbCr_422_I,                    V4L2_PIX_FMT_YUYV           },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,             V4L2_PIX_FMT_YVYU           },
+    {HAL_PIXEL_FORMAT_YCbCr_422_SP,                   V4L2_PIX_FMT_NV16           },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,     V4L2_PIX_FMT_NV12M_SBWC_8B  },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC, V4L2_PIX_FMT_NV12M_SBWC_10B },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC,     V4L2_PIX_FMT_NV21M_SBWC_8B  },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC, V4L2_PIX_FMT_NV21M_SBWC_10B },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,      V4L2_PIX_FMT_NV12N_SBWC_8B  },
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,  V4L2_PIX_FMT_NV12N_SBWC_10B },
 };
 
 static uint32_t halfmt_to_v4l2_ycbcr(uint32_t halfmt)

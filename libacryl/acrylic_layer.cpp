@@ -32,6 +32,7 @@ AcrylicCanvas::AcrylicCanvas(Acrylic *compositor, canvas_type_t type)
 
 AcrylicCanvas::~AcrylicCanvas()
 {
+    setFence(-1);
 }
 
 static const char *canvasTypeName(unsigned int type)
@@ -90,6 +91,34 @@ bool AcrylicCanvas::setImageDimension(int32_t width, int32_t height)
     return true;
 }
 
+bool AcrylicCanvas::setImageBuffer(int a, int r, int g, int b, uint32_t attr)
+{
+    if (!getCompositor()) {
+        ALOGE("Trying to set buffer to an orphaned layer");
+        return false;
+    }
+
+    const HW2DCapability &cap = getCompositor()->getCapabilities();
+
+    if (((mCanvasType == CANVAS_SOURCE) && !cap.isFeatureSupported(HW2DCapability::FEATURE_SOLIDCOLOR)) ||
+        (mCanvasType == CANVAS_TARGET)) {
+        ALOGE("SolidColor is not supported for %s", canvasTypeName(mCanvasType));
+        return false;
+    }
+
+    setFence(-1);
+    mMemoryType = MT_EMPTY;
+    mNumBuffers = 0;
+
+    mAttributes = (attr & ATTR_ALL_MASK) | ATTR_SOLIDCOLOR;
+
+    set(SETTING_BUFFER | SETTING_BUFFER_MODIFIED);
+
+    mSolidColor  = ((a & 0xFF) << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | ((b & 0xFF));
+
+    return true;
+}
+
 bool AcrylicCanvas::setImageBuffer(int fd[MAX_HW2D_PLANES], size_t len[MAX_HW2D_PLANES], off_t offset[MAX_HW2D_PLANES],
                                    int num_buffers, int fence, uint32_t attr)
 {
@@ -132,9 +161,9 @@ bool AcrylicCanvas::setImageBuffer(int fd[MAX_HW2D_PLANES], size_t len[MAX_HW2D_
     }
 
     ALOGE_IF((attr & ~ATTR_ALL_MASK) != 0,
-             "Configured unsupported attribute %#x to setImageBuffer(userptr))", attr);
+             "Configured unsupported attribute %#x to setImageBuffer(dmabuf))", attr);
 
-    mFence = fence;
+    setFence(fence);
     mMemoryType = MT_DMABUF;
     mNumBuffers = num_buffers;
 
@@ -186,6 +215,7 @@ bool AcrylicCanvas::setImageBuffer(void *addr[MAX_HW2D_PLANES], size_t len[MAX_H
     ALOGE_IF((attr & ~ATTR_ALL_MASK) != 0,
              "Configured unsupported attribute %#x to setImageBuffer(userptr))", attr);
 
+    setFence(-1);
     mMemoryType = MT_USERPTR;
     mNumBuffers = num_buffers;
 
@@ -214,8 +244,8 @@ bool AcrylicCanvas::setImageOTFBuffer(uint32_t attr)
         return false;
     }
 
-    mFence = -1;
-    mMemoryType = MT_OTF;
+    setFence(-1);
+    mMemoryType = MT_EMPTY;
     mNumBuffers = 0;
 
     mAttributes = (attr & ATTR_ALL_MASK) | ATTR_OTF;
@@ -270,7 +300,7 @@ void AcrylicCanvas::setFence(int fence)
 }
 
 AcrylicLayer::AcrylicLayer(Acrylic *compositor)
-    : AcrylicCanvas(compositor), mTransitData(NULL), mBlendingMode(HWC_BLENDING_NONE),
+    : AcrylicCanvas(compositor), mTransitData(nullptr), mBlendingMode(HWC_BLENDING_NONE),
       mTransform(0), mZOrder(0), mMaxLuminance(100), mMinLuminance(0), mPlaneAlpha(255)
 {
     // Default settings:

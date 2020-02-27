@@ -53,7 +53,7 @@ bool AcrylicPerformanceRequest::reset(int num_frames)
 
 AcrylicPerformanceRequestFrame::AcrylicPerformanceRequestFrame()
     : mNumLayers(0), mNumAllocLayers(0), mFrameRate(60),
-      mHasSolidColorLayer(false), mLayers(NULL)
+      mHasBackgroundLayer(false), mLayers(NULL)
 {
 }
 

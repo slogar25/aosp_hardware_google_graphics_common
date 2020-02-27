@@ -88,6 +88,11 @@ int32_t ExynosPrimaryDisplay::setPowerMode(
         int32_t /*hwc2_power_mode_t*/ mode) {
     Mutex::Autolock lock(mDisplayMutex);
 
+#ifndef USES_DOZEMODE
+    if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND))
+        return HWC2_ERROR_UNSUPPORTED;
+#endif
+
     /* TODO state check routine should be added */
     int fb_blank = -1;
 
