@@ -30,6 +30,9 @@ namespace android {
 
 DrmPlane::DrmPlane(DrmDevice *drm, drmModePlanePtr p)
     : drm_(drm), id_(p->plane_id), possible_crtc_mask_(p->possible_crtcs) {
+  for (uint32_t i = 0; i < p->count_formats; i++) {
+    formats_.push_back(p->formats[i]);
+  }
 }
 
 int DrmPlane::Init() {

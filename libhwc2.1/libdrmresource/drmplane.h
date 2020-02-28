@@ -67,6 +67,9 @@ class DrmPlane {
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
   }
+  const std::vector<uint32_t> &formats() const {
+      return formats_;
+  }
 
  private:
   DrmDevice *drm_;
@@ -98,6 +101,7 @@ class DrmPlane {
   DrmProperty min_luminance_;
   DrmProperty hw_restrictions_;
   std::vector<DrmProperty *> properties_;
+  std::vector<uint32_t> formats_;
 };
 }  // namespace android
 
