@@ -21,6 +21,7 @@
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 #include <cutils/properties.h>
 #include <system/graphics.h>
+#include <unordered_set>
 #include "ExynosResourceManager.h"
 #include "ExynosMPPModule.h"
 #include "ExynosResourceRestriction.h"
@@ -2296,13 +2297,11 @@ ExynosMPP* ExynosResourceManager::getOtfMPPWithChannel(int ch)
 void ExynosResourceManager::updateRestrictions() {
 
     if (mDevice->mDeviceInterface->getUseQuery() == true) {
-        uint32_t num_mpp_units = sizeof(AVAILABLE_M2M_MPP_UNITS)/sizeof(exynos_mpp_t);
-        for(uint32_t i = MPP_DPP_NUM; i < MPP_P_TYPE_MAX; i++){
-            for(uint32_t j = 0; j < num_mpp_units; j++){
-                if(AVAILABLE_M2M_MPP_UNITS[j].physicalType == i){
-                    makeAcrylRestrictions((mpp_phycal_type_t)i);
-                    break;
-                }
+        std::unordered_set<uint32_t> checkDuplicateMPP;
+        for (const auto unit: AVAILABLE_M2M_MPP_UNITS) {
+            if (checkDuplicateMPP.count(unit.physicalType) == 0)  {
+                makeAcrylRestrictions(static_cast<mpp_phycal_type_t>(unit.physicalType));
+                checkDuplicateMPP.insert(unit.physicalType);
             }
         }
     } else {
