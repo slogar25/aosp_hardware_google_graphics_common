@@ -44,14 +44,24 @@ CEndianessChecker::CEndianessChecker()
 
 
 CAppMarkerWriter::CAppMarkerWriter()
-        : m_pAppBase(NULL), m_pApp1End(NULL), m_pExif(NULL), m_pDebug(NULL)
+        : m_pAppBase(NULL), m_pApp1End(NULL), m_pExif(NULL), m_pExtra(NULL)
 {
     Init();
 }
 
 CAppMarkerWriter::CAppMarkerWriter(char *base, exif_attribute_t *exif, debug_attribute_t *debug)
 {
-    PrepareAppWriter(base, exif, debug);
+    extra_appinfo_t extraInfo;
+    app_info_t appInfo[15];
+
+    memset(&extraInfo, 0, sizeof(extraInfo));
+    memset(&appInfo, 0, sizeof(appInfo));
+
+    extraInfo.appInfo = appInfo;
+
+    ExtractDebugAttributeInfo(debug, &extraInfo);
+
+    PrepareAppWriter(base, exif, &extraInfo);
 }
 
 void CAppMarkerWriter::Init()
@@ -75,7 +85,7 @@ void CAppMarkerWriter::Init()
     m_pThumbSizePlaceholder = NULL;
 }
 
-void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif, debug_attribute_t *debug)
+void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif, extra_appinfo_t *extra)
 {
     m_pAppBase = base;
     m_pExif = exif;
@@ -101,19 +111,25 @@ void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif, debu
         m_szMake = strlen(m_pExif->maker);
         if (m_szMake > 0) {
             m_n0thIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szMake + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szMake > 3)
+                    applen += m_szMake + 1;
         }
 
         m_szSoftware = strlen(m_pExif->software);
         if (m_szSoftware > 0) {
             m_n0thIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szSoftware + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szSoftware > 3)
+                    applen += m_szSoftware + 1;
         }
 
         m_szModel = strlen(m_pExif->model);
         if (m_szModel > 0) {
             m_n0thIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szModel + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szModel > 3)
+                applen += m_szModel + 1;
         }
 
         if (m_pExif->enableGps) {
@@ -157,17 +173,23 @@ void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif, debu
         m_szUniqueID = strlen(m_pExif->unique_id); // len should be 32!
         if (m_szUniqueID > 0) {
             m_nExifIFDFields++;
-            applen += IFD_FIELD_SIZE + m_szUniqueID + 1;
+            applen += IFD_FIELD_SIZE;
+            if (m_szUniqueID > 3)
+                applen += m_szUniqueID + 1;
         }
 
         if (m_pExif->maker_note_size > 0) {
             m_nExifIFDFields++;
-            applen += IFD_FIELD_SIZE + m_pExif->maker_note_size;
+            applen += IFD_FIELD_SIZE;
+            if (m_pExif->maker_note_size > 4)
+                applen += m_pExif->maker_note_size;
         }
 
         if (m_pExif->user_comment_size > 0) {
             m_nExifIFDFields++;
-            applen += IFD_FIELD_SIZE + m_pExif->user_comment_size;
+            applen += IFD_FIELD_SIZE;
+            if (m_pExif->user_comment_size > 4)
+                applen += m_pExif->user_comment_size;
         }
 
         // Interoperability SubIFD
@@ -227,33 +249,23 @@ void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif, debu
         m_szApp1 = applen;
     }
 
-    if (debug) {
-        if (debug->num_of_appmarker > (EXTRA_APPMARKER_LIMIT - EXTRA_APPMARKER_MIN)) {
-            ALOGE("Too many extra APP markers %d", debug->num_of_appmarker);
-            return;
-        }
-
-        for (int idx = 0; idx < debug->num_of_appmarker; idx++) {
-            int appid;
-            unsigned int len;
-
-            appid = debug->idx[idx][0];
-            if ((appid < EXTRA_APPMARKER_MIN) || (appid >= EXTRA_APPMARKER_LIMIT)) {
-                ALOGE("Invalid extra APP segment ID %d", appid);
+    if (extra) {
+        for (int idx = 0; idx < extra->num_of_appmarker; idx++) {
+            if ((extra->appInfo[idx].appid < EXTRA_APPMARKER_MIN) || (extra->appInfo[idx].appid >= EXTRA_APPMARKER_LIMIT)) {
+                ALOGE("Invalid extra APP segment ID %d", extra->appInfo[idx].appid);
                 return;
             }
 
-            len = debug->debugSize[appid];
-            if ((len == 0) || (len > (JPEG_MAX_SEGMENT_SIZE - JPEG_SEGMENT_LENFIELD_SIZE))) {
-                ALOGE("Invalid APP%d segment size, %u bytes", appid, len);
+            if ((extra->appInfo[idx].dataSize == 0) || (extra->appInfo[idx].dataSize > (JPEG_MAX_SEGMENT_SIZE - JPEG_SEGMENT_LENFIELD_SIZE))) {
+                ALOGE("Invalid APP%d segment size, %u bytes", extra->appInfo[idx].appid, extra->appInfo[idx].dataSize);
                 return;
             }
 
-            ALOGD("APP%d: %u bytes", appid, len + JPEG_SEGMENT_LENFIELD_SIZE);
+            ALOGD("APP%d: %u bytes", extra->appInfo[idx].appid, extra->appInfo[idx].dataSize);
         }
     }
 
-    m_pDebug = debug;
+    m_pExtra = extra;
 
     //     |<- m_szApp1 ->|<- m_szMaxThumbSize ->|<-m_szAppX->|
     //     |<----- size of total APP1 and APP4 segments ----->|<-APP11->|<-- main image
@@ -278,7 +290,7 @@ char *CAppMarkerWriter::WriteAPP11(char *current, size_t dummy, size_t align)
     if ((dummy == 0) && (align == 1))
         return current;
 
-    if (!m_pExif && !m_pDebug)
+    if (!m_pExif && !m_pExtra)
         return current;
 
     uint16_t len = PTR_TO_ULONG(current + APPMARKLEN) & (align - 1);
@@ -297,12 +309,12 @@ char *CAppMarkerWriter::WriteAPP11(char *current, size_t dummy, size_t align)
 
 char *CAppMarkerWriter::WriteAPPX(char *current, bool just_reserve)
 {
-    if (!m_pDebug)
+    if (!m_pExtra)
         return current;
 
-    for (int idx = 0; idx < m_pDebug->num_of_appmarker; idx++) {
-        int appid = m_pDebug->idx[idx][0];
-        uint16_t len = m_pDebug->debugSize[appid] + JPEG_SEGMENT_LENFIELD_SIZE;
+    for (int idx = 0; idx < m_pExtra->num_of_appmarker; idx++) {
+        int appid = m_pExtra->appInfo[idx].appid;
+        uint16_t len = m_pExtra->appInfo[idx].dataSize + JPEG_SEGMENT_LENFIELD_SIZE;
 
         // APPx marker
         *current++ = 0xFF;
@@ -311,8 +323,8 @@ char *CAppMarkerWriter::WriteAPPX(char *current, bool just_reserve)
         current = WriteDataInBig(current, len);
         // APPx data
         if (!just_reserve)
-            memcpy(current, m_pDebug->debugData[appid], m_pDebug->debugSize[appid]);
-        current += m_pDebug->debugSize[appid];
+            memcpy(current, m_pExtra->appInfo[idx].appData, m_pExtra->appInfo[idx].dataSize);
+        current += m_pExtra->appInfo[idx].dataSize;
     }
 
     return current;
@@ -508,26 +520,22 @@ static inline size_t GetSegLen(char *p)
     return len | (*reinterpret_cast<unsigned char *>(p + 1) & 0xFF);
 }
 
-static inline size_t GetExtraAPPSize(debug_attribute_t *debug, unsigned int *appid_bits)
+static inline size_t GetExtraAPPSize(extra_appinfo_t *info)
 {
     size_t len = 0;
 
-    for (int idx = 0; idx < debug->num_of_appmarker; idx++) {
-        int appid = debug->idx[idx][0];
-        unsigned int applen = debug->debugSize[appid];
-
-        if ((appid < EXTRA_APPMARKER_MIN) || (appid >= EXTRA_APPMARKER_LIMIT)) {
-            ALOGE("%s: Invalid extra APP segment ID %d", dbgerrmsg, appid);
+    for (int idx = 0; idx < info->num_of_appmarker; idx++) {
+        if ((info->appInfo[idx].appid < EXTRA_APPMARKER_MIN) || (info->appInfo[idx].appid >= EXTRA_APPMARKER_LIMIT)) {
+            ALOGE("%s: Invalid extra APP segment ID %d", dbgerrmsg, info->appInfo[idx].appid);
             return 0;
         }
 
-        if ((applen == 0) || (applen > (JPEG_MAX_SEGMENT_SIZE - JPEG_SEGMENT_LENFIELD_SIZE))) {
-            ALOGE("%s: Invalid APP%d segment size, %u bytes.", dbgerrmsg, appid, applen);
+        if ((info->appInfo[idx].dataSize == 0) || (info->appInfo[idx].dataSize > (JPEG_MAX_SEGMENT_SIZE - JPEG_SEGMENT_LENFIELD_SIZE))) {
+            ALOGE("%s: Invalid APP%d segment size, %u bytes.", dbgerrmsg, info->appInfo[idx].appid, info->appInfo[idx].dataSize);
             return 0;
         }
 
-        len += applen + JPEG_MARKER_SIZE + JPEG_SEGMENT_LENFIELD_SIZE;
-        *appid_bits |= 1 << appid;
+        len += info->appInfo[idx].dataSize + JPEG_MARKER_SIZE + JPEG_SEGMENT_LENFIELD_SIZE;
     }
 
     return len;
@@ -535,18 +543,29 @@ static inline size_t GetExtraAPPSize(debug_attribute_t *debug, unsigned int *app
 
 bool UpdateDebugData(char *jpeg, size_t jpeglen, debug_attribute_t *debug) // include/ExynosExif.h
 {
-    if (!debug) {
+    extra_appinfo_t extraInfo;
+    app_info_t appInfo[15];
+
+    memset(&extraInfo, 0, sizeof(extraInfo));
+    memset(&appInfo, 0, sizeof(appInfo));
+
+    extraInfo.appInfo = appInfo;
+
+    ExtractDebugAttributeInfo(debug, &extraInfo);
+
+    UpdateDebugData(jpeg, jpeglen, &extraInfo);
+
+    return true;
+}
+
+bool UpdateDebugData(char *jpeg, size_t jpeglen, extra_appinfo_t *extra) // include/ExynosExif.h
+{
+    if (!extra) {
         ALOGI("No data to update in APPx");
         return true;
     }
 
-    if (debug->num_of_appmarker > (EXTRA_APPMARKER_LIMIT - EXTRA_APPMARKER_MIN)) {
-        ALOGE("%s: Too many extra APP markers %d", dbgerrmsg, debug->num_of_appmarker);
-        return false;
-    }
-
-    unsigned int validappid_bits = 0;
-    size_t validlen = GetExtraAPPSize(debug, &validappid_bits);
+    size_t validlen = GetExtraAPPSize(extra);
 
     if (jpeglen < (validlen + JPEG_MARKER_SIZE)) {
         ALOGE("%s: Too small JPEG stream length %zu", dbgerrmsg, jpeglen);
@@ -558,6 +577,8 @@ bool UpdateDebugData(char *jpeg, size_t jpeglen, debug_attribute_t *debug) // in
         return false;
     }
     jpeglen -= 2;
+
+    int idx = 0;
 
     while ((*jpeg++ == 0xFF) && (validlen > 0) && (jpeglen > validlen)) {
         size_t seglen;
@@ -573,21 +594,26 @@ bool UpdateDebugData(char *jpeg, size_t jpeglen, debug_attribute_t *debug) // in
         }
 
         appid = marker & 0xF;
-        if (((marker & 0xF0) == 0xE0) && !!(validappid_bits & (1 << appid))) {
-            // validappid_bits always has valid index bits
-            // length check is performed in GetExtraAPPSize()
+        if (((marker & 0xF0) == 0xE0) && ((appid >= EXTRA_APPMARKER_MIN) && (appid <= EXTRA_APPMARKER_LIMIT))) {
+            if (appid != extra->appInfo[idx].appid) {
+                ALOGE("%s: stored appid(%d) is different with updated appid(%d)",
+                        dbgerrmsg, appid, extra->appInfo[idx].appid);
+                return false;
+            }
+
             seglen = GetSegLen(jpeg);
-            if (seglen < (debug->debugSize[appid] + JPEG_SEGMENT_LENFIELD_SIZE)) {
+            if (seglen < (extra->appInfo[idx].dataSize + JPEG_SEGMENT_LENFIELD_SIZE)) {
                 ALOGE("%s: too small APP%d length %zu to store %u bytes",
-                        dbgerrmsg, appid, seglen, debug->debugSize[appid]);
+                        dbgerrmsg, appid, seglen, extra->appInfo[idx].dataSize);
                 return false;
             }
 
             memcpy(jpeg + JPEG_SEGMENT_LENFIELD_SIZE,
-                    debug->debugData[appid], debug->debugSize[appid]);
-            ALOGD("Successfully updated %u bytes to APP%d", debug->debugSize[appid], appid);
+                    extra->appInfo[idx].appData, extra->appInfo[idx].dataSize);
+            ALOGD("Successfully updated %u bytes to APP%d", extra->appInfo[idx].dataSize, appid);
 
-            validlen -= debug->debugSize[appid] + JPEG_MARKER_SIZE + JPEG_SEGMENT_LENFIELD_SIZE;
+            validlen -= extra->appInfo[idx].dataSize + JPEG_MARKER_SIZE + JPEG_SEGMENT_LENFIELD_SIZE;
+            idx++;
         } else {
             // just skip all other segments
             seglen = GetSegLen(jpeg);
@@ -640,4 +666,20 @@ bool UpdateExif(char *jpeg, size_t jpeglen, exif_attribute_t *exif)
     ALOGD("Successfully updated Exif");
 
     return true;
+}
+
+void ExtractDebugAttributeInfo(debug_attribute_t *debug, extra_appinfo_t *extra)
+{
+    if (!debug) {
+        extra->num_of_appmarker = 0;
+        return;
+    }
+
+    extra->num_of_appmarker = debug->num_of_appmarker;
+    for (int idx = 0; idx < debug->num_of_appmarker; idx++) {
+        int appid = debug->idx[idx][0];
+        extra->appInfo[idx].appid = appid;
+        extra->appInfo[idx].appData = debug->debugData[appid];
+        extra->appInfo[idx].dataSize = debug->debugSize[appid];
+    }
 }
