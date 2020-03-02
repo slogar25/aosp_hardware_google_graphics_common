@@ -74,7 +74,6 @@ enum {
     MPP_ATTR_ROT_90                 = 0x00000080,
     MPP_ATTR_ROT_180                = 0x00000100,
     MPP_ATTR_ROT_270                = 0x00000200,
-    MPP_ATTR_CUSTOM_ROT             = 0x00000400,
     MPP_ATTR_SCALE                  = 0x00000800,
     MPP_ATTR_DIM                    = 0x00001000,
 
