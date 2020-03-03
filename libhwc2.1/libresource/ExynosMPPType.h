@@ -72,8 +72,6 @@ enum {
     MPP_ATTR_FLIP_H                 = 0x00000020,
     MPP_ATTR_FLIP_V                 = 0x00000040,
     MPP_ATTR_ROT_90                 = 0x00000080,
-    MPP_ATTR_ROT_180                = 0x00000100,
-    MPP_ATTR_ROT_270                = 0x00000200,
     MPP_ATTR_SCALE                  = 0x00000800,
     MPP_ATTR_DIM                    = 0x00001000,
 
@@ -99,8 +97,6 @@ const transform_map_t transform_map_table [] =
     {HAL_TRANSFORM_FLIP_H, MPP_ATTR_FLIP_H},
     {HAL_TRANSFORM_FLIP_V, MPP_ATTR_FLIP_V},
     {HAL_TRANSFORM_ROT_90, MPP_ATTR_ROT_90},
-    {HAL_TRANSFORM_ROT_180, MPP_ATTR_ROT_180},
-    {HAL_TRANSFORM_ROT_270, MPP_ATTR_ROT_270}
 };
 
 typedef struct dpu_attr_map {
@@ -113,7 +109,7 @@ const dpu_attr_map_t dpu_attr_map_table [] =
     {DPP_ATTR_AFBC, MPP_ATTR_AFBC},
     {DPP_ATTR_BLOCK, MPP_ATTR_BLOCK_MODE},
     {DPP_ATTR_FLIP, MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V},
-    {DPP_ATTR_ROT, MPP_ATTR_ROT_90 | MPP_ATTR_ROT_180 | MPP_ATTR_ROT_270},
+    {DPP_ATTR_ROT, MPP_ATTR_ROT_90},
     {DPP_ATTR_SCALE, MPP_ATTR_SCALE},
     {DPP_ATTR_HDR, MPP_ATTR_HDR10},
     {DPP_ATTR_C_HDR, MPP_ATTR_HDR10},
