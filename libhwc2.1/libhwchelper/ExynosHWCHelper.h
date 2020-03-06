@@ -56,6 +56,8 @@ class ExynosDisplay;
 
 using namespace android;
 
+#define HAL_COLOR_TRANSFORM_ERROR   100
+
 enum {
     EXYNOS_HWC_DIM_LAYER = 0x00000001,
 };
@@ -311,13 +313,15 @@ inline int WIDTH(const hwc_frect_t &rect) { return (int)(rect.right - rect.left)
 inline int HEIGHT(const hwc_frect_t &rect) { return (int)(rect.bottom - rect.top); }
 
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space);
-enum decon_pixel_format halFormatToS3CFormat(int format);
-uint32_t S3CFormatToHalFormat(int format);
+enum decon_pixel_format halFormatToDpuFormat(int format);
+uint32_t DpuFormatToHalFormat(int format);
 int halFormatToDrmFormat(int format, bool compressed);
+#define MAX_SAME_HAL_PIXEL_FORMAT 10
+uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat, uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT]);
 uint8_t formatToBpp(int format);
-uint8_t DeconFormatToBpp(decon_pixel_format format);
-enum decon_blending halBlendingToS3CBlending(int32_t blending);
-enum dpp_rotate halTransformToS3CRot(uint32_t halTransform);
+uint8_t DpuFormatToBpp(decon_pixel_format format);
+enum decon_blending halBlendingToDpuBlending(int32_t blending);
+enum dpp_rotate halTransformToDpuRot(uint32_t halTransform);
 uint64_t halTransformToDrmRot(uint32_t halTransform);
 
 bool isFormatRgb(int format);

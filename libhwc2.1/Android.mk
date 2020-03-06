@@ -88,9 +88,8 @@ LOCAL_SRC_FILES := \
 	libresource/ExynosResourceManager.cpp \
 	libexternaldisplay/ExynosExternalDisplay.cpp \
 	libvirtualdisplay/ExynosVirtualDisplay.cpp \
-	libdisplayinterface/ExynosDeviceFbInterface.cpp \
+	libdisplayinterface/ExynosDeviceInterface.cpp \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
-	libdisplayinterface/ExynosDisplayFbInterface.cpp \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp
 

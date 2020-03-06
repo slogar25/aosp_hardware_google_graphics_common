@@ -21,7 +21,6 @@
 #include "ExynosLayer.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosHWCDebug.h"
-#include "ExynosDisplayFbInterfaceModule.h"
 #include "ExynosDisplayDrmInterface.h"
 #include <linux/fb.h>
 
@@ -576,6 +575,7 @@ void ExynosExternalDisplay::initDisplayInterface(uint32_t interfaceType)
     if (interfaceType == INTERFACE_TYPE_DRM)
         mDisplayInterface = std::make_unique<ExynosDisplayDrmInterface>((ExynosDisplay *)this);
     else
-        mDisplayInterface = std::make_unique<ExynosExternalDisplayFbInterfaceModule>((ExynosDisplay *)this);
+        LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
+                __func__, interfaceType);
     mDisplayInterface->init(this);
 }

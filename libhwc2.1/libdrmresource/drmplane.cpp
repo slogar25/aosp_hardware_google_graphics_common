@@ -30,6 +30,9 @@ namespace android {
 
 DrmPlane::DrmPlane(DrmDevice *drm, drmModePlanePtr p)
     : drm_(drm), id_(p->plane_id), possible_crtc_mask_(p->possible_crtcs) {
+  for (uint32_t i = 0; i < p->count_formats; i++) {
+    formats_.push_back(p->formats[i]);
+  }
 }
 
 int DrmPlane::Init() {
@@ -158,6 +161,10 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get min_luminance property");
 
+  ret = drm_->GetPlaneProperty(*this, "hw restrictions", &hw_restrictions_);
+  if (ret)
+    ALOGI("Could not get hw restrictions property");
+
   properties_.push_back(&crtc_property_);
   properties_.push_back(&fb_property_);
   properties_.push_back(&crtc_x_property_);
@@ -178,6 +185,7 @@ int DrmPlane::Init() {
   properties_.push_back(&range_);
   properties_.push_back(&max_luminance_);
   properties_.push_back(&min_luminance_);
+  properties_.push_back(&hw_restrictions_);
 
   return 0;
 }
@@ -272,5 +280,9 @@ const DrmProperty &DrmPlane::max_luminance_property() const {
 
 const DrmProperty &DrmPlane::min_luminance_property() const {
   return min_luminance_;
+}
+
+const DrmProperty &DrmPlane::hw_restrictions_property() const {
+  return hw_restrictions_;
 }
 }  // namespace android
