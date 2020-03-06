@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <drm/drm_mode.h>
 #include "ExynosDeviceDrmInterface.h"
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosHWCDebug.h"
@@ -21,6 +22,39 @@
 #include "ExynosDisplay.h"
 #include "ExynosExternalDisplayModule.h"
 #include <hardware/hwcomposer_defs.h>
+#include "DeconDrmHeader.h"
+
+static void set_dpp_ch_restriction(struct dpp_ch_restriction &common_restriction,
+        struct drm_dpp_ch_restriction &drm_restriction)
+{
+    common_restriction.id = drm_restriction.id;
+    common_restriction.attr = drm_restriction.attr;
+    common_restriction.restriction.src_f_w = drm_restriction.restriction.src_f_w;
+    common_restriction.restriction.src_f_h = drm_restriction.restriction.src_f_h;
+    common_restriction.restriction.src_w = drm_restriction.restriction.src_w;
+    common_restriction.restriction.src_h = drm_restriction.restriction.src_h;
+    common_restriction.restriction.src_x_align = drm_restriction.restriction.src_x_align;
+    common_restriction.restriction.src_y_align = drm_restriction.restriction.src_y_align;
+    common_restriction.restriction.dst_f_w = drm_restriction.restriction.dst_f_w;
+    common_restriction.restriction.dst_f_h = drm_restriction.restriction.dst_f_h;
+    common_restriction.restriction.dst_w = drm_restriction.restriction.dst_w;
+    common_restriction.restriction.dst_h = drm_restriction.restriction.dst_h;
+    common_restriction.restriction.dst_x_align = drm_restriction.restriction.dst_x_align;
+    common_restriction.restriction.dst_y_align = drm_restriction.restriction.dst_y_align;
+    common_restriction.restriction.blk_w = drm_restriction.restriction.blk_w;
+    common_restriction.restriction.blk_h = drm_restriction.restriction.blk_h;
+    common_restriction.restriction.blk_x_align = drm_restriction.restriction.blk_x_align;
+    common_restriction.restriction.blk_y_align = drm_restriction.restriction.blk_y_align;
+    common_restriction.restriction.src_h_rot_max = drm_restriction.restriction.src_h_rot_max;
+    common_restriction.restriction.scale_down = drm_restriction.restriction.scale_down;
+    common_restriction.restriction.scale_up = drm_restriction.restriction.scale_up;
+
+    /* scale ratio can't be 0 */
+    if (common_restriction.restriction.scale_down == 0)
+        common_restriction.restriction.scale_down = 1;
+    if (common_restriction.restriction.scale_up == 0)
+        common_restriction.restriction.scale_up = 1;
+}
 
 ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice)
 {
@@ -60,7 +94,70 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
 
 void ExynosDeviceDrmInterface::updateRestrictions()
 {
-    mUseQuery = false;
+    int32_t ret = 0;
+
+    mDPUInfo.dpuInfo.dpp_cnt = mDrmDevice->planes().size();
+    uint32_t channelId = 0;
+
+    for (auto &plane : mDrmDevice->planes()) {
+        /* Set size restriction information */
+        if (plane->hw_restrictions_property().id()) {
+            uint64_t blobId;
+            std::tie(ret, blobId) = plane->hw_restrictions_property().value();
+            if (ret)
+                break;
+            struct drm_dpp_ch_restriction *res;
+            drmModePropertyBlobPtr blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
+            if (!blob) {
+                ALOGE("Fail to get blob for hw_restrictions(%" PRId64 ")", blobId);
+                ret = HWC2_ERROR_UNSUPPORTED;
+                break;
+            }
+            res = (struct drm_dpp_ch_restriction *)blob->data;
+            set_dpp_ch_restriction(mDPUInfo.dpuInfo.dpp_ch[channelId], *res);
+            drmModeFreePropertyBlob(blob);
+        } else {
+            ALOGI("plane[%d] There is no hw restriction information", channelId);
+            ret = HWC2_ERROR_UNSUPPORTED;
+            break;
+        }
+        /* Set supported format information */
+        for (auto format : plane->formats()) {
+            uint32_t halFormatNum = 0;
+            uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT];
+
+            int &formatIndex = mDPUInfo.dpuInfo.dpp_ch[channelId].restriction.format_cnt;
+            drmFormatToHalFormats(format, &halFormatNum, halFormats);
+            for (uint32_t i = 0; i < halFormatNum; i++) {
+                mDPUInfo.dpuInfo.dpp_ch[channelId].restriction.format[formatIndex] =
+                    halFormats[i];
+                formatIndex++;
+            }
+        }
+        if (hwcCheckDebugMessages(eDebugDefault))
+            printDppRestriction(mDPUInfo.dpuInfo.dpp_ch[channelId]);
+
+        channelId++;
+    }
+
+    if (ret != NO_ERROR) {
+        ALOGI("Fail to get restriction (ret: %d)", ret);
+        mUseQuery = false;
+        return;
+    }
+
+    if ((ret = makeDPURestrictions()) != NO_ERROR) {
+        ALOGE("makeDPURestrictions fail");
+    } else if ((ret = updateFeatureTable()) != NO_ERROR) {
+        ALOGE("updateFeatureTable fail");
+    }
+
+    if (ret == NO_ERROR)
+        mUseQuery = true;
+    else {
+        ALOGI("There is no hw restriction information, use default values");
+        mUseQuery = false;
+    }
 }
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::init(ExynosDevice *exynosDevice)

@@ -56,6 +56,8 @@ class ExynosDisplayInterface {
         virtual int32_t setForcePanic() {return NO_ERROR;};
         virtual int getDisplayFd() {return -1;};
         virtual uint32_t getMaxWindowNum() {return 0;};
+        virtual int32_t setColorTransform(const float* __unused matrix,
+                int32_t __unused hint) {return HWC2_ERROR_UNSUPPORTED;}
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

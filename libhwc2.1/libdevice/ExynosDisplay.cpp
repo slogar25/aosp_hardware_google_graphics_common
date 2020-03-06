@@ -22,6 +22,7 @@
 #include <utils/CallStack.h>
 #include <hardware/hwcomposer_defs.h>
 #include <sync/sync.h>
+
 #include <map>
 #include "ExynosDisplay.h"
 #include "ExynosExternalDisplay.h"
@@ -327,7 +328,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
 
     mLowFpsLayerInfo.initializeInfos();
 
-    mUseDecon = true;
+    mUseDpu = true;
     return;
 }
 
@@ -979,14 +980,14 @@ bool ExynosDisplay::validateExynosCompositionLayer()
         (mExynosCompositionInfo.mLastIndex >= 0)) {
         sourceSize = mExynosCompositionInfo.mLastIndex - mExynosCompositionInfo.mFirstIndex + 1;
 
-        if (!mUseDecon && mClientCompositionInfo.mHasCompositionLayer)
+        if (!mUseDpu && mClientCompositionInfo.mHasCompositionLayer)
             sourceSize++;
     }
 
     if (m2mMpp->mAssignedSources.size() == 0) {
         DISPLAY_LOGE("No source images");
         isValid = false;
-    } else if (mUseDecon && (((mExynosCompositionInfo.mFirstIndex < 0) ||
+    } else if (mUseDpu && (((mExynosCompositionInfo.mFirstIndex < 0) ||
                (mExynosCompositionInfo.mLastIndex < 0)) ||
                (sourceSize != (int)m2mMpp->mAssignedSources.size()))) {
         DISPLAY_LOGE("Invalid index (%d, %d), size(%zu), sourceSize(%d)",
@@ -1594,7 +1595,7 @@ int ExynosDisplay::setWinConfigData() {
         if ((mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_EXYNOS) ||
                 (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT))
             continue;
-        int32_t windowIndex =  mLayers[i]->mWindowIndex; 
+        int32_t windowIndex =  mLayers[i]->mWindowIndex;
         if ((windowIndex < 0) || (windowIndex >= (int32_t)mDpuData.configs.size())) {
             DISPLAY_LOGE("%s:: %zu layer has invalid windowIndex(%d)",
                     __func__, i, windowIndex);
@@ -2072,7 +2073,7 @@ int ExynosDisplay::setReleaseFences() {
             errString.appendFormat("There is exynos composition, but m2mMPP is NULL\n");
             goto err;
         }
-        if (mUseDecon &&
+        if (mUseDpu &&
             ((mExynosCompositionInfo.mWindowIndex < 0) ||
              (mExynosCompositionInfo.mWindowIndex >= (int32_t)mDpuData.configs.size()))) {
             errString.appendFormat("%s:: exynosComposition has invalid window index(%d)\n",
@@ -2103,7 +2104,7 @@ int ExynosDisplay::setReleaseFences() {
                     i, mLayers[i]->mReleaseFence);
         }
         mExynosCompositionInfo.mM2mMPP->resetSrcReleaseFence();
-        if(mUseDecon) {
+        if(mUseDpu) {
 #ifdef DISABLE_FENCE
             mExynosCompositionInfo.mM2mMPP->setDstAcquireFence(-1);
 #else
@@ -2812,7 +2813,7 @@ int32_t ExynosDisplay::setClientTarget(
 }
 
 int32_t ExynosDisplay::setColorTransform(
-        const float* __unused matrix,
+        const float* matrix,
         int32_t /*android_color_transform_t*/ hint) {
     if ((hint < HAL_COLOR_TRANSFORM_IDENTITY) ||
         (hint > HAL_COLOR_TRANSFORM_CORRECT_TRITANOPIA))
@@ -2820,8 +2821,15 @@ int32_t ExynosDisplay::setColorTransform(
     ALOGI("%s:: %d, %d", __func__, mColorTransformHint, hint);
     if (mColorTransformHint != hint)
         setGeometryChanged(GEOMETRY_DISPLAY_COLOR_TRANSFORM_CHANGED);
-    mColorTransformHint = (android_color_transform_t)hint;
+    mColorTransformHint = hint;
+#ifdef HWC_SUPPORT_COLOR_TRANSFORM
+    int ret = mDisplayInterface->setColorTransform(matrix, hint);
+    if (ret < 0)
+        mColorTransformHint = HAL_COLOR_TRANSFORM_ERROR;
+    return ret;
+#else
     return HWC2_ERROR_NONE;
+#endif
 }
 
 int32_t ExynosDisplay::setColorMode(
@@ -3740,6 +3748,11 @@ int ExynosDisplay::handleWindowUpdate()
     unsigned int excp;
 
     mDpuData.enable_win_update = false;
+    /* Init with full size */
+    mDpuData.win_update_region.x = 0;
+    mDpuData.win_update_region.w = mXres;
+    mDpuData.win_update_region.y = 0;
+    mDpuData.win_update_region.h = mYres;
 
     if (exynosHWCControl.windowUpdate != 1) return 0;
 

@@ -146,7 +146,7 @@ uint8_t formatToBpp(int format)
     return 0;
 }
 
-uint8_t DeconFormatToBpp(decon_pixel_format format)
+uint8_t DpuFormatToBpp(decon_pixel_format format)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].s3cFormat == format)
@@ -274,7 +274,7 @@ uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space)
     return V4L2_COLORSPACE_DEFAULT;
 }
 
-enum decon_pixel_format halFormatToS3CFormat(int format)
+enum decon_pixel_format halFormatToDpuFormat(int format)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].halFormat == format)
@@ -283,7 +283,7 @@ enum decon_pixel_format halFormatToS3CFormat(int format)
     return DECON_PIXEL_FORMAT_MAX;
 }
 
-uint32_t S3CFormatToHalFormat(int format)
+uint32_t DpuFormatToHalFormat(int format)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].s3cFormat == static_cast<decon_pixel_format>(format))
@@ -302,6 +302,21 @@ int halFormatToDrmFormat(int format, bool compressed)
             return exynos_format_desc[i].drmFormat;
     }
     return DRM_FORMAT_UNDEFINED;
+}
+
+uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat,
+        uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT])
+{
+    *numFormat = 0;
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].drmFormat == format) {
+            halFormats[*numFormat] = exynos_format_desc[i].halFormat;
+            *numFormat = *numFormat + 1;
+        }
+        if (*numFormat >= MAX_SAME_HAL_PIXEL_FORMAT)
+            break;
+    }
+    return *numFormat;
 }
 
 android_dataspace colorModeToDataspace(android_color_mode_t mode)
@@ -344,7 +359,7 @@ android_dataspace colorModeToDataspace(android_color_mode_t mode)
     return dataSpace;
 }
 
-enum decon_blending halBlendingToS3CBlending(int32_t blending)
+enum decon_blending halBlendingToDpuBlending(int32_t blending)
 {
     switch (blending) {
     case HWC2_BLEND_MODE_NONE:
@@ -359,7 +374,7 @@ enum decon_blending halBlendingToS3CBlending(int32_t blending)
     }
 }
 
-enum dpp_rotate halTransformToS3CRot(uint32_t halTransform)
+enum dpp_rotate halTransformToDpuRot(uint32_t halTransform)
 {
     switch (halTransform) {
     case HAL_TRANSFORM_FLIP_H:

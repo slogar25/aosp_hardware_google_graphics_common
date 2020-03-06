@@ -365,7 +365,7 @@ class ExynosDisplay {
          */
         int mLastRetireFence;
 
-        bool mUseDecon;
+        bool mUseDpu;
 
         /**
          * Max Window number, It should be set by display module(chip)
@@ -379,7 +379,7 @@ class ExynosDisplay {
         uint32_t mNumMaxPriorityAllowed;
         int32_t mCursorIndex;
 
-        android_color_transform mColorTransformHint;
+        int32_t mColorTransformHint;
 
         ExynosLowFpsLayerInfo mLowFpsLayerInfo;
 

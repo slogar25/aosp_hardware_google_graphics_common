@@ -19,7 +19,6 @@
 
 #include "ExynosDisplay.h"
 #include <cutils/properties.h>
-#include "ExynosDisplayFbInterface.h"
 
 #define EXTERNAL_DISPLAY_SKIP_LAYER   0x00000100
 #define SKIP_EXTERNAL_FRAME 5
@@ -27,7 +26,6 @@
 class ExynosExternalDisplay : public ExynosDisplay {
     public:
         hwc2_config_t mActiveConfigIndex;
-        int mExternalDisplayResolution = DP_RESOLUTION_DEFAULT; //preset
 
         /* Methods */
         ExynosExternalDisplay(uint32_t type, ExynosDevice *device);

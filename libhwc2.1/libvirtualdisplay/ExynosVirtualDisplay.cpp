@@ -60,6 +60,7 @@ ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t __unused type, ExynosDevice 
     mMaxTargetLuminance = 100;
     mSinkDeviceType = 0;
 
+    mUseDpu = false;
     mDisplayControl.enableExynosCompositionOptimization = false;
     mDisplayControl.enableClientCompositionOptimization = false;
     mDisplayControl.handleLowFpsLayers = false;

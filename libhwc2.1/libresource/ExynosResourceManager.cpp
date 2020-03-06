@@ -21,6 +21,7 @@
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 #include <cutils/properties.h>
 #include <system/graphics.h>
+#include <unordered_set>
 #include "ExynosResourceManager.h"
 #include "ExynosMPPModule.h"
 #include "ExynosResourceRestriction.h"
@@ -491,7 +492,7 @@ int32_t ExynosResourceManager::assignResource(ExynosDisplay *display)
         }
     }
 
-    if (!display->mUseDecon) {
+    if (!display->mUseDpu) {
         if (display->mClientCompositionInfo.mHasCompositionLayer) {
             if ((ret = display->mExynosCompositionInfo.mM2mMPP->assignMPP(display, &display->mClientCompositionInfo)) != NO_ERROR)
             {
@@ -999,10 +1000,10 @@ int32_t ExynosResourceManager::assignCompositionTarget(ExynosDisplay * display, 
 
     if (targetType == COMPOSITION_EXYNOS) {
         for (uint32_t i = 0; i < mM2mMPPs.size(); i++) {
-            if ((display->mUseDecon == true) &&
+            if ((display->mUseDpu == true) &&
                 (mM2mMPPs[i]->mLogicalType != MPP_LOGICAL_G2D_RGB))
                 continue;
-            if ((display->mUseDecon == false) &&
+            if ((display->mUseDpu == false) &&
                 (mM2mMPPs[i]->mLogicalType != MPP_LOGICAL_G2D_COMBO))
                 continue;
             if (mM2mMPPs[i]->isAssignableState(display, src_img, dst_img)) {
@@ -1025,7 +1026,7 @@ int32_t ExynosResourceManager::assignCompositionTarget(ExynosDisplay * display, 
         return -EINVAL;
     }
 
-    if (display->mUseDecon == false) {
+    if (display->mUseDpu == false) {
         return NO_ERROR;
     }
 
@@ -1090,8 +1091,14 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
     if (layer->mCompositionType == HWC2_COMPOSITION_CLIENT)
         return eSkipLayer;
 
+#ifndef HWC_SUPPORT_COLOR_TRANSFORM
     if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY)
         return eUnSupportedColorTransform;
+#else
+    if ((display->mColorTransformHint == HAL_COLOR_TRANSFORM_ERROR) &&
+        (layer->mOverlayPriority < ePriorityHigh))
+        return eUnSupportedColorTransform;
+#endif
 
     if ((display->mLowFpsLayerInfo.mHasLowFpsLayer == true) &&
         (display->mLowFpsLayerInfo.mFirstIndex <= (int32_t)index) &&
@@ -1326,7 +1333,7 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
     layer->setExynosMidImage(dst_img);
 
     validateFlag = validateLayer(layer_index, display, layer);
-    if ((display->mUseDecon) &&
+    if ((display->mUseDpu) &&
         (display->mWindowNumUsed >= display->mMaxWindowNum))
         validateFlag |= eInsufficientWindow;
 
@@ -1365,10 +1372,10 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
         /* 2. Find available m2mMPP */
         for (uint32_t j = 0; j < mM2mMPPs.size(); j++) {
 
-            if ((display->mUseDecon == true) &&
+            if ((display->mUseDpu == true) &&
                 (mM2mMPPs[j]->mLogicalType == MPP_LOGICAL_G2D_COMBO))
                 continue;
-            if ((display->mUseDecon == false) &&
+            if ((display->mUseDpu == false) &&
                 (mM2mMPPs[j]->mLogicalType == MPP_LOGICAL_G2D_RGB))
                 continue;
 
@@ -1589,7 +1596,7 @@ int32_t ExynosResourceManager::assignWindow(ExynosDisplay *display)
     int ret = NO_ERROR;
     uint32_t windowIndex = 0;
 
-    if (!display->mUseDecon)
+    if (!display->mUseDpu)
         return ret;
 
     windowIndex = display->mBaseWindowIndex;
@@ -2190,14 +2197,14 @@ void ExynosResourceManager::makeSizeRestrictions(uint32_t mppId, restriction_siz
             size.cropHeightAlign);
 }
 
-void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table, int deviceFormat) {
+void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table) {
 
     mFormatRestrictions[mFormatRestrictionCnt] = table;
 
-    HDEBUGLOGD(eDebugDefault, "MPP : %s, %d, %s(device : %d), %d"
+    HDEBUGLOGD(eDebugDefault, "MPP : %s, %d, %s, %d"
             ,getMPPStr(mFormatRestrictions[mFormatRestrictionCnt].hwType).string()
             ,mFormatRestrictions[mFormatRestrictionCnt].nodeType
-            ,getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format).string(), deviceFormat
+            ,getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format).string()
             ,mFormatRestrictions[mFormatRestrictionCnt].reserved);
     mFormatRestrictionCnt++;
 }
@@ -2226,8 +2233,7 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
             queried_format.nodeType = NODE_NONE;
             queried_format.format = exynos_format_desc[i].halFormat;
             queried_format.reserved = 0;
-            makeFormatRestrictions(queried_format,
-                    queried_format.format);
+            makeFormatRestrictions(queried_format);
         }
     }
 
@@ -2297,8 +2303,13 @@ ExynosMPP* ExynosResourceManager::getOtfMPPWithChannel(int ch)
 void ExynosResourceManager::updateRestrictions() {
 
     if (mDevice->mDeviceInterface->getUseQuery() == true) {
-        makeAcrylRestrictions(MPP_MSC);
-        makeAcrylRestrictions(MPP_G2D);
+        std::unordered_set<uint32_t> checkDuplicateMPP;
+        for (const auto unit: AVAILABLE_M2M_MPP_UNITS) {
+            if (checkDuplicateMPP.count(unit.physicalType) == 0)  {
+                makeAcrylRestrictions(static_cast<mpp_phycal_type_t>(unit.physicalType));
+                checkDuplicateMPP.insert(unit.physicalType);
+            }
+        }
     } else {
         mFormatRestrictionCnt = sizeof(restriction_format_table)/sizeof(restriction_key);
         for (uint32_t i = 0 ; i < mFormatRestrictionCnt; i++) {
