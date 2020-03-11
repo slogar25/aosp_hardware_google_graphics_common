@@ -2352,12 +2352,12 @@ bool ExynosResourceManager::hasHDR10PlusMPP() {
 
     for (uint32_t i = 0; i < mOtfMPPs.size(); i++) {
         if (mOtfMPPs[i] == NULL) continue;
-        if (mOtfMPPs[i]->mAttr | MPP_ATTR_HDR10PLUS)
+        if (mOtfMPPs[i]->mAttr & MPP_ATTR_HDR10PLUS)
             return true;
     }
     for (uint32_t i = 0; i < mM2mMPPs.size(); i++) {
         if (mM2mMPPs[i] == NULL) continue;
-        if (mM2mMPPs[i]->mAttr | MPP_ATTR_HDR10PLUS)
+        if (mM2mMPPs[i]->mAttr & MPP_ATTR_HDR10PLUS)
             return true;
     }
 
