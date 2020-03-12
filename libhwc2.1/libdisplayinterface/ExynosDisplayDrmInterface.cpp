@@ -415,7 +415,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config)
     mode->ToDrmModeModeInfo(&drm_mode);
 
     uint32_t id = 0;
-    int ret = mDrmDevice->CreatePropertyBlob(&drm_mode, sizeof(struct drm_mode_modeinfo),
+    int ret = mDrmDevice->CreatePropertyBlob(&drm_mode, sizeof(drm_mode),
             &id);
     if (ret) {
         HWC_LOGE(mExynosDisplay, "Failed to create mode property blob %d", ret);
@@ -934,7 +934,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::clearDisplay()
+int32_t ExynosDisplayDrmInterface::clearDisplay(bool __unused readback)
 {
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);

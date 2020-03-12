@@ -101,6 +101,28 @@ hwc2_function_pointer_t exynos_function_pointer[] =
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_LAYER_FLOAT_COLOR
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setLayerPerFrameMetadata),    //HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getPerFrameMetadataKeys),     //HWC2_FUNCTION_GET_PER_FRAME_METADATA_KEYS
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setReadbackBuffer),           //HWC2_FUNCTION_SET_READBACK_BUFFER
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getReadbackBufferAttributes), //HWC2_FUNCTION_GET_READBACK_BUFFER_ATTRIBUTES
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getReadbackBufferFence),      //HWC2_FUNCTION_GET_READBACK_BUFFER_FENCE
+#ifdef HWC_SUPPORT_RENDER_INTENT
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getRenderIntents),            //HWC2_FUNCTION_GET_RENDER_INTENTS
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setColorModeWithRenderIntent),//HWC2_FUNCTION_SET_COLOR_MODE_WITH_RENDER_INTENT
+#else
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_RENDER_INTENTS
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_COLOR_MODE_WITH_RENDER_INTENT
+#endif
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_DATASPACE_SATURATION_MATRIX
+
+    // composer 2.3
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getDisplayIdentificationData),//HWC2_FUNCTION_GET_DISPLAY_IDENTIFICATION_DATA
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getDisplayCapabilities),      //HWC2_FUNCTION_GET_DISPLAY_CAPABILITIES
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_LAYER_COLOR_TRANSFORM
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_DISPLAYED_CONTENT_SAMPLING_ATTRIBUTES
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_DISPLAYED_CONTENT_SAMPLING_ENABLED
+    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_DISPLAYED_CONTENT_SAMPLE
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setLayerPerFrameMetadataBlobs), //HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA_BLOBS
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_getDisplayBrightnessSupport),   //HWC2_FUNCTION_GET_DISPLAY_BRIGHTNESS_SUPPORT
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setDisplayBrightness),          //HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS
 };
 
 inline ExynosDevice* checkDevice(hwc2_device_t *dev)
@@ -144,7 +166,7 @@ hwc2_function_pointer_t exynos_getFunction(struct hwc2_device *dev,
     if (!exynosDevice)
         return NULL;
 
-    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_GET_PER_FRAME_METADATA_KEYS)
+    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS)
         return NULL;
     return exynos_function_pointer[descriptor];
 }
@@ -303,6 +325,43 @@ int32_t exynos_getColorModes(hwc2_device_t *dev, hwc2_display_t display, uint32_
     return HWC2_ERROR_BAD_DISPLAY;
 }
 
+int32_t exynos_getRenderIntents(hwc2_device_t* dev, hwc2_display_t display, int32_t mode,
+                uint32_t* outNumIntents, int32_t* /*android_render_intent_v1_1_t*/ outIntents)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+    ALOGD("%s:: mode(%d)", __func__, mode);
+
+    if (mode < 0)
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->getRenderIntents(mode, outNumIntents, outIntents);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_setColorModeWithRenderIntent(hwc2_device_t* dev, hwc2_display_t display,
+        int32_t /*android_color_mode_t*/ mode,
+        int32_t /*android_render_intent_v1_1_t */ intent)
+{
+    if ((mode < 0) || (intent < 0))
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    ExynosDevice *exynosDevice = checkDevice(dev);
+    ALOGD("%s:: mode(%d), intent(%d)", __func__, mode, intent);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->setColorModeWithRenderIntent(mode, intent);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
 int32_t exynos_getDisplayAttribute(hwc2_device_t *dev, hwc2_display_t display,
         hwc2_config_t config, int32_t /*hwc2_attribute_t*/ attribute, int32_t* outValue)
 {
@@ -451,6 +510,8 @@ int32_t exynos_presentDisplay(hwc2_device_t *dev, hwc2_display_t display,
             }
         }
         int32_t ret = exynosDisplay->presentDisplay(outRetireFence);
+        if (ret != HWC2_ERROR_NOT_VALIDATED)
+            exynosDisplay->presentPostProcessing();
         exynosDisplay->mHWCRenderingState = RENDERING_STATE_PRESENTED;
         return ret;
     }
@@ -855,13 +916,27 @@ int32_t exynos_setLayerPerFrameMetadata(hwc2_device_t *dev, hwc2_display_t displ
     return HWC2_ERROR_BAD_DISPLAY;
 }
 
-int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* __unused dev, hwc2_display_t __unused display,
+int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* dev, hwc2_display_t __unused display,
         uint32_t* outNumKeys, int32_t* /*hwc2_per_frame_metadata_key_t*/ outKeys) {
+
+    ExynosDevice *exynosDevice = checkDevice(dev);
+    if (exynosDevice == NULL)
+        return HWC2_ERROR_BAD_DISPLAY;
+
+    ExynosResourceManager *resourceManager = exynosDevice->mResourceManager;
+
+    uint32_t numKeys = 0;
+
+    if (resourceManager->hasHDR10PlusMPP())
+        numKeys = HWC2_HDR10_PLUS_SEI;
+    else
+        numKeys = HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL;
+
     if (outKeys == NULL) {
-        *outNumKeys = HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL + 1;
+        *outNumKeys = numKeys + 1;
         return NO_ERROR;
     } else {
-        if (*outNumKeys != (HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL + 1)) {
+        if (*outNumKeys != (numKeys + 1)) {
             ALOGE("%s:: invalid outNumKeys(%d)", __func__, *outNumKeys);
             return -1;
         }
@@ -871,8 +946,125 @@ int32_t exynos_getPerFrameMetadataKeys(hwc2_device_t* __unused dev, hwc2_display
     }
     return NO_ERROR;
 }
- /* ************************************************************************************/
 
+int32_t exynos_getReadbackBufferAttributes(hwc2_device_t *dev, hwc2_display_t display,
+        int32_t* /*android_pixel_format_t*/ outFormat,
+        int32_t* /*android_dataspace_t*/ outDataspace) {
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->getReadbackBufferAttributes(outFormat, outDataspace);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_getDisplayIdentificationData(hwc2_device_t* dev, hwc2_display_t display, uint8_t* outPort,
+        uint32_t* outDataSize, uint8_t* outData)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+
+        if (exynosDisplay) {
+            return exynosDisplay->getDisplayIdentificationData(outPort, outDataSize, outData);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_setReadbackBuffer(hwc2_device_t *dev, hwc2_display_t display,
+        buffer_handle_t buffer, int32_t releaseFence) {
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->setReadbackBuffer(buffer, releaseFence);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_getDisplayCapabilities(hwc2_device_t* dev, hwc2_display_t display, uint32_t* outNumCapabilities,
+        uint32_t* outCapabilities)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->getDisplayCapabilities(outNumCapabilities, outCapabilities);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_getReadbackBufferFence(hwc2_device_t *dev, hwc2_display_t display,
+        int32_t* outFence) {
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay)
+            return exynosDisplay->getReadbackBufferFence(outFence);
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_setLayerPerFrameMetadataBlobs(hwc2_device_t* dev, hwc2_display_t display,
+        hwc2_layer_t layer, uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
+        const uint8_t* metadata)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            ExynosLayer *exynosLayer = checkLayer(exynosDisplay, layer);
+            if (exynosLayer)
+                return exynosLayer->setLayerPerFrameMetadataBlobs(numElements, keys, sizes, metadata);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_getDisplayBrightnessSupport(hwc2_device_t* dev, hwc2_display_t display, bool* outSupport)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->getDisplayBrightnessSupport(outSupport);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_setDisplayBrightness(hwc2_device_t* dev, hwc2_display_t display, float brightness)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->setDisplayBrightness(brightness);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+/* ************************************************************************************/
 
 void exynos_boot_finished(ExynosHWCCtx *dev)
 {

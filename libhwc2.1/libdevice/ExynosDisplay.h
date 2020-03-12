@@ -101,6 +101,20 @@ struct ExynosFrameInfo
     exynos_image dstInfo[NUM_SKIP_STATIC_LAYER];
 };
 
+struct exynos_readback_info
+{
+    private_handle_t *handle = NULL;
+    /* release sync fence file descriptor,
+     * which will be signaled when it is safe to write to the output buffer.
+     */
+    int rel_fence = -1;
+    /* acquire sync fence file descriptor which will signal when the
+     * buffer provided to setReadbackBuffer has been filled by the device and is
+     * safe for the client to read.
+     */
+    int acq_fence = -1;
+};
+
 struct exynos_win_config_data
 {
     enum {
@@ -115,7 +129,7 @@ struct exynos_win_config_data
     int fd_idma[3] = {-1, -1, -1};
     int acq_fence = -1;
     int rel_fence = -1;
-    float plane_alpha = 0;
+    float plane_alpha = 1;
     int32_t blending = HWC2_BLEND_MODE_NONE;
     ExynosMPP* assignedMPP = NULL;
     int format = 0;
@@ -142,7 +156,9 @@ struct exynos_dpu_data
     int retire_fence = -1;
     std::vector<exynos_win_config_data> configs;
     bool enable_win_update = false;
+    bool enable_readback = false;
     struct decon_frame win_update_region = {0, 0, 0, 0, 0, 0};
+    struct exynos_readback_info readback_info;
 
     void init(uint32_t configNum) {
         for(uint32_t i = 0; i < configNum; i++)
@@ -157,6 +173,11 @@ struct exynos_dpu_data
         retire_fence = -1;
         for (uint32_t i = 0; i < configs.size(); i++)
             configs[i].reset();
+
+        /*
+         * Should not initialize readback_info
+         * readback_info should be initialized after present
+         */
     };
     exynos_dpu_data& operator =(const exynos_dpu_data &configs_data){
         retire_fence = configs_data.retire_fence;
@@ -250,6 +271,8 @@ struct DisplayControl {
     bool adjustDisplayFrame;
     /** setCursorPosition support **/
     bool cursorSupport;
+    /** readback support **/
+    bool readbackSupport = false;
 };
 
 class ExynosDisplay {
@@ -406,6 +429,9 @@ class ExynosDisplay {
 
         // Skip present frame if there was no validate after power on
         bool mSkipFrame;
+
+        FILE *mBrightnessFd;
+        unsigned int mMaxBrightness;
 
         void initDisplay();
 
@@ -588,6 +614,7 @@ class ExynosDisplay {
          * HWC2_PFN_PRESENT_DISPLAY
          */
         virtual int32_t presentDisplay(int32_t* outRetireFence);
+        virtual int32_t presentPostProcessing();
 
         /* setActiveConfig(..., config)
          * Descriptor: HWC2_FUNCTION_SET_ACTIVE_CONFIG
@@ -626,7 +653,7 @@ class ExynosDisplay {
                 buffer_handle_t buffer,
                 int32_t releaseFence);
 
-        virtual int clearDisplay();
+        virtual int clearDisplay(bool readback = false);
 
         /* setPowerMode(..., mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
@@ -656,8 +683,86 @@ class ExynosDisplay {
         virtual int32_t getHdrCapabilities(uint32_t* outNumTypes, int32_t* /*android_hdr_t*/ outTypes, float* outMaxLuminance,
                 float* outMaxAverageLuminance, float* outMinLuminance);
 
+        int32_t getRenderIntents(int32_t mode, uint32_t* outNumIntents,
+                int32_t* /*android_render_intent_v1_1_t*/ outIntents);
+        int32_t setColorModeWithRenderIntent(int32_t /*android_color_mode_t*/ mode,
+                int32_t /*android_render_intent_v1_1_t */ intent);
+
+        /* HWC 2.3 APIs */
+
+        /* getDisplayIdentificationData(..., outPort, outDataSize, outData)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_IDENTIFICATION_DATA
+         * Parameters:
+         *   outPort - the connector to which the display is connected;
+         *             pointer will be non-NULL
+         *   outDataSize - if outData is NULL, the size in bytes of the data which would
+         *       have been returned; if outData is not NULL, the size of outData, which
+         *       must not exceed the value stored in outDataSize prior to the call;
+         *       pointer will be non-NULL
+         *   outData - the EDID 1.3 blob identifying the display
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         */
+        int32_t getDisplayIdentificationData(uint8_t* outPort,
+                uint32_t* outDataSize, uint8_t* outData);
+
+        /* getDisplayCapabilities(..., outCapabilities)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_CAPABILITIES
+         * Parameters:
+         *   outNumCapabilities - if outCapabilities was nullptr, returns the number of capabilities
+         *       if outCapabilities was not nullptr, returns the number of capabilities stored in
+         *       outCapabilities, which must not exceed the value stored in outNumCapabilities prior
+         *       to the call; pointer will be non-NULL
+         *   outCapabilities - a list of supported capabilities.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         */
+        /* Capabilities
+           Invalid = HWC2_CAPABILITY_INVALID,
+           SidebandStream = HWC2_CAPABILITY_SIDEBAND_STREAM,
+           SkipClientColorTransform = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM,
+           PresentFenceIsNotReliable = HWC2_CAPABILITY_PRESENT_FENCE_IS_NOT_RELIABLE,
+           SkipValidate = HWC2_CAPABILITY_SKIP_VALIDATE,
+        */
+        int32_t getDisplayCapabilities(uint32_t* outNumCapabilities,
+                uint32_t* outCapabilities);
+
+        /* getDisplayBrightnessSupport(displayToken)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_BRIGHTNESS_SUPPORT
+         * Parameters:
+         *   outSupport - whether the display supports operations.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY when the display is invalid.
+         */
+        int32_t getDisplayBrightnessSupport(bool* outSupport);
+
+        /* setDisplayBrightness(displayToken, brightnesss)
+         * Descriptor: HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS
+         * Parameters:
+         *   brightness - a number between 0.0f (minimum brightness) and 1.0f (maximum brightness), or
+         *          -1.0f to turn the backlight off.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY   when the display is invalid, or
+         *   HWC2_ERROR_UNSUPPORTED   when brightness operations are not supported, or
+         *   HWC2_ERROR_BAD_PARAMETER when the brightness is invalid, or
+         *   HWC2_ERROR_NO_RESOURCES  when the brightness cannot be applied.
+         */
+        int32_t setDisplayBrightness(float brightness);
+
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
+
+        int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
+                int32_t* /*android_dataspace_t*/ outDataspace);
+        int32_t setReadbackBuffer(buffer_handle_t buffer, int32_t releaseFence);
+        void setReadbackBufferInternal(buffer_handle_t buffer, int32_t releaseFence);
+        int32_t getReadbackBufferFence(int32_t* outFence);
+        /* This function is called by ExynosDisplayInterface class to set acquire fence*/
+        int32_t setReadbackBufferAcqFence(int32_t acqFence);
 
         void dump(String8& result);
 

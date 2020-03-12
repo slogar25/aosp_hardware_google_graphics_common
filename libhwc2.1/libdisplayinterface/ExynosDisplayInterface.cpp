@@ -54,3 +54,10 @@ int32_t ExynosDisplayInterface::updateHdrCapabilities()
 {
     return 0;
 }
+
+int32_t ExynosDisplayInterface::getReadbackBufferAttributes(
+        int32_t* __unused outFormat, int32_t* __unused outDataspace)
+{
+    /* readback is not supported */
+    return HWC2_ERROR_UNSUPPORTED;
+}

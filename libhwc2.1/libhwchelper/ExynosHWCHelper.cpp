@@ -319,6 +319,18 @@ uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat,
     return *numFormat;
 }
 
+int drmFormatToHalFormat(int format)
+{
+    if (format == DRM_FORMAT_RGB565)
+        return HAL_PIXEL_FORMAT_RGB_565;
+
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].drmFormat == format)
+            return exynos_format_desc[i].halFormat;
+    }
+    return HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED;
+}
+
 android_dataspace colorModeToDataspace(android_color_mode_t mode)
 {
     android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;

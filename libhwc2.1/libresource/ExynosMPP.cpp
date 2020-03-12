@@ -148,8 +148,8 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
 {
 
     for (int i=0; i<RESTRICTION_MAX; i++){
-        memset(&mSrcSizeRestrictions[i], 0, sizeof(restriction_size));
-        memset(&mDstSizeRestrictions[i], 0, sizeof(restriction_size));
+        memset(&mSrcSizeRestrictions[i], 0, sizeof(mSrcSizeRestrictions[i]));
+        memset(&mDstSizeRestrictions[i], 0, sizeof(mDstSizeRestrictions[i]));
     }
 
     if (mPhysicalType == MPP_G2D) {
@@ -221,12 +221,12 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     }
 
     for (uint32_t i = 0; i < NUM_MPP_SRC_BUFS; i++) {
-        memset(&mSrcImgs[i], 0, sizeof(exynos_mpp_img_info));
+        memset(&mSrcImgs[i], 0, sizeof(mSrcImgs[i]));
         mSrcImgs[i].acrylicAcquireFenceFd = -1;
         mSrcImgs[i].acrylicReleaseFenceFd = -1;
     }
     for (uint32_t i = 0; i < NUM_MPP_DST_BUFS(mLogicalType); i++) {
-        memset(&mDstImgs[i], 0, sizeof(exynos_mpp_img_info));
+        memset(&mDstImgs[i], 0, sizeof(mDstImgs[i]));
         mDstImgs[i].acrylicAcquireFenceFd = -1;
         mDstImgs[i].acrylicReleaseFenceFd = -1;
     }
@@ -903,7 +903,7 @@ int32_t ExynosMPP::allocOutBuf(uint32_t w, uint32_t h, uint32_t format, uint64_t
         return -EINVAL;
     }
 
-    memset(&mDstImgs[index], 0, sizeof(exynos_mpp_img_info));
+    memset(&mDstImgs[index], 0, sizeof(mDstImgs[index]));
 
     mDstImgs[index].acrylicAcquireFenceFd = -1;
     mDstImgs[index].acrylicReleaseFenceFd = -1;
@@ -1162,12 +1162,17 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
 
     /* HDR process */
     if (hasHdrInfo(src)) {
-        unsigned int max = (src.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000);
-        unsigned int min = src.hdrStaticInfo.sType1.mMinDisplayLuminance;
+        unsigned int max = (src.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000);
+        unsigned int min = src.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
 
         srcImgInfo->mppLayer->setMasterDisplayLuminance(min,max);
         MPP_LOGD(eDebugMPP, "HWC2: G2D luminance min %d, max %d", min, max);
         MPP_LOGD(eDebugMPP|eDebugFence, "G2D getting HDR source!");
+    }
+
+    /* Transfer MetaData */
+    if (src.hasMetaParcel) {
+        srcImgInfo->mppLayer->setLayerData(&src.metaParcel, sizeof(src.metaParcel));
     }
 
     srcImgInfo->bufferType = getBufferType(srcHandle);
@@ -1844,7 +1849,7 @@ int32_t ExynosMPP::requestHWStateChange(uint32_t state)
         if (mMPPType == MPP_TYPE_M2M) {
             for(uint32_t i = 0; i < NUM_MPP_DST_BUFS(mLogicalType); i++) {
                 exynos_mpp_img_info freeDstBuf = mDstImgs[i];
-                memset(&mDstImgs[i], 0, sizeof(exynos_mpp_img_info));
+                memset(&mDstImgs[i], 0, sizeof(mDstImgs[i]));
                 mDstImgs[i].acrylicAcquireFenceFd = freeDstBuf.acrylicAcquireFenceFd;
                 mDstImgs[i].acrylicReleaseFenceFd = freeDstBuf.acrylicReleaseFenceFd;
                 freeDstBuf.acrylicAcquireFenceFd = -1;
@@ -1906,7 +1911,7 @@ int32_t ExynosMPP::setupRestriction() {
                 if ((restriction_size_table[j].key.nodeType == NODE_SRC) ||
                         (restriction_size_table[j].key.nodeType == NODE_NONE)) {
                     memcpy(&mSrcSizeRestrictions[i], &restriction_size_table[j].sizeRestriction,
-                            sizeof(restriction_size));
+                            sizeof(mSrcSizeRestrictions[i]));
                     MPP_LOGD(eDebugMPP, "\tSet mSrcSizeRestrictions[%d], "
                             "[%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
                             i, mSrcSizeRestrictions[i].maxDownScale, mSrcSizeRestrictions[i].maxUpScale,
@@ -1922,7 +1927,7 @@ int32_t ExynosMPP::setupRestriction() {
                 if ((restriction_size_table[j].key.nodeType == NODE_DST) ||
                         (restriction_size_table[j].key.nodeType == NODE_NONE)) {
                     memcpy(&mDstSizeRestrictions[i], &restriction_size_table[j].sizeRestriction,
-                            sizeof(restriction_size));
+                            sizeof(mDstSizeRestrictions[i]));
                     MPP_LOGD(eDebugMPP, "\tSet mDstSizeRestrictions[%d], "
                             "[%d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d, %d]",
                             i, mDstSizeRestrictions[i].maxDownScale, mDstSizeRestrictions[i].maxUpScale,

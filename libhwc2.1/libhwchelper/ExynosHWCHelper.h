@@ -180,7 +180,9 @@ typedef enum hwc_fdebug_fence_type_t {
     FENCE_TYPE_FREE_ACQUIRE = 6,
     FENCE_TYPE_HW_STATE = 7,
     FENCE_TYPE_RETIRE = 8,
-    FENCE_TYPE_ALL = 9,
+    FENCE_TYPE_READBACK_ACQUIRE = 9,
+    FENCE_TYPE_READBACK_RELEASE = 10,
+    FENCE_TYPE_ALL = 11,
     FENCE_TYPE_UNDEFINED = 100
 } hwc_fdebug_fence_type;
 
@@ -290,8 +292,8 @@ typedef struct exynos_image {
     /* refer
      * frameworks/native/include/media/hardware/VideoAPI.h
      * frameworks/native/include/media/hardware/HardwareAPI.h */
-    ExynosHdrStaticInfo hdrStaticInfo;
-    ExynosHdrDynamicInfo hdrDynamicInfo;
+    bool hasMetaParcel = false;
+    ExynosVideoMeta metaParcel;
     ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
     bool needDegamma = false;
     bool isDimLayer()
@@ -318,6 +320,7 @@ uint32_t DpuFormatToHalFormat(int format);
 int halFormatToDrmFormat(int format, bool compressed);
 #define MAX_SAME_HAL_PIXEL_FORMAT 10
 uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat, uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT]);
+int drmFormatToHalFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DpuFormatToBpp(decon_pixel_format format);
 enum decon_blending halBlendingToDpuBlending(int32_t blending);

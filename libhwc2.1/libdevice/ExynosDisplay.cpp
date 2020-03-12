@@ -293,7 +293,9 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mDeviceXres(0),
     mDeviceYres(0),
     mColorMode(HAL_COLOR_MODE_NATIVE),
-    mSkipFrame(false)
+    mSkipFrame(false),
+    mBrightnessFd(NULL),
+    mMaxBrightness(0)
 {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
@@ -1239,9 +1241,9 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
             if (layer.mBufferHasMetaParcel) {
                 uint32_t parcelFdIndex = getBufferNumOfFormat(layer.mMidImg.format);
                 if (parcelFdIndex > 0) {
-                    if (getBufferNumOfFormat(layer.mLayerBuffer->format) == 1)
+                    if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_2PRIVATE_DATA)
                         cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd1;
-                    else if (getBufferNumOfFormat(layer.mLayerBuffer->format) == 2)
+                    else if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_3PRIVATE_DATA)
                         cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd2;
                 }
             } else {
@@ -1261,8 +1263,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
              * and uses 0.0001nit unit for min luminance
              * Conversion is required
              */
-            luminanceMin = src_img.hdrStaticInfo.sType1.mMinDisplayLuminance;
-            luminanceMax = src_img.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
+            luminanceMin = src_img.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
+            luminanceMax = src_img.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
         } else {
             cfg.hdr_enable = true;
@@ -1294,8 +1296,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
                 if (parcelFdIndex > 0)
                     cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
             }
-            luminanceMin = src_img.hdrStaticInfo.sType1.mMinDisplayLuminance;
-            luminanceMax = src_img.hdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
+            luminanceMin = src_img.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
+            luminanceMax = src_img.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
         } else {
             cfg.hdr_enable = true;
@@ -1998,6 +2000,12 @@ int ExynosDisplay::setReleaseFences() {
             fence_close(mDpuData.configs[i].acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
         mDpuData.configs[i].acq_fence = -1;
     }
+    // DPU doesn't close rel_fence of readback buffer, HWC should close it
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+    }
 
     for (size_t i = 0; i < mLayers.size(); i++) {
         if ((mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT) ||
@@ -2565,7 +2573,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     if ((mLayers.size() == 0) &&
         (mDisplayId != HWC_DISPLAY_VIRTUAL)) {
-        clearDisplay();
+        clearDisplay(mDpuData.enable_readback);
         *outRetireFence = -1;
         mLastRetireFence = fence_close(mLastRetireFence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP);
@@ -2750,6 +2758,13 @@ not_validated:
     return HWC2_ERROR_NOT_VALIDATED;
 }
 
+int32_t ExynosDisplay::presentPostProcessing()
+{
+    setReadbackBufferInternal(NULL, -1);
+    mDpuData.enable_readback = false;
+    return NO_ERROR;
+}
+
 int32_t ExynosDisplay::setActiveConfig(
         hwc2_config_t config) {
     return mDisplayInterface->setActiveConfig(config);
@@ -2849,15 +2864,101 @@ int32_t ExynosDisplay::setColorMode(
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosDisplay::getRenderIntents(int32_t mode, uint32_t* outNumIntents,
+        int32_t* /*android_render_intent_v1_1_t*/ outIntents)
+{
+    ALOGI("%s:: mode(%d), outNum(%d), outIntents(%p)",
+            __func__, mode, *outNumIntents, outIntents);
+
+    return mDisplayInterface->getRenderIntents(mode, outNumIntents, outIntents);
+}
+
+int32_t ExynosDisplay::setColorModeWithRenderIntent(int32_t /*android_color_mode_t*/ mode,
+        int32_t /*android_render_intent_v1_1_t */ intent)
+{
+    ALOGI("%s:: mode(%d), intent(%d)", __func__, mode, intent);
+
+    return mDisplayInterface->setColorModeWithRenderIntent(mode, intent);
+}
+
+int32_t ExynosDisplay::getDisplayIdentificationData(uint8_t* outPort,
+        uint32_t* outDataSize, uint8_t* outData)
+{
+    return mDisplayInterface->getDisplayIdentificationData(outPort, outDataSize, outData);
+}
+
+int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
+        uint32_t* outCapabilities)
+{
+    /* If each display has their own capabilities,
+     * this should be described in display module codes */
+
+    uint32_t capabilityNum = 0;
+    if (mBrightnessFd != NULL)
+        capabilityNum++;
+
+#ifdef USES_DOZEMODE
+    capabilityNum++;
+#endif
+
+    if (outCapabilities == NULL) {
+        *outNumCapabilities = capabilityNum;
+        return HWC2_ERROR_NONE;
+    }
+    if (capabilityNum != *outNumCapabilities) {
+        ALOGE("%s:: invalid outNumCapabilities(%d), should be(%d)", __func__, *outNumCapabilities, capabilityNum);
+        return HWC2_ERROR_NONE;
+    }
+
+    uint32_t index = 0;
+    if (mBrightnessFd != NULL)
+        outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_BRIGHTNESS;
+
+#ifdef USES_DOZEMODE
+    outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_DOZE;
+#endif
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
+{
+    if (mBrightnessFd == NULL) {
+        *outSupport = false;
+    } else {
+        *outSupport = true;
+    }
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::setDisplayBrightness(float brightness)
+{
+    if (mBrightnessFd == NULL)
+        return HWC2_ERROR_UNSUPPORTED;
+
+    char val[4];
+    uint32_t scaledBrightness = brightness * mMaxBrightness;
+
+    sprintf(val, "%d", scaledBrightness);
+    uint32_t res = fwrite(val, 4, 1, mBrightnessFd);
+    if(res == 0){
+        ALOGE("brightness write failed.");
+    }
+    rewind(mBrightnessFd);
+
+    return HWC2_ERROR_NONE;
+}
+
 int32_t ExynosDisplay::setOutputBuffer(
         buffer_handle_t __unused buffer,
         int32_t __unused releaseFence) {
     return 0;
 }
 
-int ExynosDisplay::clearDisplay() {
+int ExynosDisplay::clearDisplay(bool readback) {
 
-    const int ret = mDisplayInterface->clearDisplay();
+    const int ret = mDisplayInterface->clearDisplay(readback);
     if (ret)
         DISPLAY_LOGE("fail to clear display");
 
@@ -3968,6 +4069,17 @@ void ExynosDisplay::closeFencesForSkipFrame(rendering_state renderingState)
         }
     }
 
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+    }
+    if (mDpuData.readback_info.acq_fence >= 0) {
+        mDpuData.readback_info.acq_fence =
+            fence_close(mDpuData.readback_info.acq_fence, this,
+                    FENCE_TYPE_READBACK_ACQUIRE, FENCE_IP_DPP);
+    }
+
     if (renderingState >= RENDERING_STATE_VALIDATED) {
         if (mDisplayControl.earlyStartMPP == true) {
             if (mExynosCompositionInfo.mHasCompositionLayer) {
@@ -4062,6 +4174,17 @@ void ExynosDisplay::closeFences()
     mDpuData.retire_fence = -1;
 
     mLastRetireFence = fence_close(mLastRetireFence, this,  FENCE_TYPE_RETIRE, FENCE_IP_DPP);
+
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+    }
+    if (mDpuData.readback_info.acq_fence >= 0) {
+        mDpuData.readback_info.acq_fence =
+            fence_close(mDpuData.readback_info.acq_fence, this,
+                    FENCE_TYPE_READBACK_ACQUIRE, FENCE_IP_DPP);
+    }
 }
 
 void ExynosDisplay::setHWCControl(uint32_t ctrl, int32_t val)
@@ -4154,6 +4277,101 @@ void ExynosDisplay::increaseMPPDstBufIndex() {
         (mExynosCompositionInfo.mM2mMPP != NULL)) {
         mExynosCompositionInfo.mM2mMPP->increaseDstBuffIndex();
     }
+}
+
+int32_t ExynosDisplay::getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
+        int32_t* /*android_dataspace_t*/ outDataspace)
+{
+    int32_t ret = mDisplayInterface->getReadbackBufferAttributes(outFormat, outDataspace);
+    if (ret == NO_ERROR) {
+        mDisplayControl.readbackSupport = true;
+        ALOGI("readback info: format(0x%8x), dataspace(0x%8x)", *outFormat, *outDataspace);
+    } else {
+        mDisplayControl.readbackSupport = false;
+        ALOGI("readback is not supported, ret(%d)", ret);
+        ret = HWC2_ERROR_UNSUPPORTED;
+    }
+    return ret;
+}
+
+int32_t ExynosDisplay::setReadbackBuffer(buffer_handle_t buffer, int32_t releaseFence)
+{
+    int32_t ret = NO_ERROR;
+
+    if (buffer == nullptr)
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    if (mDisplayControl.readbackSupport) {
+        mDpuData.enable_readback = true;
+    } else {
+        DISPLAY_LOGE("readback is not supported but setReadbackBuffer is called, buffer(%p), releaseFence(%d)",
+                buffer, releaseFence);
+        if (releaseFence >= 0)
+            releaseFence = fence_close(releaseFence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+        mDpuData.enable_readback = false;
+        ret = HWC2_ERROR_UNSUPPORTED;
+    }
+    setReadbackBufferInternal(buffer, releaseFence);
+    return ret;
+}
+
+void ExynosDisplay::setReadbackBufferInternal(buffer_handle_t buffer, int32_t releaseFence)
+{
+    if (mDpuData.readback_info.rel_fence >= 0) {
+        mDpuData.readback_info.rel_fence =
+            fence_close(mDpuData.readback_info.rel_fence, this,
+                    FENCE_TYPE_READBACK_RELEASE, FENCE_IP_FB);
+        DISPLAY_LOGE("previous readback release fence is not delivered to display device");
+    }
+    if (releaseFence >= 0) {
+        setFenceInfo(releaseFence, this, FENCE_TYPE_READBACK_RELEASE,
+                FENCE_IP_FB, FENCE_FROM);
+    }
+    mDpuData.readback_info.rel_fence = releaseFence;
+
+    private_handle_t *handle = NULL;
+    if (buffer != NULL)
+        handle = private_handle_t::dynamicCast(buffer);
+    mDpuData.readback_info.handle = handle;
+}
+
+int32_t ExynosDisplay::getReadbackBufferFence(int32_t* outFence)
+{
+    /*
+     * acq_fence was not set or
+     * it was already closed by error or frame skip
+     */
+    if (mDpuData.readback_info.acq_fence < 0) {
+        *outFence = -1;
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    *outFence = mDpuData.readback_info.acq_fence;
+    /* Fence will be closed by caller of this function */
+    mDpuData.readback_info.acq_fence = -1;
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplay::setReadbackBufferAcqFence(int32_t acqFence) {
+    if (mDpuData.readback_info.acq_fence >= 0) {
+        mDpuData.readback_info.acq_fence =
+            fence_close(mDpuData.readback_info.acq_fence, this,
+                    FENCE_TYPE_READBACK_ACQUIRE, FENCE_IP_DPP);
+        DISPLAY_LOGE("previous readback out fence is not delivered to framework");
+    }
+    mDpuData.readback_info.acq_fence = acqFence;
+    if (acqFence >= 0) {
+        /*
+         * Requtester of readback will get acqFence after presentDisplay
+         * so validateFences should not check this fence
+         * in presentDisplay so this function sets pendingAllowed parameter.
+         */
+        setFenceInfo(acqFence, this, FENCE_TYPE_READBACK_ACQUIRE,
+                FENCE_IP_DPP, FENCE_FROM, true);
+    }
+
+    return NO_ERROR;
 }
 
 void ExynosDisplay::initDisplayInterface(uint32_t __unused interfaceType)

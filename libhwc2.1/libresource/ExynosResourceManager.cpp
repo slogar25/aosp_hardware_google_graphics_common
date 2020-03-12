@@ -1154,7 +1154,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     dst_img.dataSpace = src_img.dataSpace;
 
     /* Copy origin source HDR metadata */
-    dst_img.hdrStaticInfo = src_img.hdrStaticInfo;
+    dst_img.metaParcel = src_img.metaParcel;
     dst_img.needDegamma = false; //Dst side need not degamma
 
     uint32_t dstW = dst_img.w;
@@ -2325,7 +2325,7 @@ void ExynosResourceManager::updateRestrictions() {
             mSizeRestrictionCnt[i] = restriction_tables[i].table_element_size;
             for (uint32_t j = 0; j < mSizeRestrictionCnt[i]; j++) {
                 memcpy(&mSizeRestrictions[i][j], &restriction_tables[i].table[j],
-                        sizeof(restriction_size_element_t));
+                        sizeof(mSizeRestrictions[i][j]));
             }
         }
     }
@@ -2346,4 +2346,20 @@ void ExynosResourceManager::updateRestrictions() {
 uint32_t ExynosResourceManager::getFeatureTableSize() const
 {
     return sizeof(feature_table)/sizeof(feature_support_t);
+}
+
+bool ExynosResourceManager::hasHDR10PlusMPP() {
+
+    for (uint32_t i = 0; i < mOtfMPPs.size(); i++) {
+        if (mOtfMPPs[i] == NULL) continue;
+        if (mOtfMPPs[i]->mAttr & MPP_ATTR_HDR10PLUS)
+            return true;
+    }
+    for (uint32_t i = 0; i < mM2mMPPs.size(); i++) {
+        if (mM2mMPPs[i] == NULL) continue;
+        if (mM2mMPPs[i]->mAttr & MPP_ATTR_HDR10PLUS)
+            return true;
+    }
+
+    return false;
 }

@@ -808,6 +808,35 @@ public:
     void setMasterDisplayLuminance(uint16_t min, uint16_t max);
 
     /*
+     * Configure an opaque data associated to a layer
+     * @data: pointer to data associated to this layer
+     * @data_len: number of effective bytes pointed by @data
+     *
+     * The configured data is opaque to libacryl. It should be handled by the
+     * implementations. How to specify and how to understand the data is just
+     * contract between the user of a specific implementation and the implemtation.
+     * The configured data is effective until the data is cleared by invoking
+     * clearLayerData().
+     * The second argument @data_lan can be used for checking the contract. The
+     * implementation and the users should decide the data structure delivered by
+     * setLayerData(). If the data structure has fixed length, the implementation
+     * can determine if the delivered data is correctly configured with comparing
+     * @data_len and the expected size.
+     */
+    void setLayerData(void *data, size_t data_len) {
+        mLayerData = data;
+        mLayerDataLen = data_len;
+    }
+
+    /*
+     * Clears the configured layer data.
+     */
+    void clearLayerData() {
+        mLayerData = nullptr;
+        mLayerDataLen = 0;
+    }
+
+    /*
      * MEMBER FUNCTIONS FOR THE IMPLEMENTATIONS of Acrylic
      */
     /*
@@ -866,10 +895,17 @@ public:
      * Retrieve the transit data from the instance.
      */
     void *getTransit() { return mTransitData; }
+    /*
+     * Retrieve the layer opaque data.
+     */
+    void *getLayerData() { return mLayerData; }
+    size_t getLayerDataLength() { return mLayerDataLen; }
 private:
     AcrylicLayer(Acrylic *compositor);
 
     void *mTransitData;
+    void *mLayerData;
+    size_t mLayerDataLen;
     hw2d_rect_t mImageRect;
     hw2d_rect_t mTargetRect;
     uint32_t mBlendingMode;

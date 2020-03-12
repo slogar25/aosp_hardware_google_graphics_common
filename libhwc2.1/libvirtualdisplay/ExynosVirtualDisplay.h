@@ -72,7 +72,7 @@ public:
             buffer_handle_t buffer,
             int32_t releaseFence);
 
-    virtual int clearDisplay();
+    virtual int clearDisplay(bool readback = false);
 
     /* validateDisplay(..., outNumTypes, outNumRequests)
      * Descriptor: HWC2_FUNCTION_VALIDATE_DISPLAY
