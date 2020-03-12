@@ -33,6 +33,10 @@
 #include <cutils/properties.h>
 #include <log/log.h>
 
+#ifndef DRM_CLIENT_CAP_WRITEBACK_CONNECTORS
+#define DRM_CLIENT_CAP_WRITEBACK_CONNECTORS 5
+#endif
+
 namespace android {
 
 DrmDevice::DrmDevice() : event_listener_(this) {

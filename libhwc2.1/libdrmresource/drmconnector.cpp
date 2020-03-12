@@ -25,6 +25,10 @@
 #include <log/log.h>
 #include <xf86drmMode.h>
 
+#ifndef DRM_MODE_CONNECTOR_WRITEBACK
+#define DRM_MODE_CONNECTOR_WRITEBACK 18
+#endif
+
 namespace android {
 
 DrmConnector::DrmConnector(DrmDevice *drm, drmModeConnectorPtr c,
