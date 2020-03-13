@@ -1186,7 +1186,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     cfg.blending = blending;
     cfg.assignedMPP = otfMPP;
 
-    if (layer.isDimLayer() && handle == NULL) {
+    if (layer.isDimLayer()) {
         cfg.state = cfg.WIN_STATE_COLOR;
         hwc_color_t color = layer.mColor;
         cfg.color = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
