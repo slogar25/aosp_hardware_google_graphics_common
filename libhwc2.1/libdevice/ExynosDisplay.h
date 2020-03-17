@@ -45,6 +45,8 @@
 #define SET_HDR_CAPABILITIES_NUM 0
 #endif
 
+#define MAX_BRIGHTNESS_LEN 5
+
 typedef hwc2_composition_t exynos_composition;
 
 class ExynosLayer;
@@ -431,7 +433,7 @@ class ExynosDisplay {
         bool mSkipFrame;
 
         FILE *mBrightnessFd;
-        unsigned int mMaxBrightness;
+        uint32_t mMaxBrightness;
 
         void initDisplay();
 

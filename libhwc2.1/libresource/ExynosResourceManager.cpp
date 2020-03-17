@@ -1095,7 +1095,7 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
     if (display->mColorTransformHint != HAL_COLOR_TRANSFORM_IDENTITY)
         return eUnSupportedColorTransform;
 #else
-    if ((display->mColorTransformHint == HAL_COLOR_TRANSFORM_ERROR) &&
+    if ((display->mColorTransformHint < 0) &&
         (layer->mOverlayPriority < ePriorityHigh))
         return eUnSupportedColorTransform;
 #endif
@@ -2226,14 +2226,19 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
     cap = &arc->getCapabilities();
 
     /* format restriction */
+    std::unordered_set<int32_t> supportedHalFormats;
     for (uint32_t i = 0; i < FORMAT_MAX_CNT; i++) {
         if (cap->isFormatSupported(exynos_format_desc[i].halFormat)) {
+            /* Not add same hal pixel format */
+            if (supportedHalFormats.count(exynos_format_desc[i].halFormat))
+                continue;
             restriction_key_t queried_format;
             queried_format.hwType = type;
             queried_format.nodeType = NODE_NONE;
             queried_format.format = exynos_format_desc[i].halFormat;
             queried_format.reserved = 0;
             makeFormatRestrictions(queried_format);
+            supportedHalFormats.insert(exynos_format_desc[i].halFormat);
         }
     }
 

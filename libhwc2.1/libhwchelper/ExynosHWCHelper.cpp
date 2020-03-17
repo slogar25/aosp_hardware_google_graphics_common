@@ -292,38 +292,33 @@ uint32_t DpuFormatToHalFormat(int format)
     return HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED;
 }
 
-int halFormatToDrmFormat(int format, bool compressed)
+int halFormatToDrmFormat(int format, uint32_t compressType)
 {
-    if (compressed && (format == HAL_PIXEL_FORMAT_RGB_565))
-        return DRM_FORMAT_RGB565;
-
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if (exynos_format_desc[i].halFormat == format)
-            return exynos_format_desc[i].drmFormat;
+        if ((exynos_format_desc[i].halFormat == format) &&
+            (exynos_format_desc[i].getCompression() == compressType)) {
+                return exynos_format_desc[i].drmFormat;
+        }
     }
     return DRM_FORMAT_UNDEFINED;
 }
 
-uint32_t drmFormatToHalFormats(int format, uint32_t *numFormat,
-        uint32_t halFormats[MAX_SAME_HAL_PIXEL_FORMAT])
+int32_t drmFormatToHalFormats(int format, std::vector<uint32_t> *halFormats)
 {
-    *numFormat = 0;
+    if (halFormats == NULL)
+        return -EINVAL;
+
+    halFormats->clear();
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].drmFormat == format) {
-            halFormats[*numFormat] = exynos_format_desc[i].halFormat;
-            *numFormat = *numFormat + 1;
+            halFormats->push_back(exynos_format_desc[i].halFormat);
         }
-        if (*numFormat >= MAX_SAME_HAL_PIXEL_FORMAT)
-            break;
     }
-    return *numFormat;
+    return NO_ERROR;
 }
 
 int drmFormatToHalFormat(int format)
 {
-    if (format == DRM_FORMAT_RGB565)
-        return HAL_PIXEL_FORMAT_RGB_565;
-
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].drmFormat == format)
             return exynos_format_desc[i].halFormat;

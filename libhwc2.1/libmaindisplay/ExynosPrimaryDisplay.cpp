@@ -58,23 +58,27 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice 
     ALOGI("Trying %s open for get max brightness", MAX_BRIGHTNESS_NODE_BASE);
 
     if (maxBrightnessFd != NULL) {
+        char val[MAX_BRIGHTNESS_LEN] = {0};
+        size_t size = fread(val, 1, MAX_BRIGHTNESS_LEN, maxBrightnessFd);
+        if (size) {
+            mMaxBrightness = atoi(val);
+            ALOGI("Max brightness : %d", mMaxBrightness);
 
-        char val[4];
-        size_t size;
-        size = fread(&val, 4, 1, maxBrightnessFd);
-        mMaxBrightness = atoi(val);
-        ALOGI("Max brightness : %d", mMaxBrightness);
+            mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "w+");
+            ALOGI("Trying %s open for brightness control", BRIGHTNESS_NODE_BASE);
 
+            if (mBrightnessFd == NULL)
+                ALOGE("%s open failed! %s", BRIGHTNESS_NODE_BASE, strerror(errno));
+        } else {
+            ALOGE("Max brightness read failed (size: %zu)", size);
+            if (ferror(maxBrightnessFd)) {
+                ALOGE("An error occurred");
+                clearerr(maxBrightnessFd);
+            }
+        }
         fclose(maxBrightnessFd);
-
-        mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "w+");
-        ALOGI("Trying %s open for brightness control", BRIGHTNESS_NODE_BASE);
-
-        if (mBrightnessFd == NULL)
-            ALOGI("%s open failed! %s", BRIGHTNESS_NODE_BASE, strerror(errno));
-
     } else {
-        ALOGI("Brightness node is not opened");
+        ALOGE("Brightness node is not opened");
     }
 #endif
 
