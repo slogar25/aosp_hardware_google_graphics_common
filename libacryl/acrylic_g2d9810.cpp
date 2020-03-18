@@ -1113,8 +1113,10 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
     mTask.release_fence = reinterpret_cast<int *>(alloca(sizeof(int) * num_fences));
 
     mTask.commands.num_extra_regs = cscMatrixWriter.getRegisterCount() +
-                                    mHdrWriter.getCommandCount() +
-                                    getFilterCoefficientCount(mTask.commands.source, layercount);
+                                    mHdrWriter.getCommandCount();
+    if (mUsePolyPhaseFilter)
+        mTask.commands.num_extra_regs += getFilterCoefficientCount(mTask.commands.source, layercount);
+
     mTask.commands.extra = reinterpret_cast<g2d_reg *>(alloca(sizeof(g2d_reg) * mTask.commands.num_extra_regs));
 
     g2d_reg *regs = mTask.commands.extra;
