@@ -252,6 +252,11 @@ typedef struct g2d_ppc_list_for_scaling {
     float ppcList[PPC_SCALE_MAX];
 } g2d_ppc_list_for_scaling_t;
 
+typedef struct dstMetaInfo {
+    uint16_t minLuminance = 0;
+    uint16_t maxLuminance = 0;
+} dstMetaInfo_t;
+
 enum
 {
     NODE_NONE,
@@ -652,6 +657,7 @@ public:
 
     virtual bool checkRotationCondition(struct exynos_image &src);
     void updateAttr();
+    dstMetaInfo getDstMetaInfo(android_dataspace_t dstDataspace);
 
 protected:
     uint32_t getBufferType(uint64_t usage);
