@@ -607,35 +607,11 @@ uint32_t getBufferNumOfFormat(int format)
 
 uint32_t getPlaneNumOfFormat(int format)
 {
-    if (isFormatRgb(format))
-        return 1;
-    switch (format) {
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_TILED:
-        case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M:
-        case HAL_PIXEL_FORMAT_YCBCR_P010:
-        case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP:
-        case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B:
-            return 2;
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M:
-        case HAL_PIXEL_FORMAT_EXYNOS_YV12_M:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN:
-        case HAL_PIXEL_FORMAT_YV12:
-            return 3;
-        /* Not supported format */
-        default:
-            return 0;
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].halFormat == format)
+            return exynos_format_desc[i].planeNum;
     }
+    return 0;
 }
 
 void setFenceName(int fenceFd, hwc_fence_type fenceType)
