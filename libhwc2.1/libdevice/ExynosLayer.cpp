@@ -228,11 +228,12 @@ int32_t ExynosLayer::doPreProcess()
     exynos_image dst_img;
     setSrcExynosImage(&src_img);
     setDstExynosImage(&dst_img);
-    ExynosMPP *exynosMPPVG = ExynosResourceManager::getExynosMPP(MPP_LOGICAL_DPP_VG);
-    if (exynosMPPVG == NULL) {
-        exynosMPPVG = ExynosResourceManager::getExynosMPP(MPP_LOGICAL_DPP_VGS);
-        if (exynosMPPVG == NULL)
-            exynosMPPVG = ExynosResourceManager::getExynosMPP(MPP_LOGICAL_DPP_VGFS);
+    ExynosMPP *exynosMPPVG = nullptr;
+    if (isFormatYUV(mLayerBuffer->format)) {
+        auto otfMPPs = ExynosResourceManager::getOtfMPPs();
+        auto mpp_it = std::find_if(otfMPPs.begin(), otfMPPs.end(),
+                [&src_img](auto m) { return m->isSrcFormatSupported(src_img); });
+        exynosMPPVG = mpp_it == otfMPPs.end() ? nullptr : *mpp_it;
     }
 
     /* Set HDR Flag */
