@@ -167,6 +167,8 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
         ALOGE("drmDevice is NULL");
         return;
     }
+    mReadbackInfo.init(mDrmDevice, mExynosDisplay->mDisplayId);
+
     if ((mDrmCrtc = mDrmDevice->GetCrtcForDisplay(mExynosDisplay->mDisplayId)) == NULL) {
         ALOGE("%s:: GetCrtcForDisplay is NULL", mExynosDisplay->mDisplayName.string());
         return;
@@ -828,6 +830,14 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
     android::String8 result;
 
+    if (mExynosDisplay->mDpuData.enable_readback) {
+        if ((ret = setupWritebackCommit(drmReq)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s:: Failed to setup writeback commit ret(%d)",
+                    __func__, ret);
+            return ret;
+        }
+    }
+
     if (mDrmCrtc->partial_x_property().id() &&
         mDrmCrtc->partial_y_property().id() &&
         mDrmCrtc->partial_w_property().id() &&
@@ -909,7 +919,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
-    if ((ret = drmReq.commit(0, true)) < 0) {
+    uint32_t flags = 0;
+    if (mExynosDisplay->mDpuData.enable_readback)
+        flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+    if ((ret = drmReq.commit(flags, true)) < 0) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in deliverWinConfigData()\n",
                 __func__, ret);
         return ret;
@@ -939,6 +952,16 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool __unused readback)
 {
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);
+#if 0
+    /* TODO (b/151848411): Check whether clearing writeback buffer is required */
+    if (readback) {
+        if ((ret = setupWritebackCommit(drmReq)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s:: Failed to setup writeback commit ret(%d)",
+                    __func__, ret);
+            return ret;
+        }
+    }
+#endif
 
     /* Disable all planes */
     for (auto &plane : mDrmDevice->planes()) {
@@ -1173,6 +1196,12 @@ void ExynosDisplayDrmInterface::DrmModeAtomicReq::moveTrackedFbs(std::vector<uin
     mFbIds.clear();
 }
 
+void ExynosDisplayDrmInterface::DrmModeAtomicReq::moveTrackedLastFb(uint32_t &fb)
+{
+    fb = mFbIds.back();
+    mFbIds.pop_back();
+}
+
 int ExynosDisplayDrmInterface::DrmModeAtomicReq::addFB2WithModifiers(
         uint32_t width, uint32_t height,
         uint32_t pixel_format, const uint32_t bo_handles[4],
@@ -1212,4 +1241,134 @@ std::tuple<uint64_t, int> ExynosDisplayDrmInterface::halToDrmEnum(
                 __func__, halData);
         return std::make_tuple(0, -EINVAL);
     }
+}
+
+int32_t ExynosDisplayDrmInterface::getReadbackBufferAttributes(
+        int32_t* /*android_pixel_format_t*/ outFormat,
+        int32_t* /*android_dataspace_t*/ outDataspace)
+{
+    DrmConnector *writeback_conn = mReadbackInfo.getWritebackConnector();
+    if (writeback_conn == NULL) {
+        ALOGE("%s: There is no writeback connection", __func__);
+        return -EINVAL;
+    }
+    /* TODO (b/149043754): color mode should be set */
+    mReadbackInfo.pickFormatDataspace(HAL_COLOR_MODE_NATIVE);
+
+    if ((mReadbackInfo.mReadbackFormat == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) ||
+        (mReadbackInfo.mReadbackDataspace == HAL_DATASPACE_UNKNOWN)) {
+        ALOGE("readback format(%d) or dataspace(0x%8x) is not valid",
+                mReadbackInfo.mReadbackFormat,
+                mReadbackInfo.mReadbackDataspace);
+        return -EINVAL;
+    }
+    *outFormat = mReadbackInfo.mReadbackFormat;
+    *outDataspace = mReadbackInfo.mReadbackDataspace;
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplayDrmInterface::setupWritebackCommit(DrmModeAtomicReq &drmReq)
+{
+    int ret = NO_ERROR;
+    DrmConnector *writeback_conn = mReadbackInfo.getWritebackConnector();
+    if (writeback_conn == NULL) {
+        ALOGE("%s: There is no writeback connection", __func__);
+        return -EINVAL;
+    }
+    if (writeback_conn->writeback_fb_id().id() == 0 ||
+        writeback_conn->writeback_out_fence().id() == 0) {
+        ALOGE("%s: Writeback properties don't exit", __func__);
+        return -EINVAL;
+    }
+
+    uint32_t writeback_fb_id = 0;
+    exynos_win_config_data writeback_config;
+    writeback_config.state = exynos_win_config_data::WIN_STATE_BUFFER;
+    writeback_config.format = mReadbackInfo.mReadbackFormat;
+    writeback_config.src = {0, 0, mExynosDisplay->mXres, mExynosDisplay->mYres,
+        mExynosDisplay->mXres, mExynosDisplay->mYres};
+    writeback_config.dst = {0, 0, mExynosDisplay->mXres, mExynosDisplay->mYres,
+        mExynosDisplay->mXres, mExynosDisplay->mYres};
+    writeback_config.fd_idma[0] = mExynosDisplay->mDpuData.readback_info.handle->fd;
+    writeback_config.fd_idma[1] = mExynosDisplay->mDpuData.readback_info.handle->fd1;
+    writeback_config.fd_idma[2] = mExynosDisplay->mDpuData.readback_info.handle->fd2;
+    if ((ret = addFBFromDisplayConfig(drmReq, writeback_config, writeback_fb_id)) < 0) {
+        ALOGE("%s: addFBFromDisplayConfig() fail ret(%d)",__func__, ret);
+        return ret;
+    }
+
+    if ((ret = drmReq.atomicAddProperty(writeback_conn->id(),
+            writeback_conn->writeback_fb_id(),
+            writeback_fb_id)) < 0)
+        return ret;
+
+    if ((ret = drmReq.atomicAddProperty(writeback_conn->id(),
+            writeback_conn->writeback_out_fence(),
+            (uint64_t)& mExynosDisplay->mDpuData.readback_info.acq_fence)) < 0)
+        return ret;
+
+    if ((ret = drmReq.atomicAddProperty(writeback_conn->id(),
+            writeback_conn->crtc_id_property(),
+            mDrmCrtc->id())) < 0)
+        return ret;
+
+    uint32_t fb = 0;
+    drmReq.moveTrackedLastFb(fb);
+    /* writeback_fb_id and fb should be same */
+    mReadbackInfo.setFbId(fb);
+    return NO_ERROR;
+}
+
+void ExynosDisplayDrmInterface::DrmReadbackInfo::init(DrmDevice *drmDevice, uint32_t displayId)
+{
+    mDrmDevice = drmDevice;
+    mWritebackConnector = mDrmDevice->AvailableWritebackConnector(displayId);
+    if (mWritebackConnector == NULL) {
+        ALOGI("writeback is not supported");
+        return;
+    }
+    if (mWritebackConnector->writeback_fb_id().id() == 0 ||
+        mWritebackConnector->writeback_out_fence().id() == 0) {
+        ALOGE("%s: Writeback properties don't exit", __func__);
+        mWritebackConnector = NULL;
+        return;
+    }
+
+    if (mWritebackConnector->writeback_pixel_formats().id()) {
+        int32_t ret = NO_ERROR;
+        uint64_t blobId;
+        std::tie(ret, blobId) = mWritebackConnector->writeback_pixel_formats().value();
+        if (ret) {
+            ALOGE("Fail to get blob id for writeback_pixel_formats");
+            return;
+        }
+        drmModePropertyBlobPtr blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
+        if (!blob) {
+            ALOGE("Fail to get blob for writeback_pixel_formats(%" PRId64 ")", blobId);
+            return;
+        }
+        uint32_t formatNum = (blob->length)/sizeof(uint32_t);
+        uint32_t *formats = (uint32_t *)blob->data;
+        for (uint32_t i = 0; i < formatNum; i++) {
+            int halFormat = drmFormatToHalFormat(formats[i]);
+            ALOGD("supported writeback format[%d] %4.4s, %d", i, (char *)&formats[i], halFormat);
+            if (halFormat != HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED)
+                mSupportedFormats.push_back(halFormat);
+        }
+        drmModeFreePropertyBlob(blob);
+    }
+
+    /* TODO (b/149043754):
+     * Get dataspace form display driver
+     */
+    mSupportedDataspaces.push_back(HAL_DATASPACE_V0_SRGB);
+}
+
+void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace(int32_t colorMode)
+{
+    /* TODO (b/149043754): This should be set according to color mode */
+    if (!mSupportedFormats.empty())
+        mReadbackFormat = mSupportedFormats[0];
+    if (!mSupportedDataspaces.empty())
+        mReadbackDataspace = mSupportedDataspaces[0];
 }
