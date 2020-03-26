@@ -326,7 +326,9 @@ int halFormatToDrmFormat(int format, uint32_t compressType)
         const uint32_t compType = exynos_format_desc[i].getCompression();
 
         if ((halFormat == format) &&
-            ((compType == COMP_ANY) || (compType == compressType))) {
+            ((compType == COMP_ANY) ||
+             (compressType == COMP_ANY) ||
+             (compType == compressType))) {
                 return exynos_format_desc[i].drmFormat;
         }
     }
