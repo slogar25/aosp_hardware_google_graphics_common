@@ -664,6 +664,26 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
         return 2 * __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8);
     case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP:
         return __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8);
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L75:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L50:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L75:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC:
+        return SBWC_8B_Y_SIZE(width, height) +
+            SBWC_8B_Y_HEADER_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L60:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L40:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L60:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L80:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC:
+        return SBWC_10B_Y_SIZE(width, height) +
+            SBWC_10B_Y_HEADER_SIZE(width, height);
     }
 
     return NV12M_Y_SIZE(width, height) + ((width % 128) == 0 ? 0 : 256);
@@ -692,6 +712,26 @@ uint32_t getExynosBufferCbCrLength(uint32_t width, uint32_t height, int format)
         return __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8);
     case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP:
         return __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8) / 2;
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L75:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L50:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L75:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_SBWC:
+        return SBWC_8B_CBCR_SIZE(width, height) +
+            SBWC_8B_CBCR_HEADER_SIZE(width, height);
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L60:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L40:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L60:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L80:
+    case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC:
+        return SBWC_10B_CBCR_SIZE(width, height) +
+            SBWC_10B_CBCR_HEADER_SIZE(width, height);
     }
 
     return NV12M_CBCR_SIZE(width, height);
