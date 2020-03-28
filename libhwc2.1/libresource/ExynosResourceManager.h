@@ -136,7 +136,7 @@ class ExynosResourceManager {
         mpp_phycal_type_t getPhysicalType(int ch) const;
         ExynosMPP* getOtfMPPWithChannel(int ch);
         uint32_t getFeatureTableSize() const;
-        const ExynosMPPVector& getOtfMPPs() { return mOtfMPPs; };
+        const static ExynosMPPVector& getOtfMPPs() { return mOtfMPPs; };
         virtual bool hasHDR10PlusMPP();
 
     private:

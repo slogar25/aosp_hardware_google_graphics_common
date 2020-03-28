@@ -139,14 +139,16 @@ void ExynosCompositionInfo::initializeInfos(ExynosDisplay *display)
     mHasCompositionLayer = false;
     mFirstIndex = -1;
     mLastIndex = -1;
-    mTargetBuffer = NULL;
-    mDataSpace = HAL_DATASPACE_UNKNOWN;
-    if (mAcquireFence >= 0) {
-        ALOGD("ExynosCompositionInfo(%d):: mAcquire is not initialized(%d)", mType, mAcquireFence);
-        if (display != NULL)
-            fence_close(mAcquireFence, display, FENCE_TYPE_UNDEFINED, FENCE_IP_UNDEFINED);
+    if (mType != COMPOSITION_CLIENT) {
+        mTargetBuffer = NULL;
+        mDataSpace = HAL_DATASPACE_UNKNOWN;
+        if (mAcquireFence >= 0) {
+            ALOGD("ExynosCompositionInfo(%d):: mAcquire is not initialized(%d)", mType, mAcquireFence);
+            if (display != NULL)
+                fence_close(mAcquireFence, display, FENCE_TYPE_UNDEFINED, FENCE_IP_UNDEFINED);
+        }
+        mAcquireFence = -1;
     }
-    mAcquireFence = -1;
     if (mReleaseFence >= 0) {
         ALOGD("ExynosCompositionInfo(%d):: mReleaseFence is not initialized(%d)", mType, mReleaseFence);
         if (display!= NULL)
@@ -1186,7 +1188,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     cfg.blending = blending;
     cfg.assignedMPP = otfMPP;
 
-    if (layer.isDimLayer() && handle == NULL) {
+    if (layer.isDimLayer()) {
         cfg.state = cfg.WIN_STATE_COLOR;
         hwc_color_t color = layer.mColor;
         cfg.color = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
@@ -2777,52 +2779,47 @@ int32_t ExynosDisplay::setClientTarget(
     if (target != NULL)
         handle = private_handle_t::dynamicCast(target);
 
-    if (mClientCompositionInfo.mHasCompositionLayer == false) {
-        if (acquireFence >= 0)
-            fence_close(acquireFence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB);
-    } else {
 #ifdef DISABLE_FENCE
-        if (acquireFence >= 0)
-            fence_close(acquireFence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB);
-        acquireFence = -1;
+    if (acquireFence >= 0)
+        fence_close(acquireFence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB);
+    acquireFence = -1;
 #endif
-        acquireFence = hwcCheckFenceDebug(this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB, acquireFence);
-        if (handle == NULL) {
-            DISPLAY_LOGD(eDebugOverlaySupported, "ClientTarget is NULL, skipStaic (%d)",
-                    mClientCompositionInfo.mSkipFlag);
-            if (mClientCompositionInfo.mSkipFlag == false) {
-                DISPLAY_LOGE("ClientTarget is NULL");
-                DISPLAY_LOGE("\t%s:: mRenderingState(%d)",__func__, mRenderingState);
-            }
-        } else {
-            DISPLAY_LOGD(eDebugOverlaySupported, "ClientTarget handle: %p [fd: %d, %d, %d]",
-                    handle, handle->fd, handle->fd1, handle->fd2);
-            if ((mClientCompositionInfo.mSkipFlag == true) &&
+    acquireFence = hwcCheckFenceDebug(this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB, acquireFence);
+    if (handle == NULL) {
+        DISPLAY_LOGD(eDebugOverlaySupported, "ClientTarget is NULL, skipStaic (%d)",
+                mClientCompositionInfo.mSkipFlag);
+        if (mClientCompositionInfo.mSkipFlag == false) {
+            DISPLAY_LOGE("ClientTarget is NULL");
+            DISPLAY_LOGE("\t%s:: mRenderingState(%d)",__func__, mRenderingState);
+        }
+    } else {
+        DISPLAY_LOGD(eDebugOverlaySupported, "ClientTarget handle: %p [fd: %d, %d, %d]",
+                handle, handle->fd, handle->fd1, handle->fd2);
+        if ((mClientCompositionInfo.mSkipFlag == true) &&
                 ((mClientCompositionInfo.mLastWinConfigData.fd_idma[0] != handle->fd) ||
                  (mClientCompositionInfo.mLastWinConfigData.fd_idma[1] != handle->fd1) ||
                  (mClientCompositionInfo.mLastWinConfigData.fd_idma[2] != handle->fd2))) {
-                String8 errString;
-                DISPLAY_LOGE("skip flag is enabled but buffer is updated lastConfig[%d, %d, %d], handle[%d, %d, %d]\n",
-                        mClientCompositionInfo.mLastWinConfigData.fd_idma[0],
-                        mClientCompositionInfo.mLastWinConfigData.fd_idma[1],
-                        mClientCompositionInfo.mLastWinConfigData.fd_idma[2],
-                        handle->fd, handle->fd1, handle->fd2);
-                DISPLAY_LOGE("last win config");
-                for (size_t i = 0; i < mLastDpuData.configs.size(); i++) {
-                    errString.appendFormat("config[%zu]\n", i);
-                    dumpConfig(errString, mLastDpuData.configs[i]);
-                    DISPLAY_LOGE("\t%s", errString.string());
-                    errString.clear();
-                }
-                errString.appendFormat("%s:: skip flag is enabled but buffer is updated\n",
-                        __func__);
-                printDebugInfos(errString);
+            String8 errString;
+            DISPLAY_LOGE("skip flag is enabled but buffer is updated lastConfig[%d, %d, %d], handle[%d, %d, %d]\n",
+                    mClientCompositionInfo.mLastWinConfigData.fd_idma[0],
+                    mClientCompositionInfo.mLastWinConfigData.fd_idma[1],
+                    mClientCompositionInfo.mLastWinConfigData.fd_idma[2],
+                    handle->fd, handle->fd1, handle->fd2);
+            DISPLAY_LOGE("last win config");
+            for (size_t i = 0; i < mLastDpuData.configs.size(); i++) {
+                errString.appendFormat("config[%zu]\n", i);
+                dumpConfig(errString, mLastDpuData.configs[i]);
+                DISPLAY_LOGE("\t%s", errString.string());
+                errString.clear();
             }
+            errString.appendFormat("%s:: skip flag is enabled but buffer is updated\n",
+                    __func__);
+            printDebugInfos(errString);
         }
-        mClientCompositionInfo.setTargetBuffer(this, handle, acquireFence, (android_dataspace)dataspace);
-        setFenceInfo(acquireFence, this,
-                FENCE_TYPE_SRC_RELEASE, FENCE_IP_FB, FENCE_FROM);
     }
+    mClientCompositionInfo.setTargetBuffer(this, handle, acquireFence, (android_dataspace)dataspace);
+    setFenceInfo(acquireFence, this,
+            FENCE_TYPE_SRC_RELEASE, FENCE_IP_FB, FENCE_FROM);
 
     return 0;
 }
