@@ -1,3 +1,7 @@
+# ***************************************************************
+# Vendor libs in hardware/google/graphics refer to this make file
+# ***************************************************************
+
 #for Build Split
 ifeq ($(BOARD_USES_VENDORIMAGE), true)
 LOCAL_PROPRIETARY_MODULE := true
