@@ -1633,6 +1633,7 @@ int32_t ExynosMPP::doPostProcessing(struct exynos_image &src, struct exynos_imag
                 allocFormat = DEFAULT_MPP_DST_FORMAT;
 
             if ((allocFormat == HAL_PIXEL_FORMAT_RGBA_1010102) ||
+                (allocFormat == HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B) ||
                 (allocFormat == HAL_PIXEL_FORMAT_YCBCR_P010))
                 allocFormat = DEFAULT_MPP_DST_FORMAT;
 
