@@ -34,5 +34,5 @@ LOCAL_PRELINK_MODULE := false
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_CFLAGS += -Wno-unused-parameter -Wno-unused-function
 
-include $(TOP)/hardware/samsung_slsi/exynos/BoardConfigCFlags.mk
+include $(TOP)/hardware/google/graphics/common/BoardConfigCFlags.mk
 include $(BUILD_SHARED_LIBRARY)
