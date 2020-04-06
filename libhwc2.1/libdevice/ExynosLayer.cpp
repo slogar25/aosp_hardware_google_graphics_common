@@ -190,8 +190,8 @@ int32_t ExynosLayer::doPreProcess()
                     if ((metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) ||
                             (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC)) {
                         if (allocMetaParcel() == NO_ERROR) {
-                            *mMetaParcel = *metaData;
                             if (metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) {
+                                mMetaParcel->sHdrStaticInfo = metaData->sHdrStaticInfo;
                                 HDEBUGLOGD(eDebugLayer, "HWC2: Static metadata min(%d), max(%d)",
                                         mMetaParcel->sHdrStaticInfo.sType1.mMinDisplayLuminance,
                                         mMetaParcel->sHdrStaticInfo.sType1.mMaxDisplayLuminance);
@@ -199,6 +199,7 @@ int32_t ExynosLayer::doPreProcess()
                             if (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC) {
                                 /* Reserved field for dynamic meta data */
                                 /* Currently It's not be used not only HWC but also OMX */
+                                mMetaParcel->sHdrDynamicInfo = metaData->sHdrDynamicInfo;
                                 HDEBUGLOGD(eDebugLayer, "HWC2: Layer has dynamic metadata");
                             }
                         }
