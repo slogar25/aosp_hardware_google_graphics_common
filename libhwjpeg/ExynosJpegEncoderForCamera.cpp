@@ -373,6 +373,11 @@ int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
             "Debugging information is not specified. Skipping writing APP4 marker");
     ALOGD("Given stream buffer size: %d bytes", *size);
 
+    if (!mThumbnailScaler->available() && (exifInfo != nullptr)) {
+        exifInfo->enableThumb = false;
+        ALOGW("Thumbnail scaler is not available. No thumbnail is embedded");
+    }
+
     CStopWatch stopwatch(true);
 
     if (!ProcessExif(jpeg_base, m_nStreamSize, exifInfo, appInfo))

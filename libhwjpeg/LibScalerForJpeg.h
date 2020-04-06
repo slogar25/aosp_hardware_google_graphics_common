@@ -38,6 +38,7 @@ public:
     bool RunStream(int srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen);
     bool RunStream(char *srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen);
 
+    bool available() { return mDevice.mFd >= 0; }
 private:
     struct Device {
         int mFd;
