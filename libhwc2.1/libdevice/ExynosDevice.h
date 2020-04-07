@@ -197,10 +197,8 @@ class ExynosDevice {
          * - HotplugCallback: Hot plug event by new display hardware.
          */
 
-        /** TODO : Array size shuld be checked
-         * TODO : Is HWC2_CALLBACK_VSYNC max?
-         */
-        exynos_callback_info_t mCallbackInfos[HWC2_CALLBACK_VSYNC + 1];
+        /** TODO : Array size shuld be checked */
+        exynos_callback_info_t mCallbackInfos[HWC2_CALLBACK_SEAMLESS_POSSIBLE + 1];
 
         /**
          * Thread variables
@@ -273,6 +271,11 @@ class ExynosDevice {
          */
         /* TODO overide check!! */
         uint32_t getMaxVirtualDisplayCount();
+
+         /* Descriptor: HWC2_FUNCTION_GET_LAYER_GENERIC_METADATA_KEY
+         */
+        void getLayerGenericMetadataKey(uint32_t __unused keyIndex,
+                uint32_t* __unused outKeyLength, char* __unused outKey, bool* __unused outMandatory);
 
         /**
          * Descriptor: HWC2_FUNCTION_REGISTER_CALLBACK

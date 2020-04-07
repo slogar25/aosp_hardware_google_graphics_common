@@ -372,6 +372,44 @@ class ExynosLayer : public ExynosMPPSource {
                 const uint8_t* metadata);
 
         int32_t setLayerColorTransform(const float* matrix);
+        /* setLayerGenericMetadata(..., keyLength, key, mandatory, valueLength, value)
+         * Descriptor: HWC2_FUNCTION_SET_LAYER_GENERIC_METADATA
+         * Optional for HWC2 devices for composer 2.4+
+         *
+         * setLayerGenericMetadata sets a piece of generic metadata for the given layer.
+         * If this function is called twice with the same key but different values, the
+         * newer value must override the older one. Calling this function with
+         * valueLength == 0 must reset that key's metadata as if it had not been set.
+         *
+         * A given piece of metadata may either be mandatory or a hint (non-mandatory)
+         * as indicated by the `mandatory` parameter. Mandatory metadata may affect the
+         * composition result, which is to say that it may cause a visible change in the
+         * final image. By contrast, hints may only affect the composition strategy,
+         * such as which layers are composited by the client, but must not cause a
+         * visible change in the final image.
+         *
+         * This implies that if the device does not understand a given key:
+         * - If the key is marked as mandatory, it must mark this layer for client
+         *   composition in order to ensure the correct composition result
+         * - If the key is a hint, the metadata provided may be ignored
+         *
+         * Parameters:
+         *   keyLength - the length of the key parameter
+         *   key - the metadata key
+         *   mandatory - indicates whether this particular key represents mandatory
+         *       metadata or a hint, as described above
+         *   valueLength - the length of the value parameter
+         *   value - the metadata value
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         *   HWC2_ERROR_BAD_LAYER - an invalid layer handle was passed in
+         *   HWC2_ERROR_BAD_PARAMETER - an unsupported key was passed in, or the value
+         *       does not conform to the expected format for the key
+         */
+        int32_t setLayerGenericMetadata(hwc2_layer_t __unused layer,
+                uint32_t __unused keyLength, const char* __unused key,
+                bool __unused mandatory, uint32_t __unused valueLength, const uint8_t* __unused value);
 
         void resetValidateData();
         virtual void dump(String8& result);

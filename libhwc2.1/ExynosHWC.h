@@ -161,6 +161,26 @@ int32_t exynos_setLayerPerFrameMetadataBlobs(hwc2_device_t* device, hwc2_display
 int32_t exynos_getDisplayBrightnessSupport(hwc2_device_t* device, hwc2_display_t display, bool* outSupport);
 int32_t exynos_setDisplayBrightness(hwc2_device_t* device, hwc2_display_t display, float brightness);
 
+int32_t exynos_GetDisplayConnectionType(hwc2_device_t* device, hwc2_display_t display,
+        uint32_t* /*hwc2_display_connection_type_t*/ outType);
+int32_t exynos_GetDisplayVsyncPeriod(hwc2_device_t* device, hwc2_display_t display,
+        hwc2_vsync_period_t* outVsyncPeriod);
+int32_t exynos_SetActiveConfigWithConstraints(hwc2_device_t* device, hwc2_display_t display,
+        hwc2_config_t config, hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t* outTimeline);
+int32_t exynos_SetAutoLowLatencyMode(hwc2_device_t* device, hwc2_display_t display, bool on);
+int32_t exynos_GetSupportedContentTypes(hwc2_device_t* device, hwc2_display_t display,
+        uint32_t* outNumSupportedContentTypes, uint32_t* outSupportedContentTypes);
+int32_t exynos_SetContentType(hwc2_device_t* device, hwc2_display_t display,
+        int32_t /* hwc2_content_type_t */ contentType);
+int32_t exynos_GetClientTargetProperty(hwc2_device_t* device, hwc2_display_t display,
+        hwc_client_target_property_t* outClientTargetProperty);
+int32_t exynos_SetLayerGenericMetadata(hwc2_device_t* device, hwc2_display_t display,
+        hwc2_layer_t layer, uint32_t keyLength, const char* key,
+        bool mandatory, uint32_t valueLength, const uint8_t* value);
+void exynos_GetLayerGenericMetadataKey(hwc2_device_t* device, uint32_t keyIndex,
+        uint32_t* outKeyLength, char* outKey, bool* outMandatory);
+
 enum {
     NO_DRM = 0,
     NORMAL_DRM,

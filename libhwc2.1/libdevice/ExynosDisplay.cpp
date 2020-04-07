@@ -2980,10 +2980,61 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness)
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::setOutputBuffer(
-        buffer_handle_t __unused buffer,
-        int32_t __unused releaseFence) {
-    return 0;
+int32_t ExynosDisplay::getDisplayConnectionType(uint32_t* outType)
+{
+    if (mType == HWC_DISPLAY_PRIMARY)
+        *outType = HWC2_DISPLAY_CONNECTION_TYPE_INTERNAL;
+    else if (mType == HWC_DISPLAY_EXTERNAL)
+        *outType = HWC2_DISPLAY_CONNECTION_TYPE_EXTERNAL;
+    else
+        return HWC2_ERROR_BAD_DISPLAY;
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::getDisplayVsyncPeriod(hwc2_vsync_period_t* __unused outVsyncPeriod)
+{
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t __unused config,
+        hwc_vsync_period_change_constraints_t* __unused vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t* __unused outTimeline)
+{
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::setAutoLowLatencyMode(bool __unused on)
+{
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
+int32_t ExynosDisplay::getSupportedContentTypes(uint32_t* __unused outNumSupportedContentTypes,
+        uint32_t* __unused outSupportedContentTypes)
+{
+    if (outSupportedContentTypes == NULL)
+        outNumSupportedContentTypes = 0;
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::setContentType(int32_t /* hwc2_content_type_t */ contentType)
+{
+    if (contentType == HWC2_CONTENT_TYPE_NONE)
+        return HWC2_ERROR_NONE;
+
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
+int32_t ExynosDisplay::getClientTargetProperty(hwc_client_target_property_t* outClientTargetProperty)
+{
+    outClientTargetProperty->pixelFormat = HAL_PIXEL_FORMAT_RGBA_8888;
+    outClientTargetProperty->dataspace = HAL_DATASPACE_UNKNOWN;
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::setOutputBuffer( buffer_handle_t __unused buffer, int32_t __unused releaseFence)
+{
+    return HWC2_ERROR_NONE;
 }
 
 int ExynosDisplay::clearDisplay(bool readback) {

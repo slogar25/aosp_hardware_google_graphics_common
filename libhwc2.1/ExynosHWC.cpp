@@ -123,6 +123,17 @@ hwc2_function_pointer_t exynos_function_pointer[] =
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setLayerPerFrameMetadataBlobs), //HWC2_FUNCTION_SET_LAYER_PER_FRAME_METADATA_BLOBS
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getDisplayBrightnessSupport),   //HWC2_FUNCTION_GET_DISPLAY_BRIGHTNESS_SUPPORT
     reinterpret_cast<hwc2_function_pointer_t>(exynos_setDisplayBrightness),          //HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS
+
+    // composer 2.4
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_GetDisplayConnectionType),      //HWC2_FUNCTION_GET_DISPLAY_CONNECTION_TYPE
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_GetDisplayVsyncPeriod),         //HWC2_FUNCTION_GET_DISPLAY_VSYNC_PERIOD
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_SetActiveConfigWithConstraints),//HWC2_FUNCTION_SET_ACTIVE_CONFIG_WITH_CONSTRAINTS
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_SetAutoLowLatencyMode),         //HWC2_FUNCTION_SET_AUTO_LOW_LATENCY_MODE
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_GetSupportedContentTypes),      //HWC2_FUNCTION_GET_SUPPORTED_CONTENT_TYPES
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_SetContentType),                //HWC2_FUNCTION_SET_CONTENT_TYPE
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_GetClientTargetProperty),       //HWC2_FUNCTION_GET_CLIENT_TARGET_PROPERTY
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_SetLayerGenericMetadata),       //HWC2_FUNCTION_SET_LAYER_GENERIC_METADATA
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_GetLayerGenericMetadataKey),    //HWC2_FUNCTION_GET_LAYER_GENERIC_METADATA_KEY
 };
 
 inline ExynosDevice* checkDevice(hwc2_device_t *dev)
@@ -162,7 +173,7 @@ inline ExynosLayer* checkLayer(ExynosDisplay *exynosDisplay, hwc2_layer_t layer)
 hwc2_function_pointer_t exynos_getFunction(struct hwc2_device *dev,
         int32_t descriptor)
 {
-    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS)
+    if (descriptor <= HWC2_FUNCTION_INVALID || descriptor > HWC2_FUNCTION_GET_LAYER_GENERIC_METADATA_KEY)
         return NULL;
 
     ExynosDevice *exynosDevice = checkDevice(dev);
@@ -536,9 +547,12 @@ int32_t exynos_registerCallback(hwc2_device_t* dev,
     }
 
     switch (descriptor) {
+        case HWC2_CALLBACK_INVALID:
         case HWC2_CALLBACK_HOTPLUG:
         case HWC2_CALLBACK_REFRESH:
         case HWC2_CALLBACK_VSYNC:
+        case HWC2_CALLBACK_VSYNC_2_4:
+        case HWC2_CALLBACK_VSYNC_PERIOD_TIMING_CHANGED:
             ret = exynosDevice->registerCallback(descriptor, callbackData, pointer);
             return ret;
         default:
@@ -1093,6 +1107,143 @@ int32_t exynos_setDisplayBrightness(hwc2_device_t* dev, hwc2_display_t display, 
     }
 
     return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_GetDisplayConnectionType(hwc2_device_t* dev, hwc2_display_t display,
+        uint32_t* /*hwc2_display_connection_type_t*/ outType)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->getDisplayConnectionType(outType);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_GetDisplayVsyncPeriod(hwc2_device_t* dev, hwc2_display_t display,
+        hwc2_vsync_period_t* outVsyncPeriod)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->getDisplayVsyncPeriod(outVsyncPeriod);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_SetActiveConfigWithConstraints(hwc2_device_t* dev, hwc2_display_t display,
+        hwc2_config_t config, hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t* outTimeline)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->setActiveConfigWithConstraints(config, vsyncPeriodChangeConstraints, outTimeline);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_SetAutoLowLatencyMode(hwc2_device_t* dev, hwc2_display_t display, bool on)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->setAutoLowLatencyMode(on);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_GetSupportedContentTypes(hwc2_device_t* dev, hwc2_display_t display,
+        uint32_t* outNumSupportedContentTypes, uint32_t* outSupportedContentTypes)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->getSupportedContentTypes(outNumSupportedContentTypes, outSupportedContentTypes);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_SetContentType(hwc2_device_t* dev, hwc2_display_t display,
+        int32_t /* hwc2_content_type_t */ contentType)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            return exynosDisplay->setContentType(contentType);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_GetClientTargetProperty(hwc2_device_t* dev, hwc2_display_t display,
+        hwc_client_target_property_t* outClientTargetProperty)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            /* TODO */
+            return exynosDisplay->getClientTargetProperty(outClientTargetProperty);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_SetLayerGenericMetadata(hwc2_device_t* dev, hwc2_display_t display,
+        hwc2_layer_t layer, uint32_t keyLength, const char* key,
+        bool mandatory, uint32_t valueLength, const uint8_t* value)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            ExynosLayer *exynosLayer = checkLayer(exynosDisplay, layer);
+            if (exynosLayer)
+                return exynosLayer->setLayerGenericMetadata(layer,
+                        keyLength, key, mandatory, valueLength, value);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+void exynos_GetLayerGenericMetadataKey(hwc2_device_t* dev, uint32_t keyIndex,
+        uint32_t* outKeyLength, char* outKey, bool* outMandatory)
+{
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        return exynosDevice->getLayerGenericMetadataKey(keyIndex, outKeyLength, outKey, outMandatory);
+    }
+
+    return;
 }
 
 /* ************************************************************************************/

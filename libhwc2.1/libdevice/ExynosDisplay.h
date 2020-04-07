@@ -758,6 +758,171 @@ class ExynosDisplay {
          */
         int32_t setDisplayBrightness(float brightness);
 
+        /* getDisplayConnectionType(..., outType)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_CONNECTION_TYPE
+         * Optional for all HWC2 devices
+         *
+         * Returns whether the given physical display is internal or external.
+         *
+         * Parameters:
+         * outType - the connection type of the display; pointer will be non-NULL
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         * HWC2_ERROR_BAD_DISPLAY when the display is invalid or virtual.
+         */
+        int32_t getDisplayConnectionType(uint32_t* outType);
+
+        /* getDisplayVsyncPeriod(..., outVsyncPeriods)
+         * Descriptor: HWC2_FUNCTION_GET_DISPLAY_VSYNC_PERIOD
+         * Required for HWC2 devices for composer 2.4
+         *
+         * Retrieves which vsync period the display is currently using.
+         *
+         * If no display configuration is currently active, this function must
+         * return BAD_CONFIG. If a vsync period is about to change due to a
+         * setActiveConfigWithConstraints call, this function must return the current vsync period
+         * until the change has taken place.
+         *
+         * Parameters:
+         *     outVsyncPeriod - the current vsync period of the display.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         *   HWC2_ERROR_BAD_CONFIG - no configuration is currently active
+         */
+        int32_t getDisplayVsyncPeriod(hwc2_vsync_period_t* __unused outVsyncPeriod);
+
+        /* setActiveConfigWithConstraints(...,
+         *                                config,
+         *                                vsyncPeriodChangeConstraints,
+         *                                outTimeline)
+         * Descriptor: HWC2_FUNCTION_SET_ACTIVE_CONFIG_WITH_CONSTRAINTS
+         * Required for HWC2 devices for composer 2.4
+         *
+         * Sets the active configuration and the refresh rate for this display.
+         * If the new config shares the same config group as the current config,
+         * only the vsync period shall change.
+         * Upon returning, the given display configuration, except vsync period, must be active and
+         * remain so until either this function is called again or the display is disconnected.
+         * When the display starts to refresh at the new vsync period, onVsync_2_4 callback must be
+         * called with the new vsync period.
+         *
+         * Parameters:
+         *     config - the new display configuration.
+         *     vsyncPeriodChangeConstraints - constraints required for changing vsync period:
+         *                                    desiredTimeNanos - the time in CLOCK_MONOTONIC after
+         *                                                       which the vsync period may change
+         *                                                       (i.e., the vsync period must not change
+         *                                                       before this time).
+         *                                    seamlessRequired - if true, requires that the vsync period
+         *                                                       change must happen seamlessly without
+         *                                                       a noticeable visual artifact.
+         *                                                       When the conditions change and it may be
+         *                                                       possible to change the vsync period
+         *                                                       seamlessly, HWC2_CALLBACK_SEAMLESS_POSSIBLE
+         *                                                       callback must be called to indicate that
+         *                                                       caller should retry.
+         *     outTimeline - the timeline for the vsync period change.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in.
+         *   HWC2_ERROR_BAD_CONFIG - an invalid configuration handle passed in.
+         *   HWC2_ERROR_SEAMLESS_NOT_ALLOWED - when seamlessRequired was true but config provided doesn't
+         *                                 share the same config group as the current config.
+         *   HWC2_ERROR_SEAMLESS_NOT_POSSIBLE - when seamlessRequired was true but the display cannot
+         *                                      achieve the vsync period change without a noticeable
+         *                                      visual artifact.
+         */
+        int32_t setActiveConfigWithConstraints(hwc2_config_t __unused config,
+                hwc_vsync_period_change_constraints_t* __unused vsyncPeriodChangeConstraints,
+                hwc_vsync_period_change_timeline_t* __unused outTimeline);
+
+        /* setAutoLowLatencyMode(displayToken, on)
+         * Descriptor: HWC2_FUNCTION_SET_AUTO_LOW_LATENCY_MODE
+         * Optional for HWC2 devices
+         *
+         * setAutoLowLatencyMode requests that the display goes into low latency mode. If the display
+         * is connected via HDMI 2.1, then Auto Low Latency Mode should be triggered. If the display is
+         * internally connected, then a custom low latency mode should be triggered (if available).
+         *
+         * Parameters:
+         *   on - indicates whether to turn low latency mode on (=true) or off (=false)
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - when the display is invalid, or
+         *   HWC2_ERROR_UNSUPPORTED - when the display does not support any low latency mode
+         */
+        int32_t setAutoLowLatencyMode(bool __unused on);
+
+        /* getSupportedContentTypes(..., outSupportedContentTypes)
+         * Descriptor: HWC2_FUNCTION_GET_SUPPORTED_CONTENT_TYPES
+         * Optional for HWC2 devices
+         *
+         * getSupportedContentTypes returns a list of supported content types
+         * (as described in the definition of ContentType above).
+         * This list must not change after initialization.
+         *
+         * Parameters:
+         *   outNumSupportedContentTypes - if outSupportedContentTypes was nullptr, returns the number
+         *       of supported content types; if outSupportedContentTypes was not nullptr, returns the
+         *       number of capabilities stored in outSupportedContentTypes, which must not exceed the
+         *       value stored in outNumSupportedContentTypes prior to the call; pointer will be non-NULL
+         *   outSupportedContentTypes - a list of supported content types.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         */
+        int32_t getSupportedContentTypes(uint32_t* __unused outNumSupportedContentTypes,
+                uint32_t* __unused outSupportedContentTypes);
+
+        /* setContentType(displayToken, contentType)
+         * Descriptor: HWC2_FUNCTION_SET_CONTENT_TYPE
+         * Optional for HWC2 devices
+         *
+         * setContentType instructs the display that the content being shown is of the given contentType
+         * (one of GRAPHICS, PHOTO, CINEMA, GAME).
+         *
+         * According to the HDMI 1.4 specification, supporting all content types is optional. Whether
+         * the display supports a given content type is reported by getSupportedContentTypes.
+         *
+         * Parameters:
+         *   contentType - the type of content that is currently being shown on the display
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - when the display is invalid, or
+         *   HWC2_ERROR_UNSUPPORTED - when the given content type is a valid content type, but is not
+         *                            supported on this display, or
+         *   HWC2_ERROR_BAD_PARAMETER - when the given content type is invalid
+         */
+        int32_t setContentType(int32_t /* hwc2_content_type_t */ __unused contentType);
+
+        /* getClientTargetProperty(..., outClientTargetProperty)
+         * Descriptor: HWC2_FUNCTION_GET_CLIENT_TARGET_PROPERTY
+         * Optional for HWC2 devices
+         *
+         * Retrieves the client target properties for which the hardware composer
+         * requests after the last call to validateDisplay. The client must set the
+         * properties of the client target to match the returned values.
+         * When this API is implemented, if client composition is needed, the hardware
+         * composer must return meaningful client target property with dataspace not
+         * setting to UNKNOWN.
+         * When the returned dataspace is set to UNKNOWN, it means hardware composer
+         * requests nothing, the client must ignore the returned client target property
+         * structrue.
+         *
+         * Parameters:
+         *   outClientTargetProperty - the client target properties that hardware
+         *       composer requests. If dataspace field is set to UNKNOWN, it means
+         *       the hardware composer requests nothing, the client must ignore the
+         *       returned client target property structure.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *   HWC2_ERROR_BAD_DISPLAY - an invalid display handle was passed in
+         *   HWC2_ERROR_NOT_VALIDATED - validateDisplay has not been called for this
+         *       display
+         */
+        int32_t getClientTargetProperty(hwc_client_target_property_t* outClientTargetProperty);
+
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
 
