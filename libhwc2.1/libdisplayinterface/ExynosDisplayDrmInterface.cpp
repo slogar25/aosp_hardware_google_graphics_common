@@ -594,6 +594,8 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
     uint32_t buf_handles[HWC_DRM_BO_MAX_PLANES] = {0};
     uint64_t modifiers[HWC_DRM_BO_MAX_PLANES] = {0};
     uint32_t bufferNum, planeNum = 0;
+    if (config.protection)
+        modifiers[0] |= DRM_FORMAT_MOD_PROTECTION;
 
     if (config.state == config.WIN_STATE_BUFFER) {
         drmFormat = halFormatToDrmFormat(config.format,
@@ -644,7 +646,7 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
                 default:
                     break;
             }
-            modifiers[0] = DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
+            modifiers[0] |= DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
         }
 
         ret = drmReq.addFB2WithModifiers(config.src.f_w, config.src.f_h,
@@ -655,7 +657,7 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
             drmReq.freeBufHandle(buf_handles[bufferIndex]);
         }
     } else if (config.state == config.WIN_STATE_COLOR) {
-        modifiers[0] = DRM_FORMAT_MOD_SAMSUNG_COLORMAP;
+        modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_COLORMAP;
         drmFormat = DRM_FORMAT_BGRA8888;
         buf_handles[0] = config.color;
         bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
