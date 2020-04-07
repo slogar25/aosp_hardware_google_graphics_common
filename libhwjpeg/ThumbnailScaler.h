@@ -16,6 +16,8 @@ public:
     virtual bool RunStream(char *srcBuf[SCALER_MAX_PLANES], int srcLen[SCALER_MAX_PLANES], int dstBuf, size_t dstLen) = 0;
 
     static ThumbnailScaler *createInstance();
+
+    virtual bool available() { return false; }
 };
 
 #endif //__HARDWARE_EXYNOS_THUMBNAIL_SCALER_H__
