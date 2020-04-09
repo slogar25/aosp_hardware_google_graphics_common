@@ -83,8 +83,14 @@ typedef enum format_type {
     BIT10           = 0x00002000,
 
     /* compression */
+    /*
+     * COMP_ANY: Compression type doesn't affect any other
+     * descriptions of format (ex: drmFormat, bufferNum, bpp...)
+     * in format_description
+     */
     COMP_SHIFT      = 20,
     COMP_MASK       = 0x0ff00000,
+    COMP_ANY        = 0x08000000, /* the highest bit */
     AFBC            = 0x00100000,
 
 } format_type_t;
@@ -109,21 +115,21 @@ typedef struct format_description {
 const format_description_t exynos_format_desc[] = {
     /* RGB */
     {HAL_PIXEL_FORMAT_RGBA_8888, DECON_PIXEL_FORMAT_RGBA_8888, DRM_FORMAT_RGBA8888,
-        1, 32, RGB|BIT8, true, String8("RGBA_8888"), 0},
+        1, 32, RGB|BIT8|COMP_ANY, true, String8("RGBA_8888"), 0},
     {HAL_PIXEL_FORMAT_RGBX_8888, DECON_PIXEL_FORMAT_RGBX_8888, DRM_FORMAT_RGBX8888,
-        1, 32, RGB|BIT8, false, String8("RGBx_8888"), 0},
+        1, 32, RGB|BIT8|COMP_ANY, false, String8("RGBx_8888"), 0},
     {HAL_PIXEL_FORMAT_RGB_888, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_RGB888,
-        1, 32, RGB|BIT8, false, String8("RGB_888"), 0},
+        1, 32, RGB|BIT8|COMP_ANY, false, String8("RGB_888"), 0},
     {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_BGR565,
         1, 16, RGB, false, String8("RGB_565"), 0},
     {HAL_PIXEL_FORMAT_RGB_565, DECON_PIXEL_FORMAT_RGB_565, DRM_FORMAT_RGB565,
         1, 16, RGB|AFBC, false, String8("RGB_565_AFBC"), 0},
     {HAL_PIXEL_FORMAT_BGRA_8888, DECON_PIXEL_FORMAT_BGRA_8888, DRM_FORMAT_BGRA8888,
-        1, 32, RGB|BIT8, true, String8("BGRA_8888"), 0},
+        1, 32, RGB|BIT8|COMP_ANY, true, String8("BGRA_8888"), 0},
     {HAL_PIXEL_FORMAT_RGBA_1010102, DECON_PIXEL_FORMAT_ABGR_2101010, DRM_FORMAT_RGBA1010102,
-        1, 32, RGB|BIT10, true, String8("RGBA_1010102"), 0},
+        1, 32, RGB|BIT10|COMP_ANY, true, String8("RGBA_1010102"), 0},
     {HAL_PIXEL_FORMAT_EXYNOS_ARGB_8888, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_ARGB8888,
-        1, 32, RGB|BIT8, true, String8("EXYNOS_ARGB_8888"), 0},
+        1, 32, RGB|BIT8|COMP_ANY, true, String8("EXYNOS_ARGB_8888"), 0},
 
     /* YUV 420 */
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M, DECON_PIXEL_FORMAT_YUV420M, DRM_FORMAT_UNDEFINED,
