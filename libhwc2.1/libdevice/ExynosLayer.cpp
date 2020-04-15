@@ -739,7 +739,11 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
     src_img->layerFlags = mLayerFlag;
     src_img->acquireFenceFd = mAcquireFence;
     src_img->releaseFenceFd = -1;
+
     src_img->dataSpace = mDataSpace;
+    if(src_img->dataSpace == HAL_DATASPACE_UNKNOWN)
+        src_img->dataSpace = HAL_DATASPACE_V0_SRGB;
+
     src_img->blending = mBlending;
     src_img->transform = mTransform;
     src_img->compressed = mCompressed;
