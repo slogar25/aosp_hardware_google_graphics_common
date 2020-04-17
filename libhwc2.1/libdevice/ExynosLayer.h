@@ -372,6 +372,7 @@ class ExynosLayer : public ExynosMPPSource {
         void setGeometryChanged(uint64_t changedBit);
         void clearGeometryChanged() {mGeometryChanged = 0;};
         bool isDimLayer();
+        const ExynosVideoMeta* getMetaParcel() { return mMetaParcel; };
 
     private:
         ExynosVideoMeta *mMetaParcel;
