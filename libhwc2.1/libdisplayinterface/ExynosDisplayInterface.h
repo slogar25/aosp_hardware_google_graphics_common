@@ -66,6 +66,8 @@ class ExynosDisplayInterface {
         /* HWC 2.3 APIs */
         virtual int32_t getDisplayIdentificationData(uint8_t* __unused outPort,
                 uint32_t* __unused outDataSize, uint8_t* __unused outData) {return 0;}
+
+        bool isPrimary();
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };
