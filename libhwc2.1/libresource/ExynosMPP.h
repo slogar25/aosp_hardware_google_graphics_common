@@ -669,6 +669,7 @@ protected:
     virtual int32_t doPostProcessingInternal();
     virtual int32_t setupLayer(exynos_mpp_img_info *srcImgInfo,
             struct exynos_image &src, struct exynos_image &dst);
+    virtual int32_t setColorConversionInfo() { return NO_ERROR; };
 
     uint32_t getRestrictionClassification(struct exynos_image &img);
 

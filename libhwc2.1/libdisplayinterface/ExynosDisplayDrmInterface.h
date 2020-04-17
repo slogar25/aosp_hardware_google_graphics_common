@@ -109,6 +109,14 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         virtual uint32_t getMaxWindowNum();
         virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
                 int32_t* /*android_dataspace_t*/ outDataspace);
+        virtual int32_t setDisplayColorSetting(
+                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq)
+        { return NO_ERROR;};
+        virtual int32_t setPlaneColorSetting(
+                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq,
+                const std::unique_ptr<DrmPlane> &plane,
+                const exynos_win_config_data& config)
+        { return NO_ERROR;};
     protected:
         int32_t applyDisplayMode();
         int32_t chosePreferredConfig();

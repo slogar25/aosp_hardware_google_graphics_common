@@ -685,9 +685,9 @@ class ExynosDisplay {
         virtual int32_t getHdrCapabilities(uint32_t* outNumTypes, int32_t* /*android_hdr_t*/ outTypes, float* outMaxLuminance,
                 float* outMaxAverageLuminance, float* outMinLuminance);
 
-        int32_t getRenderIntents(int32_t mode, uint32_t* outNumIntents,
+        virtual int32_t getRenderIntents(int32_t mode, uint32_t* outNumIntents,
                 int32_t* /*android_render_intent_v1_1_t*/ outIntents);
-        int32_t setColorModeWithRenderIntent(int32_t /*android_color_mode_t*/ mode,
+        virtual int32_t setColorModeWithRenderIntent(int32_t /*android_color_mode_t*/ mode,
                 int32_t /*android_render_intent_v1_1_t */ intent);
 
         /* HWC 2.3 APIs */
@@ -803,6 +803,7 @@ class ExynosDisplay {
         virtual int getDDIScalerMode(int width, int height);
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
+        virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
 

@@ -2562,6 +2562,11 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             DISPLAY_LOGD(eDebugSkipValidate, "validate is skipped");
         }
 
+        if (updateColorConversionInfo() != NO_ERROR) {
+            DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
+                    __func__, ret);
+            goto err;
+        }
         if (mDisplayControl.earlyStartMPP == true) {
             /*
              * HWC should update performanceInfo when validate is skipped
@@ -3103,6 +3108,12 @@ int32_t ExynosDisplay::validateDisplay(
                 __func__, mDisplayId, ret);
         printDebugInfos(errString);
         mDisplayInterface->setForcePanic();
+    }
+
+    if ((ret = updateColorConversionInfo()) != NO_ERROR) {
+        validateError = true;
+        DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
+                __func__, ret);
     }
 
     if ((ret = skipStaticLayers(mClientCompositionInfo)) != NO_ERROR) {

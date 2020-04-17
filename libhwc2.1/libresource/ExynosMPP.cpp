@@ -1416,6 +1416,13 @@ int32_t ExynosMPP::doPostProcessingInternal()
             return ret;
         }
     }
+
+    if ((ret = setColorConversionInfo()) != NO_ERROR) {
+            MPP_LOGE("%s:: fail to setColorConversionInfo ret %d",
+                    __func__, ret);
+            return ret;
+    }
+
     if (mPrevFrameInfo.srcNum > sourceNum) {
         MPP_LOGD(eDebugMPP, "prev sourceNum(%d), current sourceNum(%zu)",
                 mPrevFrameInfo.srcNum, sourceNum);
