@@ -432,6 +432,13 @@ typedef struct hwc_fence_info {
     bool leaking = false;
 } hwc_fence_info_t;
 
+class funcReturnCallback {
+    public:
+        funcReturnCallback(const std::function<void(void)> cb) : mCb(cb) {}
+        ~funcReturnCallback() { mCb(); }
+    private:
+        const std::function<void(void)> mCb;
+};
 
 void setFenceName(int fenceFd, hwc_fence_type fenceType);
 void setFenceName(uint32_t fd, ExynosDisplay *display,

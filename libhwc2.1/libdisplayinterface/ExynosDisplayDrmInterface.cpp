@@ -939,6 +939,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     uint32_t flags = 0;
     if (mExynosDisplay->mDpuData.enable_readback)
         flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+
     if ((ret = drmReq.commit(flags, true)) < 0) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in deliverWinConfigData()\n",
                 __func__, ret);

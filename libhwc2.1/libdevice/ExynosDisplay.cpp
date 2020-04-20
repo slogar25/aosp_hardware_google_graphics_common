@@ -2514,6 +2514,11 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     mClientCompositionInfo.setExynosImage(src_img, dst_img);
     mClientCompositionInfo.setExynosMidImage(dst_img);
 
+    funcReturnCallback presentRetCallback([&]() {
+        if (ret != HWC2_ERROR_NOT_VALIDATED)
+            presentPostProcessing();
+    });
+
     if (mSkipFrame) {
         ALOGI("[%d] presentDisplay is skipped by mSkipFrame", mDisplayId);
         closeFencesForSkipFrame(RENDERING_STATE_PRESENTED);
@@ -2590,7 +2595,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         mLastRetireFence = fence_close(mLastRetireFence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP);
         mRenderingState = RENDERING_STATE_PRESENTED;
-        return 0;
+        ret = 0;
+        return ret;
     }
 
     if (!checkFrameValidation()) {
@@ -2762,17 +2768,21 @@ err:
     }
     mDisplayInterface->setForcePanic();
 
-    return -EINVAL;
+    ret = -EINVAL;
+    return ret;
 
 not_validated:
     DISPLAY_LOGD(eDebugSkipValidate, "display need validate");
     mRenderingState = RENDERING_STATE_NONE;
-    return HWC2_ERROR_NOT_VALIDATED;
+    ret = HWC2_ERROR_NOT_VALIDATED;
+    return ret;
 }
 
 int32_t ExynosDisplay::presentPostProcessing()
 {
     setReadbackBufferInternal(NULL, -1);
+    if (mDpuData.enable_readback)
+        mDevice->signalReadbackDone();
     mDpuData.enable_readback = false;
     return NO_ERROR;
 }
@@ -4315,6 +4325,7 @@ int32_t ExynosDisplay::getReadbackBufferAttributes(int32_t* /*android_pixel_form
 
 int32_t ExynosDisplay::setReadbackBuffer(buffer_handle_t buffer, int32_t releaseFence)
 {
+    Mutex::Autolock lock(mDisplayMutex);
     int32_t ret = NO_ERROR;
 
     if (buffer == nullptr)

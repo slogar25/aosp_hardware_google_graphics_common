@@ -30,6 +30,8 @@
 
 #include <thread>
 #include <atomic>
+#include <utils/Mutex.h>
+#include <utils/Condition.h>
 
 #include <hardware/hwcomposer2.h>
 
@@ -56,6 +58,10 @@
 
 #ifndef DRM_DEVICE_PATH
 #define DRM_DEVICE_PATH "/dev/dri/card0"
+#endif
+
+#ifndef WRITEBACK_CAPTURE_PATH
+#define WRITEBACK_CAPTURE_PATH "/data/vendor/log/hwc"
 #endif
 
 namespace android {
@@ -295,10 +301,34 @@ class ExynosDevice {
         bool isDynamicRecompositionThreadAlive();
         void checkDynamicRecompositionThread();
 
+        class captureReadbackClass {
+            public:
+                captureReadbackClass(ExynosDevice *device);
+                ~captureReadbackClass();
+                int32_t allocBuffer(uint32_t format, uint32_t w, uint32_t h);
+                buffer_handle_t& getBuffer() { return mBuffer; };
+                void saveToFile();
+            private:
+                GrallocWrapper::Allocator* mAllocator = nullptr;
+                GrallocWrapper::Mapper* mMapper = nullptr;
+                buffer_handle_t mBuffer = nullptr;
+                ExynosDevice* mDevice = nullptr;
+        };
+        void captureScreenWithReadback(uint32_t displayType);
+        void cleanupCaptureScreen(void *buffer);
+        void signalReadbackDone();
+        void clearWaitingReadbackReqDone() {
+            mIsWaitingReadbackReqDone = false;
+        };
+
     protected:
         void initDeviceInterface(uint32_t interfaceType);
     protected:
         uint32_t mInterfaceType;
+    private:
+        Mutex mCaptureMutex;
+        Condition mCaptureCondition;
+        std::atomic<bool> mIsWaitingReadbackReqDone = false;
 };
 
 #endif //_EXYNOSDEVICE_H
