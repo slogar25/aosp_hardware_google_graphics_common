@@ -190,6 +190,7 @@ int32_t ExynosLayer::doPreProcess()
                     if ((metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) ||
                             (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC)) {
                         if (allocMetaParcel() == NO_ERROR) {
+                            mMetaParcel->eType = metaData->eType;
                             if (metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) {
                                 mMetaParcel->sHdrStaticInfo = metaData->sHdrStaticInfo;
                                 HDEBUGLOGD(eDebugLayer, "HWC2: Static metadata min(%d), max(%d)",
@@ -571,6 +572,7 @@ int32_t ExynosLayer::setLayerPerFrameMetadata(uint32_t numElements,
     if (allocMetaParcel() != NO_ERROR)
         return -1;
     unsigned int multipliedVal = 50000;
+    mMetaParcel->eType = VIDEO_INFO_TYPE_HDR_STATIC;
     for (uint32_t i = 0; i < numElements; i++) {
         HDEBUGLOGD(eDebugLayer, "HWC2: setLayerPerFrameMetadata key(%d), value(%7.5f)",
                 keys[i], metadata[i]);
@@ -641,6 +643,7 @@ int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const i
         switch (keys[i]) {
         case HWC2_HDR10_PLUS_SEI:
             if (allocMetaParcel() == NO_ERROR) {
+                mMetaParcel->eType = VIDEO_INFO_TYPE_HDR_DYNAMIC;
                 ExynosHdrDynamicInfo *info = &(mMetaParcel->sHdrDynamicInfo);
                 Exynos_parsing_user_data_registered_itu_t_t35(info, (void *)&metadata[i]);
             } else {
