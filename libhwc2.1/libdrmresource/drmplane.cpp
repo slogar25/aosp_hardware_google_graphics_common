@@ -165,6 +165,15 @@ int DrmPlane::Init() {
   if (ret)
     ALOGI("Could not get hw restrictions property");
 
+  if (drm_->GetPlaneProperty(*this, "eotf_lut", &eotf_lut_))
+      ALOGI("Could not get eotf_lut property");
+  if (drm_->GetPlaneProperty(*this, "oetf_lut", &oetf_lut_))
+      ALOGI("Could not get oetf_lut property");
+  if (drm_->GetPlaneProperty(*this, "gammut_matrix", &gammut_matrix_))
+      ALOGI("Could not get gammut_matrix property");
+  if (drm_->GetPlaneProperty(*this, "tone_mapping", &tone_mapping_))
+      ALOGI("Could not get tone_mapping property");
+
   properties_.push_back(&crtc_property_);
   properties_.push_back(&fb_property_);
   properties_.push_back(&crtc_x_property_);
@@ -186,6 +195,10 @@ int DrmPlane::Init() {
   properties_.push_back(&max_luminance_);
   properties_.push_back(&min_luminance_);
   properties_.push_back(&hw_restrictions_);
+  properties_.push_back(&eotf_lut_);
+  properties_.push_back(&oetf_lut_);
+  properties_.push_back(&gammut_matrix_);
+  properties_.push_back(&tone_mapping_);
 
   return 0;
 }
@@ -285,4 +298,21 @@ const DrmProperty &DrmPlane::min_luminance_property() const {
 const DrmProperty &DrmPlane::hw_restrictions_property() const {
   return hw_restrictions_;
 }
+
+const DrmProperty &DrmPlane::eotf_lut_property() const {
+  return eotf_lut_;
+}
+
+const DrmProperty &DrmPlane::oetf_lut_property() const {
+  return oetf_lut_;
+}
+
+const DrmProperty &DrmPlane::gammut_matrix_property() const {
+  return gammut_matrix_;
+}
+
+const DrmProperty &DrmPlane::tone_mapping_property() const {
+  return tone_mapping_;
+}
+
 }  // namespace android
