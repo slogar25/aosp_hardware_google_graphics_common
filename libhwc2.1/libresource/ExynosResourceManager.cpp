@@ -1170,17 +1170,16 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     /* Scale up case */
     if ((dstW > src_img.w) && (dstH > src_img.h))
     {
-        /* VGFS doesn't rotate image, m2mMPP rotates image */
+        /* otfMPP doesn't rotate image, m2mMPP rotates image */
         src_img.transform = 0;
-        ExynosMPP *mppVGFS = getExynosMPP(MPP_LOGICAL_DPP_VGFS);
         exynos_image dst_scale_img = dst_img;
 
-        /* Some chipset have VGS instead of VGFS */
-        if (mppVGFS == NULL) {
-            mppVGFS = getExynosMPP(MPP_LOGICAL_DPP_VGS);
-            if (mppVGFS == NULL)
-                mppVGFS = getExynosMPP(MPP_LOGICAL_DPP_VG);
-        }
+        ExynosMPP *otfMppForScale = nullptr;
+        auto mpp_it = std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
+                [&src_img, &dst_scale_img](auto m) {
+                return (m->getMaxUpscale(src_img, dst_scale_img) > 1);
+                });
+        otfMppForScale = mpp_it == mOtfMPPs.end() ? nullptr : *mpp_it;
 
         if (hasHdrInfo(src_img)) {
             if (isFormatYUV(src_img.format))
@@ -1193,34 +1192,36 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
             }
         }
 
-        uint32_t upScaleRatio = mppVGFS->getMaxUpscale(src_img, dst_scale_img);
-        uint32_t downScaleRatio = mppVGFS->getMaxDownscale(*display, src_img, dst_scale_img);
-        uint32_t srcCropWidthAlign = mppVGFS->getSrcCropWidthAlign(src_img);
-        uint32_t srcCropHeightAlign = mppVGFS->getSrcCropHeightAlign(src_img);
+        if (otfMppForScale) {
+            uint32_t upScaleRatio = otfMppForScale->getMaxUpscale(src_img, dst_scale_img);
+            uint32_t downScaleRatio = otfMppForScale->getMaxDownscale(*display, src_img, dst_scale_img);
+            uint32_t srcCropWidthAlign = otfMppForScale->getSrcCropWidthAlign(src_img);
+            uint32_t srcCropHeightAlign = otfMppForScale->getSrcCropHeightAlign(src_img);
 
-        dst_scale_img.x = 0;
-        dst_scale_img.y = 0;
-        if (isPerpendicular) {
-            dst_scale_img.w = pixel_align(src_img.h, srcCropWidthAlign);
-            dst_scale_img.h = pixel_align(src_img.w, srcCropHeightAlign);
-        } else {
-            dst_scale_img.w = pixel_align(src_img.w, srcCropWidthAlign);
-            dst_scale_img.h = pixel_align(src_img.h, srcCropHeightAlign);
-        }
+            dst_scale_img.x = 0;
+            dst_scale_img.y = 0;
+            if (isPerpendicular) {
+                dst_scale_img.w = pixel_align(src_img.h, srcCropWidthAlign);
+                dst_scale_img.h = pixel_align(src_img.w, srcCropHeightAlign);
+            } else {
+                dst_scale_img.w = pixel_align(src_img.w, srcCropWidthAlign);
+                dst_scale_img.h = pixel_align(src_img.h, srcCropHeightAlign);
+            }
 
-        HDEBUGLOGD(eDebugResourceManager, "index[%d], w: %d, h: %d, ratio(type: %d, %d, %d)", index, dst_scale_img.w, dst_scale_img.h,
-                mppVGFS->mLogicalType, upScaleRatio, downScaleRatio);
-        if (dst_scale_img.w * upScaleRatio < dst_img.w) {
-            dst_scale_img.w = pixel_align((uint32_t)ceilf((float)dst_img.w/(float)upScaleRatio), srcCropWidthAlign);
+            HDEBUGLOGD(eDebugResourceManager, "index[%d], w: %d, h: %d, ratio(type: %d, %d, %d)", index, dst_scale_img.w, dst_scale_img.h,
+                    otfMppForScale->mLogicalType, upScaleRatio, downScaleRatio);
+            if (dst_scale_img.w * upScaleRatio < dst_img.w) {
+                dst_scale_img.w = pixel_align((uint32_t)ceilf((float)dst_img.w/(float)upScaleRatio), srcCropWidthAlign);
+            }
+            if (dst_scale_img.h * upScaleRatio < dst_img.h) {
+                dst_scale_img.h = pixel_align((uint32_t)ceilf((float)dst_img.h/(float)upScaleRatio), srcCropHeightAlign);
+            }
+            HDEBUGLOGD(eDebugResourceManager, "\tsrc[%d, %d, %d,%d], dst[%d, %d, %d,%d], mid[%d, %d, %d, %d]",
+                    src_img.x, src_img.y, src_img.w, src_img.h,
+                    dst_img.x, dst_img.y, dst_img.w, dst_img.h,
+                    dst_scale_img.x, dst_scale_img.y, dst_scale_img.w, dst_scale_img.h);
+            image_lists[index++] = dst_scale_img;
         }
-        if (dst_scale_img.h * upScaleRatio < dst_img.h) {
-            dst_scale_img.h = pixel_align((uint32_t)ceilf((float)dst_img.h/(float)upScaleRatio), srcCropHeightAlign);
-        }
-        HDEBUGLOGD(eDebugResourceManager, "\tsrc[%d, %d, %d,%d], dst[%d, %d, %d,%d], mid[%d, %d, %d, %d]",
-                src_img.x, src_img.y, src_img.w, src_img.h,
-                dst_img.x, dst_img.y, dst_img.w, dst_img.h,
-                dst_scale_img.x, dst_scale_img.y, dst_scale_img.w, dst_scale_img.h);
-        image_lists[index++] = dst_scale_img;
     }
 
     if (isFormatYUV(src_img.format) && !hasHdrInfo(src_img)) {
@@ -1247,12 +1248,17 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
         if (hasHdr10Plus(dst_img) ||
             ((external_display != NULL) && (external_display->mPlugState) &&
              (display->mDisplayId == HWC_DISPLAY_PRIMARY))) {
-            ExynosMPP *mppVGRFS = getExynosMPP(MPP_LOGICAL_DPP_VGRFS);
+            ExynosMPP *otfMppForHDRPlus = nullptr;
+            auto mpp_it = std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
+                    [](auto m) {
+                    return (m->mAttr & MPP_ATTR_HDR10PLUS);
+                    });
+            otfMppForHDRPlus = mpp_it == mOtfMPPs.end() ? nullptr : *mpp_it;
             uint32_t srcCropWidthAlign = 1;
             uint32_t srcCropHeightAlign = 1;
-            if (mppVGRFS != NULL) {
-                srcCropWidthAlign = mppVGRFS->getSrcCropWidthAlign(dst_img);
-                srcCropHeightAlign = mppVGRFS->getSrcCropHeightAlign(dst_img);
+            if (otfMppForHDRPlus) {
+                srcCropWidthAlign = otfMppForHDRPlus->getSrcCropWidthAlign(dst_img);
+                srcCropHeightAlign = otfMppForHDRPlus->getSrcCropHeightAlign(dst_img);
             }
             dst_img.w = pixel_align(dst_img.w, srcCropWidthAlign);
             dst_img.h = pixel_align(dst_img.h, srcCropHeightAlign);
