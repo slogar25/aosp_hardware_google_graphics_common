@@ -347,9 +347,8 @@ bool ExynosMPP::checkRotationCondition(struct exynos_image &src)
 
     /* If DPP has their own restriction, implmemnt module codes */
     if (mAttr & MPP_ATTR_ROT_90) {
-        if ((isFormatYUV420(src.format) == true) &&
-            (isFormat10BitYUV420(src.format) == false))
-                return true;
+        if (isFormatYUV420(src.format) == true)
+            return true;
     }
 
     /* Other DPPs */
