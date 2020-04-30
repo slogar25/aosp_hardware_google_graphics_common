@@ -1259,14 +1259,12 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
             else
                 cfg.hdr_enable = false;
 
-            /*
-             * Static info uses 0.0001nit unit for luminace
-             * Display uses 1nit unit for max luminance
-             * and uses 0.0001nit unit for min luminance
-             * Conversion is required
-             */
-            luminanceMin = src_img.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
-            luminanceMax = src_img.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
+            /* Min/Max luminance should be set as M2M MPP's HDR operations
+             * If HDR is not processed by M2M MPP, M2M's dst image should have source's min/max luminance
+             * */
+            dstMetaInfo_t metaInfo = m2mMPP->getDstMetaInfo(mpp_dst_img.dataSpace);
+            luminanceMin = metaInfo.minLuminance;
+            luminanceMax = metaInfo.maxLuminance;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
         } else {
             cfg.hdr_enable = true;
@@ -1298,6 +1296,13 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
                 if (parcelFdIndex > 0)
                     cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
             }
+
+            /*
+             * Static info uses 0.0001nit unit for luminace
+             * Display uses 1nit unit for max luminance
+             * and uses 0.0001nit unit for min luminance
+             * Conversion is required
+             */
             luminanceMin = src_img.metaParcel.sHdrStaticInfo.sType1.mMinDisplayLuminance;
             luminanceMax = src_img.metaParcel.sHdrStaticInfo.sType1.mMaxDisplayLuminance/10000;
             DISPLAY_LOGD(eDebugMPP, "HWC2: DPP luminance min %d, max %d", luminanceMin, luminanceMax);
@@ -2557,6 +2562,11 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             DISPLAY_LOGD(eDebugSkipValidate, "validate is skipped");
         }
 
+        if (updateColorConversionInfo() != NO_ERROR) {
+            DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
+                    __func__, ret);
+            goto err;
+        }
         if (mDisplayControl.earlyStartMPP == true) {
             /*
              * HWC should update performanceInfo when validate is skipped
@@ -3098,6 +3108,12 @@ int32_t ExynosDisplay::validateDisplay(
                 __func__, mDisplayId, ret);
         printDebugInfos(errString);
         mDisplayInterface->setForcePanic();
+    }
+
+    if ((ret = updateColorConversionInfo()) != NO_ERROR) {
+        validateError = true;
+        DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
+                __func__, ret);
     }
 
     if ((ret = skipStaticLayers(mClientCompositionInfo)) != NO_ERROR) {

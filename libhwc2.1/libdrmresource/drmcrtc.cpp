@@ -61,6 +61,21 @@ int DrmCrtc::Init() {
   if (drm_->GetCrtcProperty(*this, "partial_h", &partial_h_property_))
     ALOGE("Failed to get partial_h property");
 
+  if (drm_->GetCrtcProperty(*this, "cgc_lut", &cgc_lut_property_))
+    ALOGI("Failed to get cgc_lut property");
+  if (drm_->GetCrtcProperty(*this, "DEGAMMA_LUT", &degamma_lut_property_))
+    ALOGI("Failed to get &degamma_lut property");
+  if (drm_->GetCrtcProperty(*this, "DEGAMMA_LUT_SIZE", &degamma_lut_size_property_))
+    ALOGI("Failed to get &degamma_lut_size property");
+  if (drm_->GetCrtcProperty(*this, "GAMMA_LUT", &gamma_lut_property_))
+    ALOGI("Failed to get &gamma_lut property");
+  if (drm_->GetCrtcProperty(*this, "GAMMA_LUT_SIZE", &gamma_lut_size_property_))
+    ALOGI("Failed to get &gamma_lut_size property");
+  if (drm_->GetCrtcProperty(*this, "linear_matrix", &linear_matrix_property_))
+    ALOGI("Failed to get &linear_matrix property");
+  if (drm_->GetCrtcProperty(*this, "gamma_matrix", &gamma_matrix_property_))
+    ALOGI("Failed to get &gamma_matrix property");
+
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
   properties_.push_back(&out_fence_ptr_property_);
@@ -68,6 +83,13 @@ int DrmCrtc::Init() {
   properties_.push_back(&partial_y_property_);
   properties_.push_back(&partial_w_property_);
   properties_.push_back(&partial_h_property_);
+  properties_.push_back(&cgc_lut_property_);
+  properties_.push_back(&degamma_lut_property_);
+  properties_.push_back(&degamma_lut_size_property_);
+  properties_.push_back(&gamma_lut_property_);
+  properties_.push_back(&gamma_lut_size_property_);
+  properties_.push_back(&linear_matrix_property_);
+  properties_.push_back(&gamma_matrix_property_);
 
   return 0;
 }
@@ -119,4 +141,33 @@ const DrmProperty &DrmCrtc::partial_w_property() const {
 const DrmProperty &DrmCrtc::partial_h_property() const {
   return partial_h_property_;
 }
+
+const DrmProperty &DrmCrtc::cgc_lut_property() const {
+    return cgc_lut_property_;
+}
+
+const DrmProperty &DrmCrtc::degamma_lut_property() const {
+    return degamma_lut_property_;
+}
+
+const DrmProperty &DrmCrtc::degamma_lut_size_property() const {
+    return degamma_lut_size_property_;
+}
+
+const DrmProperty &DrmCrtc::gamma_lut_property() const {
+    return gamma_lut_property_;
+}
+
+const DrmProperty &DrmCrtc::gamma_lut_size_property() const {
+    return gamma_lut_size_property_;
+}
+
+const DrmProperty &DrmCrtc::linear_matrix_property() const {
+    return linear_matrix_property_;
+}
+
+const DrmProperty &DrmCrtc::gamma_matrix_property() const {
+    return gamma_matrix_property_;
+}
+
 }  // namespace android

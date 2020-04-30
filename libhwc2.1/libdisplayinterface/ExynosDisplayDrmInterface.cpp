@@ -873,6 +873,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         planeEnableInfo[plane->id()] = 0;
     }
 
+    if ((ret = setDisplayColorSetting(drmReq)) != 0) {
+        HWC_LOGE(mExynosDisplay, "Failed to set display color setting");
+        return ret;
+    }
+
     for (size_t i = 0; i < mExynosDisplay->mDpuData.configs.size(); i++) {
         exynos_win_config_data& config = mExynosDisplay->mDpuData.configs[i];
         if ((config.state == config.WIN_STATE_BUFFER) ||
@@ -893,6 +898,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             uint32_t fbId = 0;
             if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
                 HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
+                return ret;
+            }
+            if ((ret = setPlaneColorSetting(drmReq, plane, config)) != 0) {
+                HWC_LOGE(mExynosDisplay, "Failed to set plane color setting, config[%zu]", i);
                 return ret;
             }
             /* Set this plane is enabled */
@@ -1020,9 +1029,9 @@ int32_t ExynosDisplayDrmInterface::setForcePanic()
     return 0;
 }
 
-inline uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
+uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
 {
-        return mDrmDevice->planes().size();
+    return mDrmDevice->planes().size();
 }
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::DrmModeAtomicReq(ExynosDisplayDrmInterface *displayInterface)
