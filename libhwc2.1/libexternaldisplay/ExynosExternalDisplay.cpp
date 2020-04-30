@@ -22,6 +22,7 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosDisplayDrmInterface.h"
+#include "ExynosDisplayDrmInterfaceModule.h"
 #include <linux/fb.h>
 
 #define SKIP_FRAME_COUNT 3
@@ -573,7 +574,7 @@ void ExynosExternalDisplay::handleHotplugEvent()
 void ExynosExternalDisplay::initDisplayInterface(uint32_t interfaceType)
 {
     if (interfaceType == INTERFACE_TYPE_DRM)
-        mDisplayInterface = std::make_unique<ExynosDisplayDrmInterface>((ExynosDisplay *)this);
+        mDisplayInterface = std::make_unique<ExynosExternalDisplayDrmInterfaceModule>((ExynosDisplay *)this);
     else
         LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
                 __func__, interfaceType);

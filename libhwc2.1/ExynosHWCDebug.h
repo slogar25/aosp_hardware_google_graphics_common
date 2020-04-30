@@ -40,6 +40,7 @@ enum {
     eDebugSkipValidate            =   0x00010000,
     eDebugDynamicRecomp           =   0x00020000,
     eDebugDisplayInterfaceConfig  =   0x00040000,
+    eDebugColorManagement         =   0x00080000,
 };
 
 class ExynosDisplay;

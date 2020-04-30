@@ -64,6 +64,11 @@ class DrmPlane {
   const DrmProperty &min_luminance_property() const;
   const DrmProperty &hw_restrictions_property() const;
 
+  const DrmProperty &eotf_lut_property() const;
+  const DrmProperty &oetf_lut_property() const;
+  const DrmProperty &gammut_matrix_property() const;
+  const DrmProperty &tone_mapping_property() const;
+
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
   }
@@ -100,6 +105,11 @@ class DrmPlane {
   DrmProperty max_luminance_;
   DrmProperty min_luminance_;
   DrmProperty hw_restrictions_;
+  DrmProperty eotf_lut_;
+  DrmProperty oetf_lut_;
+  DrmProperty gammut_matrix_;
+  DrmProperty tone_mapping_;
+
   std::vector<DrmProperty *> properties_;
   std::vector<uint32_t> formats_;
 };
