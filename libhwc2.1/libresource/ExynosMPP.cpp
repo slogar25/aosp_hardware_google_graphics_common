@@ -144,7 +144,8 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     mNeedCompressedTarget(false),
     mDstAllocatedSize(DST_SIZE_UNKNOWN),
     mUseM2MSrcFence(false),
-    mAttr(0)
+    mAttr(0),
+    mNeedSolidColorLayer(false)
 {
 
     for (int i=0; i<RESTRICTION_MAX; i++){
@@ -181,8 +182,6 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
             abort();
         } else {
             MPP_LOGI("mAcrylicHandle is created: %p", mAcrylicHandle);
-            if (mLogicalType != MPP_LOGICAL_G2D_YUV)
-                mAcrylicHandle->setDefaultColor(0, 0, 0, 0);
         }
     }
 
@@ -204,6 +203,11 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
         } else {
             MPP_LOGI("mAcrylicHandle is created: %p", mAcrylicHandle);
         }
+    }
+
+    if (mMaxSrcLayerNum > 1) {
+        mNeedSolidColorLayer = true;
+        mAcrylicHandle->setDefaultColor(0, 0, 0, 0);
     }
 
     mAssignedSources.clear();
@@ -709,15 +713,17 @@ uint32_t ExynosMPP::getDstMinWidth(struct exynos_image &dst)
         (mPhysicalType == MPP_G2D))
         return 64;
 
-    if ((dst.compressed == 1) && (mPhysicalType == MPP_G2D))
+    if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
+
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].minCropWidth;
 }
 uint32_t ExynosMPP::getDstMinHeight(struct exynos_image &dst)
 {
-    if ((dst.compressed == 1) && (mPhysicalType == MPP_G2D))
+    if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
+
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].minCropHeight;
 }
@@ -728,17 +734,35 @@ uint32_t ExynosMPP::getDstWidthAlign(struct exynos_image &dst)
         (mPhysicalType == MPP_G2D))
         return 64;
 
-    if ((dst.compressed == 1) && (mPhysicalType == MPP_G2D))
+    if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
+
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropWidthAlign;
 }
 uint32_t ExynosMPP::getDstHeightAlign(struct exynos_image &dst)
 {
-    if ((dst.compressed == 1) && (mPhysicalType == MPP_G2D))
+    if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
+
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropHeightAlign;
+}
+uint32_t ExynosMPP::getDstXOffsetAlign(struct exynos_image &dst)
+{
+    if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
+        return 16;
+
+    uint32_t idx = getRestrictionClassification(dst);
+    return mDstSizeRestrictions[idx].cropXAlign;
+}
+uint32_t ExynosMPP::getDstYOffsetAlign(struct exynos_image &dst)
+{
+    if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
+        return 16;
+
+    uint32_t idx = getRestrictionClassification(dst);
+    return mDstSizeRestrictions[idx].cropYAlign;
 }
 uint32_t ExynosMPP::getOutBufAlign()
 {
@@ -2004,6 +2028,8 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
     uint32_t minDstHeight = getDstMinHeight(dst);
     uint32_t dstWidthAlign = getDstWidthAlign(dst);
     uint32_t dstHeightAlign = getDstHeightAlign(dst);
+    uint32_t dstXOffsetAlign = getDstXOffsetAlign(dst);
+    uint32_t dstYOffsetAlign = getDstYOffsetAlign(dst);
 
     uint32_t maxDownscale = getMaxDownscale(display, src, dst);
     uint32_t maxUpscale = getMaxUpscale(src, dst);
@@ -2083,6 +2109,9 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         else if ((src.x % srcXOffsetAlign != 0) || (src.y % srcYOffsetAlign != 0))
             return -eMPPNotAlignedOffset;
     }
+
+    if ((dst.x % dstXOffsetAlign != 0) || (dst.y % dstYOffsetAlign != 0))
+        return -eMPPNotAlignedOffset;
 
     if (!isSupportedCompression(src))
         return -eMPPUnsupportedCompression;
