@@ -295,8 +295,11 @@ uint32_t DpuFormatToHalFormat(int format)
 int halFormatToDrmFormat(int format, uint32_t compressType)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if ((exynos_format_desc[i].halFormat == format) &&
-            (exynos_format_desc[i].getCompression() == compressType)) {
+        const int halFormat = exynos_format_desc[i].halFormat;
+        const uint32_t compType = exynos_format_desc[i].getCompression();
+
+        if ((halFormat == format) &&
+            ((compType == COMP_ANY) || (compType == compressType))) {
                 return exynos_format_desc[i].drmFormat;
         }
     }
