@@ -15,6 +15,7 @@
  */
 
 #include "ExynosDisplayInterface.h"
+#include "ExynosDisplay.h"
 
 ExynosDisplayInterface::~ExynosDisplayInterface()
 {
@@ -60,4 +61,10 @@ int32_t ExynosDisplayInterface::getReadbackBufferAttributes(
 {
     /* readback is not supported */
     return HWC2_ERROR_UNSUPPORTED;
+}
+
+bool ExynosDisplayInterface::isPrimary()
+{
+    return ((mExynosDisplay != nullptr) &&
+            (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY));
 }

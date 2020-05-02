@@ -2043,8 +2043,7 @@ int32_t ExynosResourceManager::deliverPerformanceInfo()
                 }
                 uint32_t format = mpp->mAssignedSources[0]->mMidImg.format;
                 bool hasSolidColorLayer = false;
-                if ((mpp->mLogicalType == MPP_LOGICAL_G2D_RGB) ||
-                    (mpp->mLogicalType == MPP_LOGICAL_G2D_COMBO)) {
+                if (mpp->mNeedSolidColorLayer) {
                     format = DEFAULT_MPP_DST_FORMAT;
                     hasSolidColorLayer = true;
                 }

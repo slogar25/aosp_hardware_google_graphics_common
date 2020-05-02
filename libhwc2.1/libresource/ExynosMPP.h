@@ -252,6 +252,11 @@ typedef struct g2d_ppc_list_for_scaling {
     float ppcList[PPC_SCALE_MAX];
 } g2d_ppc_list_for_scaling_t;
 
+typedef struct dstMetaInfo {
+    uint16_t minLuminance = 0;
+    uint16_t maxLuminance = 0;
+} dstMetaInfo_t;
+
 enum
 {
     NODE_NONE,
@@ -549,6 +554,8 @@ public:
     /* MPP's attribute bit (supported feature bit) */
     uint64_t    mAttr;
 
+    bool mNeedSolidColorLayer;
+
     ExynosMPP(ExynosResourceManager* resourceManager,
             uint32_t physicalType, uint32_t logicalType, const char *name,
             uint32_t physicalIndex, uint32_t logicalIndex, uint32_t preAssignInfo);
@@ -610,6 +617,8 @@ public:
     uint32_t getDstMinHeight(struct exynos_image &dst);
     virtual uint32_t getDstWidthAlign(struct exynos_image &dst);
     uint32_t getDstHeightAlign(struct exynos_image &dst);
+    uint32_t getDstXOffsetAlign(struct exynos_image &dst);
+    uint32_t getDstYOffsetAlign(struct exynos_image &dst);
     uint32_t getOutBufAlign();
     virtual bool isDstFormatSupported(struct exynos_image &dst);
     uint32_t getSrcMaxBlendingNum(struct exynos_image &src, struct exynos_image &dst);
@@ -652,6 +661,7 @@ public:
 
     virtual bool checkRotationCondition(struct exynos_image &src);
     void updateAttr();
+    dstMetaInfo getDstMetaInfo(android_dataspace_t dstDataspace);
 
 protected:
     uint32_t getBufferType(uint64_t usage);
@@ -663,6 +673,7 @@ protected:
     virtual int32_t doPostProcessingInternal();
     virtual int32_t setupLayer(exynos_mpp_img_info *srcImgInfo,
             struct exynos_image &src, struct exynos_image &dst);
+    virtual int32_t setColorConversionInfo() { return NO_ERROR; };
 
     uint32_t getRestrictionClassification(struct exynos_image &img);
 

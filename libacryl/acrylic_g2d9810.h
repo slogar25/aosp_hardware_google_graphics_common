@@ -20,7 +20,7 @@
 
 #include <hardware/exynos/acryl.h>
 
-#include <hardware/exynos/g2d9810_hdr_plugin.h>
+#include <hardware/exynos/g2d_hdr_plugin.h>
 
 #include <uapi/g2d9810.h>
 
@@ -32,7 +32,7 @@ class G2DHdrWriter {
     g2d_commandlist *mCmds;
 public:
     G2DHdrWriter() : mWriter(nullptr), mCmds(nullptr) {
-#ifdef LIBACRYL_G2D9810_HDR_PLUGIN
+#ifdef LIBACRYL_G2D_HDR_PLUGIN
         mWriter = IG2DHdr10CommandWriter::createInstance();
 #endif
     }

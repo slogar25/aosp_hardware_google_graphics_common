@@ -50,6 +50,13 @@ class DrmCrtc {
   const DrmProperty &partial_y_property() const;
   const DrmProperty &partial_w_property() const;
   const DrmProperty &partial_h_property() const;
+  const DrmProperty &cgc_lut_property() const;
+  const DrmProperty &degamma_lut_property() const;
+  const DrmProperty &degamma_lut_size_property() const;
+  const DrmProperty &gamma_lut_property() const;
+  const DrmProperty &gamma_lut_size_property() const;
+  const DrmProperty &linear_matrix_property() const;
+  const DrmProperty &gamma_matrix_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -71,6 +78,13 @@ class DrmCrtc {
   DrmProperty partial_y_property_;
   DrmProperty partial_w_property_;
   DrmProperty partial_h_property_;
+  DrmProperty cgc_lut_property_;
+  DrmProperty degamma_lut_property_;
+  DrmProperty degamma_lut_size_property_;
+  DrmProperty gamma_lut_property_;
+  DrmProperty gamma_lut_size_property_;
+  DrmProperty linear_matrix_property_;
+  DrmProperty gamma_matrix_property_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android
