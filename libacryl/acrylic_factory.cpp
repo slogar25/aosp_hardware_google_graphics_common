@@ -22,7 +22,7 @@
 #include <exynos_format.h> // hardware/smasung_slsi/exynos/include
 
 #include "acrylic_internal.h"
-#include "acrylic_g2d9810.h"
+#include "acrylic_g2d.h"
 
 static uint32_t all_fimg2d_gs101_formats[] = {
     HAL_PIXEL_FORMAT_RGBA_8888,
@@ -122,7 +122,7 @@ Acrylic *Acrylic::createInstance(const char *spec)
     ALOGD_TEST("Creating a new Acrylic instance of '%s'", spec);
 
     if (strcmp(spec, "fimg2d_gs101") == 0) {
-        compositor = new AcrylicCompositorG2D9810(capability_fimg2d_gs101, true);
+        compositor = new AcrylicCompositorG2D(capability_fimg2d_gs101, true);
     } else {
         ALOGE("Unknown HW2D compositor spec., %s", spec);
         return nullptr;

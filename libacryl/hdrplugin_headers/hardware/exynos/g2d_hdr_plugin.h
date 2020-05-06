@@ -1,5 +1,5 @@
 /*
- *  libacryl_plugins/plugin/g2d9810_hdr.h
+ *  libacryl_plugins/plugin/g2d_hdr.h
  *
  *   Copyright 2018 Samsung Electronics Co., Ltd.
  *
@@ -19,7 +19,7 @@
 #ifndef __LIBACRYL_PLUGIN_G2D_HDR_H__
 #define __LIBACRYL_PLUGIN_G2D_HDR_H__
 
-#include <uapi/g2d9810.h>
+#include <uapi/g2d.h>
 
 struct g2d_commandlist {
     struct g2d_reg *layer_hdr_mode;

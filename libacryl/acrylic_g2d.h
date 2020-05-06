@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-#ifndef __HARDWARE_EXYNOS_HW2DCOMPOSITOR_G2D9810_H__
-#define __HARDWARE_EXYNOS_HW2DCOMPOSITOR_G2D9810_H__
+#ifndef __HARDWARE_EXYNOS_HW2DCOMPOSITOR_G2D_H__
+#define __HARDWARE_EXYNOS_HW2DCOMPOSITOR_G2D_H__
 
 #include <hardware/exynos/acryl.h>
 
 #include <hardware/exynos/g2d_hdr_plugin.h>
 
-#include <uapi/g2d9810.h>
+#include <uapi/g2d.h>
 
 #include "acrylic_internal.h"
 #include "acrylic_device.h"
@@ -111,10 +111,10 @@ public:
 
 struct g2d_fmt;
 
-class AcrylicCompositorG2D9810: public Acrylic {
+class AcrylicCompositorG2D: public Acrylic {
 public:
-    AcrylicCompositorG2D9810(const HW2DCapability &capability, bool newcolormode);
-    virtual ~AcrylicCompositorG2D9810();
+    AcrylicCompositorG2D(const HW2DCapability &capability, bool newcolormode);
+    virtual ~AcrylicCompositorG2D();
     virtual bool execute(int fence[], unsigned int num_fences);
     virtual bool execute(int *handle = NULL);
     virtual bool waitExecution(int handle);
@@ -150,4 +150,4 @@ private:
     size_t len_halfmt_to_g2dfmt_tbl;
 };
 
-#endif //__HARDWARE_EXYNOS_HW2DCOMPOSITOR_G2D9810_H__
+#endif //__HARDWARE_EXYNOS_HW2DCOMPOSITOR_G2D_H__

@@ -28,7 +28,7 @@
 
 #include <exynos_format.h> // hardware/smasung_slsi/exynos/include
 
-#include "acrylic_g2d9810.h"
+#include "acrylic_g2d.h"
 
 enum {
     G2D_CSC_STD_UNDEFINED = -1,
@@ -137,7 +137,7 @@ public:
 
         *command |= mMatrixCount++;
         // 8-bit part data are always dithered by MFC
-        if ((g2dfmt & G2D_DATAFMT_YUV420SP82_9810) != 0)
+        if ((g2dfmt & G2D_DATAFMT_YUV420SP82_LGCY) != 0)
             *command |= G2D_YCBCRMODE_DITHER;
 
         return true;
@@ -458,7 +458,7 @@ struct g2d_fmt {
     uint32_t rgb_bpp;
 };
 
-static g2d_fmt __halfmt_to_g2dfmt_9810[] = {
+static g2d_fmt __halfmt_to_g2dfmt_legacy[] = {
 //  {halfmt,                                      g2dfmt,  num_buffers, rgbbpp}
     {HAL_PIXEL_FORMAT_RGBA_8888,                  G2D_FMT_ABGR8888,  1, 4},
     {HAL_PIXEL_FORMAT_BGRA_8888,                  G2D_FMT_ARGB8888,  1, 4},
@@ -477,17 +477,17 @@ static g2d_fmt __halfmt_to_g2dfmt_9810[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,        G2D_FMT_NV12,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,      G2D_FMT_NV12,      2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,       G2D_FMT_NV12,      1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,  G2D_FMT_NV12_82_9810,   1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, G2D_FMT_NV12_82_9810,   2, 0},
-    {HAL_PIXEL_FORMAT_YCBCR_P010,                 G2D_FMT_NV12_P010_9810, 1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,        G2D_FMT_NV12_P010_9810, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,  G2D_FMT_NV12_82_LGCY,   1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, G2D_FMT_NV12_82_LGCY,   2, 0},
+    {HAL_PIXEL_FORMAT_YCBCR_P010,                 G2D_FMT_NV12_P010_LGCY, 1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,        G2D_FMT_NV12_P010_LGCY, 2, 0},
     {HAL_PIXEL_FORMAT_YCbCr_422_I,                G2D_FMT_YUYV,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,         G2D_FMT_YVYU,      1, 0},
     {HAL_PIXEL_FORMAT_YCbCr_422_SP,               G2D_FMT_NV16,      1, 0},
     // TODO: add p010
 };
 
-static g2d_fmt __halfmt_to_g2dfmt_9820[] = {
+static g2d_fmt __halfmt_to_g2dfmt[] = {
 //  {halfmt,                                      g2dfmt,  num_buffers, rgbbpp}
     {HAL_PIXEL_FORMAT_RGBA_8888,                  G2D_FMT_ABGR8888,  1, 4},
     {HAL_PIXEL_FORMAT_BGRA_8888,                  G2D_FMT_ARGB8888,  1, 4},
@@ -506,10 +506,10 @@ static g2d_fmt __halfmt_to_g2dfmt_9820[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,        G2D_FMT_NV12,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,      G2D_FMT_NV12,      2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,       G2D_FMT_NV12,      1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,  G2D_FMT_NV12_82_9820,   1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, G2D_FMT_NV12_82_9820,   2, 0},
-    {HAL_PIXEL_FORMAT_YCBCR_P010,                 G2D_FMT_NV12_P010_9820, 1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,        G2D_FMT_NV12_P010_9820, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,  G2D_FMT_NV12_82,   1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, G2D_FMT_NV12_82,   2, 0},
+    {HAL_PIXEL_FORMAT_YCBCR_P010,                 G2D_FMT_NV12_P010, 1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,        G2D_FMT_NV12_P010, 2, 0},
     {HAL_PIXEL_FORMAT_YCbCr_422_I,                G2D_FMT_YUYV,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,         G2D_FMT_YVYU,      1, 0},
     {HAL_PIXEL_FORMAT_YCbCr_422_SP,               G2D_FMT_NV16,      1, 0},
@@ -536,7 +536,7 @@ static g2d_fmt *halfmt_to_g2dfmt(struct g2d_fmt *tbl, size_t tbl_len, uint32_t h
     return NULL;
 }
 
-AcrylicCompositorG2D9810::AcrylicCompositorG2D9810(const HW2DCapability &capability, bool newcolormode)
+AcrylicCompositorG2D::AcrylicCompositorG2D(const HW2DCapability &capability, bool newcolormode)
     : Acrylic(capability), mDev((capability.maxLayerCount() > 2) ? "/dev/g2d" : "/dev/fimg2d"),
       mMaxSourceCount(0), mPriority(-1)
 {
@@ -547,25 +547,25 @@ AcrylicCompositorG2D9810::AcrylicCompositorG2D9810(const HW2DCapability &capabil
         ALOGERR("Failed to get G2D command version");
     ALOGI("G2D API Version %d", mVersion);
 
-    halfmt_to_g2dfmt_tbl = newcolormode ? __halfmt_to_g2dfmt_9820 : __halfmt_to_g2dfmt_9810;
-    len_halfmt_to_g2dfmt_tbl = newcolormode ? ARRSIZE(__halfmt_to_g2dfmt_9820) : ARRSIZE(__halfmt_to_g2dfmt_9810);
+    halfmt_to_g2dfmt_tbl = newcolormode ? __halfmt_to_g2dfmt : __halfmt_to_g2dfmt_legacy;
+    len_halfmt_to_g2dfmt_tbl = newcolormode ? ARRSIZE(__halfmt_to_g2dfmt) : ARRSIZE(__halfmt_to_g2dfmt_legacy);
 
     mUsePolyPhaseFilter = getCapabilities().supportedMinDecimation() == hw2d_coord_t{4, 4};
 
-    ALOGD_TEST("Created a new Acrylic for G2D 9810 on %p", this);
+    ALOGD_TEST("Created a new Acrylic for G2D on %p", this);
 }
 
-AcrylicCompositorG2D9810::~AcrylicCompositorG2D9810()
+AcrylicCompositorG2D::~AcrylicCompositorG2D()
 {
     delete [] mTask.source;
     delete [] mTask.commands.target;
     for (unsigned int i = 0; i < mMaxSourceCount; i++)
         delete [] mTask.commands.source[i];
 
-    ALOGD_TEST("Deleting Acrylic for G2D 9810 on %p", this);
+    ALOGD_TEST("Deleting Acrylic for G2D on %p", this);
 }
 
-unsigned int AcrylicCompositorG2D9810::updateFilterCoefficients(unsigned int layercount, g2d_reg regs[])
+unsigned int AcrylicCompositorG2D::updateFilterCoefficients(unsigned int layercount, g2d_reg regs[])
 {
     if (!mUsePolyPhaseFilter)
         return 0;
@@ -616,7 +616,7 @@ static unsigned int sbwc_lossy_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80,
 };
 
-bool AcrylicCompositorG2D9810::prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[], int index)
+bool AcrylicCompositorG2D::prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[], int index)
 {
     image.flags = 0;
 
@@ -765,7 +765,7 @@ static void setSolidLayer(struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t 
     cmd[G2DSFR_SRC_SBWCINFO] = 0;
 }
 
-bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g2d_layer &image, uint32_t cmd[])
+bool AcrylicCompositorG2D::prepareSolidLayer(AcrylicCanvas &canvas, struct g2d_layer &image, uint32_t cmd[])
 {
     hw2d_coord_t xy = canvas.getImageDimension();
 
@@ -795,7 +795,7 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicCanvas &canvas, struct g
     return true;
 }
 
-bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size, unsigned int index)
+bool AcrylicCompositorG2D::prepareSolidLayer(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[], hw2d_coord_t target_size, unsigned int index)
 {
     hw2d_coord_t xy = layer.getImageDimension();
 
@@ -841,7 +841,7 @@ bool AcrylicCompositorG2D9810::prepareSolidLayer(AcrylicLayer &layer, struct g2d
     return true;
 }
 
-bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[],
+bool AcrylicCompositorG2D::prepareSource(AcrylicLayer &layer, struct g2d_layer &image, uint32_t cmd[],
                                              hw2d_coord_t target_size, unsigned int index, unsigned int image_index)
 {
     if (layer.isSolidColor()) {
@@ -933,7 +933,7 @@ bool AcrylicCompositorG2D9810::prepareSource(AcrylicLayer &layer, struct g2d_lay
     return true;
 }
 
-bool AcrylicCompositorG2D9810::reallocLayer(unsigned int layercount)
+bool AcrylicCompositorG2D::reallocLayer(unsigned int layercount)
 {
     if (mMaxSourceCount >= layercount)
         return true;
@@ -981,7 +981,7 @@ bool AcrylicCompositorG2D9810::reallocLayer(unsigned int layercount)
     return true;
 }
 
-int AcrylicCompositorG2D9810::ioctlG2D(void)
+int AcrylicCompositorG2D::ioctlG2D(void)
 {
     if (mVersion == 1) {
         if (mDev.ioctl(G2D_IOC_PROCESS, &mTask) < 0)
@@ -1011,7 +1011,7 @@ int AcrylicCompositorG2D9810::ioctlG2D(void)
     return 0;
 }
 
-bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, bool nonblocking)
+bool AcrylicCompositorG2D::executeG2D(int fence[], unsigned int num_fences, bool nonblocking)
 {
     if (!validateAllLayers())
         return false;
@@ -1155,7 +1155,7 @@ bool AcrylicCompositorG2D9810::executeG2D(int fence[], unsigned int num_fences, 
     return true;
 }
 
-bool AcrylicCompositorG2D9810::execute(int fence[], unsigned int num_fences)
+bool AcrylicCompositorG2D::execute(int fence[], unsigned int num_fences)
 {
     if (!executeG2D(fence, num_fences, true)) {
         // Clearing all acquire fences because their buffers are expired.
@@ -1170,7 +1170,7 @@ bool AcrylicCompositorG2D9810::execute(int fence[], unsigned int num_fences)
     return true;
 }
 
-bool AcrylicCompositorG2D9810::execute(int *handle)
+bool AcrylicCompositorG2D::execute(int *handle)
 {
     if (!executeG2D(NULL, 0, handle ? true : false)) {
         // Clearing all acquire fences because their buffers are expired.
@@ -1188,14 +1188,14 @@ bool AcrylicCompositorG2D9810::execute(int *handle)
     return true;
 }
 
-bool AcrylicCompositorG2D9810::waitExecution(int __unused handle)
+bool AcrylicCompositorG2D::waitExecution(int __unused handle)
 {
     ALOGD_TEST("Waiting for execution of m2m1shot2 G2D completed by handle %d", handle);
 
     return true;
 }
 
-bool AcrylicCompositorG2D9810::requestPerformanceQoS(AcrylicPerformanceRequest *request)
+bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *request)
 {
     g2d_performance data;
 
@@ -1322,7 +1322,7 @@ bool AcrylicCompositorG2D9810::requestPerformanceQoS(AcrylicPerformanceRequest *
     return true;
 }
 
-int AcrylicCompositorG2D9810::prioritize(int priority)
+int AcrylicCompositorG2D::prioritize(int priority)
 {
     static int32_t g2d_priorities[] = {
             G2D_LOW_PRIORITY,     // 0
