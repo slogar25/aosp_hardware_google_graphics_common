@@ -4398,3 +4398,28 @@ void ExynosDisplay::initDisplayInterface(uint32_t __unused interfaceType)
     mDisplayInterface = std::make_unique<ExynosDisplayInterface>();
     mDisplayInterface->init(this);
 }
+
+void ExynosDisplay::traceLayerTypes() {
+    size_t g2d_count = 0;
+    size_t dpu_count = 0;
+    size_t gpu_count = 0;
+    for(auto const& layer: mLayers) {
+        switch (layer->mExynosCompositionType) {
+            case HWC2_COMPOSITION_EXYNOS:
+                g2d_count++;
+                break;
+            case HWC2_COMPOSITION_CLIENT:
+                gpu_count++;
+                break;
+            case HWC2_COMPOSITION_DEVICE:
+                dpu_count++;
+                break;
+            default:
+                break;
+        }
+    }
+    ATRACE_INT("Layers: DPU", dpu_count);
+    ATRACE_INT("Layers: G2D", g2d_count);
+    ATRACE_INT("Layers: GPU", gpu_count);
+    ATRACE_INT("Layers: Total", mLayers.size());
+}
