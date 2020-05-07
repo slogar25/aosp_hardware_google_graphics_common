@@ -19,6 +19,8 @@
 #ifndef __HARDWARE_EXYNOS_ION_H__
 #define __HARDWARE_EXYNOS_ION_H__
 
+#include <sys/types.h>
+
 #define ION_EXYNOS_HEAP_ID_SYSTEM        0
 #define ION_EXYNOS_HEAP_ID_CRYPTO        1
 #define ION_EXYNOS_HEAP_ID_VIDEO_STREAM  3
@@ -49,7 +51,7 @@
 
 __BEGIN_DECLS
 
-int exynos_ion_open();
+int exynos_ion_open(void);
 int exynos_ion_close(int fd);
 int exynos_ion_alloc(int ion_fd, size_t len,
                       unsigned int heap_mask, unsigned int flags);
