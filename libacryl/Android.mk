@@ -49,8 +49,7 @@ LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 
-LOCAL_SRC_FILES := acrylic.cpp acrylic_dummy.cpp
-LOCAL_SRC_FILES += acrylic_g2d.cpp acrylic_mscl9810.cpp acrylic_g2d9810.cpp
+LOCAL_SRC_FILES := acrylic.cpp acrylic_g2d.cpp
 LOCAL_SRC_FILES += acrylic_factory.cpp acrylic_layer.cpp acrylic_formats.cpp
 LOCAL_SRC_FILES += acrylic_performance.cpp acrylic_device.cpp
 
