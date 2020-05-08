@@ -678,10 +678,11 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
     }
     if (ret < 0) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to add FB, fb_id(%d), ret(%d), f_w: %d, f_h: %d, dst.w: %d, dst.h: %d, "
-                "format: %d, buf_handles[%d, %d, %d, %d], "
+                "format: %d %4.4s, buf_handles[%d, %d, %d, %d], "
                 "pitches[%d, %d, %d, %d], offsets[%d, %d, %d, %d], modifiers[%#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 ", %#" PRIx64 "]",
                 __func__, fbId, ret,
-                config.src.f_w, config.src.f_h, config.dst.w, config.dst.h, drmFormat,
+                config.src.f_w, config.src.f_h, config.dst.w, config.dst.h,
+                drmFormat, (char *)&drmFormat,
                 buf_handles[0], buf_handles[1], buf_handles[2], buf_handles[3],
                 pitches[0], pitches[1], pitches[2], pitches[3],
                 offsets[0], offsets[1], offsets[2], offsets[3],
@@ -1392,6 +1393,11 @@ void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace(int32_t col
     /* TODO (b/149043754): This should be set according to color mode */
     if (!mSupportedFormats.empty())
         mReadbackFormat = mSupportedFormats[0];
+    auto it = std::find(mSupportedFormats.begin(),
+            mSupportedFormats.end(), PREFERRED_READBACK_FORMAT);
+    if (it != mSupportedFormats.end())
+        mReadbackFormat = *it;
+
     if (!mSupportedDataspaces.empty())
         mReadbackDataspace = mSupportedDataspaces[0];
 }
