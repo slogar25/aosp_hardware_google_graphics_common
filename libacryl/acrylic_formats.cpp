@@ -68,7 +68,6 @@ static uint32_t __halfmt_to_v4l2_rgb[][2] = {
 
 // The V4L2_PIX_FMT_RGB32, V4L2_PIX_FMT_BGR32 are deprecated in V4L2.
 // But the legacy mscl driver and libhwcutils requires them.
-// The HAL format conversion to the deprecated V4L2 formats are prepared for mscl_9810
 static uint32_t __halfmt_to_v4l2_rgb_deprecated[][2] = {
     {HAL_PIXEL_FORMAT_RGBA_8888,                    V4L2_PIX_FMT_RGB32       },
     {HAL_PIXEL_FORMAT_BGRA_8888,                    V4L2_PIX_FMT_BGR32       },
