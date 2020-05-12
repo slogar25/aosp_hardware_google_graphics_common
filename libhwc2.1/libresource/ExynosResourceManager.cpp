@@ -1220,6 +1220,15 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
                     dst_img.x, dst_img.y, dst_img.w, dst_img.h,
                     dst_scale_img.x, dst_scale_img.y, dst_scale_img.w, dst_scale_img.h);
             image_lists[index++] = dst_scale_img;
+
+            if (isFormatSBWC(dst_scale_img.format)) {
+                /*
+                 * SBWC format could not be supported in specific dst size
+                 * Add uncompressed YUV format to cover this size
+                 */
+                dst_scale_img.format = DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT;
+                image_lists[index++] = dst_scale_img;
+            }
         }
     }
 
@@ -1265,6 +1274,14 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     }
 
     image_lists[index++] = dst_img;
+    if (isFormatSBWC(dst_img.format)) {
+        /*
+         * SBWC format could not be supported in specific dst size
+         * Add uncompressed YUV format to cover this size
+         */
+        dst_img.format = DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT;
+        image_lists[index++] = dst_img;
+    }
 
     /* For G2D HDR case */
     if (hasHdrInfo(src_img)) {
