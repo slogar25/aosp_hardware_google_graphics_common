@@ -167,7 +167,6 @@ struct exynos_dpu_data
         {
             exynos_win_config_data config_data;
             configs.push_back(config_data);
-            configs.push_back(config_data);
         }
     };
 
