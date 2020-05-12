@@ -225,6 +225,9 @@ typedef enum {
 #ifndef DEFAULT_MPP_DST_YUV_FORMAT
 #define DEFAULT_MPP_DST_YUV_FORMAT HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN
 #endif
+#ifndef DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT
+#define DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN
+#endif
 
 typedef struct exynos_mpp_img_info {
     private_handle_t *bufferHandle;

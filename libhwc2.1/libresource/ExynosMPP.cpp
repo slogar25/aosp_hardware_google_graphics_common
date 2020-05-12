@@ -708,6 +708,10 @@ uint32_t ExynosMPP::getDstMinWidth(struct exynos_image &dst)
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
 
+    if ((mPhysicalType == MPP_G2D) && (mNeedSolidColorLayer == false) &&
+            isFormatSBWC(dst.format))
+        return 32;
+
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].minCropWidth;
 }
@@ -715,6 +719,10 @@ uint32_t ExynosMPP::getDstMinHeight(struct exynos_image &dst)
 {
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
+
+    if ((mPhysicalType == MPP_G2D) && (mNeedSolidColorLayer == false) &&
+            isFormatSBWC(dst.format))
+        return 8;
 
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].minCropHeight;
@@ -729,6 +737,10 @@ uint32_t ExynosMPP::getDstWidthAlign(struct exynos_image &dst)
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
 
+    if ((mPhysicalType == MPP_G2D) && (mNeedSolidColorLayer == false) &&
+            isFormatSBWC(dst.format))
+        return 32;
+
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropWidthAlign;
 }
@@ -736,6 +748,10 @@ uint32_t ExynosMPP::getDstHeightAlign(struct exynos_image &dst)
 {
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
+
+    if ((mPhysicalType == MPP_G2D) && (mNeedSolidColorLayer == false) &&
+            isFormatSBWC(dst.format))
+        return 8;
 
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropHeightAlign;
@@ -745,6 +761,10 @@ uint32_t ExynosMPP::getDstXOffsetAlign(struct exynos_image &dst)
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
 
+    if ((mPhysicalType == MPP_G2D) && (mNeedSolidColorLayer == false) &&
+            isFormatSBWC(dst.format))
+        return 32;
+
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropXAlign;
 }
@@ -752,6 +772,10 @@ uint32_t ExynosMPP::getDstYOffsetAlign(struct exynos_image &dst)
 {
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
+
+    if ((mPhysicalType == MPP_G2D) && (mNeedSolidColorLayer == false) &&
+            isFormatSBWC(dst.format))
+        return 8;
 
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropYAlign;
