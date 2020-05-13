@@ -22,7 +22,7 @@ LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_HEADER_LIBRARIES := libcutils_headers libsystem_headers libhardware_headers
 LOCAL_SHARED_LIBRARIES := liblog libion_google
 LOCAL_SRC_FILES := memtrack_exynos.cpp mali.cpp ion.cpp dmabuf.cpp
-LOCAL_MODULE := memtrack.$(TARGET_BOOTLOADER_BOARD_NAME)
+LOCAL_MODULE := memtrack.$(TARGET_BOARD_PLATFORM)
 LOCAL_PROPRIETARY_MODULE := true
 
 include $(BUILD_SHARED_LIBRARY)
