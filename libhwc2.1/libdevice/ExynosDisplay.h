@@ -782,6 +782,8 @@ class ExynosDisplay {
 
         /* For debugging */
         void setHWC1LayerList(hwc_display_contents_1_t *contents) {mHWC1LayerList = contents;};
+        void traceLayerTypes();
+
         bool validateExynosCompositionLayer();
         void printDebugInfos(String8 &reason);
 
