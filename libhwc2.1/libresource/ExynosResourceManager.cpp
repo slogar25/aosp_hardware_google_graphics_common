@@ -1888,7 +1888,7 @@ int32_t ExynosResourceManager::preAssignResources()
             ExynosDisplay *display = NULL;
             for (size_t j = 0; j < mDevice->mDisplays.size(); j++) {
                 display = mDevice->mDisplays[j];
-                int checkBit = mOtfMPPs[i]->mPreAssignDisplayList[displayMode] & (1<<(display->mType));
+                int checkBit = mOtfMPPs[i]->mPreAssignDisplayList[displayMode] & display->getDisplayPreAssignBit();
                 HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), checkBit(%d)", j, checkBit);
                 if (checkBit) {
                     HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), displayId(%d), display(%p)", j, display->mDisplayId, display);
@@ -1918,7 +1918,7 @@ int32_t ExynosResourceManager::preAssignResources()
             ExynosDisplay *display = NULL;
             for (size_t j = 0; j < mDevice->mDisplays.size(); j++) {
                 display = mDevice->mDisplays[j];
-                int checkBit = mM2mMPPs[i]->mPreAssignDisplayList[displayMode] & (1<<(display->mType));
+                int checkBit = mM2mMPPs[i]->mPreAssignDisplayList[displayMode] & display->getDisplayPreAssignBit();
                 HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), checkBit(%d)", j, checkBit);
                 if (checkBit) {
                     HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), displayId(%d), display(%p)", j, display->mDisplayId, display);

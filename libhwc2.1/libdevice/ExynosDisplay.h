@@ -38,6 +38,11 @@
 #define MAX_BRIGHTNESS_LEN 5
 
 using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
+
+#ifndef SECOND_DISPLAY_START_BIT
+#define SECOND_DISPLAY_START_BIT   4
+#endif
+
 typedef hwc2_composition_t exynos_composition;
 
 class ExynosLayer;
@@ -1100,6 +1105,12 @@ class ExynosDisplay {
 
         int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
+        /* getDisplayPreAssignBit support mIndex up to 1.
+           It supports only dual LCD and 2 external displays */
+        inline uint32_t getDisplayPreAssignBit() {
+            uint32_t type = SECOND_DISPLAY_START_BIT * mIndex + mType;
+            return 1 << type;
+        }
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
