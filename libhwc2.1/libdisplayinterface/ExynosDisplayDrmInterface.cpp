@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include <sys/types.h>
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosHWCDebug.h"
@@ -930,6 +932,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
+    if (ATRACE_ENABLED()) {
+        mExynosDisplay->traceLayerTypes();
+    }
+
     uint32_t flags = 0;
     if (mExynosDisplay->mDpuData.enable_readback)
         flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
@@ -1158,6 +1164,7 @@ String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
 
 int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool loggingForDebug)
 {
+    ATRACE_NAME("drmModeAtomicCommit");
     android::String8 result;
     int ret = drmModeAtomicCommit(mDrmDisplayInterface->mDrmDevice->fd(),
             mPset, flags, mDrmDisplayInterface->mDrmDevice);
