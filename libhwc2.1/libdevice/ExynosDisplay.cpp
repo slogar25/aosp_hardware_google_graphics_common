@@ -309,6 +309,8 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mDisplayControl.adjustDisplayFrame = false;
     mDisplayControl.cursorSupport = false;
 
+    mDisplayConfigs.clear();
+
     mPowerModeState = HWC2_POWER_MODE_OFF;
     mVsyncState = HWC2_VSYNC_DISABLE;
 
@@ -2201,9 +2203,17 @@ int32_t ExynosDisplay::createLayer(hwc2_layer_t* outLayer) {
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::getActiveConfig(
-        hwc2_config_t* outConfig) {
-    return mDisplayInterface->getActiveConfig(outConfig);
+int32_t ExynosDisplay::getActiveConfig(hwc2_config_t* outConfig)
+{
+    Mutex::Autolock lock(mDisplayMutex);
+    return getActiveConfigInternal(outConfig);
+}
+
+int32_t ExynosDisplay::getActiveConfigInternal(hwc2_config_t* outConfig)
+{
+    *outConfig = mActiveConfig;
+
+    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::getLayerCompositionTypeForValidationType(uint32_t layerIndex)
@@ -2307,7 +2317,38 @@ int32_t ExynosDisplay::getColorModes(
 int32_t ExynosDisplay::getDisplayAttribute(
         hwc2_config_t config,
         int32_t /*hwc2_attribute_t*/ attribute, int32_t* outValue) {
-    return mDisplayInterface->getDisplayAttribute(config, attribute, outValue);
+
+    switch (attribute) {
+    case HWC2_ATTRIBUTE_VSYNC_PERIOD:
+        *outValue = mDisplayConfigs[config].vsyncPeriod;
+        break;
+
+    case HWC2_ATTRIBUTE_WIDTH:
+        *outValue = mDisplayConfigs[config].width;
+        break;
+
+    case HWC2_ATTRIBUTE_HEIGHT:
+        *outValue = mDisplayConfigs[config].height;
+        break;
+
+    case HWC2_ATTRIBUTE_DPI_X:
+        *outValue = mDisplayConfigs[config].Xdpi;
+        break;
+
+    case HWC2_ATTRIBUTE_DPI_Y:
+        *outValue = mDisplayConfigs[config].Ydpi;
+        break;
+
+    case HWC2_ATTRIBUTE_CONFIG_GROUP:
+        *outValue = mDisplayConfigs[config].groupId;
+        break;
+
+    default:
+        ALOGE("unknown display attribute %u", attribute);
+        return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::getDisplayConfigs(
@@ -2790,9 +2831,33 @@ int32_t ExynosDisplay::presentPostProcessing()
     return NO_ERROR;
 }
 
-int32_t ExynosDisplay::setActiveConfig(
-        hwc2_config_t config) {
-    return mDisplayInterface->setActiveConfig(config);
+int32_t ExynosDisplay::setActiveConfig(hwc2_config_t config)
+{
+    Mutex::Autolock lock(mDisplayMutex);
+    return setActiveConfigInternal(config);
+}
+
+int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config)
+{
+    if(isBadConfig(config))
+        return HWC2_ERROR_BAD_CONFIG;
+    /* Don't skip when power was off */
+    if(!mSkipFrame && needNotChangeConfig(config))
+        return HWC2_ERROR_NONE;
+
+    ALOGI("%s : %dx%d, %dms, %d Xdpi, %d Ydpi", __func__,
+            mXres, mYres, mVsyncPeriod, mXdpi, mYdpi);
+    ALOGI("(requested %d) : %dx%d, %dms, %d Xdpi, %d Ydpi", config,
+            mDisplayConfigs[config].width, mDisplayConfigs[config].height, mDisplayConfigs[config].vsyncPeriod,
+            mDisplayConfigs[config].Xdpi, mDisplayConfigs[config].Ydpi);
+
+    if (mDisplayInterface->setActiveConfig(config) < 0) {
+        ALOGE("%s bad config request", __func__);
+        return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    updateInternalDisplayConfigVariables(config);
+    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplay::setClientTarget(
@@ -3030,6 +3095,44 @@ int32_t ExynosDisplay::getClientTargetProperty(hwc_client_target_property_t* out
     outClientTargetProperty->pixelFormat = HAL_PIXEL_FORMAT_RGBA_8888;
     outClientTargetProperty->dataspace = HAL_DATASPACE_UNKNOWN;
     return HWC2_ERROR_NONE;
+}
+
+bool ExynosDisplay::isBadConfig(hwc2_config_t config)
+{
+    /* Check invalid config */
+    const auto its = mDisplayConfigs.find(config);
+    if (its == mDisplayConfigs.end()) {
+        ALOGE("%s, invalid config : %d", __func__, config);
+        return true;
+    }
+
+    return false;
+}
+
+bool ExynosDisplay::needNotChangeConfig(hwc2_config_t config)
+{
+    /* getting current config and compare */
+    /* If same value, return */
+    if (mActiveConfig == config) {
+        ALOGI("%s, Same config change requested : %d", __func__, config);
+        return true;
+    }
+
+    return false;
+}
+
+int32_t ExynosDisplay::updateInternalDisplayConfigVariables(hwc2_config_t config)
+{
+    mActiveConfig = config;
+
+    /* Update internal variables */
+    getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_WIDTH, (int32_t*)&mXres);
+    getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_HEIGHT, (int32_t*)&mYres);
+    getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_X, (int32_t*)&mXdpi);
+    getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_Y, (int32_t*)&mYdpi);
+    getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD, (int32_t*)&mVsyncPeriod);
+
+    return NO_ERROR;
 }
 
 int32_t ExynosDisplay::setOutputBuffer( buffer_handle_t __unused buffer, int32_t __unused releaseFence)

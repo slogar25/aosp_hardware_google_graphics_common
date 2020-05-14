@@ -29,8 +29,6 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         ~ExynosPrimaryDisplay();
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
-        virtual int32_t setActiveConfig(hwc2_config_t config) override;
-        virtual int32_t getActiveConfig(hwc2_config_t* outConfig) override;
         virtual int32_t SetCurrentPanelGammaSource(const DisplayType type,
                                                    const PanelGammaSource& source) override;
         virtual PanelGammaSource GetCurrentPanelGammaSource() const override {
@@ -49,6 +47,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
          */
         virtual int32_t setPowerMode(int32_t mode) override;
         virtual bool getHDRException(ExynosLayer* __unused layer);
+        virtual int32_t setActiveConfigInternal(hwc2_config_t config) override;
+        virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig) override;
     public:
         // Prepare multi resolution
         ResolutionInfo mResolutionInfo;

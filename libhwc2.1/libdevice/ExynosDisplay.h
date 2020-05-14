@@ -21,6 +21,7 @@
 #include <system/graphics.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
+#include <android/hardware/graphics/composer/2.4/types.h>
 
 #include "ExynosHWC.h"
 #include "display_common.h"
@@ -41,6 +42,7 @@
 #define LOW_FPS_THRESHOLD     5
 #define MAX_BRIGHTNESS_LEN 5
 
+using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
 typedef hwc2_composition_t exynos_composition;
 
 class ExynosLayer;
@@ -262,6 +264,21 @@ struct ResolutionInfo {
     int      nPanelType[3];
 };
 
+typedef struct displayConfigs {
+    // HWC2_ATTRIBUTE_VSYNC_PERIOD
+    VsyncPeriodNanos vsyncPeriod;
+    // HWC2_ATTRIBUTE_WIDTH
+    uint32_t width;
+    // case HWC2_ATTRIBUTE_HEIGHT
+    uint32_t height;
+    // HWC2_ATTRIBUTE_DPI_X
+    uint32_t Xdpi;
+    // HWC2_ATTRIBUTE_DPI_Y
+    uint32_t Ydpi;
+    // HWC2_ATTRIBUTE_CONFIG_GROUP
+    uint32_t groupId;
+} displayConfigs_t;
+
 struct DisplayControl {
     /** Composition crop en/disable **/
     bool enableCompositionCrop;
@@ -428,6 +445,7 @@ class ExynosDisplay {
         int32_t mDeviceXres;
         int32_t mDeviceYres;
         ResolutionInfo mResolutionInfo;
+        std::map<uint32_t, displayConfigs_t> mDisplayConfigs;
 
         // WCG
         android_color_mode_t mColorMode;
@@ -437,6 +455,8 @@ class ExynosDisplay {
 
         FILE *mBrightnessFd;
         uint32_t mMaxBrightness;
+
+        uint32_t mActiveConfig = UINT_MAX;
 
         void initDisplay();
 
@@ -923,6 +943,11 @@ class ExynosDisplay {
          */
         int32_t getClientTargetProperty(hwc_client_target_property_t* outClientTargetProperty);
 
+        /* setActiveConfig MISCs */
+        bool isBadConfig(hwc2_config_t config);
+        bool needNotChangeConfig(hwc2_config_t config);
+        int32_t updateInternalDisplayConfigVariables(hwc2_config_t config);
+
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
 
@@ -984,6 +1009,8 @@ class ExynosDisplay {
 
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
+        virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
+        virtual int32_t setActiveConfigInternal(hwc2_config_t config);
 
     public:
         /**

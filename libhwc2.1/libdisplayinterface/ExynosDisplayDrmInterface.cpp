@@ -23,6 +23,8 @@
 #include <xf86drm.h>
 #include <drm.h>
 
+using namespace std::chrono_literals;
+
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
 constexpr float DISPLAY_LUMINANCE_UNIT = 10000;
@@ -65,7 +67,6 @@ void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
     mDrmDevice = NULL;
     mDrmCrtc = NULL;
     mDrmConnector = NULL;
-    mActiveConfig = UINT_MAX;
 }
 
 void ExynosDisplayDrmInterface::parseEnums(const DrmProperty& property,
@@ -284,6 +285,18 @@ int32_t ExynosDisplayDrmInterface::setLowPowerMode() {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
+    uint32_t mm_width = mDrmConnector->mm_width();
+    uint32_t mm_height = mDrmConnector->mm_height();
+
+    mExynosDisplay->mXres = mDozeDrmMode.h_display();
+    mExynosDisplay->mYres = mDozeDrmMode.v_display();
+    // in nanoseconds
+    mExynosDisplay->mVsyncPeriod = 1000 * 1000 * 1000 / mDozeDrmMode.v_refresh();
+    // Dots per 1000 inches
+    mExynosDisplay->mXdpi = mm_width ? (mDozeDrmMode.h_display() * kUmPerInch) / mm_width : -1;
+    // Dots per 1000 inches
+    mExynosDisplay->mYdpi = mm_height ? (mDozeDrmMode.v_display() * kUmPerInch) / mm_height : -1;
+
     return setActiveDrmMode(mDozeDrmMode);
 }
 
@@ -311,49 +324,6 @@ int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::getDisplayAttribute(
-        hwc2_config_t config,
-        int32_t attribute, int32_t* outValue)
-{
-    auto mode = std::find_if(mDrmConnector->modes().begin(),
-            mDrmConnector->modes().end(),
-            [config](DrmMode const &m) {
-            return m.id() == config;
-            });
-    if (mode == mDrmConnector->modes().end()) {
-        ALOGE("Could not find active mode for %d", config);
-        return HWC2_ERROR_BAD_CONFIG;
-    }
-
-    uint32_t mm_width = mDrmConnector->mm_width();
-    uint32_t mm_height = mDrmConnector->mm_height();
-
-    switch (attribute) {
-        case HWC2_ATTRIBUTE_WIDTH:
-            *outValue = mode->h_display();
-            break;
-        case HWC2_ATTRIBUTE_HEIGHT:
-            *outValue = mode->v_display();
-            break;
-        case HWC2_ATTRIBUTE_VSYNC_PERIOD:
-            // in nanoseconds
-            *outValue = std::chrono::duration_cast<std::chrono::nanoseconds>((std::chrono::seconds)1).count() / mode->v_refresh();
-            break;
-        case HWC2_ATTRIBUTE_DPI_X:
-            // Dots per 1000 inches
-            *outValue = mm_width ? (mode->h_display() * kUmPerInch) / mm_width : -1;
-            break;
-        case HWC2_ATTRIBUTE_DPI_Y:
-            // Dots per 1000 inches
-            *outValue = mm_height ? (mode->v_display() * kUmPerInch) / mm_height : -1;
-            break;
-        default:
-            *outValue = -1;
-            return HWC2_ERROR_BAD_CONFIG;
-    }
-    return HWC2_ERROR_NONE;
-}
-
 int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
 {
     uint32_t num_configs = 0;
@@ -361,8 +331,11 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
     if (err != HWC2_ERROR_NONE || !num_configs)
         return err;
 
-    ALOGI("Preferred mode id: %d", mDrmConnector->get_preferred_mode_id());
-    return setActiveConfig(mDrmConnector->get_preferred_mode_id());
+    hwc2_config_t config = mDrmConnector->get_preferred_mode_id();
+    ALOGI("Preferred mode id: %d", config);
+    err = setActiveConfig(config);
+    mExynosDisplay->updateInternalDisplayConfigVariables(config);
+    return err;
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
@@ -376,6 +349,40 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             return HWC2_ERROR_BAD_DISPLAY;
         }
         dumpDisplayConfigs();
+
+        mExynosDisplay->mDisplayConfigs.clear();
+
+        uint32_t mm_width = mDrmConnector->mm_width();
+        uint32_t mm_height = mDrmConnector->mm_height();
+
+        /* key: (width<<32 | height) */
+        std::map<uint64_t, uint32_t> groupIds;
+        uint32_t groupId = 0;
+
+        for (const DrmMode &mode : mDrmConnector->modes()) {
+            displayConfigs_t configs;
+            constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
+            configs.vsyncPeriod = nsecsPerSec/ mode.v_refresh();
+            configs.width = mode.h_display();
+            configs.height = mode.v_display();
+            uint64_t key = ((uint64_t)configs.width<<32) | configs.height;
+            auto it = groupIds.find(key);
+            if (it != groupIds.end()) {
+                configs.groupId = it->second;
+            } else {
+                groupIds.insert(std::make_pair(key, groupId));
+                groupId++;
+            }
+
+            // Dots per 1000 inches
+            configs.Xdpi = mm_width ? (mode.h_display() * kUmPerInch) / mm_width : -1;
+            // Dots per 1000 inches
+            configs.Ydpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
+            mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
+            ALOGD("config group(%d), w(%d), h(%d), vsync(%d), xdpi(%d), ydpi(%d)",
+                    configs.groupId, configs.width, configs.height,
+                    configs.vsyncPeriod, configs.Xdpi, configs.Ydpi);
+        }
     }
 
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
@@ -385,6 +392,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
     }
 
     uint32_t idx = 0;
+
     for (const DrmMode &mode : mDrmConnector->modes()) {
         if (idx >= *outNumConfigs)
             break;
@@ -428,18 +436,6 @@ int32_t ExynosDisplayDrmInterface::setColorMode(int32_t mode)
 }
 
 int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
-    uint32_t mm_width = mDrmConnector->mm_width();
-    uint32_t mm_height = mDrmConnector->mm_height();
-
-    mExynosDisplay->mXres = mode.h_display();
-    mExynosDisplay->mYres = mode.v_display();
-    // in nanoseconds
-    mExynosDisplay->mVsyncPeriod = 1000 * 1000 * 1000 / mode.v_refresh();
-    // Dots per 1000 inches
-    mExynosDisplay->mXdpi = mm_width ? (mode.h_display() * kUmPerInch) / mm_width : -1;
-    // Dots per 1000 inches
-    mExynosDisplay->mYdpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
-
     mModeState.mode = mode;
 
     struct drm_mode_modeinfo drm_mode;
@@ -461,9 +457,10 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     mModeState.blob_id = id;
     mModeState.needs_modeset = true;
 
-    if (applyDisplayMode() < 0) {
+    if ((ret = applyDisplayMode()) < 0) {
         HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
                 __func__);
+        return ret;
     }
     return HWC2_ERROR_NONE;
 }
@@ -476,7 +473,6 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
         return HWC2_ERROR_BAD_CONFIG;
     }
 
-    mActiveConfig = mode->id();
     if (!setActiveDrmMode(*mode))
         ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
 

@@ -152,18 +152,18 @@ int ExynosPrimaryDisplay::getDDIScalerMode(int width, int height) {
     return 1; // WQHD
 }
 
-int32_t ExynosPrimaryDisplay::getActiveConfig(hwc2_config_t *outConfig) {
+int32_t ExynosPrimaryDisplay::getActiveConfigInternal(hwc2_config_t *outConfig) {
     if (outConfig && mPendActiveConfig != UINT_MAX) {
         *outConfig = mPendActiveConfig;
         return HWC2_ERROR_NONE;
     }
-    return ExynosDisplay::getActiveConfig(outConfig);
+    return ExynosDisplay::getActiveConfigInternal(outConfig);
 }
 
-int32_t ExynosPrimaryDisplay::setActiveConfig(hwc2_config_t config) {
+int32_t ExynosPrimaryDisplay::setActiveConfigInternal(hwc2_config_t config) {
     hwc2_config_t cur_config;
 
-    getActiveConfig(&cur_config);
+    getActiveConfigInternal(&cur_config);
     if (cur_config == config) {
         ALOGI("%s:: Same display config is set", __func__);
         return HWC2_ERROR_NONE;
@@ -172,7 +172,7 @@ int32_t ExynosPrimaryDisplay::setActiveConfig(hwc2_config_t config) {
         mPendActiveConfig = config;
         return HWC2_ERROR_NONE;
     }
-    return ExynosDisplay::setActiveConfig(config);
+    return ExynosDisplay::setActiveConfigInternal(config);
 }
 
 int32_t ExynosPrimaryDisplay::applyPendingConfig() {
@@ -182,9 +182,9 @@ int32_t ExynosPrimaryDisplay::applyPendingConfig() {
         config = mPendActiveConfig;
         mPendActiveConfig = UINT_MAX;
     } else {
-        getActiveConfig(&config);
+        getActiveConfigInternal(&config);
     }
-    return ExynosDisplay::setActiveConfig(config);
+    return ExynosDisplay::setActiveConfigInternal(config);
 }
 
 int32_t ExynosPrimaryDisplay::setPowerOn() {

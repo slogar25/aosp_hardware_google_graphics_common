@@ -108,9 +108,6 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
             return mDozeDrmMode.h_display() > 0 && mDozeDrmMode.v_display() > 0;
         };
         virtual int32_t setVsyncEnabled(uint32_t enabled);
-        virtual int32_t getDisplayAttribute(
-                hwc2_config_t config,
-                int32_t attribute, int32_t* outValue);
         virtual int32_t getDisplayConfigs(
                 uint32_t* outNumConfigs,
                 hwc2_config_t* outConfigs);
