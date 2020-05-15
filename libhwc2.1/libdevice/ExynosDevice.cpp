@@ -25,6 +25,8 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosDeviceDrmInterface.h"
 #include <unistd.h>
+#include <sync/sync.h>
+#include <sys/mman.h>
 
 /**
  * ExynosDevice implementation
@@ -533,6 +535,9 @@ void ExynosDevice::setHWCControl(uint32_t display, uint32_t ctrl, int32_t val)
             setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
             invalidate();
             break;
+        case HWC_CTL_CAPTURE_READBACK:
+            captureScreenWithReadback(HWC_DISPLAY_PRIMARY);
+            break;
         case HWC_CTL_DISPLAY_MODE:
             ALOGI("%s::HWC_CTL_DISPLAY_MODE mode=%d", __func__, val);
             setDisplayMode((uint32_t)val);
@@ -780,4 +785,154 @@ void ExynosDevice::compareVsyncPeriod() {
     }
 
     return;
+}
+
+ExynosDevice::captureReadbackClass::captureReadbackClass(
+        ExynosDevice *device) :
+    mDevice(device)
+{
+    if (device == nullptr)
+        return;
+    mDevice->getAllocator(&mMapper, &mAllocator);
+}
+
+ExynosDevice::captureReadbackClass::~captureReadbackClass()
+{
+    if ((mBuffer != nullptr) && (mMapper != nullptr))
+        mMapper->freeBuffer(mBuffer);
+
+    if (mDevice != nullptr)
+        mDevice->clearWaitingReadbackReqDone();
+}
+
+
+int32_t ExynosDevice::captureReadbackClass::allocBuffer(
+        uint32_t format, uint32_t w, uint32_t h)
+{
+    if (mAllocator == nullptr) {
+        ALOGE("%s:: Failed to get allocator", __func__);
+        return -EINVAL;
+    }
+
+    uint32_t dstStride = 0;
+    GrallocWrapper::IMapper::BufferDescriptorInfo info = {};
+    info.width = w;
+    info.height = h;
+    info.layerCount = 1;
+    info.format = static_cast<GrallocWrapper::PixelFormat>(format);
+    info.usage = static_cast<uint64_t>(GRALLOC1_CONSUMER_USAGE_HWCOMPOSER |
+            GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN);
+    GrallocWrapper::Error error = GrallocWrapper::Error::NONE;
+    error = mAllocator->allocate(info, &dstStride, &mBuffer);
+    if ((error != GrallocWrapper::Error::NONE) || (mBuffer == nullptr)) {
+        ALOGE("failed to allocate destination buffer(%dx%d): %d",
+                info.width, info.height, error);
+        return static_cast<int32_t>(error);
+    }
+    return NO_ERROR;
+}
+
+void  ExynosDevice::captureReadbackClass::saveToFile()
+{
+    if (mBuffer == nullptr) {
+        ALOGE("%s:: buffer is null", __func__);
+        return;
+    }
+
+    char filePath[MAX_DEV_NAME] = {0};
+    time_t curTime = time(NULL);
+    struct tm *tm = localtime(&curTime);
+    private_handle_t *hnd = private_handle_t::dynamicCast(mBuffer);
+    snprintf(filePath, MAX_DEV_NAME,
+            "%s/capture_format%d_%dx%d_%04d-%02d-%02d_%02d_%02d_%02d.raw",
+            WRITEBACK_CAPTURE_PATH, hnd->format, hnd->stride, hnd->vstride,
+            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+            tm->tm_hour, tm->tm_min, tm->tm_sec);
+    FILE *fp = fopen(filePath, "w");
+    if (fp) {
+        uint32_t writeSize =
+            hnd->stride * hnd->vstride * formatToBpp(hnd->format)/8;
+        void *writebackData = mmap(0, writeSize,
+                PROT_READ|PROT_WRITE, MAP_SHARED, hnd->fd, 0);
+        if (writebackData != MAP_FAILED && writebackData != NULL) {
+            size_t result = fwrite(writebackData, writeSize, 1, fp);
+            munmap(writebackData, writeSize);
+            ALOGD("Success to write %zu data, size(%d)", result, writeSize);
+        } else {
+            ALOGE("Fail to mmap");
+        }
+    } else {
+        ALOGE("Fail to open %s", filePath);
+    }
+}
+
+void ExynosDevice::signalReadbackDone()
+{
+    if (mIsWaitingReadbackReqDone) {
+        Mutex::Autolock lock(mCaptureMutex);
+        mCaptureCondition.signal();
+    }
+}
+
+void ExynosDevice::captureScreenWithReadback(uint32_t displayType)
+{
+    ExynosDisplay *display = getDisplay(displayType);
+    if (display == nullptr) {
+        ALOGE("There is no display(%d)", displayType);
+        return;
+    }
+
+    int32_t outFormat;
+    int32_t outDataspace;
+    int32_t ret = 0;
+    if ((ret = display->getReadbackBufferAttributes(
+                &outFormat, &outDataspace)) != HWC2_ERROR_NONE) {
+        ALOGE("getReadbackBufferAttributes fail, ret(%d)", ret);
+        return;
+    }
+
+    captureReadbackClass captureClass(this);
+    if ((ret = captureClass.allocBuffer(outFormat, display->mXres, display->mYres))
+            != NO_ERROR) {
+        return;
+    }
+
+    mIsWaitingReadbackReqDone = true;
+
+    if (display->setReadbackBuffer(captureClass.getBuffer(), -1) != HWC2_ERROR_NONE) {
+        ALOGE("setReadbackBuffer fail");
+        return;
+    }
+
+    /* Update screen */
+    invalidate();
+
+    /* Wait for handling readback */
+    uint32_t waitPeriod = display->mVsyncPeriod * 3;
+    {
+        Mutex::Autolock lock(mCaptureMutex);
+        status_t err = mCaptureCondition.waitRelative(
+                mCaptureMutex, us2ns(waitPeriod));
+        if (err == TIMED_OUT) {
+            ALOGE("timeout, readback is not requested");
+            return;
+        } else if (err != NO_ERROR) {
+            ALOGE("error waiting for readback request: %s (%d)", strerror(-err), err);
+            return;
+        } else {
+            ALOGD("readback request is done");
+        }
+    }
+
+    int32_t fence = -1;
+    if (display->getReadbackBufferFence(&fence) != HWC2_ERROR_NONE) {
+        ALOGE("getReadbackBufferFence fail");
+        return;
+    }
+    if (sync_wait(fence, 1000) < 0) {
+        ALOGE("sync wait error, fence(%d)", fence);
+    }
+    hwcFdClose(fence);
+
+    captureClass.saveToFile();
 }

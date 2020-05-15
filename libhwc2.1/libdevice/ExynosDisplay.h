@@ -158,7 +158,7 @@ struct exynos_dpu_data
     int retire_fence = -1;
     std::vector<exynos_win_config_data> configs;
     bool enable_win_update = false;
-    bool enable_readback = false;
+    std::atomic<bool> enable_readback = false;
     struct decon_frame win_update_region = {0, 0, 0, 0, 0, 0};
     struct exynos_readback_info readback_info;
 

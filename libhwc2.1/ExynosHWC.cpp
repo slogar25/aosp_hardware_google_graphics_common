@@ -511,8 +511,6 @@ int32_t exynos_presentDisplay(hwc2_device_t *dev, hwc2_display_t display,
             }
         }
         int32_t ret = exynosDisplay->presentDisplay(outRetireFence);
-        if (ret != HWC2_ERROR_NOT_VALIDATED)
-            exynosDisplay->presentPostProcessing();
         exynosDisplay->mHWCRenderingState = RENDERING_STATE_PRESENTED;
         return ret;
     }
