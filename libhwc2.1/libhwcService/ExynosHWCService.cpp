@@ -378,4 +378,8 @@ void ExynosHWCService::setExynosHWCCtx(ExynosHWCCtx *HWCCtx)
     }
 }
 
+int32_t ExynosHWCService::setDisplayDeviceMode(int32_t display_id, int32_t mode)
+{
+    return mHWCCtx->device->setDisplayDeviceMode(display_id, mode);
+}
 } //namespace android

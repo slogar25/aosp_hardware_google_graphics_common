@@ -300,6 +300,7 @@ class ExynosDevice {
         void compareVsyncPeriod();
         bool isDynamicRecompositionThreadAlive();
         void checkDynamicRecompositionThread();
+        int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode);
 
         class captureReadbackClass {
             public:

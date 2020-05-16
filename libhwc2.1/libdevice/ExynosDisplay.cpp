@@ -2504,6 +2504,13 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     Mutex::Autolock lock(mDisplayMutex);
 
+    if (mPauseDisplay) {
+        closeFencesForSkipFrame(RENDERING_STATE_PRESENTED);
+        *outRetireFence = -1;
+        mRenderingState = RENDERING_STATE_PRESENTED;
+        return HWC2_ERROR_NONE;
+    }
+
     /*
      * buffer handle, dataspace were set by setClientTarget() after validateDisplay
      * ExynosImage should be set again according to changed handle and dataspace
@@ -3078,6 +3085,10 @@ int32_t ExynosDisplay::validateDisplay(
     ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastValidateTime, NULL);
     Mutex::Autolock lock(mDisplayMutex);
+
+    if (mPauseDisplay)
+        return HWC2_ERROR_NONE;
+
     int ret = NO_ERROR;
     bool validateError = false;
     mUpdateEventCnt++;

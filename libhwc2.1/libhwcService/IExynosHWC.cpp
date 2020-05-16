@@ -56,6 +56,7 @@ enum {
     GET_HWC_DEBUG = 106,
     SET_HWC_FENCE_DEBUG = 107,
     GET_HWC_FENCE_DEBUG = 108,
+    SET_DISPLAY_DEVICE_MODE = 1000,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -351,6 +352,13 @@ public:
         remote()->transact(NOTIFY_PSR_EXIT, data, &reply);
     }
     */
+
+    int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode)
+    {
+        ALOGD("null func: %s(%d %d)", __func__, display_id, mode);
+        return NO_ERROR;
+    }
+
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -551,6 +559,15 @@ status_t BnExynosHWCService::onTransact(
             return NO_ERROR;
         }
 #endif
+        case SET_DISPLAY_DEVICE_MODE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            int32_t display_id = data.readInt32();
+            int32_t mode = data.readInt32();
+            int32_t error = setDisplayDeviceMode(display_id, mode);
+            reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }

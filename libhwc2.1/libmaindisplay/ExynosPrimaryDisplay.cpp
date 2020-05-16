@@ -118,9 +118,16 @@ int ExynosPrimaryDisplay::getDDIScalerMode(int width, int height) {
     return 1; // WQHD
 }
 
-int32_t ExynosPrimaryDisplay::setPowerMode(
-        int32_t /*hwc2_power_mode_t*/ mode) {
+int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     Mutex::Autolock lock(mDisplayMutex);
+
+    if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::PAUSE)) {
+        mode = HWC2_POWER_MODE_OFF;
+        mPauseDisplay = true;
+    } else if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME)) {
+        mode = HWC2_POWER_MODE_ON;
+        mPauseDisplay = false;
+    }
 
 #ifndef USES_DOZEMODE
     if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND))
