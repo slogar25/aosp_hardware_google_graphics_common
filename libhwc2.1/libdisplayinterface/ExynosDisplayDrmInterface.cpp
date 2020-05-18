@@ -620,21 +620,6 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
                     __func__, config.format, planeNum);
             return -EINVAL;
         }
-        for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
-            pitches[bufferIndex] = config.src.f_w * bpp;
-
-            buf_handles[bufferIndex] = drmReq.getBufHandleFromFd(config.fd_idma[bufferIndex]);
-        }
-        if ((bufferNum == 1) && (planeNum > bufferNum)) {
-            /* offset for cbcr */
-            offsets[CBCR_INDEX] =
-                getExynosBufferYLength(config.src.f_w, config.src.f_h, config.format);
-            for (uint32_t planeIndex = 1; planeIndex < planeNum; planeIndex++)
-            {
-                buf_handles[planeIndex] = buf_handles[0];
-                pitches[planeIndex] = pitches[0];
-            }
-        }
 
         if (config.compression) {
             uint64_t compressed_modifier = AFBC_FORMAT_MOD_BLOCK_SIZE_16x16;
@@ -649,6 +634,25 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
                     break;
             }
             modifiers[0] |= DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
+        }
+
+        for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
+            pitches[bufferIndex] = config.src.f_w * bpp;
+
+            buf_handles[bufferIndex] = drmReq.getBufHandleFromFd(config.fd_idma[bufferIndex]);
+            modifiers[bufferIndex] = modifiers[0];
+        }
+
+        if ((bufferNum == 1) && (planeNum > bufferNum)) {
+            /* offset for cbcr */
+            offsets[CBCR_INDEX] =
+                getExynosBufferYLength(config.src.f_w, config.src.f_h, config.format);
+            for (uint32_t planeIndex = 1; planeIndex < planeNum; planeIndex++)
+            {
+                buf_handles[planeIndex] = buf_handles[0];
+                pitches[planeIndex] = pitches[0];
+                modifiers[planeIndex] = modifiers[0];
+            }
         }
 
         ret = drmReq.addFB2WithModifiers(config.src.f_w, config.src.f_h,
