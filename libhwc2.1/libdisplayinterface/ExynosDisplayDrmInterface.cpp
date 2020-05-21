@@ -940,9 +940,9 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         mExynosDisplay->traceLayerTypes();
     }
 
-    uint32_t flags = 0;
+    uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
     if (mExynosDisplay->mDpuData.enable_readback)
-        flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+        flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
     if ((ret = drmReq.commit(flags, true)) < 0) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in deliverWinConfigData()\n",
