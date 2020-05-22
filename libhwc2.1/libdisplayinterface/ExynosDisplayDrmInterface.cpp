@@ -227,14 +227,19 @@ void ExynosDisplayDrmInterface::ExynosVsyncCallback::init(
 void ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
         int display, int64_t timestamp)
 {
+    if ((mExynosDevice == nullptr) || (mExynosDisplay == nullptr))
+        return;
+
     mExynosDevice->compareVsyncPeriod();
     if (mExynosDevice->mVsyncDisplay == (int)mExynosDisplay->mDisplayId) {
         hwc2_callback_data_t callbackData =
             mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC].callbackData;
         HWC2_PFN_VSYNC callbackFunc =
             (HWC2_PFN_VSYNC)mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC].funcPointer;
-        if (callbackFunc != NULL)
+        if ((mExynosDisplay->mVsyncState == HWC2_VSYNC_ENABLE) &&
+            (callbackFunc != NULL)) {
             callbackFunc(callbackData, mExynosDisplay->mDisplayId, timestamp);
+        }
     }
 }
 
