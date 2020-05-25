@@ -764,6 +764,18 @@ uint32_t ExynosMPP::getOutBufAlign()
         return 1;
 }
 
+int32_t ExynosMPP::isSupportLayerColorTransform(
+        struct exynos_image &src, struct exynos_image __unused &dst)
+{
+    if (src.needColorTransform == false)
+        return true;
+
+    if (mAttr & MPP_ATTR_LAYER_TRANSFORM)
+        return true;
+
+    return false;
+}
+
 bool ExynosMPP::ResourceManageThread::threadLoop()
 {
     if (mExynosMPP == NULL)
@@ -1772,6 +1784,8 @@ int32_t ExynosMPP::getDstImageInfo(exynos_image *img)
             img->y = mAssignedSources[0]->mMidImg.y;
             img->w = mAssignedSources[0]->mMidImg.w;
             img->h = mAssignedSources[0]->mMidImg.h;
+            img->needColorTransform =
+                mAssignedSources[0]->mMidImg.needColorTransform;
         }
 
         img->format = mDstImgs[mCurrentDstBuf].format;
@@ -2092,6 +2106,9 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
 
     if (!isSupportedCompression(src))
         return -eMPPUnsupportedCompression;
+
+    if (!isSupportLayerColorTransform(src,dst))
+        return -eMPPUnsupportedColorTransform;
 
     return NO_ERROR;
 }

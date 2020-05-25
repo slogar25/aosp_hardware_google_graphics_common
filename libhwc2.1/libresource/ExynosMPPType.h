@@ -73,6 +73,7 @@ enum {
     MPP_ATTR_ROT_90                 = 0x00000080,
     MPP_ATTR_SCALE                  = 0x00000800,
     MPP_ATTR_DIM                    = 0x00001000,
+    MPP_ATTR_LAYER_TRANSFORM        = 0x00002000,
 
     MPP_ATTR_WCG                    = 0x00100000,
     MPP_ATTR_HDR10                  = 0x00200000,

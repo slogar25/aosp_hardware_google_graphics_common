@@ -1313,6 +1313,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
 
     cfg.min_luminance = luminanceMin;
     cfg.max_luminance = luminanceMax;
+    cfg.needColorTransform = src_img.needColorTransform;
 
     /* Adjust configuration */
     uint32_t srcMaxWidth, srcMaxHeight, srcWidthAlign, srcHeightAlign = 0;
