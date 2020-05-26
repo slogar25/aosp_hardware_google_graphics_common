@@ -106,6 +106,8 @@ ExynosJpegEncoderForCamera::ExynosJpegEncoderForCamera(bool bBTBComp)
     m_extraInfo.appInfo = m_appInfo;
 
     mThumbnailScaler.reset(ThumbnailScaler::createInstance());
+    if (!mThumbnailScaler->available())
+        ALOGW("Thumbnail scaler is not available.");
 
     ALOGD("ExynosJpegEncoderForCamera Created: %p, ION %d", this, m_fdIONClient);
 }
@@ -372,11 +374,6 @@ int ExynosJpegEncoderForCamera::encode(int *size, exif_attribute_t *exifInfo,
     ALOGI_IF(!appInfo,
             "Debugging information is not specified. Skipping writing APP4 marker");
     ALOGD("Given stream buffer size: %d bytes", *size);
-
-    if (!mThumbnailScaler->available() && (exifInfo != nullptr)) {
-        exifInfo->enableThumb = false;
-        ALOGW("Thumbnail scaler is not available. No thumbnail is embedded");
-    }
 
     CStopWatch stopwatch(true);
 
