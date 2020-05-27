@@ -173,6 +173,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                     mFbId = fbId;
                 }
                 void pickFormatDataspace(int32_t colorMode);
+                static constexpr uint32_t PREFERRED_READBACK_FORMAT =
+                    HAL_PIXEL_FORMAT_RGBA_8888;
                 uint32_t mReadbackFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
                 uint32_t mReadbackDataspace = HAL_DATASPACE_UNKNOWN;
             private:
