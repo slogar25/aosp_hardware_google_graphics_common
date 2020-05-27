@@ -183,46 +183,41 @@ int32_t ExynosLayer::doPreProcess()
                 HWC_LOGE(mDisplay, "Layer's metadata map failed!!");
             } else {
                 mBufferHasMetaParcel = true;
-                if (metaData->eType == VIDEO_INFO_TYPE_INVALID) {
-                    if (isFormat10BitYUV420(mLayerBuffer->format))
-                        ALOGV("Video metadata has invalid type.");
-                } else {
-                    if ((metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) ||
-                            (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC)) {
-                        if (allocMetaParcel() == NO_ERROR) {
-                            mMetaParcel->eType = metaData->eType;
-                            if (metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) {
-                                mMetaParcel->sHdrStaticInfo = metaData->sHdrStaticInfo;
-                                HDEBUGLOGD(eDebugLayer, "HWC2: Static metadata min(%d), max(%d)",
-                                        mMetaParcel->sHdrStaticInfo.sType1.mMinDisplayLuminance,
-                                        mMetaParcel->sHdrStaticInfo.sType1.mMaxDisplayLuminance);
-                            }
-                            if (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC) {
-                                /* Reserved field for dynamic meta data */
-                                /* Currently It's not be used not only HWC but also OMX */
-                                mMetaParcel->sHdrDynamicInfo = metaData->sHdrDynamicInfo;
-                                HDEBUGLOGD(eDebugLayer, "HWC2: Layer has dynamic metadata");
-                            }
+                if ((metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) ||
+                        (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC)) {
+                    if (allocMetaParcel() == NO_ERROR) {
+                        mMetaParcel->eType = metaData->eType;
+                        if (metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) {
+                            mMetaParcel->sHdrStaticInfo = metaData->sHdrStaticInfo;
+                            HDEBUGLOGD(eDebugLayer, "HWC2: Static metadata min(%d), max(%d)",
+                                    mMetaParcel->sHdrStaticInfo.sType1.mMinDisplayLuminance,
+                                    mMetaParcel->sHdrStaticInfo.sType1.mMaxDisplayLuminance);
+                        }
+                        if (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC) {
+                            /* Reserved field for dynamic meta data */
+                            /* Currently It's not be used not only HWC but also OMX */
+                            mMetaParcel->sHdrDynamicInfo = metaData->sHdrDynamicInfo;
+                            HDEBUGLOGD(eDebugLayer, "HWC2: Layer has dynamic metadata");
                         }
                     }
-                    if (metaData->eType & VIDEO_INFO_TYPE_INTERLACED) {
-                        mPreprocessedInfo.interlacedType = metaData->data.dec.nInterlacedType;
-                        if (mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_BT) {
-                            if ((int)mSourceCrop.left < (int)(mLayerBuffer->stride)) {
-                                mPreprocessedInfo.sourceCrop.left = (int)mSourceCrop.left + mLayerBuffer->stride;
-                                mPreprocessedInfo.sourceCrop.right = (int)mSourceCrop.right + mLayerBuffer->stride;
-                            }
-                        }
-                        if (mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_TB ||
-                                mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_BT) {
-                            mPreprocessedInfo.sourceCrop.top = (int)(mSourceCrop.top)/2;
-                            mPreprocessedInfo.sourceCrop.bottom = (int)(mSourceCrop.bottom)/2;
+                }
+                if (metaData->eType & VIDEO_INFO_TYPE_INTERLACED) {
+                    mPreprocessedInfo.interlacedType = metaData->data.dec.nInterlacedType;
+                    if (mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_BT) {
+                        if ((int)mSourceCrop.left < (int)(mLayerBuffer->stride)) {
+                            mPreprocessedInfo.sourceCrop.left = (int)mSourceCrop.left + mLayerBuffer->stride;
+                            mPreprocessedInfo.sourceCrop.right = (int)mSourceCrop.right + mLayerBuffer->stride;
                         }
                     }
-                    if (metaData->eType & VIDEO_INFO_TYPE_CHECK_PIXEL_FORMAT) {
-                        mPreprocessedInfo.mUsePrivateFormat = true;
-                        mPreprocessedInfo.mPrivateFormat = metaData->nPixelFormat;
+                    if (mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_TB ||
+                            mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_BT) {
+                        mPreprocessedInfo.sourceCrop.top = (int)(mSourceCrop.top)/2;
+                        mPreprocessedInfo.sourceCrop.bottom = (int)(mSourceCrop.bottom)/2;
                     }
+                }
+                if (metaData->eType & VIDEO_INFO_TYPE_CHECK_PIXEL_FORMAT) {
+                    mPreprocessedInfo.mUsePrivateFormat = true;
+                    mPreprocessedInfo.mPrivateFormat = metaData->nPixelFormat;
                 }
                 munmap(metaData, sizeof(ExynosVideoMeta));
             }
