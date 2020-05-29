@@ -636,7 +636,7 @@ int32_t ExynosLayer::setLayerPerFrameMetadata(uint32_t numElements,
 int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
         const uint8_t* metadata)
 {
-
+    const uint8_t *metadata_start = metadata;
     for (uint32_t i = 0; i < numElements; i++) {
         HDEBUGLOGD(eDebugLayer, "HWC2: setLayerPerFrameMetadataBlobs key(%d)", keys[i]);
         switch (keys[i]) {
@@ -645,7 +645,7 @@ int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const i
                 mMetaParcel->eType =
                     static_cast<ExynosVideoInfoType>(mMetaParcel->eType | VIDEO_INFO_TYPE_HDR_DYNAMIC);
                 ExynosHdrDynamicInfo *info = &(mMetaParcel->sHdrDynamicInfo);
-                Exynos_parsing_user_data_registered_itu_t_t35(info, (void *)&metadata[i]);
+                Exynos_parsing_user_data_registered_itu_t_t35(info, (void *)metadata_start);
             } else {
                 ALOGE("Layer has no metaParcel!");
                 return HWC2_ERROR_UNSUPPORTED;
@@ -654,6 +654,7 @@ int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const i
         default:
             return HWC2_ERROR_BAD_PARAMETER;
         }
+        metadata_start += sizes[i];
     }
     return HWC2_ERROR_NONE;
 }
