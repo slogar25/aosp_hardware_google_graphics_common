@@ -23,7 +23,6 @@
 #include <unordered_set>
 #include "ExynosResourceManager.h"
 #include "ExynosMPPModule.h"
-#include "ExynosResourceRestriction.h"
 #include "ExynosLayer.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
