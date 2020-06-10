@@ -980,16 +980,6 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool __unused readback)
 {
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);
-#if 0
-    /* TODO (b/151848411): Check whether clearing writeback buffer is required */
-    if (readback) {
-        if ((ret = setupWritebackCommit(drmReq)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s:: Failed to setup writeback commit ret(%d)",
-                    __func__, ret);
-            return ret;
-        }
-    }
-#endif
 
     /* Disable all planes */
     for (auto &plane : mDrmDevice->planes()) {
