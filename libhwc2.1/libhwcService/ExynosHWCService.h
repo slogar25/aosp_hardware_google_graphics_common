@@ -68,6 +68,7 @@ public:
     void setPSRExitCallback(void (*callback)(exynos_hwc_composer_device_1_t *));
     virtual void notifyPSRExit();
 #endif
+    virtual int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode);
 private:
     friend class Singleton<ExynosHWCService>;
     ExynosHWCService();

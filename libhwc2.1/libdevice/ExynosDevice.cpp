@@ -936,3 +936,23 @@ void ExynosDevice::captureScreenWithReadback(uint32_t displayType)
 
     captureClass.saveToFile();
 }
+
+int32_t ExynosDevice::setDisplayDeviceMode(int32_t display_id, int32_t mode)
+{
+    int32_t ret = HWC2_ERROR_NONE;
+
+    if (display_id == HWC_DISPLAY_PRIMARY) {
+        if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::PAUSE) ||
+            mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME)) {
+            ret = mDisplays[display_id]->setPowerMode(mode);
+            if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME) && ret == HWC2_ERROR_NONE) {
+                invalidate();
+            }
+            return ret;
+        } else {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+    } else {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+}

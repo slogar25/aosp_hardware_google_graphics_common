@@ -61,6 +61,8 @@ public:
     virtual int setHWCCtl(uint32_t display, uint32_t ctrl, int32_t val) = 0;
 
     virtual int setDDIScaler(uint32_t width, uint32_t height) = 0;
+
+    virtual int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode) = 0;
     /*
     virtual void notifyPSRExit() = 0;
     */

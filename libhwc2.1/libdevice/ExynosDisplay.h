@@ -95,6 +95,12 @@ enum {
     eVirtualDisplay  = 0x00000004,
 };
 
+// served as extension of hwc2_power_mode_t for use with setPowerMode
+enum class ext_hwc2_power_mode_t{
+    PAUSE = 10,
+    RESUME,
+};
+
 #define NUM_SKIP_STATIC_LAYER  5
 struct ExynosFrameInfo
 {
@@ -309,6 +315,7 @@ class ExynosDisplay {
         hwc2_power_mode_t mPowerModeState;
         hwc2_vsync_t mVsyncState;
         bool mHasSingleBuffer;
+        bool mPauseDisplay = false;
 
         DisplayControl mDisplayControl;
 

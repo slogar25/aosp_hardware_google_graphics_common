@@ -30,8 +30,15 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         virtual void initDisplayInterface(uint32_t interfaceType);
     protected:
-        virtual int32_t setPowerMode(
-                int32_t /*hwc2_power_mode_t*/ mode);
+        /* setPowerMode(int32_t mode)
+         * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
+         * Parameters:
+         *   mode - hwc2_power_mode_t and ext_hwc2_power_mode_t
+         *
+         * Returns HWC2_ERROR_NONE or the following error:
+         *   HWC2_ERROR_UNSUPPORTED when DOZE mode not support
+         */
+        virtual int32_t setPowerMode(int32_t mode);
         virtual bool getHDRException(ExynosLayer* __unused layer);
     public:
         // Prepare multi resolution
