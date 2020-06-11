@@ -78,7 +78,7 @@ int32_t ExynosDeviceInterface::makeDPURestrictions() {
     std::unordered_set<unsigned long> attrs;
     for (size_t i = 0; i < dpuInfo->dpp_cnt; ++i) {
         const dpp_ch_restriction &r = dpuInfo->dpp_ch[i];
-        if (attrs.count(r.attr))
+        if (attrs.find(r.attr) != attrs.end())
             mDPUInfo.overlap[i] = true;
         else
             attrs.insert(r.attr);

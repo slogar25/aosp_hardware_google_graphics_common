@@ -1227,7 +1227,8 @@ String8 getMPPStr(int typeId) {
 }
 
 bool hasPPC(uint32_t physicalType, uint32_t formatIndex, uint32_t rotIndex) {
-    if (ppc_table_map.count(PPC_IDX(physicalType, formatIndex, rotIndex)) != 0) {
+    if (ppc_table_map.find(PPC_IDX(physicalType, formatIndex, rotIndex)) !=
+            ppc_table_map.end()) {
         return true;
     }
     return false;

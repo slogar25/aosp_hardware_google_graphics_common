@@ -3217,11 +3217,9 @@ int32_t ExynosDisplay::startPostProcessing()
     float assignedCapacity = mResourceManager->getAssignedCapacity(MPP_G2D);
 
     if (assignedCapacity > (mResourceManager->getM2MCapa(MPP_G2D) * MPP_CAPA_OVER_THRESHOLD)) {
-        DISPLAY_LOGE("Assigned capacity for exynos composition is over restriction (%f)",
+        errString.appendFormat("Assigned capacity for exynos composition is over restriction (%f)",
                 assignedCapacity);
-        printDebugInfos(errString);
-        mDisplayInterface->setForcePanic();
-        return -EINVAL;
+        goto err;
     }
 
     if ((ret = doExynosComposition()) != NO_ERROR) {

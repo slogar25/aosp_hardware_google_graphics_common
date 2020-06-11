@@ -2373,8 +2373,10 @@ bool ExynosMPP::hasEnoughCapa(ExynosDisplay *display, struct exynos_image &src, 
         return false;
 }
 
-void ExynosMPP::getPPCIndex(struct exynos_image &src, struct exynos_image &dst,
-        uint32_t &formatIndex, uint32_t &rotIndex, uint32_t &scaleIndex, struct exynos_image &criteria)
+void ExynosMPP::getPPCIndex(const struct exynos_image &src,
+        const struct exynos_image &dst,
+        uint32_t &formatIndex, uint32_t &rotIndex, uint32_t &scaleIndex,
+        const struct exynos_image &criteria)
 {
     formatIndex = 0;
     rotIndex = 0;
@@ -2430,8 +2432,10 @@ void ExynosMPP::getPPCIndex(struct exynos_image &src, struct exynos_image &dst,
     } else scaleIndex = 0; /* MSC doesn't refer scale Index */
 }
 
-float ExynosMPP::getPPC(struct exynos_image &src, struct exynos_image &dst, struct exynos_image &criteria,
-        struct exynos_image *assignCheckSrc, struct exynos_image *assignCheckDst)
+float ExynosMPP::getPPC(const struct exynos_image &src,
+        const struct exynos_image &dst, const struct exynos_image &criteria,
+        const struct exynos_image *assignCheckSrc,
+        const struct exynos_image *assignCheckDst)
 {
     float PPC = 0;
     uint32_t formatIndex = 0;
@@ -2573,18 +2577,18 @@ float ExynosMPP::getRequiredCapacity(ExynosDisplay *display, struct exynos_image
             }
 
             for (uint32_t i = 0; i < mAssignedSources.size(); i++) {
-                float srcCycles = 0;
-                uint32_t srcResolution = mAssignedSources[i]->mSrcImg.w * mAssignedSources[i]->mSrcImg.h;
-                uint32_t dstResolution = mAssignedSources[i]->mMidImg.w * mAssignedSources[i]->mMidImg.h;
-                uint32_t maxResolution = max(srcResolution, dstResolution);
-                float PPC = getPPC(mAssignedSources[i]->mSrcImg, mAssignedSources[i]->mMidImg,
+                float assignedSrcCycles = 0;
+                uint32_t assignedSrcResolution = mAssignedSources[i]->mSrcImg.w * mAssignedSources[i]->mSrcImg.h;
+                uint32_t assignedDstResolution = mAssignedSources[i]->mMidImg.w * mAssignedSources[i]->mMidImg.h;
+                uint32_t assignedMaxResolution = max(assignedSrcResolution, assignedDstResolution);
+                float assignedPPC = getPPC(mAssignedSources[i]->mSrcImg, mAssignedSources[i]->mMidImg,
                         mAssignedSources[i]->mSrcImg, &src, &dst);
 
-                srcCycles = maxResolution/PPC;
-                baseCycles += srcCycles;
+                assignedSrcCycles = assignedMaxResolution/assignedPPC;
+                baseCycles += assignedSrcCycles;
 
                 MPP_LOGD(eDebugCapacity, "Src[%d] cycles: %f, total cycles: %f, PPC: %f, srcResolution: %d, dstResolution: %d, rot(%d)",
-                        i, srcCycles, baseCycles, PPC, srcResolution, dstResolution, mAssignedSources[i]->mSrcImg.transform);
+                        i, assignedSrcCycles, baseCycles, assignedPPC, assignedSrcResolution, assignedDstResolution, mAssignedSources[i]->mSrcImg.transform);
             }
 
             PPC = getPPC(src, dst, src, &src, &dst);

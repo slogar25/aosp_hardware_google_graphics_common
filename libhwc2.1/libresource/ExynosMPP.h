@@ -694,12 +694,16 @@ protected:
      * getPPC for src, dst referencing mppSources in mAssignedSources and
      * assignCheckSrc, assignCheckDst that are likely to be added to the mAssignedSources
      */
-    float getPPC(struct exynos_image &src, struct exynos_image &dst, struct exynos_image &criteria,
-            struct exynos_image *assignCheckSrc = NULL, struct exynos_image *assignCheckDst = NULL);
+    float getPPC(const struct exynos_image &src, const struct exynos_image &dst,
+            const struct exynos_image &criteria,
+            const struct exynos_image *assignCheckSrc = NULL,
+            const struct exynos_image *assignCheckDst = NULL);
 
     /* format and rotation index are defined by indexImage */
-    void getPPCIndex(struct exynos_image &indexImage, struct exynos_image &refImage,
-            uint32_t &formatIndex, uint32_t &rotIndex, uint32_t &scaleIndex, struct exynos_image &criteria);
+    void getPPCIndex(const struct exynos_image &indexImage,
+            const struct exynos_image &refImage,
+            uint32_t &formatIndex, uint32_t &rotIndex, uint32_t &scaleIndex,
+            const struct exynos_image &criteria);
 
     float getRequiredBaseCycles(struct exynos_image &src, struct exynos_image &dst);
     bool addCapacity(ExynosMPPSource* mppSource);
