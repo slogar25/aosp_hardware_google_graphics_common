@@ -35,7 +35,6 @@ class ExynosDisplay;
 class ExynosMPP;
 
 #define ASSIGN_RESOURCE_TRY_COUNT   100
-#define M2M_MPP_OUT_IMAGS_COUNT     3
 
 #define MAX_OVERLAY_LAYER_NUM       20
 
@@ -133,7 +132,7 @@ class ExynosResourceManager {
         int32_t updateExynosComposition(ExynosDisplay *display);
         int32_t updateClientComposition(ExynosDisplay *display);
         int32_t getCandidateM2mMPPOutImages(ExynosDisplay *display,
-                ExynosLayer *layer, uint32_t *imageNum, exynos_image *image_lists);
+                ExynosLayer *layer, std::vector<exynos_image> &image_lists);
         int32_t setResourcePriority(ExynosDisplay *display);
         int32_t deliverPerformanceInfo();
         int32_t prepareResources();
