@@ -169,12 +169,14 @@ int32_t ExynosDeviceInterface::updateFeatureTable() {
         // feature table count
         for (uint32_t j = 0; j < featureTableCnt; j++){
             if (feature_table[j].hwType == hwType) {
+                uint64_t attr = 0;
                 // dpp attr count
                 for (int k = 0; k < attrMapCnt; k++) {
                     if (c_r.attr & (1 << dpu_attr_map_table[k].dpp_attr)) {
-                        feature_table[j].attr |= dpu_attr_map_table[k].hwc_attr;
+                        attr |= dpu_attr_map_table[k].hwc_attr;
                     }
                 }
+                feature_table[j].attr = attr;
             }
         }
     }
