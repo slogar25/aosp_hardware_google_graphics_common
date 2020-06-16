@@ -314,7 +314,6 @@ typedef struct exynos_image {
     bool hasMetaParcel = false;
     ExynosVideoMeta metaParcel;
     ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
-    bool needDegamma = false;
     bool isDimLayer()
     {
         if (layerFlags & EXYNOS_HWC_DIM_LAYER)

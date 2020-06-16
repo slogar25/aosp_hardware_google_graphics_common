@@ -130,7 +130,6 @@ enum {
     eMPPUnsupportedRotation       =     1 << 2,
     eMPPHWBusy                    =     1 << 3,
     eMPPExeedSrcCropMax           =     1 << 4,
-    eMPPUnsupportedDegamma        =     1 << 5,
     eMPPUnsupportedBlending       =     1 << 6,
     eMPPUnsupportedFormat         =     1 << 7,
     eMPPNotAlignedDstSize         =     1 << 8,
@@ -582,7 +581,6 @@ public:
     virtual bool isSupportedTransform(struct exynos_image &src);
     bool isSupportedCapability(ExynosDisplay &display, struct exynos_image &src);
     bool isSupportedDRM(struct exynos_image &src);
-    bool isSupportedDegamma(struct exynos_image &src);
     virtual bool isSupportedHStrideCrop(struct exynos_image &src);
     virtual uint32_t getMaxDownscale(ExynosDisplay &display, struct exynos_image &src, struct exynos_image &dst);
     virtual uint32_t getMaxUpscale(struct exynos_image &src, struct exynos_image &dst);

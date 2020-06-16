@@ -68,7 +68,6 @@ enum {
     MPP_ATTR_WINDOW_UPDATE          = 0x00000002,
     MPP_ATTR_BLOCK_MODE             = 0x00000004,
     MPP_ATTR_USE_CAPA               = 0x00000008,
-    MPP_ATTR_DEGAMMA                = 0x00000010,
     MPP_ATTR_FLIP_H                 = 0x00000020,
     MPP_ATTR_FLIP_V                 = 0x00000040,
     MPP_ATTR_ROT_90                 = 0x00000080,

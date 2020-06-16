@@ -223,7 +223,6 @@ class ExynosLayer : public ExynosMPPSource {
         /**
          * HDR flags
          */
-        bool mNeedDegamma;
         bool mIsHdrLayer;
         bool mBufferHasMetaParcel;
         int mMetaParcelFd;

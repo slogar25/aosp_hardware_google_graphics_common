@@ -61,7 +61,6 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
     mZOrder(0),
     mDataSpace(HAL_DATASPACE_UNKNOWN),
     mLayerFlag(0x0),
-    mNeedDegamma(false),
     mIsHdrLayer(false),
     mBufferHasMetaParcel(false),
     mMetaParcelFd(-1)
@@ -131,7 +130,6 @@ int32_t ExynosLayer::doPreProcess()
 {
     overlay_priority priority = ePriorityLow;
     mIsHdrLayer = false;
-    mNeedDegamma = false;
     mBufferHasMetaParcel = false;
     mLayerFlag = 0x0;
 
@@ -759,7 +757,6 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
     } else {
         src_img->hasMetaParcel = false;
     }
-    src_img->needDegamma = mNeedDegamma;
 
     return NO_ERROR;
 }
@@ -831,7 +828,6 @@ int32_t ExynosLayer::setDstExynosImage(exynos_image *dst_img)
     } else {
         dst_img->hasMetaParcel = false;
     }
-    dst_img->needDegamma = false;
 
     return NO_ERROR;
 }
