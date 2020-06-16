@@ -41,6 +41,7 @@ enum {
     eDebugDynamicRecomp           =   0x00020000,
     eDebugDisplayInterfaceConfig  =   0x00040000,
     eDebugColorManagement         =   0x00080000,
+    eDebugAttrSetting             =   0x00100000,
 };
 
 class ExynosDisplay;
