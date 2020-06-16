@@ -26,6 +26,7 @@
 #include "ExynosDisplay.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosMPPModule.h"
+#include "ExynosResourceRestriction.h"
 
 using namespace android;
 
@@ -37,6 +38,21 @@ class ExynosMPP;
 #define M2M_MPP_OUT_IMAGS_COUNT     3
 
 #define MAX_OVERLAY_LAYER_NUM       20
+
+#ifndef USE_MODULE_DPU_ATTR_MAP
+const dpu_attr_map_t dpu_attr_map_table [] =
+{
+    {DPP_ATTR_AFBC, MPP_ATTR_AFBC},
+    {DPP_ATTR_BLOCK, MPP_ATTR_BLOCK_MODE},
+    {DPP_ATTR_FLIP, MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V},
+    {DPP_ATTR_ROT, MPP_ATTR_ROT_90},
+    {DPP_ATTR_SCALE, MPP_ATTR_SCALE},
+    {DPP_ATTR_HDR, MPP_ATTR_HDR10},
+    {DPP_ATTR_C_HDR, MPP_ATTR_HDR10},
+    {DPP_ATTR_C_HDR10_PLUS, MPP_ATTR_HDR10PLUS},
+    {DPP_ATTR_WCG, MPP_ATTR_WCG},
+};
+#endif
 
 /* Based on multi-resolution feature */
 enum dst_realloc_state {

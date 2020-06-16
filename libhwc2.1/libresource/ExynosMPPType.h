@@ -103,19 +103,6 @@ typedef struct dpu_attr_map {
     uint32_t hwc_attr = 0;
 } dpu_attr_map_t;
 
-const dpu_attr_map_t dpu_attr_map_table [] =
-{
-    {DPP_ATTR_AFBC, MPP_ATTR_AFBC},
-    {DPP_ATTR_BLOCK, MPP_ATTR_BLOCK_MODE},
-    {DPP_ATTR_FLIP, MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V},
-    {DPP_ATTR_ROT, MPP_ATTR_ROT_90},
-    {DPP_ATTR_SCALE, MPP_ATTR_SCALE},
-    {DPP_ATTR_HDR, MPP_ATTR_HDR10},
-    {DPP_ATTR_C_HDR, MPP_ATTR_HDR10},
-    {DPP_ATTR_C_HDR10_PLUS, MPP_ATTR_HDR10PLUS},
-    {DPP_ATTR_WCG, MPP_ATTR_WCG},
-};
-
 typedef struct dpp_channel_map {
     mpp_phycal_type_t type;
     uint32_t index;
