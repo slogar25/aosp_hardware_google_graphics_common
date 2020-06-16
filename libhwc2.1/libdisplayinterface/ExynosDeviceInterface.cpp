@@ -20,6 +20,7 @@
 #include "ExynosResourceManager.h"
 #include "ExynosMPP.h"
 #include <unordered_set>
+#include <unordered_map>
 
 extern feature_support_t feature_table[];
 
@@ -180,6 +181,8 @@ int32_t ExynosDeviceInterface::updateFeatureTable() {
         HDEBUGLOGD(eDebugAttrSetting, "type : %d, feature : 0x%lx",
                 feature_table[j].hwType,
                 (unsigned long)feature_table[j].attr);
+        mExynosDevice->mResourceManager->mMPPAttrs.insert(std::make_pair((uint32_t)feature_table[j].hwType,
+                    (uint64_t)feature_table[j].attr));
     }
     return 0;
 }
