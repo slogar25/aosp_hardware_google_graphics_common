@@ -130,6 +130,7 @@ enum {
     eMPPUnsupportedRotation       =     1ULL << 2,
     eMPPHWBusy                    =     1ULL << 3,
     eMPPExeedSrcCropMax           =     1ULL << 4,
+    eMPPUnsupportedColorTransform =     1ULL << 5,
     eMPPUnsupportedBlending       =     1ULL << 6,
     eMPPUnsupportedFormat         =     1ULL << 7,
     eMPPNotAlignedDstSize         =     1ULL << 8,
@@ -619,6 +620,8 @@ public:
     uint32_t getDstYOffsetAlign(struct exynos_image &dst);
     uint32_t getOutBufAlign();
     virtual bool isDstFormatSupported(struct exynos_image &dst);
+    int32_t isSupportLayerColorTransform(
+            struct exynos_image &src, struct exynos_image &dst);
     uint32_t getSrcMaxBlendingNum(struct exynos_image &src, struct exynos_image &dst);
     uint32_t getAssignedSourceNum();
 

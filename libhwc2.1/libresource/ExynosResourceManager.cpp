@@ -1318,6 +1318,21 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
         image_lists[index++] = dst_img;
     }
 
+    /*
+     * image_lists[] would be src of otfMPP.
+     * Layer color transform should be addressed
+     * with dataspace conversion.
+     * It should be addressed by m2mMPP if m2mMPP converts dataspace.
+     * In other cases, m2mMPP ignores color transform setting and
+     * otfMPP addresses layer color transform if it is necessary.
+     */
+    for (uint32_t i = 0; i < index; i++) {
+        if (image_lists[i].dataSpace == src_img.dataSpace)
+            image_lists[i].needColorTransform = src_img.needColorTransform;
+        else
+            image_lists[i].needColorTransform = false;
+    }
+
     if (*imageNum < index)
         return -EINVAL;
     else {
@@ -1422,12 +1437,20 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                     for (uint32_t outImg = 0; outImg < imageNum; outImg++)
                     {
                         dumpExynosImage(eDebugResourceManager, image_lists[outImg]);
+                        exynos_image m2m_src_img = src_img;
                         otf_src_img = image_lists[outImg];
                         /* transform is already handled by m2mMPP */
                         otf_src_img.transform = 0;
                         otf_dst_img.transform = 0;
 
-                        if ((isSupported = mM2mMPPs[j]->isSupported(*display, src_img, otf_src_img)) != NO_ERROR)
+                        /*
+                         * This is the case that layer color transform should be
+                         * addressed by otfMPP not m2mMPP
+                         */
+                        if (otf_src_img.needColorTransform)
+                            m2m_src_img.needColorTransform = false;
+
+                        if ((isSupported = mM2mMPPs[j]->isSupported(*display, m2m_src_img, otf_src_img)) != NO_ERROR)
                         {
                             HDEBUGLOGD(eDebugResourceManager, "\t\t\t check %s: supportedBit(0x%" PRIx64 ")",
                                     mM2mMPPs[j]->mName.string(), -isSupported);

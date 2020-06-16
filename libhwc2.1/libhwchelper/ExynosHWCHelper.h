@@ -56,6 +56,8 @@ class ExynosDisplay;
 
 using namespace android;
 
+static constexpr uint32_t TRANSFORM_MAT_SIZE = 4*4;
+
 enum {
     EXYNOS_HWC_DIM_LAYER = 0x00000001,
 };
@@ -314,6 +316,8 @@ typedef struct exynos_image {
     bool hasMetaParcel = false;
     ExynosVideoMeta metaParcel;
     ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
+    bool needColorTransform = false;
+
     bool isDimLayer()
     {
         if (layerFlags & EXYNOS_HWC_DIM_LAYER)

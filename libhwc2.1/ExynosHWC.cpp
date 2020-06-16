@@ -116,7 +116,7 @@ hwc2_function_pointer_t exynos_function_pointer[] =
     // composer 2.3
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getDisplayIdentificationData),//HWC2_FUNCTION_GET_DISPLAY_IDENTIFICATION_DATA
     reinterpret_cast<hwc2_function_pointer_t>(exynos_getDisplayCapabilities),      //HWC2_FUNCTION_GET_DISPLAY_CAPABILITIES
-    reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_LAYER_COLOR_TRANSFORM
+    reinterpret_cast<hwc2_function_pointer_t>(exynos_setLayerColorTransform),      //HWC2_FUNCTION_SET_LAYER_COLOR_TRANSFORM
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_DISPLAYED_CONTENT_SAMPLING_ATTRIBUTES
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_SET_DISPLAYED_CONTENT_SAMPLING_ENABLED
     reinterpret_cast<hwc2_function_pointer_t>(NULL),                               //HWC2_FUNCTION_GET_DISPLAYED_CONTENT_SAMPLE
@@ -998,6 +998,26 @@ int32_t exynos_getDisplayCapabilities(hwc2_device_t* dev, hwc2_display_t display
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
         if (exynosDisplay) {
             return exynosDisplay->getDisplayCapabilities(outNumCapabilities, outCapabilities);
+        }
+    }
+
+    return HWC2_ERROR_BAD_DISPLAY;
+}
+
+int32_t exynos_setLayerColorTransform(hwc2_device_t* dev,
+        hwc2_display_t display, hwc2_layer_t layer, const float* matrix)
+{
+    if (matrix == nullptr)
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    ExynosDevice *exynosDevice = checkDevice(dev);
+
+    if (exynosDevice) {
+        ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
+        if (exynosDisplay) {
+            ExynosLayer *exynosLayer = checkLayer(exynosDisplay, layer);
+            if (exynosLayer)
+                return exynosLayer->setLayerColorTransform(matrix);
         }
     }
 

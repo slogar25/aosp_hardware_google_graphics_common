@@ -154,6 +154,7 @@ struct exynos_win_config_data
     struct decon_frame dst = {0, 0, 0, 0, 0, 0};
     bool protection = false;
     bool compression = false;
+    bool needColorTransform = false;
 
     void reset(){
         *this = {};

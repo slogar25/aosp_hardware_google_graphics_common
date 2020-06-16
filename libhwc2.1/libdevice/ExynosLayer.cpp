@@ -656,6 +656,17 @@ int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const i
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosLayer::setLayerColorTransform(const float* matrix)
+{
+    mLayerColorTransform.enable = true;
+    for (uint32_t i = 0; i < TRANSFORM_MAT_SIZE; i++)
+    {
+        mLayerColorTransform.mat[i] = matrix[i];
+    }
+
+    return 0;
+}
+
 void ExynosLayer::resetValidateData()
 {
     mValidateCompositionType = HWC2_COMPOSITION_INVALID;
@@ -757,6 +768,8 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
     } else {
         src_img->hasMetaParcel = false;
     }
+
+    src_img->needColorTransform = mLayerColorTransform.enable;
 
     return NO_ERROR;
 }
@@ -871,10 +884,11 @@ void ExynosLayer::dump(String8& result)
     result.appendFormat("|  %8p | %d, %d, %d | 0x%2x |   %1d  | 0x%8x | %s | 0x%4x  |    %1.3f    |    %d   | 0x%2x, 0x%2x, 0x%2x, 0x%2x |  %2d |    %2d    |    %d               |\n",
             mLayerBuffer, fd, fd1, fd2, mTransform, mCompressed, mDataSpace, getFormatStr(format).string(),
             mBlending, mPlaneAlpha, mZOrder, mColor.r, mColor.g, mColor.b, mColor.a, mFps, mOverlayPriority, mWindowIndex);
-    result.appendFormat("|               +------------+------+------+------+-----+-----------+--------++-----+------+-----+--+-----------+------------++----+----------+--------------------+ \n");
-    result.appendFormat("|               |            sourceCrop           |          dispFrame       | type | exynosType | validateType | overlayInfo | supportedMPPFlag                   |\n");
-    result.appendFormat("|               +---------------------------------+--------------------------+------+------------+--------------+-------------+------------------------------------+ \n");
-    result.appendFormat("|               | %7.1f,%7.1f,%7.1f,%7.1f | %5d,%5d,%5d,%5d  |  %2d  |     %2d     |      %2d      |  0x%8x |    0x%8x                      |\n",
+    result.appendFormat("|---------------+------------+------+------+------+-----+-----------+--------++-----+------+-----+--+-----------+------------++----+----------+--------------------+ \n");
+    result.appendFormat("|    colorTr    |            sourceCrop           |          dispFrame       | type | exynosType | validateType | overlayInfo | supportedMPPFlag                   |\n");
+    result.appendFormat("|---------------+---------------------------------+--------------------------+------+------------+--------------+-------------+------------------------------------+ \n");
+    result.appendFormat("|            %2d | %7.1f,%7.1f,%7.1f,%7.1f | %5d,%5d,%5d,%5d  |  %2d  |     %2d     |      %2d      |  0x%8x |    0x%8x                      |\n",
+            mLayerColorTransform.enable,
             mPreprocessedInfo.sourceCrop.left, mPreprocessedInfo.sourceCrop.top, mPreprocessedInfo.sourceCrop.right, mPreprocessedInfo.sourceCrop.bottom,
             mPreprocessedInfo.displayFrame.left, mPreprocessedInfo.displayFrame.top, mPreprocessedInfo.displayFrame.right, mPreprocessedInfo.displayFrame.bottom,
             mCompositionType, mExynosCompositionType, mValidateCompositionType, mOverlayInfo, mSupportedMPPFlag);

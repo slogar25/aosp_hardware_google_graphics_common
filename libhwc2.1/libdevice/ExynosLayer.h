@@ -228,6 +228,14 @@ class ExynosLayer : public ExynosMPPSource {
         int mMetaParcelFd;
 
         /**
+         * color transform info
+         */
+        struct LayerColorTransform {
+            bool enable = false;
+            std::array<float, TRANSFORM_MAT_SIZE> mat;
+        } mLayerColorTransform;
+
+        /**
          * @param type
          */
         int32_t setCompositionType(int32_t type);
@@ -359,6 +367,8 @@ class ExynosLayer : public ExynosMPPSource {
          */
         int32_t setLayerPerFrameMetadataBlobs(uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
                 const uint8_t* metadata);
+
+        int32_t setLayerColorTransform(const float* matrix);
 
         void resetValidateData();
         virtual void dump(String8& result);
