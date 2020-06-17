@@ -1730,7 +1730,8 @@ int32_t ExynosResourceManager::updateSupportedMPPFlag(ExynosDisplay * display)
             if (ret < 0) {
                 HDEBUGLOGD(eDebugResourceManager, "\t%s: unsupported flag(0x%" PRIx64 ")", mOtfMPPs[j]->mName.string(), -ret);
                 uint64_t checkFlag = 0x0;
-                if (layer->mCheckMPPFlag.count(mOtfMPPs[j]->mLogicalType) != 0) {
+                if (layer->mCheckMPPFlag.find(mOtfMPPs[j]->mLogicalType) !=
+                        layer->mCheckMPPFlag.end()) {
                     checkFlag = layer->mCheckMPPFlag.at(mOtfMPPs[j]->mLogicalType);
                 }
                 checkFlag |= (-ret);
@@ -1753,7 +1754,8 @@ int32_t ExynosResourceManager::updateSupportedMPPFlag(ExynosDisplay * display)
             if (ret < 0) {
                 HDEBUGLOGD(eDebugResourceManager, "\t%s: unsupported flag(0x%" PRIx64 ")", mM2mMPPs[j]->mName.string(), -ret);
                 uint64_t checkFlag = 0x0;
-                if (layer->mCheckMPPFlag.count(mM2mMPPs[j]->mLogicalType) != 0) {
+                if (layer->mCheckMPPFlag.find(mM2mMPPs[j]->mLogicalType) !=
+                        layer->mCheckMPPFlag.end()) {
                     checkFlag = layer->mCheckMPPFlag.at(mM2mMPPs[j]->mLogicalType);
                 }
                 checkFlag |= (-ret);
@@ -2262,7 +2264,8 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
     for (uint32_t i = 0; i < FORMAT_MAX_CNT; i++) {
         if (cap->isFormatSupported(exynos_format_desc[i].halFormat)) {
             /* Not add same hal pixel format */
-            if (supportedHalFormats.count(exynos_format_desc[i].halFormat))
+            if (supportedHalFormats.find(exynos_format_desc[i].halFormat) !=
+                    supportedHalFormats.end())
                 continue;
             restriction_key_t queried_format;
             queried_format.hwType = type;
@@ -2342,7 +2345,8 @@ void ExynosResourceManager::updateRestrictions() {
     if (mDevice->mDeviceInterface->getUseQuery() == true) {
         std::unordered_set<uint32_t> checkDuplicateMPP;
         for (const auto unit: AVAILABLE_M2M_MPP_UNITS) {
-            if (checkDuplicateMPP.count(unit.physicalType) == 0)  {
+            if (checkDuplicateMPP.find(unit.physicalType) ==
+                    checkDuplicateMPP.end())  {
                 makeAcrylRestrictions(static_cast<mpp_phycal_type_t>(unit.physicalType));
                 checkDuplicateMPP.insert(unit.physicalType);
             }
@@ -2417,7 +2421,7 @@ float ExynosResourceManager::getM2MCapa(uint32_t physicalType)
     float ret = 0;
     for (size_t i = 0; i < mM2mMPPs.size(); i++) {
         if (mM2mMPPs[i]->mPhysicalType == physicalType)
-            ret = mM2mMPPs[i]->mCapacity;
+            return mM2mMPPs[i]->mCapacity;
     }
 
     return ret;
