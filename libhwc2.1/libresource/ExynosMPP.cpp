@@ -2445,6 +2445,15 @@ float ExynosMPP::getAssignedCapacity()
     if (mPhysicalType != MPP_G2D)
         return 0;
 
+    /*
+     * Client target is assigned to m2mMPP
+     * even if capacity is not enough
+     */
+    if ((mAssignedDisplay != NULL) &&
+        (mAssignedDisplay->mType == HWC_DISPLAY_VIRTUAL))
+        return 0;
+
+
     for (uint32_t i = 0; i < mAssignedSources.size(); i++) {
         if ((mAssignedSources[i]->mSrcImg.transform & HAL_TRANSFORM_ROT_90) != 0)
             rotIndex = PPC_ROT;
@@ -2469,12 +2478,16 @@ float ExynosMPP::getAssignedCapacity()
         uint32_t scaleIndex = 0;
         float PPC = 0;
 
-        getPPCIndex(mAssignedSources[i]->mSrcImg,
-                mAssignedSources[i]->mMidImg,
-                formatIndex, tmpRotIndex, scaleIndex, mAssignedSources[i]->mSrcImg);
+        if (mAssignedSources[i]->mSrcImg.layerFlags & EXYNOS_HWC_DIM_LAYER) {
+            PPC = G2D_BASE_PPC_COLORFILL;
+        } else {
+            getPPCIndex(mAssignedSources[i]->mSrcImg,
+                    mAssignedSources[i]->mMidImg,
+                    formatIndex, tmpRotIndex, scaleIndex, mAssignedSources[i]->mSrcImg);
 
-        if (ppc_table_map.count(PPC_IDX(mPhysicalType, formatIndex, rotIndex)) != 0) {
-            PPC = ppc_table_map.at(PPC_IDX(mPhysicalType, formatIndex, rotIndex)).ppcList[scaleIndex];
+            if (ppc_table_map.count(PPC_IDX(mPhysicalType, formatIndex, rotIndex)) != 0) {
+                PPC = ppc_table_map.at(PPC_IDX(mPhysicalType, formatIndex, rotIndex)).ppcList[scaleIndex];
+            }
         }
         srcCycles = maxResolution/PPC;
 
