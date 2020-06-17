@@ -22,6 +22,9 @@
 #include <errno.h>
 #include <stdint.h>
 
+#include <array>
+#include <sstream>
+
 #include <log/log.h>
 #include <xf86drmMode.h>
 
@@ -31,6 +34,8 @@
 
 namespace android {
 
+constexpr size_t TYPES_COUNT = 17;
+
 DrmConnector::DrmConnector(DrmDevice *drm, drmModeConnectorPtr c,
                            DrmEncoder *current_encoder,
                            std::vector<DrmEncoder *> &possible_encoders)
@@ -39,6 +44,7 @@ DrmConnector::DrmConnector(DrmDevice *drm, drmModeConnectorPtr c,
       encoder_(current_encoder),
       display_(-1),
       type_(c->connector_type),
+      type_id_(c->connector_type_id),
       state_(c->connection),
       mm_width_(c->mmWidth),
       mm_height_(c->mmHeight),
@@ -55,6 +61,10 @@ int DrmConnector::Init() {
   if (ret) {
     ALOGE("Could not get CRTC_ID property\n");
     return ret;
+  }
+  ret = drm_->GetConnectorProperty(*this, "EDID", &edid_property_);
+  if (ret) {
+    ALOGW("Could not get EDID property\n");
   }
   if (writeback()) {
     ret = drm_->GetConnectorProperty(*this, "WRITEBACK_PIXEL_FORMATS",
@@ -126,7 +136,8 @@ void DrmConnector::set_display(int display) {
 
 bool DrmConnector::internal() const {
   return type_ == DRM_MODE_CONNECTOR_LVDS || type_ == DRM_MODE_CONNECTOR_eDP ||
-         type_ == DRM_MODE_CONNECTOR_DSI || type_ == DRM_MODE_CONNECTOR_VIRTUAL;
+         type_ == DRM_MODE_CONNECTOR_DSI ||
+         type_ == DRM_MODE_CONNECTOR_VIRTUAL || type_ == DRM_MODE_CONNECTOR_DPI;
 }
 
 bool DrmConnector::external() const {
@@ -146,6 +157,22 @@ bool DrmConnector::writeback() const {
 
 bool DrmConnector::valid_type() const {
   return internal() || external() || writeback();
+}
+
+std::string DrmConnector::name() const {
+  constexpr std::array<const char *, TYPES_COUNT> names =
+      {"None",   "VGA",  "DVI-I",     "DVI-D",   "DVI-A", "Composite",
+       "SVIDEO", "LVDS", "Component", "DIN",     "DP",    "HDMI-A",
+       "HDMI-B", "TV",   "eDP",       "Virtual", "DSI"};
+
+  if (type_ < TYPES_COUNT) {
+    std::ostringstream name_buf;
+    name_buf << names[type_] << "-" << type_id_;
+    return name_buf.str();
+  } else {
+    ALOGE("Unknown type in connector %d, could not make his name", id_);
+    return "None";
+  }
 }
 
 int DrmConnector::UpdateModes() {
@@ -203,6 +230,10 @@ const DrmProperty &DrmConnector::dpms_property() const {
 
 const DrmProperty &DrmConnector::crtc_id_property() const {
   return crtc_id_property_;
+}
+
+const DrmProperty &DrmConnector::edid_property() const {
+  return edid_property_;
 }
 
 const DrmProperty &DrmConnector::writeback_pixel_formats() const {
