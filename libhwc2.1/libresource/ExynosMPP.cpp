@@ -2711,24 +2711,28 @@ int32_t ExynosMPP::updateUsedCapacity()
                     ((mAssignedDisplay->mXres * mAssignedDisplay->mYres) / G2D_BASE_PPC_COLORFILL), cycles);
         }
         for (uint32_t i = 0; i < mAssignedSources.size(); i++) {
+            uint32_t srcResolution = mAssignedSources[i]->mSrcImg.w * mAssignedSources[i]->mSrcImg.h;
+            if ((mAssignedSources[i]->mSrcImg.transform & HAL_TRANSFORM_ROT_90) == 0)
+                mNoRotatedSrcCropBW += srcResolution;
+            else
+                mRotatedSrcCropBW += srcResolution;
+        }
+        MPP_LOGD(eDebugCapacity, "mNoRotatedSrcCropBW(%d), mRotatedSrcCropBW(%d)",
+                mNoRotatedSrcCropBW, mRotatedSrcCropBW);
+        for (uint32_t i = 0; i < mAssignedSources.size(); i++) {
             float srcCycles = 0;
             uint32_t srcResolution = mAssignedSources[i]->mSrcImg.w * mAssignedSources[i]->mSrcImg.h;
             uint32_t dstResolution = mAssignedSources[i]->mMidImg.w * mAssignedSources[i]->mMidImg.h;
             uint32_t maxResolution = max(srcResolution, dstResolution);
             float PPC = getPPC(mAssignedSources[i]->mSrcImg, mAssignedSources[i]->mMidImg, mAssignedSources[i]->mSrcImg);
-
             srcCycles = maxResolution/PPC;
             cycles += srcCycles;
-
-            if ((mAssignedSources[i]->mSrcImg.transform & HAL_TRANSFORM_ROT_90) == 0)
-                mNoRotatedSrcCropBW += srcResolution;
-            else
-                mRotatedSrcCropBW += srcResolution;
 
             MPP_LOGD(eDebugCapacity, "Src[%d] cycles: %f, total cycles: %f, PPC: %f, srcResolution: %d, dstResolution: %d, rot(%d)",
                     i, srcCycles, cycles, PPC, srcResolution, dstResolution, mAssignedSources[i]->mSrcImg.transform);
         }
 
+        mUsedBaseCycles = cycles;
         capacity = cycles/getMPPClock();
 
         mUsedCapacity = capacity;
