@@ -2365,6 +2365,8 @@ void ExynosMPP::getPPCIndex(struct exynos_image &src, struct exynos_image &dst,
         formatIndex = PPC_FORMAT_YUV420;
     else if (isFormatYUV422(criteria.format))
         formatIndex = PPC_FORMAT_YUV422;
+    else if (mPhysicalType == MPP_G2D && src.compressed == 1)
+        formatIndex = PPC_FORMAT_AFBC;
     else
         formatIndex = PPC_FORMAT_RGB32;
 

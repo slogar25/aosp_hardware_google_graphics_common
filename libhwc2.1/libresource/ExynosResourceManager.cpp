@@ -2044,6 +2044,9 @@ int32_t ExynosResourceManager::deliverPerformanceInfo()
                             mppSource->mSrcImg.w, mppSource->mSrcImg.h,
                             mppSource->mSrcImg.format);
 
+                    if (mppSource->mSrcImg.compressed == 1)
+                        frame->setAttribute(j, AcrylicCanvas::ATTR_COMPRESSED);
+
                     hwc_rect_t src_area;
                     src_area.left = mppSource->mSrcImg.x;
                     src_area.top = mppSource->mSrcImg.y;

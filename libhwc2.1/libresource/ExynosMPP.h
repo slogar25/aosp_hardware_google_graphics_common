@@ -254,6 +254,7 @@ typedef enum {
     PPC_FORMAT_YUV8_2,
     PPC_FORMAT_SBWC,
     PPC_FORMAT_P010,
+    PPC_FORMAT_AFBC,
     PPC_FORMAT_FORMAT_MAX
 } format_index_t;
 
