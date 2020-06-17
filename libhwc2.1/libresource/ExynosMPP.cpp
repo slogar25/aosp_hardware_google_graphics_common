@@ -2510,11 +2510,14 @@ float ExynosMPP::getRequiredCapacity(ExynosDisplay *display, struct exynos_image
         MPP_LOGD(eDebugCapacity, "baseCycles: %f, capacity: %f",
                 baseCycles, capacity);
     } else if (mPhysicalType == MPP_MSC) {
-        float srcCapacity = ((float)(src.w*src.h))/(getMPPClock()*(float)getPPC(src, dst, src));
-        float dstCapacity = ((float)(dst.w*dst.h))/(getMPPClock()*(float)getPPC(src, dst, dst));
+        float srcPPC = (float)getPPC(src, dst, src);
+        float dstPPC = (float)getPPC(src, dst, dst);
+        float srcCapacity = ((float)(src.w*src.h))/(getMPPClock()*srcPPC);
+        float dstCapacity = ((float)(dst.w*dst.h))/(getMPPClock()*dstPPC);
 
         capacity = max(srcCapacity, dstCapacity);
-        MPP_LOGD(eDebugCapacity, "MSC capacity - src : %f, dst : %f", srcCapacity, dstCapacity);
+        MPP_LOGD(eDebugCapacity, "MSC capacity - src capa: %f, src.w: %d, src.h: %d, srcPPC: %f, dst capa: %f, dst.w: %d, dst.h: %d, dstPPC: %f",
+                srcCapacity, src.w, src.h, srcPPC, dstCapacity, dst.w, dst.h, dstPPC);
     }
 
     return capacity;
@@ -2561,22 +2564,26 @@ bool ExynosMPP::addCapacity(ExynosMPPSource* mppSource)
         }
     }
 
-    float baseCycles = getRequiredBaseCycles(mppSource->mSrcImg, mppSource->mMidImg);
-    mUsedBaseCycles += baseCycles;
+    if (mPhysicalType == MPP_G2D) {
+        float baseCycles = getRequiredBaseCycles(mppSource->mSrcImg, mppSource->mMidImg);
+        mUsedBaseCycles += baseCycles;
 
-    uint32_t srcResolution = mppSource->mSrcImg.w * mppSource->mSrcImg.h;
-    uint32_t dstResolution = mppSource->mMidImg.w * mppSource->mMidImg.h;
-    if ((mppSource->mSrcImg.transform & HAL_TRANSFORM_ROT_90) == 0)
-        mNoRotatedSrcCropBW += srcResolution;
-    else
-        mRotatedSrcCropBW += srcResolution;
+        uint32_t srcResolution = mppSource->mSrcImg.w * mppSource->mSrcImg.h;
+        uint32_t dstResolution = mppSource->mMidImg.w * mppSource->mMidImg.h;
+        if ((mppSource->mSrcImg.transform & HAL_TRANSFORM_ROT_90) == 0)
+            mNoRotatedSrcCropBW += srcResolution;
+        else
+            mRotatedSrcCropBW += srcResolution;
 
-    mUsedCapacity = mUsedBaseCycles/getMPPClock();
+        mUsedCapacity = mUsedBaseCycles/getMPPClock();
 
-    MPP_LOGD(eDebugCapacity, "src num: %zu base cycle is added: %f, mUsedBaseCycles: %f, mUsedCapacity(%f), srcResolution: %d, dstResolution: %d, rot: %d, mNoRotatedSrcCropBW(%d), mRotatedSrcCropBW(%d)",
-            mAssignedSources.size(),
-            baseCycles, mUsedBaseCycles, mUsedCapacity, srcResolution, dstResolution,
-            mppSource->mSrcImg.transform, mNoRotatedSrcCropBW, mRotatedSrcCropBW);
+        MPP_LOGD(eDebugCapacity, "src num: %zu base cycle is added: %f, mUsedBaseCycles: %f, mUsedCapacity(%f), srcResolution: %d, dstResolution: %d, rot: %d, mNoRotatedSrcCropBW(%d), mRotatedSrcCropBW(%d)",
+                mAssignedSources.size(),
+                baseCycles, mUsedBaseCycles, mUsedCapacity, srcResolution, dstResolution,
+                mppSource->mSrcImg.transform, mNoRotatedSrcCropBW, mRotatedSrcCropBW);
+    } else if (mPhysicalType == MPP_MSC) {
+        mUsedCapacity = getRequiredCapacity(NULL, mppSource->mSrcImg, mppSource->mMidImg);
+    }
 
     return false;
 }
