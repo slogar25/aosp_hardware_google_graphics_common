@@ -1450,11 +1450,11 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                         if (otf_src_img.needColorTransform)
                             m2m_src_img.needColorTransform = false;
 
-                        if (((isAssignable = mM2mMPPs[j]->isAssignable(display, m2m_src_img, otf_src_img)) == false) ||
-                            ((isSupported = mM2mMPPs[j]->isSupported(*display, m2m_src_img, otf_src_img)) != NO_ERROR))
+                        if (((isSupported = mM2mMPPs[j]->isSupported(*display, m2m_src_img, otf_src_img)) != NO_ERROR) ||
+                            ((isAssignable = mM2mMPPs[j]->hasEnoughCapa(display, m2m_src_img, otf_src_img)) == false))
                         {
-                            HDEBUGLOGD(eDebugResourceManager, "\t\t\t check %s: supportedBit(0x%" PRIx64 ")",
-                                    mM2mMPPs[j]->mName.string(), -isSupported);
+                            HDEBUGLOGD(eDebugResourceManager, "\t\t\t check %s: supportedBit(0x%" PRIx64 "), hasEnoughCapa(%d)",
+                                    mM2mMPPs[j]->mName.string(), -isSupported, isAssignable);
                             continue;
                         }
 
@@ -1476,9 +1476,13 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                         }
                     }
                 } else {
-                    if (layer->mSupportedMPPFlag & mM2mMPPs[j]->mLogicalType) {
+                    if ((layer->mSupportedMPPFlag & mM2mMPPs[j]->mLogicalType) &&
+                        ((isAssignable = mM2mMPPs[j]->hasEnoughCapa(display, src_img, dst_img) == true))) {
                         *m2mMPP = mM2mMPPs[j];
                         return HWC2_COMPOSITION_EXYNOS;
+                    } else {
+                        HDEBUGLOGD(eDebugResourceManager, "\t\t\t check %s: layer's mSupportedMPPFlag(0x%8x), hasEnoughCapa(%d)",
+                                mM2mMPPs[j]->mName.string(), layer->mSupportedMPPFlag, isAssignable);
                     }
                 }
             }
