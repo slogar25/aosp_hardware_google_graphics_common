@@ -160,9 +160,7 @@ int32_t ExynosLayer::doPreProcess()
         mPreprocessedInfo.preProcessed = true;
     }
 
-    if ((mLayerBuffer->format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M) ||
-        (mLayerBuffer->format == HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M) ||
-        (isFormat10BitYUV420(mLayerBuffer->format))) {
+    if (isFormatYUV(mLayerBuffer->format)) {
         ExynosVideoMeta *metaData = NULL;
         int priv_fd = -1;
 
@@ -183,7 +181,7 @@ int32_t ExynosLayer::doPreProcess()
                 mBufferHasMetaParcel = true;
                 if (metaData->eType == VIDEO_INFO_TYPE_INVALID) {
                     if (isFormat10BitYUV420(mLayerBuffer->format))
-                        HWC_LOGE(mDisplay, "Video metadata has invalid type!!");
+                        ALOGV("Video metadata has invalid type.");
                 } else {
                     if ((metaData->eType & VIDEO_INFO_TYPE_HDR_STATIC) ||
                             (metaData->eType & VIDEO_INFO_TYPE_HDR_DYNAMIC)) {
@@ -216,6 +214,9 @@ int32_t ExynosLayer::doPreProcess()
                             mPreprocessedInfo.sourceCrop.top = (int)(mSourceCrop.top)/2;
                             mPreprocessedInfo.sourceCrop.bottom = (int)(mSourceCrop.bottom)/2;
                         }
+                    }
+                    if (metaData->eType & VIDEO_INFO_TYPE_CHECK_PIXEL_FORMAT) {
+                        mLayerBuffer->format = metaData->nPixelFormat;
                     }
                 }
                 munmap(metaData, sizeof(ExynosVideoMeta));
