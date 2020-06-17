@@ -2342,7 +2342,7 @@ bool ExynosMPP::isAssignable(ExynosDisplay *display,
         struct exynos_image &src, struct exynos_image &dst)
 {
     bool isAssignable = isAssignableState(display, src, dst);
-    return (isAssignable & hasEnoughCapa(display, src, dst));
+    return (isAssignable && hasEnoughCapa(display, src, dst));
 }
 
 bool ExynosMPP::hasEnoughCapa(ExynosDisplay *display, struct exynos_image &src, struct exynos_image &dst)
