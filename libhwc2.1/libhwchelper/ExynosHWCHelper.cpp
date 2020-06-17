@@ -25,6 +25,7 @@
 #include "exynos_sync.h"
 #include <linux/videodev2_exynos_media.h>
 #include "VendorVideoAPI.h"
+#include "ExynosResourceRestriction.h"
 
 #define AFBC_MAGIC  0xafbc
 
@@ -236,6 +237,19 @@ bool isFormatYUV422(int format)
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].halFormat == format) {
             if (exynos_format_desc[i].type & YUV422)
+                return true;
+            else
+                return false;
+        }
+    }
+    return false;
+}
+
+bool isFormatP010(int format)
+{
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].halFormat == format) {
+            if (exynos_format_desc[i].type & P010)
                 return true;
             else
                 return false;
@@ -1210,4 +1224,11 @@ String8 getMPPStr(int typeId) {
     String8 result;
     result.appendFormat("? %08x", typeId);
     return result;
+}
+
+bool hasPPC(uint32_t physicalType, uint32_t formatIndex, uint32_t rotIndex) {
+    if (ppc_table_map.count(PPC_IDX(physicalType, formatIndex, rotIndex)) != 0) {
+        return true;
+    }
+    return false;
 }

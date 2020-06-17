@@ -2356,16 +2356,18 @@ void ExynosMPP::getPPCIndex(struct exynos_image &src, struct exynos_image &dst,
     rotIndex = 0;
     scaleIndex = 0;
 
-    /* Compare SBWC first! because SBWC can be overlapped with other format */
-    if (isFormatSBWC(criteria.format))
+    /* Compare SBWC and 10bitYUV420 first! because can be overlapped with other format */
+    if (isFormatSBWC(criteria.format) && hasPPC(mPhysicalType, PPC_FORMAT_SBWC, PPC_ROT_NO))
         formatIndex = PPC_FORMAT_SBWC;
-    else if (isFormatYUV8_2(criteria.format))
+    else if (isFormatP010(criteria.format) && hasPPC(mPhysicalType, PPC_FORMAT_P010, PPC_ROT_NO))
+        formatIndex = PPC_FORMAT_P010;
+    else if (isFormatYUV8_2(criteria.format) && hasPPC(mPhysicalType, PPC_FORMAT_YUV8_2, PPC_ROT_NO))
         formatIndex = PPC_FORMAT_YUV8_2;
-    else if (isFormatYUV420(criteria.format))
+    else if (isFormatYUV420(criteria.format) && hasPPC(mPhysicalType, PPC_FORMAT_YUV420, PPC_ROT_NO))
         formatIndex = PPC_FORMAT_YUV420;
-    else if (isFormatYUV422(criteria.format))
+    else if (isFormatYUV422(criteria.format) && hasPPC(mPhysicalType, PPC_FORMAT_YUV422, PPC_ROT_NO))
         formatIndex = PPC_FORMAT_YUV422;
-    else if (mPhysicalType == MPP_G2D && src.compressed == 1)
+    else if ((src.compressed == 1) && hasPPC(mPhysicalType, PPC_FORMAT_AFBC, PPC_ROT_NO))
         formatIndex = PPC_FORMAT_AFBC;
     else
         formatIndex = PPC_FORMAT_RGB32;
@@ -2420,7 +2422,7 @@ float ExynosMPP::getPPC(struct exynos_image &src, struct exynos_image &dst, stru
     }
 
     if (mPhysicalType == MPP_G2D || mPhysicalType == MPP_MSC) {
-        if (ppc_table_map.count(PPC_IDX(mPhysicalType, formatIndex, rotIndex)) != 0) {
+        if (hasPPC(mPhysicalType, formatIndex, rotIndex)) {
             PPC = ppc_table_map.at(PPC_IDX(mPhysicalType, formatIndex, rotIndex)).ppcList[scaleIndex];
         }
     }
