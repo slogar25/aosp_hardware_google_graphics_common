@@ -1135,13 +1135,8 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
 }
 
 int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *display,
-        ExynosLayer *layer, uint32_t *imageNum, exynos_image *image_lists)
+        ExynosLayer *layer, std::vector<exynos_image> &image_lists)
 {
-    uint32_t listSize = *imageNum;
-    if (listSize != M2M_MPP_OUT_IMAGS_COUNT)
-        return -EINVAL;
-
-    uint32_t index = 0;
     exynos_image src_img;
     exynos_image dst_img;
     layer->setSrcExynosImage(&src_img);
@@ -1207,7 +1202,8 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
                 dst_scale_img.h = pixel_align(src_img.h, srcCropHeightAlign);
             }
 
-            HDEBUGLOGD(eDebugResourceManager, "index[%d], w: %d, h: %d, ratio(type: %d, %d, %d)", index, dst_scale_img.w, dst_scale_img.h,
+            HDEBUGLOGD(eDebugResourceManager, "scale up w: %d, h: %d, ratio(type: %d, %d, %d)",
+                    dst_scale_img.w, dst_scale_img.h,
                     otfMppForScale->mLogicalType, upScaleRatio, downScaleRatio);
             if (dst_scale_img.w * upScaleRatio < dst_img.w) {
                 dst_scale_img.w = pixel_align((uint32_t)ceilf((float)dst_img.w/(float)upScaleRatio), srcCropWidthAlign);
@@ -1219,7 +1215,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
                     src_img.x, src_img.y, src_img.w, src_img.h,
                     dst_img.x, dst_img.y, dst_img.w, dst_img.h,
                     dst_scale_img.x, dst_scale_img.y, dst_scale_img.w, dst_scale_img.h);
-            image_lists[index++] = dst_scale_img;
+            image_lists.push_back(dst_scale_img);
 
             if (isFormatSBWC(dst_scale_img.format)) {
                 /*
@@ -1227,7 +1223,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
                  * Add uncompressed YUV format to cover this size
                  */
                 dst_scale_img.format = DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT;
-                image_lists[index++] = dst_scale_img;
+                image_lists.push_back(dst_scale_img);
             }
         }
     }
@@ -1273,14 +1269,14 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
         }
     }
 
-    image_lists[index++] = dst_img;
+    image_lists.push_back(dst_img);
     if (isFormatSBWC(dst_img.format)) {
         /*
          * SBWC format could not be supported in specific dst size
          * Add uncompressed YUV format to cover this size
          */
         dst_img.format = DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT;
-        image_lists[index++] = dst_img;
+        image_lists.push_back(dst_img);
     }
 
     /* For G2D HDR case */
@@ -1318,7 +1314,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
          * because G2D is used only for HDR on exernal display
          */
         if (!(isExternalPlugged && (display->mDisplayId == HWC_DISPLAY_PRIMARY))) {
-            image_lists[index++] = dst_img;
+            image_lists.push_back(dst_img);
         }
     }
 
@@ -1332,7 +1328,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
             /* Covert data space */
             dst_img.dataSpace = colorModeToDataspace(display->mColorMode);
         }
-        image_lists[index++] = dst_img;
+        image_lists.push_back(dst_img);
     }
 
     /*
@@ -1343,19 +1339,15 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
      * In other cases, m2mMPP ignores color transform setting and
      * otfMPP addresses layer color transform if it is necessary.
      */
-    for (uint32_t i = 0; i < index; i++) {
-        if (image_lists[i].dataSpace == src_img.dataSpace)
-            image_lists[i].needColorTransform = src_img.needColorTransform;
+    for (auto &image: image_lists) {
+        if (image.dataSpace == src_img.dataSpace)
+            image.needColorTransform = src_img.needColorTransform;
         else
-            image_lists[i].needColorTransform = false;
+            image.needColorTransform = false;
+
     }
 
-    if (*imageNum < index)
-        return -EINVAL;
-    else {
-        *imageNum = index;
-        return (uint32_t)listSize;
-    }
+    return static_cast<int32_t>(image_lists.size());
 }
 
 int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *layer, uint32_t layer_index,
@@ -1438,24 +1430,20 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
             if (isAssignableState) {
                 if ((mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_RGB) &&
                     (mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_COMBO)) {
-                    exynos_image otf_src_img = dst_img;
                     exynos_image otf_dst_img = dst_img;
 
                     otf_dst_img.format = DEFAULT_MPP_DST_FORMAT;
 
-                    exynos_image image_lists[M2M_MPP_OUT_IMAGS_COUNT];
-                    uint32_t imageNum = M2M_MPP_OUT_IMAGS_COUNT;
-                    if ((ret = getCandidateM2mMPPOutImages(display, layer, &imageNum, image_lists)) < 0)
+                    std::vector<exynos_image> image_lists;
+                    if ((ret = getCandidateM2mMPPOutImages(display, layer, image_lists)) < 0)
                     {
                         HWC_LOGE(display, "Fail getCandidateM2mMPPOutImages (%d)", ret);
                         return ret;
                     }
-                    HDEBUGLOGD(eDebugResourceManager, "candidate M2mMPPOutImage num: %d", imageNum);
-                    for (uint32_t outImg = 0; outImg < imageNum; outImg++)
-                    {
-                        dumpExynosImage(eDebugResourceManager, image_lists[outImg]);
+                    HDEBUGLOGD(eDebugResourceManager, "candidate M2mMPPOutImage num: %zu", image_lists.size());
+                    for (auto &otf_src_img : image_lists) {
+                        dumpExynosImage(eDebugResourceManager, otf_src_img);
                         exynos_image m2m_src_img = src_img;
-                        otf_src_img = image_lists[outImg];
                         /* transform is already handled by m2mMPP */
                         otf_src_img.transform = 0;
                         otf_dst_img.transform = 0;
