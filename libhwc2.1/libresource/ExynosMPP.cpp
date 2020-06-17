@@ -2359,7 +2359,7 @@ void ExynosMPP::getPPCIndex(struct exynos_image &src, struct exynos_image &dst,
     /* Compare SBWC first! because SBWC can be overlapped with other format */
     if (isFormatSBWC(criteria.format))
         formatIndex = PPC_FORMAT_SBWC;
-    else if (isFormat10BitYUV420(criteria.format))
+    else if (isFormatYUV8_2(criteria.format))
         formatIndex = PPC_FORMAT_YUV8_2;
     else if (isFormatYUV420(criteria.format))
         formatIndex = PPC_FORMAT_YUV420;

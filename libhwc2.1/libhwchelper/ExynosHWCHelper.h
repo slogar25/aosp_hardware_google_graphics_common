@@ -83,6 +83,7 @@ typedef enum format_type {
     BIT_MASK        = 0x000ff000,
     BIT8            = 0x00001000,
     BIT10           = 0x00002000,
+    BIT8_2          = 0x00004000,
 
     /* compression */
     /*
@@ -166,9 +167,9 @@ const format_description_t exynos_format_desc[] = {
     {HAL_PIXEL_FORMAT_YV12, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
         3, 1, 12, YUV420|BIT8, false, String8("YV12"), 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, DECON_PIXEL_FORMAT_NV12M_S10B, DRM_FORMAT_UNDEFINED,
-        2, 2, 12, YUV420|BIT10, false, String8("EXYNOS_YCbCr_420_SP_M_S10B"), 0},
+        2, 2, 12, YUV420|BIT10|BIT8_2, false, String8("EXYNOS_YCbCr_420_SP_M_S10B"), 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B, DECON_PIXEL_FORMAT_NV12N_10B, DRM_FORMAT_UNDEFINED,
-        2, 1, 12, YUV420|BIT10, false, String8("EXYNOS_YCbCr_420_SPN_S10B"), 0},
+        2, 1, 12, YUV420|BIT10|BIT8_2, false, String8("EXYNOS_YCbCr_420_SPN_S10B"), 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M, DECON_PIXEL_FORMAT_NV12M_P010, DRM_FORMAT_P010,
         2, 2, 24, YUV420|BIT10, false, String8("EXYNOS_YCbCr_P010_M"), 0},
     {HAL_PIXEL_FORMAT_YCBCR_P010, DECON_PIXEL_FORMAT_NV12_P010, DRM_FORMAT_P010,
@@ -395,6 +396,7 @@ bool isFormatYUV(int format);
 bool isFormatYUV420(int format);
 bool isFormatYUV422(int format);
 bool isFormatYCrCb(int format);
+bool isFormatYUV8_2(int format);
 bool isFormat10BitYUV420(int format);
 bool isFormatLossy(int format);
 bool isFormatSBWC(int format);
