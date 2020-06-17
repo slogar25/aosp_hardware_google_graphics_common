@@ -605,8 +605,13 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
         modifiers[0] |= DRM_FORMAT_MOD_PROTECTION;
 
     if (config.state == config.WIN_STATE_BUFFER) {
-        drmFormat = halFormatToDrmFormat(config.format,
-                config.compression ? AFBC : 0);
+        uint32_t compressType = 0;
+        if (config.compression)
+            compressType = AFBC;
+        else if (isFormatSBWC(config.format))
+            compressType = COMP_ANY;
+
+        drmFormat = halFormatToDrmFormat(config.format, compressType);
         if (drmFormat == DRM_FORMAT_UNDEFINED) {
             HWC_LOGE(mExynosDisplay, "%s:: known drm format (%d)",
                     __func__, config.format);
@@ -639,6 +644,14 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
                     break;
             }
             modifiers[0] |= DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
+        } else {
+            if (isFormatSBWC(config.format)) {
+                if (isFormat10BitYUV420(config.format)) {
+                    modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLOCK_SIZE_32x5);
+                } else {
+                    modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLOCK_SIZE_32x4);
+                }
+            }
         }
 
         for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
