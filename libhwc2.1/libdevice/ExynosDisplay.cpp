@@ -3214,6 +3214,15 @@ int32_t ExynosDisplay::startPostProcessing()
     int ret = NO_ERROR;
     String8 errString;
 
+    float assignedCapacity = 0;
+    if ((assignedCapacity = mDevice->mResourceManager->getAssignedCapacity(MPP_G2D)) > 8.5) {
+        DISPLAY_LOGE("Assigned capacity for exynos composition is over restriction (%f)",
+                assignedCapacity);
+        printDebugInfos(errString);
+        mDisplayInterface->setForcePanic();
+        return -EINVAL;
+    }
+
     if ((ret = doExynosComposition()) != NO_ERROR) {
         errString.appendFormat("exynosComposition fail (%d)\n", ret);
         goto err;
