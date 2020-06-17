@@ -109,6 +109,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         virtual uint32_t getMaxWindowNum();
         virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
                 int32_t* /*android_dataspace_t*/ outDataspace);
+        virtual int32_t getDisplayIdentificationData(uint8_t* outPort,
+                uint32_t* outDataSize, uint8_t* outData);
         virtual int32_t setDisplayColorSetting(
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq)
         { return NO_ERROR;};
