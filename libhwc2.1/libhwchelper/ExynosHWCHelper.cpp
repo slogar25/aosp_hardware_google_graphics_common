@@ -176,6 +176,20 @@ bool isFormatYUV(int format)
     return true;
 }
 
+bool isFormatSBWC(int format)
+{
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].halFormat == format) {
+            if ((exynos_format_desc[i].type & SBWC) ||
+                    (exynos_format_desc[i].type & SBWC_LOSSY))
+                return true;
+            else
+                return false;
+        }
+    }
+    return false;
+}
+
 bool isFormatYUV420(int format)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
@@ -215,25 +229,16 @@ bool isFormatYCrCb(int format)
 
 bool isFormatLossy(int format)
 {
-    switch (format) {
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L75:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L50:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L75:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L60:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L40:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L60:
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L80:
-            return true;
-        default:
-            return false;
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
+        if (exynos_format_desc[i].halFormat == format) {
+            if (exynos_format_desc[i].type & SBWC_LOSSY)
+                return true;
+            else
+                return false;
+        }
     }
     return false;
 }
-
-
 
 bool formatHasAlphaChannel(int format)
 {
