@@ -393,6 +393,7 @@ bool isFormatYUV420(int format);
 bool isFormatYUV422(int format);
 bool isFormatYCrCb(int format);
 bool isFormat10BitYUV420(int format);
+bool isFormatLossy(int format);
 bool formatHasAlphaChannel(int format);
 unsigned int isNarrowRgb(int format, android_dataspace data_space);
 bool isCompressed(const private_handle_t *handle);

@@ -1363,7 +1363,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     uint64_t bufSize = handle->size * formatToBpp(handle->format);
     uint64_t srcSize = cfg.src.f_w * cfg.src.f_h * formatToBpp(cfg.format);
 
-    if (bufSize < srcSize) {
+    if (!isFormatLossy(handle->format) && (bufSize < srcSize)) {
         DISPLAY_LOGE("%s:: buffer size is smaller than source size, buf(size: %d, format: %d), src(w: %d, h: %d, format: %d)",
                 __func__, handle->size, handle->format, cfg.src.f_w, cfg.src.f_h, cfg.format);
         return -EINVAL;
@@ -1572,7 +1572,7 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
 
     uint64_t bufSize = handle->size * formatToBpp(handle->format);
     uint64_t srcSize = config.src.f_w * config.src.f_h * formatToBpp(config.format);
-    if (bufSize < srcSize) {
+    if (!isFormatLossy(handle->format) && (bufSize < srcSize)) {
         DISPLAY_LOGE("%s:: buffer size is smaller than source size, buf(size: %d, format: %d), src(w: %d, h: %d, format: %d)",
                 __func__, handle->size, handle->format, config.src.f_w, config.src.f_h, config.format);
         return -EINVAL;
