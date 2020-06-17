@@ -156,6 +156,7 @@ class ExynosResourceManager {
         ExynosMPP* getOtfMPPWithChannel(int ch);
         uint32_t getFeatureTableSize() const;
         const static ExynosMPPVector& getOtfMPPs() { return mOtfMPPs; };
+        float getM2MCapa(uint32_t physicalType);
         virtual bool hasHDR10PlusMPP();
         float getAssignedCapacity(uint32_t physicalType);
 

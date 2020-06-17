@@ -120,6 +120,9 @@ class Allocator;
 #define MPP_MSC_CAPACITY    8
 #endif
 
+/* Currently allowed capacity percentage is over 10% */
+#define MPP_CAPA_OVER_THRESHOLD 1.1
+
 #ifndef MPP_G2D_SRC_SCALED_WEIGHT
 #define MPP_G2D_SRC_SCALED_WEIGHT   1.125
 #endif
