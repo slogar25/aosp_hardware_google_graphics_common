@@ -152,6 +152,9 @@ int32_t ExynosLayer::doPreProcess()
         return NO_ERROR;
     }
 
+    mPreprocessedInfo.mUsePrivateFormat = false;
+    mPreprocessedInfo.mPrivateFormat = mLayerBuffer->format;
+
     if (isFormatYUV(mLayerBuffer->format)) {
         mPreprocessedInfo.sourceCrop.top = (int)mSourceCrop.top;
         mPreprocessedInfo.sourceCrop.left = (int)mSourceCrop.left;
@@ -161,6 +164,7 @@ int32_t ExynosLayer::doPreProcess()
     }
 
     if (isFormatYUV(mLayerBuffer->format)) {
+
         ExynosVideoMeta *metaData = NULL;
         int priv_fd = -1;
 
@@ -216,7 +220,8 @@ int32_t ExynosLayer::doPreProcess()
                         }
                     }
                     if (metaData->eType & VIDEO_INFO_TYPE_CHECK_PIXEL_FORMAT) {
-                        mLayerBuffer->format = metaData->nPixelFormat;
+                        mPreprocessedInfo.mUsePrivateFormat = true;
+                        mPreprocessedInfo.mPrivateFormat = metaData->nPixelFormat;
                     }
                 }
                 munmap(metaData, sizeof(ExynosVideoMeta));
@@ -729,7 +734,10 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
             src_img->fullWidth = handle->stride;
             src_img->fullHeight = handle->vstride;
         }
-        src_img->format = handle->format;
+        if (!mPreprocessedInfo.mUsePrivateFormat)
+            src_img->format = handle->format;
+        else
+            src_img->format = mPreprocessedInfo.mPrivateFormat;
 #ifdef GRALLOC_VERSION1
         src_img->usageFlags = handle->producer_usage;
 #else

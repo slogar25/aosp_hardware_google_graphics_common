@@ -62,6 +62,9 @@ typedef struct pre_processed_layer_info
     hwc_frect_t sourceCrop;
     hwc_rect_t displayFrame;
     int interlacedType;
+    /* SBWC exception */
+    bool mUsePrivateFormat = false;
+    u32 mPrivateFormat = 0;
 } pre_processed_layer_info_t;
 
 enum {
