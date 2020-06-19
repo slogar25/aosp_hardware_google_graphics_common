@@ -91,7 +91,6 @@ typedef struct transform_map {
     uint32_t hwc_tr;
 } transform_map_t;
 
-#define TRANSFORM_NUM   5
 const transform_map_t transform_map_table [] =
 {
     {HAL_TRANSFORM_FLIP_H, MPP_ATTR_FLIP_H},
