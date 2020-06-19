@@ -223,6 +223,9 @@ int32_t exynos_createLayer(hwc2_device_t *dev,
 int32_t exynos_createVirtualDisplay(hwc2_device_t *dev, uint32_t width, uint32_t height,
         int32_t *format, hwc2_display_t *outDisplay)
 {
+    if (format == nullptr)
+        return HWC2_ERROR_BAD_PARAMETER;
+
     ExynosDevice *exynosDevice = checkDevice(dev);
     *outDisplay = HWC_DISPLAY_VIRTUAL;
 
@@ -593,6 +596,9 @@ int32_t exynos_setColorMode(hwc2_device_t *dev, hwc2_display_t display, int32_t 
 int32_t exynos_setColorTransform(hwc2_device_t *dev, hwc2_display_t display,
         const float* matrix, int32_t hint)
 {
+    if (matrix == nullptr)
+        return HWC2_ERROR_BAD_PARAMETER;
+
     ExynosDevice *exynosDevice = checkDevice(dev);
 
     if (exynosDevice) {
@@ -900,6 +906,9 @@ int32_t exynos_setLayerPerFrameMetadata(hwc2_device_t *dev, hwc2_display_t displ
         hwc2_layer_t layer, uint32_t numElements,
         const int32_t* /*hw2_per_frame_metadata_key_t*/ keys,
         const float* metadata) {
+    if ((keys == nullptr) || (metadata == nullptr))
+        return HWC2_ERROR_BAD_PARAMETER;
+
     ExynosDevice *exynosDevice = checkDevice(dev);
     if (exynosDevice) {
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
@@ -1041,6 +1050,9 @@ int32_t exynos_setLayerPerFrameMetadataBlobs(hwc2_device_t* dev, hwc2_display_t 
         hwc2_layer_t layer, uint32_t numElements, const int32_t* keys, const uint32_t* sizes,
         const uint8_t* metadata)
 {
+    if ((keys == nullptr) || (sizes == nullptr) || (metadata == nullptr))
+        return HWC2_ERROR_BAD_PARAMETER;
+
     ExynosDevice *exynosDevice = checkDevice(dev);
 
     if (exynosDevice) {
