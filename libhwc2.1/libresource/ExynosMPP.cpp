@@ -380,9 +380,9 @@ bool ExynosMPP::isSupportedTransform(struct exynos_image &src)
     if (!checkRotationCondition(src))
         return false;
 
-    for (int i = 0; i < TRANSFORM_NUM; i++) {
-        if (src.transform & transform_map_table[i].hal_tr) {
-            if (!(mAttr & transform_map_table[i].hwc_tr))
+    for(auto transform_map : transform_map_table) {
+        if (src.transform & transform_map.hal_tr) {
+            if (!(mAttr & transform_map.hwc_tr))
                 return false;
         }
     }
