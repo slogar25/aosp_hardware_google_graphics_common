@@ -2852,6 +2852,9 @@ int32_t ExynosDisplay::setClientTarget(
     setFenceInfo(acquireFence, this,
             FENCE_TYPE_SRC_RELEASE, FENCE_IP_FB, FENCE_FROM);
 
+    if (handle)
+        mClientCompositionInfo.mCompressed = isCompressed(handle);
+
     return 0;
 }
 
