@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <xf86drmMode.h>
+#include <string>
 #include <vector>
 
 namespace android {
@@ -49,6 +50,8 @@ class DrmConnector {
   bool writeback() const;
   bool valid_type() const;
 
+  std::string name() const;
+
   int UpdateModes();
 
   const std::vector<DrmMode> &modes() const {
@@ -59,6 +62,7 @@ class DrmConnector {
 
   const DrmProperty &dpms_property() const;
   const DrmProperty &crtc_id_property() const;
+  const DrmProperty &edid_property() const;
   const DrmProperty &writeback_pixel_formats() const;
   const DrmProperty &writeback_fb_id() const;
   const DrmProperty &writeback_out_fence() const;
@@ -94,6 +98,7 @@ class DrmConnector {
   int display_;
 
   uint32_t type_;
+  uint32_t type_id_;
   drmModeConnection state_;
 
   uint32_t mm_width_;
@@ -104,6 +109,7 @@ class DrmConnector {
 
   DrmProperty dpms_property_;
   DrmProperty crtc_id_property_;
+  DrmProperty edid_property_;
   DrmProperty writeback_pixel_formats_;
   DrmProperty writeback_fb_id_;
   DrmProperty writeback_out_fence_;
