@@ -1409,3 +1409,52 @@ void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace(int32_t col
     if (!mSupportedDataspaces.empty())
         mReadbackDataspace = mSupportedDataspaces[0];
 }
+
+int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
+        uint8_t* outPort, uint32_t* outDataSize, uint8_t* outData)
+{
+    if ((mDrmDevice == nullptr) || (mDrmConnector == nullptr)) {
+        ALOGE("%s: display(%s) mDrmDevice(%p), mDrmConnector(%p)",
+                __func__, mExynosDisplay->mDisplayName.string(),
+                mDrmDevice, mDrmConnector);
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    if (mDrmConnector->edid_property().id() == 0) {
+        ALOGD("%s: edid_property is not supported",
+                mExynosDisplay->mDisplayName.string());
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    drmModePropertyBlobPtr blob;
+    int ret;
+    uint64_t blobId;
+
+    std::tie(ret, blobId) = mDrmConnector->edid_property().value();
+    if (ret) {
+        ALOGE("Failed to get edid property value.");
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+    if (blobId == 0) {
+        ALOGD("%s: edid_property is supported but blob is not valid",
+                mExynosDisplay->mDisplayName.string());
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
+    if (blob == nullptr) {
+        ALOGD("%s: Failed to get blob",
+                mExynosDisplay->mDisplayName.string());
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    if (outData) {
+        *outDataSize = std::min(*outDataSize, blob->length);
+        memcpy(outData, blob->data, *outDataSize);
+    } else {
+        *outDataSize = blob->length;
+    }
+    *outPort = mDrmConnector->id();
+
+    return HWC2_ERROR_NONE;
+}
