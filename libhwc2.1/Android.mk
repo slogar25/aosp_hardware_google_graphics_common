@@ -22,18 +22,21 @@ LOCAL_SHARED_LIBRARIES := libcutils libdrm liblog libutils libhardware
 
 LOCAL_PROPRIETARY_MODULE := true
 
+LOCAL_C_INCLUDES += \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include
+
 LOCAL_SRC_FILES := \
-	libdrmresource/worker.cpp \
-	libdrmresource/resourcemanager.cpp \
-	libdrmresource/drmdevice.cpp \
-	libdrmresource/drmconnector.cpp \
-	libdrmresource/drmcrtc.cpp \
-	libdrmresource/drmencoder.cpp \
-	libdrmresource/drmmode.cpp \
-	libdrmresource/drmplane.cpp \
-	libdrmresource/drmproperty.cpp \
-	libdrmresource/drmeventlistener.cpp \
-	libdrmresource/vsyncworker.cpp
+	libdrmresource/utils/worker.cpp \
+	libdrmresource/drm/resourcemanager.cpp \
+	libdrmresource/drm/drmdevice.cpp \
+	libdrmresource/drm/drmconnector.cpp \
+	libdrmresource/drm/drmcrtc.cpp \
+	libdrmresource/drm/drmencoder.cpp \
+	libdrmresource/drm/drmmode.cpp \
+	libdrmresource/drm/drmplane.cpp \
+	libdrmresource/drm/drmproperty.cpp \
+	libdrmresource/drm/drmeventlistener.cpp \
+	libdrmresource/drm/vsyncworker.cpp
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -Wno-unused-parameter
@@ -76,7 +79,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include
 
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
@@ -139,7 +142,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libdrm
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_C_INCLUDES)
