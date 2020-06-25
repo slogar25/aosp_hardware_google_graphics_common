@@ -109,6 +109,7 @@ int DrmConnector::Init() {
 
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
+  properties_.push_back(&edid_property_);
   if (writeback()) {
       properties_.push_back(&writeback_pixel_formats_);
       properties_.push_back(&writeback_fb_id_);
