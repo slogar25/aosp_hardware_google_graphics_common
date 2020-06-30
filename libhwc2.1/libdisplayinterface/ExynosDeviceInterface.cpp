@@ -176,6 +176,9 @@ int32_t ExynosDeviceInterface::updateFeatureTable() {
                         attr |= dpu_attr_map_table[k].hwc_attr;
                     }
                 }
+                auto it = sw_feature_table.find(hwType);
+                if (it != sw_feature_table.end())
+                    attr |= it->second;
                 feature_table[j].attr = attr;
             }
         }
