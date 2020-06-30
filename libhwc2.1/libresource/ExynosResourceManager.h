@@ -38,6 +38,19 @@ class ExynosMPP;
 
 #define MAX_OVERLAY_LAYER_NUM       20
 
+#ifndef USE_MODULE_SW_FEATURE
+const std::map<mpp_phycal_type_t, uint64_t> sw_feature_table =
+{
+    {MPP_DPP_G, MPP_ATTR_DIM},
+    {MPP_DPP_GF, MPP_ATTR_DIM},
+    {MPP_DPP_VG, MPP_ATTR_DIM},
+    {MPP_DPP_VGS, MPP_ATTR_DIM},
+    {MPP_DPP_VGF, MPP_ATTR_DIM},
+    {MPP_DPP_VGFS, MPP_ATTR_DIM},
+    {MPP_DPP_VGRFS, MPP_ATTR_DIM},
+};
+#endif
+
 #ifndef USE_MODULE_DPU_ATTR_MAP
 const dpu_attr_map_t dpu_attr_map_table [] =
 {

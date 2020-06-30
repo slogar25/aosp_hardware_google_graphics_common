@@ -483,17 +483,17 @@ uint64_t halTransformToDrmRot(uint32_t halTransform)
 {
     switch (halTransform) {
     case HAL_TRANSFORM_FLIP_H:
-        return DRM_MODE_REFLECT_X|DRM_MODE_ROTATE_0;
-    case HAL_TRANSFORM_FLIP_V:
         return DRM_MODE_REFLECT_Y|DRM_MODE_ROTATE_0;
+    case HAL_TRANSFORM_FLIP_V:
+        return DRM_MODE_REFLECT_X|DRM_MODE_ROTATE_0;
     case HAL_TRANSFORM_ROT_180:
         return DRM_MODE_ROTATE_180;
     case HAL_TRANSFORM_ROT_90:
         return DRM_MODE_ROTATE_90;
     case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
-        return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_X);
-    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
         return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_Y);
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
+        return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_X);
     case HAL_TRANSFORM_ROT_270:
         return DRM_MODE_ROTATE_270;
     default:
