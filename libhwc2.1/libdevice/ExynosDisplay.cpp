@@ -37,6 +37,7 @@
  */
 
 using namespace android;
+
 extern struct exynos_hwc_control exynosHWCControl;
 extern struct update_time_info updateTimeInfo;
 
@@ -295,7 +296,10 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mColorMode(HAL_COLOR_MODE_NATIVE),
     mSkipFrame(false),
     mBrightnessFd(NULL),
-    mMaxBrightness(0)
+    mMaxBrightness(0),
+    mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
+    mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
+    mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE)
 {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
@@ -2632,6 +2636,12 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     mDpuData.reset();
 
+    if (mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_PENDING) {
+        if ((ret = doDisplayConfigPostProcess(mDevice)) != NO_ERROR) {
+            DISPLAY_LOGE("doDisplayConfigPostProcess error (%d)", ret);
+        }
+    }
+
     if ((mLayers.size() == 0) &&
         (mDisplayId != HWC_DISPLAY_VIRTUAL)) {
         clearDisplay(mDpuData.enable_readback);
@@ -2790,6 +2800,11 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     mRenderingState = RENDERING_STATE_PRESENTED;
 
+    if (mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
+        /* Do not update mVsyncPeriod */
+        updateInternalDisplayConfigVariables(mDesiredConfig, false);
+    }
+
     return ret;
 err:
     printDebugInfos(errString);
@@ -2834,6 +2849,7 @@ int32_t ExynosDisplay::presentPostProcessing()
 int32_t ExynosDisplay::setActiveConfig(hwc2_config_t config)
 {
     Mutex::Autolock lock(mDisplayMutex);
+    DISPLAY_LOGD(eDebugDisplayConfig, "%s:: config(%d)", __func__, config);
     return setActiveConfigInternal(config);
 }
 
@@ -2845,9 +2861,9 @@ int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config)
     if(!mSkipFrame && needNotChangeConfig(config))
         return HWC2_ERROR_NONE;
 
-    ALOGI("%s : %dx%d, %dms, %d Xdpi, %d Ydpi", __func__,
+    DISPLAY_LOGD(eDebugDisplayConfig, "(current %d) : %dx%d, %dms, %d Xdpi, %d Ydpi", mActiveConfig,
             mXres, mYres, mVsyncPeriod, mXdpi, mYdpi);
-    ALOGI("(requested %d) : %dx%d, %dms, %d Xdpi, %d Ydpi", config,
+    DISPLAY_LOGD(eDebugDisplayConfig, "(requested %d) : %dx%d, %dms, %d Xdpi, %d Ydpi", config,
             mDisplayConfigs[config].width, mDisplayConfigs[config].height, mDisplayConfigs[config].vsyncPeriod,
             mDisplayConfigs[config].Xdpi, mDisplayConfigs[config].Ydpi);
 
@@ -3059,13 +3075,86 @@ int32_t ExynosDisplay::getDisplayConnectionType(uint32_t* outType)
 
 int32_t ExynosDisplay::getDisplayVsyncPeriod(hwc2_vsync_period_t* __unused outVsyncPeriod)
 {
-    return HWC2_ERROR_NONE;
+    Mutex::Autolock lock(mDisplayMutex);
+    return getDisplayVsyncPeriodInternal(outVsyncPeriod);
 }
 
-int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t __unused config,
-        hwc_vsync_period_change_constraints_t* __unused vsyncPeriodChangeConstraints,
-        hwc_vsync_period_change_timeline_t* __unused outTimeline)
+int32_t ExynosDisplay::getConfigAppliedTime(const uint64_t desiredTime,
+        const uint64_t actualChangeTime,
+        int64_t &appliedTime, int64_t &refreshTime)
 {
+    uint32_t transientDuration = mDisplayInterface->getConfigChangeDuration();
+    appliedTime = actualChangeTime;
+    while (desiredTime > appliedTime) {
+        DISPLAY_LOGD(eDebugDisplayConfig, "desired time(%" PRId64 ") > applied time(%" PRId64 ")", desiredTime, appliedTime);;
+        appliedTime += mVsyncPeriod;
+    }
+
+    refreshTime = appliedTime - (transientDuration * mVsyncPeriod);
+
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
+        hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t* outTimeline)
+{
+    ATRACE_CALL();
+    Mutex::Autolock lock(mDisplayMutex);
+
+    DISPLAY_LOGD(eDebugDisplayConfig, "%s:: config(%d), seamless(%d), "
+            "desiredTime(%" PRId64, ")",
+            config,
+            vsyncPeriodChangeConstraints->seamlessRequired,
+            vsyncPeriodChangeConstraints->desiredTimeNanos);
+
+    if(isBadConfig(config))
+        return HWC2_ERROR_BAD_CONFIG;
+
+    if(needNotChangeConfig(config)) {
+        outTimeline->refreshRequired = false;
+        outTimeline->newVsyncAppliedTimeNanos = vsyncPeriodChangeConstraints->desiredTimeNanos;
+        return HWC2_ERROR_NONE;
+    }
+
+    if (vsyncPeriodChangeConstraints->seamlessRequired) {
+        if (mDisplayConfigs[mActiveConfig].groupId != mDisplayConfigs[config].groupId) {
+            DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not allowed");
+            return HWC2_ERROR_SEAMLESS_NOT_ALLOWED;
+        }
+        if ((mDisplayInterface->setActiveConfigWithConstraints(config, true)) != NO_ERROR) {
+            DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not possible");
+            return HWC2_ERROR_SEAMLESS_NOT_POSSIBLE;
+        }
+    }
+
+    DISPLAY_LOGD(eDebugDisplayConfig, "%s : %dx%d, %dms, %d Xdpi, %d Ydpi", __func__,
+            mXres, mYres, mVsyncPeriod, mXdpi, mYdpi);
+
+    /* Config would be requested on present time */
+    mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_PENDING;
+    mVsyncPeriodChangeConstraints = *vsyncPeriodChangeConstraints;
+    mDesiredConfig = config;
+
+    int64_t actualChangeTime = 0;
+    /* actualChangeTime includes transient duration */
+    mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
+
+    outTimeline->refreshRequired = true;
+    getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos,
+            actualChangeTime,
+            outTimeline->newVsyncAppliedTimeNanos,
+            outTimeline->refreshTimeNanos);
+
+    DISPLAY_LOGD(eDebugDisplayConfig, "requested config : %d(%d)->%d(%d), "
+            "desired %" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64 "",
+            mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod,
+            config, mDisplayConfigs[config].vsyncPeriod,
+            mVsyncPeriodChangeConstraints.desiredTimeNanos,
+            outTimeline->newVsyncAppliedTimeNanos);
+
+    mVsyncAppliedTimeLine = *outTimeline;
+
     return HWC2_ERROR_NONE;
 }
 
@@ -3102,7 +3191,7 @@ bool ExynosDisplay::isBadConfig(hwc2_config_t config)
     /* Check invalid config */
     const auto its = mDisplayConfigs.find(config);
     if (its == mDisplayConfigs.end()) {
-        ALOGE("%s, invalid config : %d", __func__, config);
+        DISPLAY_LOGE("%s, invalid config : %d", __func__, config);
         return true;
     }
 
@@ -3114,14 +3203,15 @@ bool ExynosDisplay::needNotChangeConfig(hwc2_config_t config)
     /* getting current config and compare */
     /* If same value, return */
     if (mActiveConfig == config) {
-        ALOGI("%s, Same config change requested : %d", __func__, config);
+        DISPLAY_LOGI("%s, Same config change requested : %d", __func__, config);
         return true;
     }
 
     return false;
 }
 
-int32_t ExynosDisplay::updateInternalDisplayConfigVariables(hwc2_config_t config)
+int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
+        hwc2_config_t config, bool updateVsync)
 {
     mActiveConfig = config;
 
@@ -3130,8 +3220,105 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(hwc2_config_t config
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_HEIGHT, (int32_t*)&mYres);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_X, (int32_t*)&mXdpi);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_Y, (int32_t*)&mYdpi);
-    getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD, (int32_t*)&mVsyncPeriod);
+    if (updateVsync)
+        getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD,
+                (int32_t*)&mVsyncPeriod);
 
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplay::getDisplayVsyncPeriodInternal(hwc2_vsync_period_t* outVsyncPeriod)
+{
+    /* Getting actual config from DPU */
+    if (mDisplayInterface->getDisplayVsyncPeriod(outVsyncPeriod) == HWC2_ERROR_NONE) {
+        DISPLAY_LOGD(eDebugDisplayInterfaceConfig, "period : %ld",
+                (long)*outVsyncPeriod);
+        return HWC2_ERROR_NONE;
+    }
+
+    uint64_t current = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    DISPLAY_LOGD(eDebugDisplayConfig, "configRequest: %d, getVsync %" PRId64 ", %" PRId64 ", mVsyncPeriod: %d",
+            mConfigRequestState, current,
+            mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos, mVsyncPeriod);
+    if (mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
+        if (mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos <= current) {
+            getDisplayAttribute(mDesiredConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD,
+                    (int32_t*)&mVsyncPeriod);
+            DISPLAY_LOGD(eDebugDisplayConfig, "configRequest: mVsyncPeriod is updated: %d", mVsyncPeriod);
+            mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
+        }
+    }
+
+    *outVsyncPeriod = mVsyncPeriod;
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
+{
+    uint64_t current = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    hwc2_callback_data_t vsync_callbackData = nullptr;
+    HWC2_PFN_VSYNC_PERIOD_TIMING_CHANGED vsync_callbackFunc = nullptr;
+    if (dev->mCallbackInfos[HWC2_CALLBACK_VSYNC_PERIOD_TIMING_CHANGED].funcPointer != NULL) {
+        vsync_callbackData =
+            dev->mCallbackInfos[HWC2_CALLBACK_VSYNC_PERIOD_TIMING_CHANGED].callbackData;
+        vsync_callbackFunc =
+            (HWC2_PFN_VSYNC_PERIOD_TIMING_CHANGED)dev->mCallbackInfos[HWC2_CALLBACK_VSYNC_PERIOD_TIMING_CHANGED].funcPointer;
+    }
+
+    int64_t actualChangeTime = 0;
+    mDisplayInterface->getVsyncAppliedTime(mDesiredConfig, &actualChangeTime);
+    bool needSetActiveConfig = false;
+
+    DISPLAY_LOGD(eDebugDisplayConfig,
+            "Check time for setActiveConfig (curr: %" PRId64
+            ", actualChangeTime: %" PRId64 ", desiredTime: %" PRId64 "",
+            current, actualChangeTime,
+            mVsyncPeriodChangeConstraints.desiredTimeNanos);
+    if (actualChangeTime >= mVsyncPeriodChangeConstraints.desiredTimeNanos) {
+        DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig");
+        needSetActiveConfig = true;
+    } else {
+        DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending");
+    }
+
+    if (needSetActiveConfig) {
+        int32_t ret = NO_ERROR;
+        if ((ret = mDisplayInterface->setActiveConfigWithConstraints(mDesiredConfig)) != NO_ERROR)
+            return ret;
+
+        mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_REQUESTED;
+    }
+
+    /* Update time information */
+    if (actualChangeTime > mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos) {
+        DISPLAY_LOGD(eDebugDisplayConfig,"Vsync applied time is changed (%" PRId64 "-> %" PRId64 ")",
+                mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos,
+                actualChangeTime);
+        getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos,
+                actualChangeTime,
+                mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos,
+                mVsyncAppliedTimeLine.refreshTimeNanos);
+        if (mConfigRequestState ==
+                hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
+            mVsyncAppliedTimeLine.refreshRequired = false;
+        } else {
+            mVsyncAppliedTimeLine.refreshRequired = true;
+        }
+
+        DISPLAY_LOGD(eDebugDisplayConfig,"refresh required(%d), newVsyncAppliedTimeNanos (%" PRId64 ")",
+                mVsyncAppliedTimeLine.refreshRequired,
+                mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos);
+
+        if (vsync_callbackFunc != nullptr)
+            vsync_callbackFunc(vsync_callbackData, getDisplayId(),
+                    &mVsyncAppliedTimeLine);
+        else {
+            ALOGD("callback function is null");
+        }
+    }
     return NO_ERROR;
 }
 
@@ -3209,8 +3396,6 @@ int32_t ExynosDisplay::setVsyncEnabled(
         int32_t /*hwc2_vsync_t*/ enabled) {
 
     uint32_t val = 0;
-
-//    ALOGD("HWC2 : %s : %d %d", __func__, __LINE__, enabled);
 
     if (enabled < 0 || enabled > HWC2_VSYNC_DISABLE)
         return HWC2_ERROR_BAD_PARAMETER;

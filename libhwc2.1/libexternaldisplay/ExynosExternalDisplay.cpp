@@ -132,8 +132,7 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
     return mDisplayInterface->getDisplayConfigs(outNumConfigs, outConfigs);
 }
 
-int32_t ExynosExternalDisplay::getActiveConfig(
-        hwc2_config_t* outConfig) {
+int32_t ExynosExternalDisplay::getActiveConfig(hwc2_config_t* outConfig) {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
     if (!mHpdStatus)

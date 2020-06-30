@@ -53,10 +53,14 @@ ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDispla
 
 ExynosDisplayDrmInterface::~ExynosDisplayDrmInterface()
 {
-    if (mModeState.blob_id)
-        mDrmDevice->DestroyPropertyBlob(mModeState.blob_id);
-    if (mModeState.old_blob_id)
-        mDrmDevice->DestroyPropertyBlob(mModeState.old_blob_id);
+    if (mActiveModeState.blob_id)
+        mDrmDevice->DestroyPropertyBlob(mActiveModeState.blob_id);
+    if (mActiveModeState.old_blob_id)
+        mDrmDevice->DestroyPropertyBlob(mActiveModeState.old_blob_id);
+    if (mDesiredModeState.blob_id)
+        mDrmDevice->DestroyPropertyBlob(mDesiredModeState.blob_id);
+    if (mDesiredModeState.old_blob_id)
+        mDrmDevice->DestroyPropertyBlob(mDesiredModeState.old_blob_id);
     if (mPartialRegionState.blob_id)
         mDrmDevice->DestroyPropertyBlob(mPartialRegionState.blob_id);
 }
@@ -423,6 +427,25 @@ void ExynosDisplayDrmInterface::dumpDisplayConfigs()
     }
 }
 
+int32_t ExynosDisplayDrmInterface::getDisplayVsyncPeriod(hwc2_vsync_period_t* outVsyncPeriod)
+{
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
+int32_t ExynosDisplayDrmInterface::getConfigChangeDuration()
+{
+    /* TODO: Get from driver */
+    return 2;
+};
+
+int32_t ExynosDisplayDrmInterface::getVsyncAppliedTime(
+        hwc2_config_t config, int64_t* actualChangeTime)
+{
+    *actualChangeTime = mVsyncCallback.getVsyncTimeStamp() +
+        (mExynosDisplay->mVsyncPeriod) * getConfigChangeDuration();
+    return HWC2_ERROR_NONE;
+}
+
 int32_t ExynosDisplayDrmInterface::getColorModes(
         uint32_t* outNumModes,
         int32_t* outModes)
@@ -440,37 +463,101 @@ int32_t ExynosDisplayDrmInterface::setColorMode(int32_t mode)
     return 0;
 }
 
+int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
+        hwc2_config_t config, bool test)
+{
+    ALOGD("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
+    auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
+            [config](DrmMode const &m) { return m.id() == config;});
+    if (mode == mDrmConnector->modes().end()) {
+        HWC_LOGE(mExynosDisplay, "Could not find active mode for %d", config);
+        return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    if ((mActiveModeState.blob_id != 0) &&
+        (mActiveModeState.mode.id() == config)) {
+        ALOGD("%s:: same mode %d", __func__, config);
+        return HWC2_ERROR_NONE;
+    }
+
+    if (mDesiredModeState.needs_modeset) {
+        ALOGD("Previous mode change request is not applied");
+    }
+
+    int32_t ret = HWC2_ERROR_NONE;
+    DrmModeAtomicReq drmReq(this);
+    uint32_t modeBlob = 0;
+    if (mDesiredModeState.mode.id() != config) {
+        if ((ret = createModeBlob(*mode, modeBlob)) != NO_ERROR) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set mode state",
+                    __func__);
+            return HWC2_ERROR_BAD_CONFIG;
+        }
+    }
+    if (test) {
+        if ((ret = setDisplayMode(drmReq, modeBlob? modeBlob : mDesiredModeState.blob_id)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
+                    __func__);
+            return ret;
+        }
+        ret = drmReq.commit(DRM_MODE_ATOMIC_TEST_ONLY, true);
+        if (ret) {
+            drmReq.addOldBlob(modeBlob);
+            HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
+                    __func__, ret);
+            return ret;
+        }
+    } else {
+        mDesiredModeState.needs_modeset = true;
+    }
+
+    if (modeBlob != 0) {
+        mDesiredModeState.setMode(*mode, modeBlob, drmReq);
+    }
+    return HWC2_ERROR_NONE;
+}
 int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
-    mModeState.mode = mode;
-
-    struct drm_mode_modeinfo drm_mode;
-    memset(&drm_mode, 0, sizeof(drm_mode));
-    mode.ToDrmModeModeInfo(&drm_mode);
-
-    uint32_t id = 0;
-    int ret = mDrmDevice->CreatePropertyBlob(&drm_mode, sizeof(drm_mode),
-            &id);
-    if (ret) {
-        HWC_LOGE(mExynosDisplay, "Failed to create mode property blob %d", ret);
-        return ret;
+    /* Don't skip when power was off */
+    if (!(mExynosDisplay->mSkipFrame) &&
+        (mActiveModeState.blob_id != 0) &&
+        (mActiveModeState.mode.id() == mode.id())) {
+        ALOGD("%s:: same mode %d", __func__, mode.id());
+        return HWC2_ERROR_NONE;
     }
 
-    if (mModeState.blob_id) {
-        mDrmDevice->DestroyPropertyBlob(mModeState.blob_id);
+    int32_t ret = HWC2_ERROR_NONE;
+    uint32_t modeBlob;
+    if ((ret = createModeBlob(mode, modeBlob)) != NO_ERROR) {
+        HWC_LOGE(mExynosDisplay, "%s: Fail to set mode state",
+                __func__);
+        return HWC2_ERROR_BAD_CONFIG;
     }
 
-    mModeState.blob_id = id;
-    mModeState.needs_modeset = true;
+    DrmModeAtomicReq drmReq(this);
 
-    if ((ret = applyDisplayMode()) < 0) {
+    if ((ret = setDisplayMode(drmReq, modeBlob)) != NO_ERROR) {
+        drmReq.addOldBlob(modeBlob);
         HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
                 __func__);
         return ret;
     }
+
+    if ((ret = drmReq.commit(DRM_MODE_ATOMIC_ALLOW_MODESET, true))) {
+        drmReq.addOldBlob(modeBlob);
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
+                __func__, ret);
+        return ret;
+    }
+
+    mDrmConnector->set_active_mode(mode);
+    mActiveModeState.setMode(mode, modeBlob, drmReq);
+    mActiveModeState.needs_modeset = false;
+
     return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
+    ALOGD("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
                              [config](DrmMode const &m) { return m.id() == config; });
     if (mode == mDrmConnector->modes().end()) {
@@ -484,44 +571,41 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
     return 0;
 }
 
-int32_t ExynosDisplayDrmInterface::applyDisplayMode()
+int32_t ExynosDisplayDrmInterface::createModeBlob(const DrmMode &mode,
+        uint32_t &modeBlob)
 {
-    if (mModeState.needs_modeset == false)
-        return NO_ERROR;
+    struct drm_mode_modeinfo drm_mode;
+    memset(&drm_mode, 0, sizeof(drm_mode));
+    mode.ToDrmModeModeInfo(&drm_mode);
 
+    modeBlob = 0;
+    int ret = mDrmDevice->CreatePropertyBlob(&drm_mode, sizeof(drm_mode),
+            &modeBlob);
+    if (ret) {
+        HWC_LOGE(mExynosDisplay, "Failed to create mode property blob %d", ret);
+        return ret;
+    }
+
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplayDrmInterface::setDisplayMode(
+        DrmModeAtomicReq &drmReq, const uint32_t modeBlob)
+{
     int ret = NO_ERROR;
-    DrmModeAtomicReq drmReq(this);
 
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
            mDrmCrtc->active_property(), 1)) < 0)
         return ret;
 
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-            mDrmCrtc->mode_property(), mModeState.blob_id)) < 0)
+            mDrmCrtc->mode_property(), modeBlob)) < 0)
         return ret;
 
     if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
             mDrmConnector->crtc_id_property(), mDrmCrtc->id())) < 0)
         return ret;
 
-    ret = drmReq.commit(DRM_MODE_ATOMIC_ALLOW_MODESET, true);
-    if (ret) {
-        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
-                __func__, ret);
-        return ret;
-    }
-
-    if (mModeState.old_blob_id) {
-        ret = mDrmDevice->DestroyPropertyBlob(mModeState.old_blob_id);
-        if (ret) {
-            HWC_LOGE(mExynosDisplay, "Failed to destroy old mode property blob %" PRIu32 "/%d",
-                    mModeState.old_blob_id, ret);
-        }
-    }
-    mDrmConnector->set_active_mode(mModeState.mode);
-    mModeState.old_blob_id = mModeState.blob_id;
-    mModeState.blob_id = 0;
-    mModeState.needs_modeset = false;
     return NO_ERROR;
 }
 
@@ -979,6 +1063,14 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
+    if (mDesiredModeState.needs_modeset) {
+        if ((ret = setDisplayMode(drmReq, mDesiredModeState.blob_id)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
+                    __func__);
+            return ret;
+        }
+    }
+
     if ((ret = setupPartialRegion(drmReq)) != NO_ERROR)
         return ret;
 
@@ -1079,6 +1171,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             display_config.rel_fence =
                 dup((int)out_fences[mDrmCrtc->pipe()]);
         }
+    }
+
+    if (mDesiredModeState.needs_modeset) {
+        mDesiredModeState.apply(mActiveModeState, drmReq);
     }
 
     return NO_ERROR;

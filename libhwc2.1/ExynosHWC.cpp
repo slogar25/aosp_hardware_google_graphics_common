@@ -565,6 +565,8 @@ int32_t exynos_registerCallback(hwc2_device_t* dev,
 int32_t exynos_setActiveConfig(hwc2_device_t *dev, hwc2_display_t display,
         hwc2_config_t config)
 {
+    HDEBUGLOGD(eDebugDisplayConfig, "%s, %d",__func__, config);
+
     ExynosDevice *exynosDevice = checkDevice(dev);
 
     if (exynosDevice) {
@@ -1143,6 +1145,7 @@ int32_t exynos_SetActiveConfigWithConstraints(hwc2_device_t* dev, hwc2_display_t
         hwc2_config_t config, hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
         hwc_vsync_period_change_timeline_t* outTimeline)
 {
+    HDEBUGLOGD(eDebugDisplayConfig, "%s, %d", __func__, config);
     ExynosDevice *exynosDevice = checkDevice(dev);
 
     if (exynosDevice) {

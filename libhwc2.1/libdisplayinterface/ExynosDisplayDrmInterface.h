@@ -136,6 +136,16 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                 int32_t* /*android_dataspace_t*/ outDataspace);
         virtual int32_t getDisplayIdentificationData(uint8_t* outPort,
                 uint32_t* outDataSize, uint8_t* outData);
+
+        /* For HWC 2.4 APIs */
+        virtual int32_t getDisplayVsyncPeriod(
+                hwc2_vsync_period_t* outVsyncPeriod);
+        virtual int32_t getConfigChangeDuration();
+        virtual int32_t getVsyncAppliedTime(hwc2_config_t config,
+                int64_t* actualChangeTime);
+        virtual int32_t setActiveConfigWithConstraints(
+                hwc2_config_t config, bool test = false);
+
         virtual int32_t setDisplayColorSetting(
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq)
         { return NO_ERROR;};
@@ -145,7 +155,29 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                 const exynos_win_config_data& config)
         { return NO_ERROR;};
     protected:
-        int32_t applyDisplayMode();
+        struct ModeState {
+            bool needs_modeset = false;
+            DrmMode mode;
+            uint32_t blob_id = 0;
+            uint32_t old_blob_id = 0;
+            void setMode(const DrmMode newMode, const uint32_t modeBlob,
+                    DrmModeAtomicReq &drmReq) {
+                drmReq.addOldBlob(old_blob_id);
+                mode = newMode;
+                old_blob_id = blob_id;
+                blob_id = modeBlob;
+            };
+            void reset() {
+                *this = {};
+            };
+            void apply(ModeState &toModeState, DrmModeAtomicReq &drmReq) {
+                toModeState.setMode(mode, blob_id, drmReq);
+                drmReq.addOldBlob(old_blob_id);
+                reset();
+            };
+        };
+        int32_t createModeBlob(const DrmMode &mode, uint32_t &modeBlob);
+        int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         uint32_t getBytePerPixelOfPrimaryPlane(int format);
@@ -181,12 +213,6 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         int32_t setActiveDrmMode(DrmMode const &mode);
 
     protected:
-        struct ModeState {
-            bool needs_modeset = false;
-            DrmMode mode;
-            uint32_t blob_id = 0;
-            uint32_t old_blob_id = 0;
-        };
         struct PartialRegionState {
             struct drm_clip_rect partial_rect = {0, 0, 0, 0};
             uint32_t blob_id = 0;
@@ -197,7 +223,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                         (partial_rect.y2 != rect.y2));
             };
         };
-    protected:
+
         class DrmReadbackInfo {
             public:
                 void init(DrmDevice *drmDevice, uint32_t displayId);
@@ -232,7 +258,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         DrmConnector *mDrmConnector;
         VSyncWorker mDrmVSyncWorker;
         ExynosVsyncCallback mVsyncCallback;
-        ModeState mModeState;
+        ModeState mActiveModeState;
+        ModeState mDesiredModeState;
         PartialRegionState mPartialRegionState;
         /* Mapping plane id to ExynosMPP, key is plane id */
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;

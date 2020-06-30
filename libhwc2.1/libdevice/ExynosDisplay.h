@@ -103,6 +103,12 @@ enum class PanelGammaSource {
     GAMMA_TYPES,
 };
 
+enum class hwc_request_state_t {
+    SET_CONFIG_STATE_NONE = 0,
+    SET_CONFIG_STATE_PENDING,
+    SET_CONFIG_STATE_REQUESTED,
+};
+
 #define NUM_SKIP_STATIC_LAYER  5
 struct ExynosFrameInfo
 {
@@ -455,6 +461,11 @@ class ExynosDisplay {
 
         FILE *mBrightnessFd;
         uint32_t mMaxBrightness;
+
+        hwc_vsync_period_change_constraints_t mVsyncPeriodChangeConstraints;
+        hwc_vsync_period_change_timeline_t mVsyncAppliedTimeLine;
+        hwc_request_state_t mConfigRequestState;
+        hwc2_config_t mDesiredConfig;
 
         uint32_t mActiveConfig = UINT_MAX;
 
@@ -946,7 +957,14 @@ class ExynosDisplay {
         /* setActiveConfig MISCs */
         bool isBadConfig(hwc2_config_t config);
         bool needNotChangeConfig(hwc2_config_t config);
-        int32_t updateInternalDisplayConfigVariables(hwc2_config_t config);
+        int32_t updateInternalDisplayConfigVariables(
+                hwc2_config_t config, bool updateVsync = true);
+        int32_t getDisplayVsyncPeriodInternal(
+                hwc2_vsync_period_t* outVsyncPeriod);
+        int32_t doDisplayConfigPostProcess(ExynosDevice *dev);
+        int32_t getConfigAppliedTime(const uint64_t desiredTime,
+                const uint64_t actualChangeTime,
+                int64_t &appliedTime, int64_t &refreshTime);
 
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);

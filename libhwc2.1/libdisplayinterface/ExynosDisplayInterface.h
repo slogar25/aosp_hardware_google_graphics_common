@@ -44,6 +44,11 @@ class ExynosDisplayInterface {
                 int32_t* outModes);
         virtual int32_t setColorMode(int32_t __unused mode) {return NO_ERROR;};
         virtual int32_t setActiveConfig(hwc2_config_t __unused config) {return NO_ERROR;};
+        virtual int32_t setActiveConfigWithConstraints(
+                hwc2_config_t __unused config, bool __unused test = false)
+        {return NO_ERROR;};
+        virtual int32_t getDisplayVsyncPeriod(hwc2_vsync_period_t* outVsyncPeriod);
+        virtual int32_t getConfigChangeDuration() {return 0;};
         virtual int32_t setCursorPositionAsync(uint32_t __unused x_pos,
                 uint32_t __unused y_pos) {return NO_ERROR;};
         virtual int32_t updateHdrCapabilities();
@@ -65,6 +70,9 @@ class ExynosDisplayInterface {
                 uint32_t* __unused outDataSize, uint8_t* __unused outData) {return 0;}
 
         bool isPrimary();
+        /* For HWC 2.4 APIs */
+        virtual int32_t getVsyncAppliedTime(hwc2_config_t __unused config, int64_t* __unused actualChangeTime) {return NO_ERROR;}
+
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

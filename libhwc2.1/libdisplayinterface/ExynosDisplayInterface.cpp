@@ -33,6 +33,11 @@ int32_t ExynosDisplayInterface::getDisplayConfigs(
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosDisplayInterface::getDisplayVsyncPeriod(hwc2_vsync_period_t* outVsyncPeriod)
+{
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
 int32_t ExynosDisplayInterface::getColorModes(
         uint32_t* outNumModes,
         int32_t* outModes)
