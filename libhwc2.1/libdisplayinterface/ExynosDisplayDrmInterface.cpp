@@ -21,6 +21,7 @@
 #include "ExynosHWCDebug.h"
 #include <drm/drm_fourcc.h>
 #include <xf86drm.h>
+#include <drm.h>
 
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
@@ -54,6 +55,8 @@ ExynosDisplayDrmInterface::~ExynosDisplayDrmInterface()
         mDrmDevice->DestroyPropertyBlob(mModeState.blob_id);
     if (mModeState.old_blob_id)
         mDrmDevice->DestroyPropertyBlob(mModeState.old_blob_id);
+    if (mPartialRegionState.blob_id)
+        mDrmDevice->DestroyPropertyBlob(mPartialRegionState.blob_id);
 }
 
 void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
@@ -861,6 +864,60 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
     return NO_ERROR;
 }
 
+int32_t ExynosDisplayDrmInterface::setupPartialRegion(DrmModeAtomicReq &drmReq)
+{
+    if (!mDrmCrtc->partial_region_property().id())
+        return NO_ERROR;
+
+    int ret = NO_ERROR;
+
+    struct decon_frame &update_region = mExynosDisplay->mDpuData.win_update_region;
+    struct drm_clip_rect partial_rect = {
+        static_cast<unsigned short>(update_region.x),
+        static_cast<unsigned short>(update_region.y),
+        static_cast<unsigned short>(update_region.x + update_region.w),
+        static_cast<unsigned short>(update_region.y + update_region.h),
+    };
+    if ((mPartialRegionState.blob_id == 0) ||
+         mPartialRegionState.isUpdated(partial_rect))
+    {
+        uint32_t blob_id = 0;
+        ret = mDrmDevice->CreatePropertyBlob(&partial_rect,
+                sizeof(partial_rect),&blob_id);
+        if (ret || (blob_id == 0)) {
+            HWC_LOGE(mExynosDisplay, "Failed to create partial region "
+                    "blob id=%d, ret=%d", blob_id, ret);
+            return ret;
+        }
+
+        HDEBUGLOGD(eDebugWindowUpdate,
+                "%s: partial region updated [%d, %d, %d, %d] -> [%d, %d, %d, %d] blob(%d)",
+                mExynosDisplay->mDisplayName.string(),
+                mPartialRegionState.partial_rect.x1,
+                mPartialRegionState.partial_rect.y1,
+                mPartialRegionState.partial_rect.x2,
+                mPartialRegionState.partial_rect.y2,
+                partial_rect.x1,
+                partial_rect.y1,
+                partial_rect.x2,
+                partial_rect.y2,
+                blob_id);
+        mPartialRegionState.partial_rect = partial_rect;
+
+        if (mPartialRegionState.blob_id)
+            drmReq.addOldBlob(mPartialRegionState.blob_id);
+        mPartialRegionState.blob_id = blob_id;
+    }
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                    mDrmCrtc->partial_region_property(),
+                    mPartialRegionState.blob_id)) < 0) {
+        HWC_LOGE(mExynosDisplay, "Failed to set partial region property %d", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
 int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 {
     int ret = NO_ERROR;
@@ -876,27 +933,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
-    if (mDrmCrtc->partial_x_property().id() &&
-        mDrmCrtc->partial_y_property().id() &&
-        mDrmCrtc->partial_w_property().id() &&
-        mDrmCrtc->partial_h_property().id()) {
-        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-                        mDrmCrtc->partial_x_property(),
-                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.x, true)) < 0)
-            return ret;
-        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-                        mDrmCrtc->partial_y_property(),
-                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.y, true)) < 0)
-            return ret;
-        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-                        mDrmCrtc->partial_w_property(),
-                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.w, true)) < 0)
-            return ret;
-        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-                        mDrmCrtc->partial_h_property(),
-                        (uint64_t)mExynosDisplay->mDpuData.win_update_region.h, true)) < 0)
-            return ret;
-    }
+    if ((ret = setupPartialRegion(drmReq)) != NO_ERROR)
+        return ret;
 
     uint64_t out_fences[mDrmDevice->crtcs().size()];
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
@@ -1084,6 +1122,8 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
     }
     if(mPset)
         drmModeAtomicFree(mPset);
+
+    destroyOldBlobs();
 }
 
 int32_t ExynosDisplayDrmInterface::DrmModeAtomicReq::atomicAddProperty(
@@ -1195,8 +1235,16 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
             mPset, flags, mDrmDisplayInterface->mDrmDevice);
     if (loggingForDebug)
         dumpAtomicCommitInfo(result, true);
-    if (ret < 0)
+    if (ret < 0) {
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "commit error");
         setError(ret);
+    }
+
+    if ((ret = destroyOldBlobs()) != NO_ERROR) {
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "destroy blob error");
+        setError(ret);
+    }
+
     return ret;
 }
 

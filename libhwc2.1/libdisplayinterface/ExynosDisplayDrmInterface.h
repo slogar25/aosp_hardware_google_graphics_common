@@ -26,6 +26,7 @@
 #include "ExynosDisplay.h"
 #include <unordered_map>
 #include <xf86drmMode.h>
+#include <drm/samsung_drm.h>
 
 /* Max plane number of buffer object */
 #define HWC_DRM_BO_MAX_PLANES 4
@@ -66,11 +67,28 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                         uint32_t flags);
                 uint32_t getBufHandleFromFd(int fd);
                 void freeBufHandle(uint32_t handle);
+                void addOldBlob(uint32_t blob_id) {
+                    mOldBlobs.push_back(blob_id);
+                };
+                int destroyOldBlobs() {
+                    for (auto &blob : mOldBlobs) {
+                        int ret = mDrmDisplayInterface->mDrmDevice->DestroyPropertyBlob(blob);
+                        if (ret) {
+                            HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                                    "Failed to destroy old blob after commit %d", ret);
+                            return ret;
+                        }
+                    }
+                    mOldBlobs.clear();
+                    return NO_ERROR;
+                };
             private:
                 drmModeAtomicReqPtr mPset;
                 int mError = 0;
                 ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
                 std::vector<uint32_t> mFbIds;
+                /* Destroy old blobs after commit */
+                std::vector<uint32_t> mOldBlobs;
                 int drmFd() const { return mDrmDisplayInterface->mDrmDevice->fd(); }
         };
         class ExynosVsyncCallback: public VsyncCallback {
@@ -139,6 +157,8 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                 const std::unique_ptr<DrmPlane> &plane,
                 uint32_t &fbId);
 
+        int32_t setupPartialRegion(DrmModeAtomicReq &drmReq);
+
         static void parseEnums(const DrmProperty& property,
                 const std::vector<std::pair<uint32_t, const char *>> &enums,
                 DrmPropertyMap &out_enums);
@@ -154,6 +174,16 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
             DrmMode mode;
             uint32_t blob_id = 0;
             uint32_t old_blob_id = 0;
+        };
+        struct PartialRegionState {
+            struct drm_clip_rect partial_rect = {0, 0, 0, 0};
+            uint32_t blob_id = 0;
+            bool isUpdated(drm_clip_rect rect) {
+                return ((partial_rect.x1 != rect.x1) ||
+                        (partial_rect.y1 != rect.y1) ||
+                        (partial_rect.x2 != rect.x2) ||
+                        (partial_rect.y2 != rect.y2));
+            };
         };
     protected:
         class DrmReadbackInfo {
@@ -191,6 +221,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         VSyncWorker mDrmVSyncWorker;
         ExynosVsyncCallback mVsyncCallbak;
         ModeState mModeState;
+        PartialRegionState mPartialRegionState;
         /* Mapping plane id to ExynosMPP, key is plane id */
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;
         /* TODO: Temporary variable to manage fb id */
