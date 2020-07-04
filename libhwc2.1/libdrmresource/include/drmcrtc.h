@@ -46,10 +46,6 @@ class DrmCrtc {
   const DrmProperty &active_property() const;
   const DrmProperty &mode_property() const;
   const DrmProperty &out_fence_ptr_property() const;
-  const DrmProperty &partial_x_property() const;
-  const DrmProperty &partial_y_property() const;
-  const DrmProperty &partial_w_property() const;
-  const DrmProperty &partial_h_property() const;
   const DrmProperty &cgc_lut_property() const;
   const DrmProperty &degamma_lut_property() const;
   const DrmProperty &degamma_lut_size_property() const;
@@ -57,6 +53,7 @@ class DrmCrtc {
   const DrmProperty &gamma_lut_size_property() const;
   const DrmProperty &linear_matrix_property() const;
   const DrmProperty &gamma_matrix_property() const;
+  const DrmProperty &partial_region_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -74,10 +71,6 @@ class DrmCrtc {
   DrmProperty active_property_;
   DrmProperty mode_property_;
   DrmProperty out_fence_ptr_property_;
-  DrmProperty partial_x_property_;
-  DrmProperty partial_y_property_;
-  DrmProperty partial_w_property_;
-  DrmProperty partial_h_property_;
   DrmProperty cgc_lut_property_;
   DrmProperty degamma_lut_property_;
   DrmProperty degamma_lut_size_property_;
@@ -85,6 +78,7 @@ class DrmCrtc {
   DrmProperty gamma_lut_size_property_;
   DrmProperty linear_matrix_property_;
   DrmProperty gamma_matrix_property_;
+  DrmProperty partial_region_property_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android

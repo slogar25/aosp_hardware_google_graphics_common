@@ -49,17 +49,8 @@ int DrmCrtc::Init() {
     return ret;
   }
 
-  if (drm_->GetCrtcProperty(*this, "partial_x", &partial_x_property_))
-    ALOGE("Failed to get partial_x property");
-
-  if (drm_->GetCrtcProperty(*this, "partial_y", &partial_y_property_))
-    ALOGE("Failed to get partial_y property");
-
-  if (drm_->GetCrtcProperty(*this, "partial_w", &partial_w_property_))
-    ALOGE("Failed to get partial_w property");
-
-  if (drm_->GetCrtcProperty(*this, "partial_h", &partial_h_property_))
-    ALOGE("Failed to get partial_h property");
+  if (drm_->GetCrtcProperty(*this, "partial_region", &partial_region_property_))
+    ALOGI("Failed to get &partial_region_property");
 
   if (drm_->GetCrtcProperty(*this, "cgc_lut", &cgc_lut_property_))
     ALOGI("Failed to get cgc_lut property");
@@ -79,10 +70,6 @@ int DrmCrtc::Init() {
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
   properties_.push_back(&out_fence_ptr_property_);
-  properties_.push_back(&partial_x_property_);
-  properties_.push_back(&partial_y_property_);
-  properties_.push_back(&partial_w_property_);
-  properties_.push_back(&partial_h_property_);
   properties_.push_back(&cgc_lut_property_);
   properties_.push_back(&degamma_lut_property_);
   properties_.push_back(&degamma_lut_size_property_);
@@ -90,6 +77,7 @@ int DrmCrtc::Init() {
   properties_.push_back(&gamma_lut_size_property_);
   properties_.push_back(&linear_matrix_property_);
   properties_.push_back(&gamma_matrix_property_);
+  properties_.push_back(&partial_region_property_);
 
   return 0;
 }
@@ -126,22 +114,6 @@ const DrmProperty &DrmCrtc::out_fence_ptr_property() const {
   return out_fence_ptr_property_;
 }
 
-const DrmProperty &DrmCrtc::partial_x_property() const {
-  return partial_x_property_;
-}
-
-const DrmProperty &DrmCrtc::partial_y_property() const {
-  return partial_y_property_;
-}
-
-const DrmProperty &DrmCrtc::partial_w_property() const {
-  return partial_w_property_;
-}
-
-const DrmProperty &DrmCrtc::partial_h_property() const {
-  return partial_h_property_;
-}
-
 const DrmProperty &DrmCrtc::cgc_lut_property() const {
     return cgc_lut_property_;
 }
@@ -168,6 +140,10 @@ const DrmProperty &DrmCrtc::linear_matrix_property() const {
 
 const DrmProperty &DrmCrtc::gamma_matrix_property() const {
     return gamma_matrix_property_;
+}
+
+const DrmProperty &DrmCrtc::partial_region_property() const {
+    return partial_region_property_;
 }
 
 }  // namespace android
