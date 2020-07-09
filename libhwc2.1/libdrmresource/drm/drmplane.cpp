@@ -174,6 +174,9 @@ int DrmPlane::Init() {
   if (drm_->GetPlaneProperty(*this, "tone_mapping", &tone_mapping_))
       ALOGI("Could not get tone_mapping property");
 
+  if (drm_->GetPlaneProperty(*this, "colormap", &colormap_))
+      ALOGI("Could not get colormap property");
+
   properties_.push_back(&crtc_property_);
   properties_.push_back(&fb_property_);
   properties_.push_back(&crtc_x_property_);
@@ -199,6 +202,7 @@ int DrmPlane::Init() {
   properties_.push_back(&oetf_lut_);
   properties_.push_back(&gammut_matrix_);
   properties_.push_back(&tone_mapping_);
+  properties_.push_back(&colormap_);
 
   return 0;
 }
@@ -313,6 +317,10 @@ const DrmProperty &DrmPlane::gammut_matrix_property() const {
 
 const DrmProperty &DrmPlane::tone_mapping_property() const {
   return tone_mapping_;
+}
+
+const DrmProperty &DrmPlane::colormap_property() const {
+  return colormap_;
 }
 
 }  // namespace android
