@@ -491,7 +491,7 @@ int32_t ExynosDisplayDrmInterface::setCursorPositionAsync(uint32_t x_pos, uint32
 int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
 {
     /* Init member variables */
-    mExynosDisplay->mHdrTypeNum = 0;
+    mExynosDisplay->mHdrTypes.clear();
     mExynosDisplay->mMaxLuminance = 0;
     mExynosDisplay->mMaxAverageLuminance = 0;
     mExynosDisplay->mMinLuminance = 0;
@@ -551,19 +551,19 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     uint32_t typeBit;
     std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("Dolby Vision");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
-        mExynosDisplay->mHdrTypes[mExynosDisplay->mHdrTypeNum++] = HAL_HDR_DOLBY_VISION;
+        mExynosDisplay->mHdrTypes.push_back(HAL_HDR_DOLBY_VISION);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.string(), HAL_HDR_DOLBY_VISION);
     }
     std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HDR10");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
-        mExynosDisplay->mHdrTypes[mExynosDisplay->mHdrTypeNum++] = HAL_HDR_HDR10;
+        mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.string(), HAL_HDR_HDR10);
     }
     std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HLG");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
-        mExynosDisplay->mHdrTypes[mExynosDisplay->mHdrTypeNum++] = HAL_HDR_HLG;
+        mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HLG);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.string(), HAL_HDR_HLG);
     }
@@ -574,8 +574,8 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
             mExynosDisplay->mDisplayName.string(),
             max_luminance, max_avg_luminance, min_luminance, hdr_formats);
 
-    ALOGI("%s: hdrTypeNum(%d), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
-            mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypeNum, mExynosDisplay->mMaxLuminance,
+    ALOGI("%s: mHdrTypes size(%zu), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
+            mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypes.size(), mExynosDisplay->mMaxLuminance,
             mExynosDisplay->mMaxAverageLuminance, mExynosDisplay->mMinLuminance);
 
     return 0;

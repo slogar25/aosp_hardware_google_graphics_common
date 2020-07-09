@@ -262,7 +262,6 @@ ExynosMPP::ResourceManageThread::~ResourceManageThread()
 
 bool ExynosMPP::isDataspaceSupportedByMPP(struct exynos_image &src, struct exynos_image &dst)
 {
-    bool ret = true;
     uint32_t srcStandard = (src.dataSpace & HAL_DATASPACE_STANDARD_MASK);
     uint32_t dstStandard = (dst.dataSpace & HAL_DATASPACE_STANDARD_MASK);
     uint32_t srcTransfer = (src.dataSpace & HAL_DATASPACE_TRANSFER_MASK);
@@ -286,25 +285,18 @@ bool ExynosMPP::isDataspaceSupportedByMPP(struct exynos_image &src, struct exyno
         return false;
 
     /* Standard support check */
-    if (dataspace_standard_map.find(srcStandard) != dataspace_standard_map.end()) {
-        if (dataspace_standard_map.at(srcStandard).supported_hwc_attr & mAttr)
-            ret = true;
-        else
-            return false;
-    }
+    auto standard_it = dataspace_standard_map.find(srcStandard);
+    if ((standard_it == dataspace_standard_map.end()) ||
+        ((mAttr & standard_it->second) == 0))
+        return false;
 
     /* Transfer support check */
-    if (dataspace_transfer_map.find(srcTransfer) != dataspace_transfer_map.end()) {
-        if (dataspace_transfer_map.at(srcTransfer).supported_hwc_attr & mAttr)
-            ret = true;
-        else
-            return false;
-    }
+    auto transfer_it = dataspace_transfer_map.find(srcTransfer);
+    if ((transfer_it == dataspace_transfer_map.end()) ||
+        ((mAttr & transfer_it->second) == 0))
+        return false;
 
-    if (ret)
-        ret = checkCSCRestriction(src, dst);
-
-    return ret;
+    return checkCSCRestriction(src, dst);
 }
 
 bool ExynosMPP::isSupportedHDR10Plus(struct exynos_image &src, struct exynos_image &dst)

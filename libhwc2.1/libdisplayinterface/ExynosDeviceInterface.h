@@ -19,9 +19,49 @@
 
 #include "ExynosHWCHelper.h"
 
+struct hwc_dpp_size_range {
+  uint32_t min;
+  uint32_t max;
+  uint32_t align;
+};
+
+struct hwc_dpp_restriction {
+  struct hwc_dpp_size_range src_f_w;
+  struct hwc_dpp_size_range src_f_h;
+  struct hwc_dpp_size_range src_w;
+  struct hwc_dpp_size_range src_h;
+  uint32_t src_x_align;
+  uint32_t src_y_align;
+  struct hwc_dpp_size_range dst_f_w;
+  struct hwc_dpp_size_range dst_f_h;
+  struct hwc_dpp_size_range dst_w;
+  struct hwc_dpp_size_range dst_h;
+  uint32_t dst_x_align;
+  uint32_t dst_y_align;
+  struct hwc_dpp_size_range blk_w;
+  struct hwc_dpp_size_range blk_h;
+  uint32_t blk_x_align;
+  uint32_t blk_y_align;
+  uint32_t src_h_rot_max;
+  std::vector<uint32_t> formats;
+  uint32_t scale_down;
+  uint32_t scale_up;
+};
+
+struct hwc_dpp_ch_restriction {
+  int id;
+  unsigned long attr;
+  struct hwc_dpp_restriction restriction;
+};
+
+struct hwc_dpp_restrictions_info {
+  uint32_t ver;
+  std::vector<hwc_dpp_ch_restriction> dpp_chs;
+};
+
 /* for restriction query */
 typedef struct dpu_dpp_info {
-    struct dpp_restrictions_info dpuInfo;
+    struct hwc_dpp_restrictions_info dpuInfo;
     bool overlap[16] = {false, };
 } dpu_dpp_info_t;
 
@@ -45,7 +85,7 @@ class ExynosDeviceInterface {
         /* Update feature table using mDPUInfo */
         int32_t updateFeatureTable();
         /* Print restriction */
-        void printDppRestriction(struct dpp_ch_restriction res);
+        void printDppRestriction(struct hwc_dpp_ch_restriction res);
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

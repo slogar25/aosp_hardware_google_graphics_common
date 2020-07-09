@@ -281,7 +281,6 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mNumMaxPriorityAllowed(1),
     mCursorIndex(-1),
     mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
-    mHdrTypeNum(0),
     mMaxLuminance(0),
     mMaxAverageLuminance(0),
     mMinLuminance(0),
@@ -1893,11 +1892,7 @@ int ExynosDisplay::deliverWinConfigData() {
     }
 
     for (size_t i = 0; i < mDpuData.configs.size(); i++) {
-        if (i == DECON_WIN_UPDATE_IDX) {
-            DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "window update config[%zu]", i);
-        } else {
-            DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "deliver config[%zu]", i);
-        }
+        DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "deliver config[%zu]", i);
         dumpConfig(mDpuData.configs[i]);
     }
 
@@ -3059,7 +3054,7 @@ int32_t ExynosDisplay::setPowerMode(
 int32_t ExynosDisplay::setVsyncEnabled(
         int32_t /*hwc2_vsync_t*/ enabled) {
 
-    __u32 val = 0;
+    uint32_t val = 0;
 
 //    ALOGD("HWC2 : %s : %d %d", __func__, __LINE__, enabled);
 
@@ -4263,16 +4258,15 @@ int32_t ExynosDisplay::getHdrCapabilities(uint32_t* outNumTypes,
     *outMaxAverageLuminance = mMaxAverageLuminance;
     *outMinLuminance = mMinLuminance;
 
-    if (outTypes == NULL)
-        *outNumTypes = mHdrTypeNum;
-
-    if (outTypes != NULL) {
-        if (*outNumTypes != mHdrTypeNum) {
-            ALOGE("%s:: Invalid parameter (outNumTypes: %d, mHdrTypeNum: %d",
-                    __func__, *outNumTypes, mHdrTypeNum);
+    if (outTypes == NULL) {
+        *outNumTypes = mHdrTypes.size();
+    } else {
+        if (*outNumTypes != mHdrTypes.size()) {
+            ALOGE("%s:: Invalid parameter (outNumTypes: %d, mHdrTypes size: %zu",
+                    __func__, *outNumTypes, mHdrTypes.size());
             return HWC2_ERROR_BAD_PARAMETER;
         }
-        for(uint32_t i = 0; i < mHdrTypeNum; i++) {
+        for(uint32_t i = 0; i < *outNumTypes; i++) {
             outTypes[i] = mHdrTypes[i];
         }
     }

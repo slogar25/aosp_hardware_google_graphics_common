@@ -388,8 +388,6 @@ int32_t drmFormatToHalFormats(int format, std::vector<uint32_t> *halFormats);
 int drmFormatToHalFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DpuFormatToBpp(decon_pixel_format format);
-enum decon_blending halBlendingToDpuBlending(int32_t blending);
-enum dpp_rotate halTransformToDpuRot(uint32_t halTransform);
 uint64_t halTransformToDrmRot(uint32_t halTransform);
 
 bool isFormatRgb(int format);

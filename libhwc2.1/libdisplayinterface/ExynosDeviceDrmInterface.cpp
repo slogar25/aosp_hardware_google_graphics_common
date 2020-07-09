@@ -22,38 +22,45 @@
 #include "ExynosDisplay.h"
 #include "ExynosExternalDisplayModule.h"
 #include <hardware/hwcomposer_defs.h>
-#include "DeconDrmHeader.h"
+#include <drm/samsung_drm.h>
 
-static void set_dpp_ch_restriction(struct dpp_ch_restriction &common_restriction,
-        struct drm_dpp_ch_restriction &drm_restriction)
+void set_hwc_dpp_size_range(hwc_dpp_size_range &hwc_dpp_range, dpp_size_range &dpp_range)
 {
-    common_restriction.id = drm_restriction.id;
-    common_restriction.attr = drm_restriction.attr;
-    common_restriction.restriction.src_f_w = drm_restriction.restriction.src_f_w;
-    common_restriction.restriction.src_f_h = drm_restriction.restriction.src_f_h;
-    common_restriction.restriction.src_w = drm_restriction.restriction.src_w;
-    common_restriction.restriction.src_h = drm_restriction.restriction.src_h;
-    common_restriction.restriction.src_x_align = drm_restriction.restriction.src_x_align;
-    common_restriction.restriction.src_y_align = drm_restriction.restriction.src_y_align;
-    common_restriction.restriction.dst_f_w = drm_restriction.restriction.dst_f_w;
-    common_restriction.restriction.dst_f_h = drm_restriction.restriction.dst_f_h;
-    common_restriction.restriction.dst_w = drm_restriction.restriction.dst_w;
-    common_restriction.restriction.dst_h = drm_restriction.restriction.dst_h;
-    common_restriction.restriction.dst_x_align = drm_restriction.restriction.dst_x_align;
-    common_restriction.restriction.dst_y_align = drm_restriction.restriction.dst_y_align;
-    common_restriction.restriction.blk_w = drm_restriction.restriction.blk_w;
-    common_restriction.restriction.blk_h = drm_restriction.restriction.blk_h;
-    common_restriction.restriction.blk_x_align = drm_restriction.restriction.blk_x_align;
-    common_restriction.restriction.blk_y_align = drm_restriction.restriction.blk_y_align;
-    common_restriction.restriction.src_h_rot_max = drm_restriction.restriction.src_h_rot_max;
-    common_restriction.restriction.scale_down = drm_restriction.restriction.scale_down;
-    common_restriction.restriction.scale_up = drm_restriction.restriction.scale_up;
+    hwc_dpp_range.min = dpp_range.min;
+    hwc_dpp_range.max = dpp_range.max;
+    hwc_dpp_range.align = dpp_range.align;
+}
+
+static void set_dpp_ch_restriction(struct hwc_dpp_ch_restriction &hwc_dpp_restriction,
+        struct dpp_ch_restriction &drm_restriction)
+{
+    hwc_dpp_restriction.id = drm_restriction.id;
+    hwc_dpp_restriction.attr = drm_restriction.attr;
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.src_f_w, drm_restriction.restriction.src_f_w);
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.src_f_h, drm_restriction.restriction.src_f_h);
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.src_w, drm_restriction.restriction.src_w);
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.src_h, drm_restriction.restriction.src_h);
+    hwc_dpp_restriction.restriction.src_x_align = drm_restriction.restriction.src_x_align;
+    hwc_dpp_restriction.restriction.src_y_align = drm_restriction.restriction.src_y_align;
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.dst_f_w, drm_restriction.restriction.dst_f_w);
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.dst_f_h, drm_restriction.restriction.dst_f_h);
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.dst_w, drm_restriction.restriction.dst_w);
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.dst_h, drm_restriction.restriction.dst_h);
+    hwc_dpp_restriction.restriction.dst_x_align = drm_restriction.restriction.dst_x_align;
+    hwc_dpp_restriction.restriction.dst_y_align = drm_restriction.restriction.dst_y_align;
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.blk_w, drm_restriction.restriction.blk_w);
+    set_hwc_dpp_size_range(hwc_dpp_restriction.restriction.blk_h, drm_restriction.restriction.blk_h);
+    hwc_dpp_restriction.restriction.blk_x_align = drm_restriction.restriction.blk_x_align;
+    hwc_dpp_restriction.restriction.blk_y_align = drm_restriction.restriction.blk_y_align;
+    hwc_dpp_restriction.restriction.src_h_rot_max = drm_restriction.restriction.src_h_rot_max;
+    hwc_dpp_restriction.restriction.scale_down = drm_restriction.restriction.scale_down;
+    hwc_dpp_restriction.restriction.scale_up = drm_restriction.restriction.scale_up;
 
     /* scale ratio can't be 0 */
-    if (common_restriction.restriction.scale_down == 0)
-        common_restriction.restriction.scale_down = 1;
-    if (common_restriction.restriction.scale_up == 0)
-        common_restriction.restriction.scale_up = 1;
+    if (hwc_dpp_restriction.restriction.scale_down == 0)
+        hwc_dpp_restriction.restriction.scale_down = 1;
+    if (hwc_dpp_restriction.restriction.scale_up == 0)
+        hwc_dpp_restriction.restriction.scale_up = 1;
 }
 
 ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice)
@@ -96,7 +103,7 @@ void ExynosDeviceDrmInterface::updateRestrictions()
 {
     int32_t ret = 0;
 
-    mDPUInfo.dpuInfo.dpp_cnt = mDrmDevice->planes().size();
+    mDPUInfo.dpuInfo.dpp_chs.resize(mDrmDevice->planes().size());
     uint32_t channelId = 0;
 
     for (auto &plane : mDrmDevice->planes()) {
@@ -106,15 +113,15 @@ void ExynosDeviceDrmInterface::updateRestrictions()
             std::tie(ret, blobId) = plane->hw_restrictions_property().value();
             if (ret)
                 break;
-            struct drm_dpp_ch_restriction *res;
+            struct dpp_ch_restriction *res;
             drmModePropertyBlobPtr blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
             if (!blob) {
                 ALOGE("Fail to get blob for hw_restrictions(%" PRId64 ")", blobId);
                 ret = HWC2_ERROR_UNSUPPORTED;
                 break;
             }
-            res = (struct drm_dpp_ch_restriction *)blob->data;
-            set_dpp_ch_restriction(mDPUInfo.dpuInfo.dpp_ch[channelId], *res);
+            res = (struct dpp_ch_restriction *)blob->data;
+            set_dpp_ch_restriction(mDPUInfo.dpuInfo.dpp_chs[channelId], *res);
             drmModeFreePropertyBlob(blob);
         } else {
             ALOGI("plane[%d] There is no hw restriction information", channelId);
@@ -128,15 +135,12 @@ void ExynosDeviceDrmInterface::updateRestrictions()
                 ALOGE("Fail to convert drm format(%d)", format);
                 continue;
             }
-            int &formatIndex = mDPUInfo.dpuInfo.dpp_ch[channelId].restriction.format_cnt;
             for (auto halFormat : halFormats) {
-                mDPUInfo.dpuInfo.dpp_ch[channelId].restriction.format[formatIndex] =
-                    halFormat;
-                formatIndex++;
+                mDPUInfo.dpuInfo.dpp_chs[channelId].restriction.formats.push_back(halFormat);
             }
         }
         if (hwcCheckDebugMessages(eDebugDefault))
-            printDppRestriction(mDPUInfo.dpuInfo.dpp_ch[channelId]);
+            printDppRestriction(mDPUInfo.dpuInfo.dpp_chs[channelId]);
 
         channelId++;
     }

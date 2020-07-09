@@ -38,13 +38,6 @@
 #define HWC_PRINT_FRAME_NUM     10
 
 #define LOW_FPS_THRESHOLD     5
-
-#if defined(HDR_CAPABILITIES_NUM)
-#define SET_HDR_CAPABILITIES_NUM HDR_CAPABILITIES_NUM
-#else
-#define SET_HDR_CAPABILITIES_NUM 0
-#endif
-
 #define MAX_BRIGHTNESS_LEN 5
 
 typedef hwc2_composition_t exynos_composition;
@@ -414,8 +407,7 @@ class ExynosDisplay {
         ExynosLowFpsLayerInfo mLowFpsLayerInfo;
 
         // HDR capabilities
-        uint32_t mHdrTypeNum;
-        android_hdr_t mHdrTypes[HDR_CAPABILITIES_NUM];
+        std::vector<android_hdr_t> mHdrTypes;
         float mMaxLuminance;
         float mMaxAverageLuminance;
         float mMinLuminance;

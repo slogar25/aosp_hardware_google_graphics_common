@@ -27,11 +27,11 @@
 extern feature_support_t feature_table[];
 #endif
 
-void ExynosDeviceInterface::printDppRestriction(struct dpp_ch_restriction res)
+void ExynosDeviceInterface::printDppRestriction(struct hwc_dpp_ch_restriction res)
 {
     ALOGD("=========================================================");
     ALOGD("id: %d", res.id);
-    ALOGD("dpp_restriction");
+    ALOGD("hwc_dpp_restriction");
     ALOGD("src_f_w (%d, %d, %d)", res.restriction.src_f_w.min, res.restriction.src_f_w.max, res.restriction.src_f_w.align);
     ALOGD("src_f_h (%d, %d, %d)", res.restriction.src_f_h.min, res.restriction.src_f_h.max, res.restriction.src_f_h.align);
     ALOGD("src_w (%d, %d, %d)", res.restriction.src_w.min, res.restriction.src_w.max, res.restriction.src_w.align);
@@ -49,9 +49,9 @@ void ExynosDeviceInterface::printDppRestriction(struct dpp_ch_restriction res)
     ALOGD("blk_h (%d, %d, %d)", res.restriction.blk_h.min, res.restriction.blk_h.max, res.restriction.blk_h.align);
     ALOGD("blk_x_align(%d), blk_y_align(%d)", res.restriction.blk_x_align, res.restriction.blk_y_align);
 
-    ALOGD("format cnt: %d", res.restriction.format_cnt);
-    for(int i = 0; i < res.restriction.format_cnt; i++) {
-        ALOGD("[%d] format: %d", i, res.restriction.format[i]);
+    ALOGD("format cnt: %zu", res.restriction.formats.size());
+    for(int i = 0; i < res.restriction.formats.size(); i++) {
+        ALOGD("[%d] format: %d", i, res.restriction.formats[i]);
     }
 
     ALOGD("scale down: %d, up: %d", res.restriction.scale_down, res.restriction.scale_up);
@@ -64,20 +64,20 @@ int32_t ExynosDeviceInterface::makeDPURestrictions() {
 #endif
     int32_t ret = 0;
 
-    struct dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
-    HDEBUGLOGD(eDebugAttrSetting, "DPP ver : %d, cnt : %d", dpuInfo->ver, dpuInfo->dpp_cnt);
+    struct hwc_dpp_restrictions_info *dpuInfo = &mDPUInfo.dpuInfo;
+    HDEBUGLOGD(eDebugAttrSetting, "DPP ver : %d, cnt : %zu", dpuInfo->ver, dpuInfo->dpp_chs.size());
     ExynosResourceManager *resourceManager = mExynosDevice->mResourceManager;
 
     /* format resctriction */
-    for (int i = 0; i < dpuInfo->dpp_cnt; i++){
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
-        HDEBUGLOGD(eDebugAttrSetting, "id : %d, format count : %d", i, r.format_cnt);
+    for (int i = 0; i < dpuInfo->dpp_chs.size(); i++){
+        hwc_dpp_restriction r = dpuInfo->dpp_chs[i].restriction;
+        HDEBUGLOGD(eDebugAttrSetting, "id : %d, format count : %zu", i, r.formats.size());
     }
 
     /* Check attribute overlap */
     std::unordered_set<unsigned long> attrs;
-    for (size_t i = 0; i < dpuInfo->dpp_cnt; ++i) {
-        const dpp_ch_restriction &r = dpuInfo->dpp_ch[i];
+    for (size_t i = 0; i < dpuInfo->dpp_chs.size(); ++i) {
+        const hwc_dpp_ch_restriction &r = dpuInfo->dpp_chs[i];
         if (attrs.find(r.attr) != attrs.end())
             mDPUInfo.overlap[i] = true;
         else
@@ -85,25 +85,25 @@ int32_t ExynosDeviceInterface::makeDPURestrictions() {
         HDEBUGLOGD(eDebugAttrSetting, "Index : %zu, overlap %d", i, mDPUInfo.overlap[i]);
     }
 
-    for (int i = 0; i < dpuInfo->dpp_cnt; i++){
+    for (int i = 0; i < dpuInfo->dpp_chs.size(); i++){
         if (mDPUInfo.overlap[i]) continue;
-        dpp_restriction r = dpuInfo->dpp_ch[i].restriction;
+        hwc_dpp_restriction r = dpuInfo->dpp_chs[i].restriction;
         mpp_phycal_type_t hwType = resourceManager->getPhysicalType(i);
-        for (int j = 0; j < r.format_cnt; j++){
+        for (auto &format: r.formats) {
             restriction_key_t queried_format;
             queried_format.hwType = hwType;
             queried_format.nodeType = NODE_NONE;
-            /* r.format[j] is HAL format */
-            queried_format.format = r.format[j];
+            /* format is HAL format */
+            queried_format.format = format;
             queried_format.reserved = 0;
             resourceManager->makeFormatRestrictions(queried_format);
-            HDEBUGLOGD(eDebugAttrSetting, "%s : %d", getMPPStr(hwType).string(), r.format[j]);
+            HDEBUGLOGD(eDebugAttrSetting, "%s : %d", getMPPStr(hwType).string(), format);
         }
     }
 
-    for (int i = 0; i < dpuInfo->dpp_cnt; i++){
+    for (int i = 0; i < dpuInfo->dpp_chs.size(); i++){
         if (mDPUInfo.overlap[i]) continue;
-        const dpp_restriction &r = dpuInfo->dpp_ch[i].restriction;
+        const hwc_dpp_restriction &r = dpuInfo->dpp_chs[i].restriction;
 
         /* RGB size restrictions */
         restriction_size rSize;
@@ -143,7 +143,7 @@ int32_t ExynosDeviceInterface::makeDPURestrictions() {
 }
 
 int32_t ExynosDeviceInterface::updateFeatureTable() {
-    const struct dpp_restrictions_info &dpuInfo = mDPUInfo.dpuInfo;
+    const struct hwc_dpp_restrictions_info &dpuInfo = mDPUInfo.dpuInfo;
     if (mExynosDevice->mResourceManager == NULL)
         return -1;
 
@@ -151,7 +151,7 @@ int32_t ExynosDeviceInterface::updateFeatureTable() {
     const uint32_t featureTableCnt = resourceManager.getFeatureTableSize();
 
     const int attrMapCnt = sizeof(dpu_attr_map_table)/sizeof(dpu_attr_map_t);
-    const int dpp_cnt = dpuInfo.dpp_cnt;
+    const int dpp_cnt = dpuInfo.dpp_chs.size();
 
     HDEBUGLOGD(eDebugAttrSetting, "Before");
     for (uint32_t j = 0; j < featureTableCnt; j++){
@@ -162,7 +162,7 @@ int32_t ExynosDeviceInterface::updateFeatureTable() {
 
     // dpp count
     for (int i = 0; i < dpp_cnt; i++){
-        dpp_ch_restriction c_r = dpuInfo.dpp_ch[i];
+        hwc_dpp_ch_restriction c_r = dpuInfo.dpp_chs[i];
         if (mDPUInfo.overlap[i]) continue;
         HDEBUGLOGD(eDebugAttrSetting, "DPU attr : (ch:%d), 0x%lx", i, (unsigned long)c_r.attr);
         mpp_phycal_type_t hwType = resourceManager.getPhysicalType(i);

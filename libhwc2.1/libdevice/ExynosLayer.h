@@ -64,7 +64,7 @@ typedef struct pre_processed_layer_info
     int interlacedType;
     /* SBWC exception */
     bool mUsePrivateFormat = false;
-    u32 mPrivateFormat = 0;
+    uint32_t mPrivateFormat = 0;
 } pre_processed_layer_info_t;
 
 enum {
