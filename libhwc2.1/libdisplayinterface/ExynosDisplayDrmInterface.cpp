@@ -683,7 +683,7 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
     } else if (config.state == config.WIN_STATE_COLOR) {
         modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_COLORMAP;
         drmFormat = DRM_FORMAT_BGRA8888;
-        buf_handles[0] = config.color;
+        buf_handles[0] = 0xff000000;
         bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
         pitches[0] = config.dst.w * bpp;
 
@@ -802,6 +802,17 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                         plane->in_fence_fd_property(), config.acq_fence)) < 0)
             return ret;
+    }
+
+    if (config.state == config.WIN_STATE_COLOR)
+    {
+        if (plane->colormap_property().id()) {
+            if ((ret = drmReq.atomicAddProperty(plane->id(),
+                            plane->colormap_property(), config.color)) < 0)
+                return ret;
+        } else {
+            HWC_LOGE(mExynosDisplay, "colormap property is not supported");
+        }
     }
 
     std::tie(drmEnum, ret) =
