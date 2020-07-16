@@ -174,18 +174,16 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                     mOldFbId = mFbId;
                     mFbId = fbId;
                 }
-                void pickFormatDataspace(int32_t colorMode);
+                void pickFormatDataspace();
                 static constexpr uint32_t PREFERRED_READBACK_FORMAT =
                     HAL_PIXEL_FORMAT_RGBA_8888;
                 uint32_t mReadbackFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
-                uint32_t mReadbackDataspace = HAL_DATASPACE_UNKNOWN;
             private:
                 DrmDevice *mDrmDevice = NULL;
                 DrmConnector *mWritebackConnector = NULL;
                 uint32_t mFbId = 0;
                 uint32_t mOldFbId = 0;
                 std::vector<uint32_t> mSupportedFormats;
-                std::vector<uint32_t> mSupportedDataspaces;
         };
         DrmDevice *mDrmDevice;
         DrmCrtc *mDrmCrtc;

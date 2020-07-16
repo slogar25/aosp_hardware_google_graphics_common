@@ -4339,6 +4339,13 @@ int32_t ExynosDisplay::getReadbackBufferAttributes(int32_t* /*android_pixel_form
 {
     int32_t ret = mDisplayInterface->getReadbackBufferAttributes(outFormat, outDataspace);
     if (ret == NO_ERROR) {
+        /* Interface didn't specific set dataspace */
+        if (*outDataspace == HAL_DATASPACE_UNKNOWN)
+            *outDataspace = colorModeToDataspace(mColorMode);
+        /* Set default value */
+        if (*outDataspace == HAL_DATASPACE_UNKNOWN)
+            *outDataspace = HAL_DATASPACE_V0_SRGB;
+
         mDisplayControl.readbackSupport = true;
         ALOGI("readback info: format(0x%8x), dataspace(0x%8x)", *outFormat, *outDataspace);
     } else {

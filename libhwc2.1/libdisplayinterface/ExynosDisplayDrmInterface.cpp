@@ -1295,18 +1295,15 @@ int32_t ExynosDisplayDrmInterface::getReadbackBufferAttributes(
         ALOGE("%s: There is no writeback connection", __func__);
         return -EINVAL;
     }
-    /* TODO (b/149043754): color mode should be set */
-    mReadbackInfo.pickFormatDataspace(HAL_COLOR_MODE_NATIVE);
-
-    if ((mReadbackInfo.mReadbackFormat == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) ||
-        (mReadbackInfo.mReadbackDataspace == HAL_DATASPACE_UNKNOWN)) {
-        ALOGE("readback format(%d) or dataspace(0x%8x) is not valid",
-                mReadbackInfo.mReadbackFormat,
-                mReadbackInfo.mReadbackDataspace);
+    mReadbackInfo.pickFormatDataspace();
+    if (mReadbackInfo.mReadbackFormat ==
+            HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+        ALOGE("readback format(%d) is not valid",
+                mReadbackInfo.mReadbackFormat);
         return -EINVAL;
     }
     *outFormat = mReadbackInfo.mReadbackFormat;
-    *outDataspace = mReadbackInfo.mReadbackDataspace;
+    *outDataspace = HAL_DATASPACE_UNKNOWN;
     return NO_ERROR;
 }
 
@@ -1400,25 +1397,16 @@ void ExynosDisplayDrmInterface::DrmReadbackInfo::init(DrmDevice *drmDevice, uint
         }
         drmModeFreePropertyBlob(blob);
     }
-
-    /* TODO (b/149043754):
-     * Get dataspace form display driver
-     */
-    mSupportedDataspaces.push_back(HAL_DATASPACE_V0_SRGB);
 }
 
-void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace(int32_t colorMode)
+void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace()
 {
-    /* TODO (b/149043754): This should be set according to color mode */
     if (!mSupportedFormats.empty())
         mReadbackFormat = mSupportedFormats[0];
     auto it = std::find(mSupportedFormats.begin(),
             mSupportedFormats.end(), PREFERRED_READBACK_FORMAT);
     if (it != mSupportedFormats.end())
         mReadbackFormat = *it;
-
-    if (!mSupportedDataspaces.empty())
-        mReadbackDataspace = mSupportedDataspaces[0];
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
