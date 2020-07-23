@@ -382,4 +382,9 @@ int32_t ExynosHWCService::setDisplayDeviceMode(int32_t display_id, int32_t mode)
 {
     return mHWCCtx->device->setDisplayDeviceMode(display_id, mode);
 }
+
+int32_t ExynosHWCService::setPanelGammaTableSource(int32_t display_id, int32_t type,
+                                                   int32_t source) {
+    return mHWCCtx->device->setPanelGammaTableSource(display_id, type, source);
+}
 } //namespace android

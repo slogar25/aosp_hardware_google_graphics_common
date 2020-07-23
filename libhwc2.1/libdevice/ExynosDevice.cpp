@@ -961,3 +961,25 @@ int32_t ExynosDevice::setDisplayDeviceMode(int32_t display_id, int32_t mode)
         return HWC2_ERROR_UNSUPPORTED;
     }
 }
+
+int32_t ExynosDevice::setPanelGammaTableSource(int32_t display_id, int32_t type, int32_t source) {
+    if (display_id < HWC_DISPLAY_PRIMARY || display_id >= HWC_NUM_DISPLAY_TYPES) {
+        ALOGE("invalid display %d", display_id);
+        return HWC2_ERROR_BAD_DISPLAY;
+    }
+
+    if (type < static_cast<int32_t>(DisplayType::DISPLAY_PRIMARY) ||
+        type >= static_cast<int32_t>(DisplayType::DISPLAY_MAX)) {
+        ALOGE("invalid display type %d", type);
+        return HWC2_ERROR_BAD_PARAMETER;
+    }
+
+    if (source < static_cast<int32_t>(PanelGammaSource::GAMMA_DEFAULT) ||
+        source >= static_cast<int32_t>(PanelGammaSource::GAMMA_TYPES)) {
+        ALOGE("invalid gamma source %d", source);
+        return HWC2_ERROR_BAD_PARAMETER;
+    }
+
+    return mDisplays[display_id]->SetCurrentPanelGammaSource(static_cast<DisplayType>(type),
+                                                             static_cast<PanelGammaSource>(source));
+}

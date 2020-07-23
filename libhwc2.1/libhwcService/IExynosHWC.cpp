@@ -57,6 +57,7 @@ enum {
     SET_HWC_FENCE_DEBUG = 107,
     GET_HWC_FENCE_DEBUG = 108,
     SET_DISPLAY_DEVICE_MODE = 1000,
+    SET_PANEL_GAMMA_TABLE_SOURCE = 1001,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -359,6 +360,10 @@ public:
         return NO_ERROR;
     }
 
+    virtual int32_t setPanelGammaTableSource(int32_t display_id, int32_t type, int32_t source) {
+        ALOGD("null func: %s(%d %d %d)", __func__, display_id, type, source);
+        return NO_ERROR;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -564,6 +569,15 @@ status_t BnExynosHWCService::onTransact(
             int32_t display_id = data.readInt32();
             int32_t mode = data.readInt32();
             int32_t error = setDisplayDeviceMode(display_id, mode);
+            reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+        case SET_PANEL_GAMMA_TABLE_SOURCE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            int32_t display_id = data.readInt32();
+            int32_t type = data.readInt32();
+            int32_t source = data.readInt32();
+            int32_t error = setPanelGammaTableSource(display_id, type, source);
             reply->writeInt32(error);
             return NO_ERROR;
         } break;

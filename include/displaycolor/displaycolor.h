@@ -22,6 +22,8 @@
 
 #include <string>
 
+#include "display_common.h"
+
 namespace displaycolor {
 
 namespace hwc {
@@ -35,16 +37,6 @@ using ColorModesMap = std::map<hwc::ColorMode, std::vector<hwc::RenderIntent>>;
 
 /// Image data bit depths.
 enum class BitDepth { kEight, kTen };
-
-/// Display type used to get pipeline or update display scene.
-enum DisplayType {
-    /// builtin primary display
-    DISPLAY_PRIMARY = 0,
-    /// builtin secondary display
-    DISPLAY_SECONDARY = 1,
-    /// number of display
-    DISPLAY_MAX = 2,
-};
 
 struct LayerColorData {
     bool operator==(const LayerColorData &rhs) const {

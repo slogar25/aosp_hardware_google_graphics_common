@@ -17,12 +17,13 @@
 #ifndef _EXYNOSDISPLAY_H
 #define _EXYNOSDISPLAY_H
 
-#include <utils/Vector.h>
-#include <utils/KeyedVector.h>
+#include <hardware/hwcomposer2.h>
 #include <system/graphics.h>
+#include <utils/KeyedVector.h>
+#include <utils/Vector.h>
 
 #include "ExynosHWC.h"
-#include <hardware/hwcomposer2.h>
+#include "display_common.h"
 #ifdef GRALLOC_VERSION1
 #include "gralloc1_priv.h"
 #else
@@ -92,6 +93,12 @@ enum {
 enum class ext_hwc2_power_mode_t{
     PAUSE = 10,
     RESUME,
+};
+
+enum class PanelGammaSource {
+    GAMMA_DEFAULT,     // Resotre gamma table to default
+    GAMMA_CALIBRATION, // Update gamma table from calibration file
+    GAMMA_TYPES,
 };
 
 #define NUM_SKIP_STATIC_LAYER  5
@@ -802,6 +809,14 @@ class ExynosDisplay {
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
+        virtual int32_t SetCurrentPanelGammaSource(const DisplayType /* type */,
+                                                   const PanelGammaSource& /* source */) {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+        virtual PanelGammaSource GetCurrentPanelGammaSource() const {
+            return PanelGammaSource::GAMMA_DEFAULT;
+        }
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
 

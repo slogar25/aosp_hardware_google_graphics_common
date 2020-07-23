@@ -16,18 +16,20 @@
 
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 //#include <linux/fb.h>
-#include <sys/ioctl.h>
-#include <linux/fb.h>
+#include "ExynosDisplay.h"
+
 #include <cutils/properties.h>
-#include <utils/CallStack.h>
 #include <hardware/hwcomposer_defs.h>
+#include <linux/fb.h>
 #include <sync/sync.h>
+#include <sys/ioctl.h>
+#include <utils/CallStack.h>
 
 #include <map>
-#include "ExynosDisplay.h"
+
 #include "ExynosExternalDisplay.h"
-#include "ExynosLayer.h"
 #include "ExynosHWCHelper.h"
+#include "ExynosLayer.h"
 #include "exynos_format.h"
 
 /**
@@ -3281,6 +3283,8 @@ void ExynosDisplay::dump(String8& result)
             mXres, mYres, mVsyncState, mColorMode, mColorTransformHint);
     mClientCompositionInfo.dump(result);
     mExynosCompositionInfo.dump(result);
+
+    result.appendFormat("PanelGammaSource (%d)\n\n", GetCurrentPanelGammaSource());
 
     for (uint32_t i = 0; i < mLayers.size(); i++) {
         ExynosLayer *layer = mLayers[i];

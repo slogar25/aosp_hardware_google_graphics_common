@@ -16,6 +16,8 @@
 #ifndef EXYNOS_PRIMARY_DISPLAY_H
 #define EXYNOS_PRIMARY_DISPLAY_H
 
+#include <map>
+
 #include "../libdevice/ExynosDisplay.h"
 
 class ExynosMPPModule;
@@ -29,6 +31,11 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual int getDDIScalerMode(int width, int height);
         virtual int32_t setActiveConfig(hwc2_config_t config) override;
         virtual int32_t getActiveConfig(hwc2_config_t* outConfig) override;
+        virtual int32_t SetCurrentPanelGammaSource(const DisplayType type,
+                                                   const PanelGammaSource& source) override;
+        virtual PanelGammaSource GetCurrentPanelGammaSource() const override {
+            return currentPanelGammaSource;
+        }
 
         virtual void initDisplayInterface(uint32_t interfaceType);
     protected:
@@ -47,11 +54,20 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         ResolutionInfo mResolutionInfo;
 
     private:
+        static constexpr const char* kDisplayCalFilePath = "/mnt/vendor/persist/display/";
+        static constexpr const char* kPanelGammaCalFilePrefix = "gamma_calib_data";
+        enum PanelGammaSource currentPanelGammaSource = PanelGammaSource::GAMMA_DEFAULT;
+
+        hwc2_config_t mPendActiveConfig = UINT_MAX;
+        bool mFirstPowerOn = true;
+
         int32_t applyPendingConfig();
         int32_t setPowerOn();
         int32_t setPowerOff();
         int32_t setPowerDoze();
-        hwc2_config_t mPendActiveConfig = UINT_MAX;
+        void firstPowerOn();
+
+        std::string getPanelSysfsPath(const DisplayType& type);
 };
 
 #endif
