@@ -183,6 +183,8 @@ class IDisplayColorGeneric {
     /// A generic stage in the display pipeline.
     struct DisplayStage {
         bool enable = false;
+        /// A flag indicating if the data has been changed in last Update call.
+        bool dirty = false;
     };
 
     virtual ~IDisplayColorGeneric() {}
