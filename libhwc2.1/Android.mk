@@ -101,7 +101,7 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm
 
 include $(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/Android.mk
 
-LOCAL_CFLAGS := -DHLOG_CODE=0
+LOCAL_CFLAGS += -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
 
