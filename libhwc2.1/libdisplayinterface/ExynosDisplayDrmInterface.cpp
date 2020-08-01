@@ -409,6 +409,11 @@ void ExynosDisplayDrmInterface::parseRangeEnums(const DrmProperty& property)
     }
 }
 
+uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
+{
+    return type+index;
+}
+
 void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 {
     if (mExynosDisplay == NULL) {
@@ -421,28 +426,35 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     }
 
     mFBManager.init(mDrmDevice->fd());
-    mReadbackInfo.init(mDrmDevice, mExynosDisplay->mDisplayId);
 
-    if ((mDrmCrtc = mDrmDevice->GetCrtcForDisplay(mExynosDisplay->mDisplayId)) == NULL) {
-        ALOGE("%s:: GetCrtcForDisplay is NULL", mExynosDisplay->mDisplayName.string());
+    uint32_t drmDisplayId = getDrmDisplayId(mExynosDisplay->mType, mExynosDisplay->mIndex);
+
+    mReadbackInfo.init(mDrmDevice, drmDisplayId);
+    if ((mDrmCrtc = mDrmDevice->GetCrtcForDisplay(drmDisplayId)) == NULL) {
+        ALOGE("%s:: GetCrtcForDisplay is NULL (id: %d)",
+                mExynosDisplay->mDisplayName.string(), drmDisplayId);
         return;
     }
-    if ((mDrmConnector = mDrmDevice->GetConnectorForDisplay(mExynosDisplay->mDisplayId)) == NULL) {
-        ALOGE("%s:: GetConnectorForDisplay is NULL", mExynosDisplay->mDisplayName.string());
+    if ((mDrmConnector = mDrmDevice->GetConnectorForDisplay(drmDisplayId)) == NULL) {
+        ALOGE("%s:: GetConnectorForDisplay is NULL (id: %d)",
+                mExynosDisplay->mDisplayName.string(), drmDisplayId);
         return;
     }
 
-    /* TODO: We should map plane to ExynosMPP */
-#if 0
-    for (auto &plane : mDrmDevice->planes()) {
+    ALOGD("%s:: display type: %d, index: %d, drmDisplayId: %d, "
+            "crtc id: %d, connector id: %d",
+            __func__, mExynosDisplay->mType, mExynosDisplay->mIndex,
+            drmDisplayId, mDrmCrtc->id(), mDrmConnector->id());
+
+    for (uint32_t i = 0; i < mDrmDevice->planes().size(); i++) {
+        auto &plane = mDrmDevice->planes().at(i);
         uint32_t plane_id = plane->id();
         ExynosMPP *exynosMPP =
-            mExynosDisplay->mResourceManager->getOtfMPPWithChannel(plane_id);
+            mExynosDisplay->mResourceManager->getOtfMPPWithChannel(i);
         if (exynosMPP == NULL)
             HWC_LOGE(mExynosDisplay, "getOtfMPPWithChannel fail, ch(%d)", plane_id);
         mExynosMPPsForPlane[plane_id] = exynosMPP;
     }
-#endif
 
     if (mExynosDisplay->mMaxWindowNum != getMaxWindowNum()) {
         ALOGE("%s:: Invalid max window number (mMaxWindowNum: %d, getMaxWindowNum(): %d",
@@ -452,7 +464,7 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     getLowPowerDrmModeModeInfo();
 
-    mDrmVSyncWorker.Init(mDrmDevice, mExynosDisplay->mDisplayId);
+    mDrmVSyncWorker.Init(mDrmDevice, drmDisplayId);
     mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(this));
 
     if (!mDrmDevice->planes().empty()) {
@@ -495,7 +507,7 @@ void ExynosDisplayDrmInterface::Callback(
         mExynosDisplay->updateConfigRequestAppliedTime();
     }
 
-    if (!mVsyncCallback.getVSyncEnabled()) {
+    if (!mExynosDisplay->mPlugState || !mVsyncCallback.getVSyncEnabled()) {
         return;
     }
 
@@ -635,7 +647,7 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
         return err;
 
     hwc2_config_t config = mDrmConnector->get_preferred_mode_id();
-    ALOGI("Preferred mode id: %d", config);
+    ALOGI("Preferred mode id: %d, state: %d", config, mDrmConnector->state());
     err = setActiveConfig(config);
     mExynosDisplay->updateInternalDisplayConfigVariables(config);
     return err;
@@ -651,6 +663,11 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
         }
+        if (mDrmConnector->state() == DRM_MODE_CONNECTED)
+            mExynosDisplay->mPlugState = true;
+        else
+            mExynosDisplay->mPlugState = false;
+
         dumpDisplayConfigs();
 
         mExynosDisplay->mDisplayConfigs.clear();
@@ -1316,14 +1333,13 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     /* Disable unused plane */
     for (auto &plane : mDrmDevice->planes()) {
         if (planeEnableInfo[plane->id()] == 0) {
-#if 0
-            /* TODO: Check whether we can disable planes that are reserved to other dispaly */
+            /* Don't disable planes that are reserved to other display */
             ExynosMPP* exynosMPP = mExynosMPPsForPlane[plane->id()];
             if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
                 (exynosMPP->mAssignedState & MPP_ASSIGN_STATE_RESERVED) &&
-                (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mType))
+                (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mDisplayId))
                 continue;
-#endif
+
             if ((ret = drmReq.atomicAddProperty(plane->id(),
                     plane->crtc_property(), 0)) < 0)
                 return ret;
@@ -1394,15 +1410,14 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool __unused readback)
 
     /* Disable all planes */
     for (auto &plane : mDrmDevice->planes()) {
-#if 0
-        /* TODO: Check whether we can disable planes that are reserved to other dispaly */
-        ExynosMPP* exynosMPP = mExynosMPPsForPlane[plane->id()];
+
         /* Do not disable planes that are reserved to other dispaly */
+        ExynosMPP* exynosMPP = mExynosMPPsForPlane[plane->id()];
         if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
             (exynosMPP->mAssignedState & MPP_ASSIGN_STATE_RESERVED) &&
-            (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mType))
+            (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mDisplayId))
             continue;
-#endif
+
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                 plane->crtc_property(), 0)) < 0)
             return ret;
@@ -1464,7 +1479,8 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
         if (mError != 0) {
             android::String8 result;
             result.appendFormat("atomic commit error\n");
-            dumpAtomicCommitInfo(result);
+            if (hwcCheckDebugMessages(eDebugDisplayInterfaceConfig) == false)
+                dumpAtomicCommitInfo(result);
             HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.string());
         }
     }
@@ -1505,6 +1521,9 @@ String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
     if (debugPrint &&
         (hwcCheckDebugMessages(eDebugDisplayInterfaceConfig) == false))
         return result;
+
+    if (debugPrint)
+        ALOGD("%s atomic config ++++++++++++", mDrmDisplayInterface->mExynosDisplay->mDisplayName.string());
 
     for (int i = 0; i < drmModeAtomicGetCursor(mPset); i++) {
         const DrmProperty *property = NULL;

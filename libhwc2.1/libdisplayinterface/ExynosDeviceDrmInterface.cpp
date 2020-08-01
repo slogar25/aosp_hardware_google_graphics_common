@@ -86,15 +86,28 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
     mExynosDrmEventHandler.init(mExynosDevice);
     mDrmDevice->event_listener()->RegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
 
-    ExynosDisplay *primaryDisplay = mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
-    if (primaryDisplay != NULL) {
-        ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(primaryDisplay->mDisplayInterface.get());
-        displayInterface->initDrmDevice(mDrmDevice);
-    }
-    ExynosDisplay *externalDisplay = mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
-    if (externalDisplay != NULL) {
-        ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(externalDisplay->mDisplayInterface.get());
-        displayInterface->initDrmDevice(mDrmDevice);
+    uint32_t primaryIndex = 0;
+    uint32_t externalIndex = 0;
+    for (auto &display : mExynosDevice->mDisplays) {
+        if (display->mType == HWC_DISPLAY_PRIMARY) {
+            ExynosDisplay *primaryDisplay =
+                mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, primaryIndex));
+            if (primaryDisplay != NULL) {
+                ExynosDisplayDrmInterface *displayInterface =
+                    static_cast<ExynosDisplayDrmInterface*>(primaryDisplay->mDisplayInterface.get());
+                displayInterface->initDrmDevice(mDrmDevice);
+            }
+            primaryIndex++;
+        } else if (display->mType == HWC_DISPLAY_EXTERNAL) {
+            ExynosDisplay *externalDisplay =
+                mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, externalIndex));
+            if (externalDisplay != NULL) {
+                ExynosDisplayDrmInterface *displayInterface =
+                    static_cast<ExynosDisplayDrmInterface*>(externalDisplay->mDisplayInterface.get());
+                displayInterface->initDrmDevice(mDrmDevice);
+            }
+            externalIndex++;
+        }
     }
 
 }
@@ -198,6 +211,26 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::init(ExynosDevice *exynosD
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleEvent(uint64_t timestamp_us)
 {
+    hwc2_callback_data_t callbackData =
+        mExynosDevice->mCallbackInfos[HWC2_CALLBACK_HOTPLUG].callbackData;
+    HWC2_PFN_HOTPLUG callbackFunc =
+        (HWC2_PFN_HOTPLUG)mExynosDevice->mCallbackInfos[HWC2_CALLBACK_HOTPLUG].funcPointer;
+
+    if (callbackData == NULL || callbackFunc == NULL)
+    {
+        ALOGE("%s:: callback info is NULL", __func__);
+        return;
+    }
+
+    for (auto it : mExynosDevice->mDisplays) {
+        /* Call UpdateModes to get plug status */
+        uint32_t numConfigs;
+        it->getDisplayConfigs(&numConfigs, NULL);
+
+        callbackFunc(callbackData, getDisplayId(it->mType, it->mIndex),
+                it->mPlugState ? HWC2_CONNECTION_CONNECTED : HWC2_CONNECTION_DISCONNECTED);
+    }
+
     /* TODO: Check plug status hear or ExynosExternalDisplay::handleHotplugEvent() */
     ExynosExternalDisplayModule *display =
         static_cast<ExynosExternalDisplayModule*>(mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0)));

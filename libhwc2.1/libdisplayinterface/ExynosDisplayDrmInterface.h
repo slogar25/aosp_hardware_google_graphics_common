@@ -209,6 +209,7 @@ class ExynosDisplayDrmInterface :
         virtual int32_t setForcePanic();
         virtual int getDisplayFd() { return mDrmDevice->fd(); };
         virtual void initDrmDevice(DrmDevice *drmDevice);
+        virtual uint32_t getDrmDisplayId(uint32_t type, uint32_t index);
         virtual uint32_t getMaxWindowNum();
         virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
                 int32_t* /*android_dataspace_t*/ outDataspace);
