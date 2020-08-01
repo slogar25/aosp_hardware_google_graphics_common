@@ -182,7 +182,8 @@ int ExynosHWCService::getExternalDisplayConfigs()
     ExynosExternalDisplay *external_display =
         (ExynosExternalDisplay *)mHWCCtx->device->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
 
-    if (external_display->mHpdStatus == true) {
+    if ((external_display != nullptr) &&
+        (external_display->mHpdStatus == true)) {
         external_display->mDisplayInterface->dumpDisplayConfigs();
     }
 
@@ -196,7 +197,8 @@ int ExynosHWCService::setExternalDisplayConfig(unsigned int index)
     ExynosExternalDisplay *external_display =
         (ExynosExternalDisplay *)mHWCCtx->device->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
 
-    if (external_display->mHpdStatus == true) {
+    if ((external_display != nullptr) &&
+        (external_display->mHpdStatus == true)) {
         external_display->setActiveConfig(index);
     }
 
@@ -210,7 +212,8 @@ int ExynosHWCService::setExternalVsyncEnabled(unsigned int index)
     mHWCCtx->device->mVsyncDisplayId = index;
     ExynosExternalDisplay *external_display =
         (ExynosExternalDisplay *)mHWCCtx->device->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
-    external_display->setVsyncEnabled(index);
+    if (external_display != nullptr)
+        external_display->setVsyncEnabled(index);
 
     return NO_ERROR;
 }
@@ -222,7 +225,9 @@ int ExynosHWCService::getExternalHdrCapabilities()
     ExynosExternalDisplay *external_display =
         (ExynosExternalDisplay *)mHWCCtx->device->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
 
-    return external_display->mExternalHdrSupported;
+    if (external_display != nullptr)
+        return external_display->mExternalHdrSupported;
+    return 0;
 }
 
 void ExynosHWCService::setBootFinishedCallback(void (*callback)(ExynosHWCCtx *))

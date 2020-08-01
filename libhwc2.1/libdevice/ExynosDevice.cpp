@@ -322,9 +322,6 @@ ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
             return (ExynosDisplay*)mDisplays[i];
     }
 
-    ALOGE("mDisplays.size(%zu), requested display(%d)",
-            mDisplays.size(), display);
-
     return NULL;
 }
 
@@ -771,7 +768,8 @@ void ExynosDevice::compareVsyncPeriod() {
 
     mVsyncDisplayId = getDisplayId(HWC_DISPLAY_PRIMARY, 0);
 
-    if (external_display->mPowerModeState == HWC2_POWER_MODE_OFF) {
+    if ((external_display == nullptr) ||
+        (external_display->mPowerModeState == HWC2_POWER_MODE_OFF)) {
         return;
     } else if (primary_display->mPowerModeState == HWC2_POWER_MODE_OFF) {
         mVsyncDisplayId = getDisplayId(HWC_DISPLAY_EXTERNAL, 0);
