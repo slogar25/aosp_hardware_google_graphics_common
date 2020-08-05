@@ -153,15 +153,17 @@ struct LayerColorData {
  */
 struct DisplayScene {
     bool operator==(const DisplayScene &rhs) const {
-        return dpu_bit_depth == rhs.dpu_bit_depth &&
+        return layer_data == rhs.layer_data &&
+               dpu_bit_depth == rhs.dpu_bit_depth &&
                color_mode == rhs.color_mode &&
-               render_intent == rhs.render_intent;
+               render_intent == rhs.render_intent &&
+               matrix == rhs.matrix;
     }
 
     /// A vector of layer color data.
     std::vector<LayerColorData> layer_data;
     /// The bit depth the DPU is currently outputting
-    BitDepth dpu_bit_depth = BitDepth::kEight;
+    BitDepth dpu_bit_depth = BitDepth::kTen;
     /// The current ColorMode (typically set by SurfaceFlinger)
     hwc::ColorMode color_mode = hwc::ColorMode::NATIVE;
     /// The current RenderIntent (typically set by SurfaceFlinger)
@@ -181,10 +183,16 @@ struct DisplayScene {
 class IDisplayColorGeneric {
    public:
     /// A generic stage in the display pipeline.
+    template <typename T>
     struct DisplayStage {
+        using ConfigType = T;
+
         bool enable = false;
         /// A flag indicating if the data has been changed in last Update call.
+        // It should be set when enable is changed from false to true.
         bool dirty = false;
+
+        const ConfigType *config = nullptr;
     };
 
     virtual ~IDisplayColorGeneric() {}
