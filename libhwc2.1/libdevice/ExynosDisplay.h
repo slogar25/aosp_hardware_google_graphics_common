@@ -24,12 +24,7 @@
 #include <android/hardware/graphics/composer/2.4/types.h>
 
 #include "ExynosHWC.h"
-#include "display_common.h"
-#ifdef GRALLOC_VERSION1
-#include "gralloc1_priv.h"
-#else
-#include "gralloc_priv.h"
-#endif
+#include <hardware/hwcomposer2.h>
 #include "ExynosHWCHelper.h"
 #include "ExynosMPP.h"
 #include "ExynosResourceManager.h"
@@ -119,7 +114,7 @@ struct ExynosFrameInfo
 
 struct exynos_readback_info
 {
-    private_handle_t *handle = NULL;
+    buffer_handle_t handle = NULL;
     /* release sync fence file descriptor,
      * which will be signaled when it is safe to write to the output buffer.
      */
@@ -234,7 +229,7 @@ class ExynosCompositionInfo : public ExynosMPPSource {
         bool mHasCompositionLayer;
         int32_t mFirstIndex;
         int32_t mLastIndex;
-        private_handle_t *mTargetBuffer;
+        buffer_handle_t mTargetBuffer;
         android_dataspace mDataSpace;
         int32_t mAcquireFence;
         int32_t mReleaseFence;
@@ -248,7 +243,7 @@ class ExynosCompositionInfo : public ExynosMPPSource {
         bool mCompressed;
 
         void initializeInfos(ExynosDisplay *display);
-        void setTargetBuffer(ExynosDisplay *display, private_handle_t *handle,
+        void setTargetBuffer(ExynosDisplay *display, buffer_handle_t handle,
                 int32_t acquireFence, android_dataspace dataspace);
         void setCompressed(bool compressed);
         bool getCompressed();

@@ -27,6 +27,9 @@
 #include <unistd.h>
 #include <sync/sync.h>
 #include <sys/mman.h>
+#include "VendorGraphicBuffer.h"
+
+using namespace vendor::graphics;
 
 /**
  * ExynosDevice implementation
@@ -43,9 +46,6 @@ int hwcFenceDebug[FENCE_IP_ALL];
 struct exynos_hwc_control exynosHWCControl;
 struct update_time_info updateTimeInfo;
 char fence_names[FENCE_MAX][32];
-
-GrallocWrapper::Mapper* ExynosDevice::mMapper = NULL;
-GrallocWrapper::Allocator* ExynosDevice::mAllocator = NULL;
 
 uint32_t getDeviceInterfaceType()
 {
@@ -166,11 +166,6 @@ ExynosDevice::~ExynosDevice() {
 
     mDRLoopStatus = false;
     mDRThread.join();
-
-    if (mMapper != NULL)
-        delete mMapper;
-    if (mAllocator != NULL)
-        delete mAllocator;
 
     delete primary_display;
 }
@@ -677,17 +672,6 @@ void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t* outCapabilities)
     return;
 }
 
-void ExynosDevice::getAllocator(GrallocWrapper::Mapper** mapper, GrallocWrapper::Allocator** allocator)
-{
-    if ((mMapper == NULL) && (mAllocator == NULL)) {
-        ALOGI("%s:: Allocator is created", __func__);
-        mMapper = new GrallocWrapper::Mapper();
-        mAllocator = new GrallocWrapper::Allocator(*mMapper);
-    }
-    *mapper = mMapper;
-    *allocator = mAllocator;
-}
-
 void ExynosDevice::clearGeometryChanged()
 {
     mGeometryChanged = 0;
@@ -796,13 +780,13 @@ ExynosDevice::captureReadbackClass::captureReadbackClass(
 {
     if (device == nullptr)
         return;
-    mDevice->getAllocator(&mMapper, &mAllocator);
 }
 
 ExynosDevice::captureReadbackClass::~captureReadbackClass()
 {
-    if ((mBuffer != nullptr) && (mMapper != nullptr))
-        mMapper->freeBuffer(mBuffer);
+    VendorGraphicBufferMapper& gMapper(VendorGraphicBufferMapper::get());
+    if (mBuffer != nullptr)
+        gMapper.freeBuffer(mBuffer);
 
     if (mDevice != nullptr)
         mDevice->clearWaitingReadbackReqDone();
@@ -812,24 +796,17 @@ ExynosDevice::captureReadbackClass::~captureReadbackClass()
 int32_t ExynosDevice::captureReadbackClass::allocBuffer(
         uint32_t format, uint32_t w, uint32_t h)
 {
-    if (mAllocator == nullptr) {
-        ALOGE("%s:: Failed to get allocator", __func__);
-        return -EINVAL;
-    }
+    VendorGraphicBufferAllocator& gAllocator(VendorGraphicBufferAllocator::get());
 
     uint32_t dstStride = 0;
-    GrallocWrapper::IMapper::BufferDescriptorInfo info = {};
-    info.width = w;
-    info.height = h;
-    info.layerCount = 1;
-    info.format = static_cast<GrallocWrapper::PixelFormat>(format);
-    info.usage = static_cast<uint64_t>(GRALLOC1_CONSUMER_USAGE_HWCOMPOSER |
+    uint64_t usage = static_cast<uint64_t>(GRALLOC1_CONSUMER_USAGE_HWCOMPOSER |
             GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN);
-    GrallocWrapper::Error error = GrallocWrapper::Error::NONE;
-    error = mAllocator->allocate(info, &dstStride, &mBuffer);
-    if ((error != GrallocWrapper::Error::NONE) || (mBuffer == nullptr)) {
+
+    status_t error = NO_ERROR;
+    error = gAllocator.allocate(w, h, format, 1, usage, &mBuffer, &dstStride, "HWC");
+    if ((error != NO_ERROR) || (mBuffer == nullptr)) {
         ALOGE("failed to allocate destination buffer(%dx%d): %d",
-                info.width, info.height, error);
+                w, h, error);
         return static_cast<int32_t>(error);
     }
     return NO_ERROR;
@@ -843,15 +820,21 @@ void  ExynosDevice::captureReadbackClass::saveToFile(const String8 &fileName)
     }
 
     char filePath[MAX_DEV_NAME] = {0};
+    time_t curTime = time(NULL);
+    struct tm *tm = localtime(&curTime);
+    VendorGraphicBufferMeta gmeta(mBuffer);
+
     snprintf(filePath, MAX_DEV_NAME,
-            "%s/%s", WRITEBACK_CAPTURE_PATH, fileName.string());
+            "%s/capture_format%d_%dx%d_%04d-%02d-%02d_%02d_%02d_%02d.raw",
+            WRITEBACK_CAPTURE_PATH, gmeta.format, gmeta.stride, gmeta.vstride,
+            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+            tm->tm_hour, tm->tm_min, tm->tm_sec);
     FILE *fp = fopen(filePath, "w");
     if (fp) {
-        private_handle_t *hnd = private_handle_t::dynamicCast(mBuffer);
         uint32_t writeSize =
-            hnd->stride * hnd->vstride * formatToBpp(hnd->format)/8;
+            gmeta.stride * gmeta.vstride * formatToBpp(gmeta.format)/8;
         void *writebackData = mmap(0, writeSize,
-                PROT_READ|PROT_WRITE, MAP_SHARED, hnd->fd, 0);
+                PROT_READ|PROT_WRITE, MAP_SHARED, gmeta.fd, 0);
         if (writebackData != MAP_FAILED && writebackData != NULL) {
             size_t result = fwrite(writebackData, writeSize, 1, fp);
             munmap(writebackData, writeSize);
