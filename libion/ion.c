@@ -35,7 +35,7 @@
 
 #include "ion_uapi.h"
 
-#define ION_MAX_HEAP_COUNT 12
+#define ION_MAX_HEAP_COUNT 13
 
 /*
  * ION heap names
@@ -56,7 +56,8 @@ static const struct {
     {"gpu_crc",         7 },
     {"gpu_buffer",      10},
     {"camera_heap",     11},
-    {"secure_camera_heap", 18}
+    {"secure_camera_heap", 18},
+    {"sensor_direct_heap", 18}
 };
 
 #define ION_NUM_HEAP_NAMES (unsigned int)(sizeof(ion_heap_name)/sizeof(ion_heap_name[0]))
