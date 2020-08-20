@@ -122,11 +122,28 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     Mutex::Autolock lock(mDisplayMutex);
 
     if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::PAUSE)) {
-        mode = HWC2_POWER_MODE_OFF;
         mPauseDisplay = true;
+        /**
+         * TODO(b/165712292): This is a temp fix.
+         *
+         * There is no power state check in common path.
+         * Repeated RESUME or HWC2_POWER_MODE_ON mode set triggers device reset.
+         * Add state check in PAUSE/RESUME path to fix repeated mode set issue
+         * triggered by factory or desense tool.
+         * Should add generic state check in common path later.
+         */
+        if (mPowerModeState == HWC2_POWER_MODE_OFF) {
+            ALOGD("Skip PAUSE mode set due to no power mode change");
+            return HWC2_ERROR_NONE;
+        }
+        mode = HWC2_POWER_MODE_OFF;
     } else if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME)) {
-        mode = HWC2_POWER_MODE_ON;
         mPauseDisplay = false;
+        if (mPowerModeState == HWC2_POWER_MODE_ON) {
+            ALOGD("Skip RESUME mode set due to no power mode change");
+            return HWC2_ERROR_NONE;
+        }
+        mode = HWC2_POWER_MODE_ON;
     }
 
 #ifndef USES_DOZEMODE
