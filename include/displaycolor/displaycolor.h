@@ -36,6 +36,16 @@ using ColorModesMap = std::map<hwc::ColorMode, std::vector<hwc::RenderIntent>>;
 /// Image data bit depths.
 enum class BitDepth { kEight, kTen };
 
+/// Display type used to get pipeline or update display scene.
+enum DisplayType {
+    /// builtin primary display
+    DISPLAY_PRIMARY = 0,
+    /// builtin secondary display
+    DISPLAY_SECONDARY = 1,
+    /// number of display
+    DISPLAY_MAX = 2,
+};
+
 struct LayerColorData {
     bool operator==(const LayerColorData &rhs) const {
         return dataspace == rhs.dataspace && matrix == rhs.matrix &&
@@ -201,16 +211,19 @@ class IDisplayColorGeneric {
      * @brief Update display color data. This function is expected to be called
      * before querying display color data, if the display scene has changed.
      *
+     * @param display The display relating to the scene.
      * @param scene Display scene data to use during the update.
      * @return OK if successful, error otherwise.
      */
-    virtual int Update(const DisplayScene &scene) = 0;
+    virtual int Update(DisplayType display, const DisplayScene &scene) = 0;
 
     /**
      * @brief Get a map of supported ColorModes, and supported RenderIntents for
      * each ColorMode.
+     * @param display The display to get the color modes and render intents.
      */
-    virtual const ColorModesMap &ColorModesAndRenderIntents() const = 0;
+    virtual const ColorModesMap &ColorModesAndRenderIntents(
+        DisplayType display) const = 0;
 };
 
 }  // namespace displaycolor
