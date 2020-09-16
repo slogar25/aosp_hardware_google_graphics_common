@@ -90,6 +90,7 @@ ExynosDevice::ExynosDevice()
     for (size_t i = 0; i < DISPLAY_COUNT; i++) {
         exynos_display_t display_t = AVAILABLE_DISPLAY_UNITS[i];
         ExynosDisplay *exynos_display = NULL;
+        ALOGD("Create display[%zu] type: %d, index: %d", i, display_t.type, display_t.index);
         switch(display_t.type) {
             case HWC_DISPLAY_PRIMARY:
                 exynos_display = (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this));
@@ -425,8 +426,13 @@ int32_t ExynosDevice::registerCallback (
     if (descriptor == HWC2_CALLBACK_HOTPLUG) {
         HWC2_PFN_HOTPLUG callbackFunc =
             (HWC2_PFN_HOTPLUG)mCallbackInfos[descriptor].funcPointer;
-        if (callbackFunc != NULL)
-            callbackFunc(callbackData, getDisplayId(HWC_DISPLAY_PRIMARY, 0), HWC2_CONNECTION_CONNECTED);
+        if (callbackFunc != NULL) {
+            for (auto it : mDisplays) {
+                if (it->mPlugState)
+                    callbackFunc(callbackData, getDisplayId(it->mType, it->mIndex),
+                            HWC2_CONNECTION_CONNECTED);
+            }
+        }
     }
 
     if (descriptor == HWC2_CALLBACK_VSYNC)
