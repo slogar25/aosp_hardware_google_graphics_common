@@ -1892,7 +1892,8 @@ int32_t ExynosResourceManager::preAssignResources()
                 HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), checkBit(%d)", j, checkBit);
                 if (checkBit) {
                     HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), displayId(%d), display(%p)", j, display->mDisplayId, display);
-                    if ((display != NULL) && (display->mPlugState == true)) {
+                    if ((display != NULL) &&
+                        (display->mDisplayControl.forceReserveMPP || display->mPlugState)) {
                         HDEBUGLOGD(eDebugResourceManager, "\t\treserve to display %d", display->mDisplayId);
                         mOtfMPPs[i]->reserveMPP(display->mDisplayId);
                         break;

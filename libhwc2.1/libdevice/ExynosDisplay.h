@@ -320,6 +320,8 @@ struct DisplayControl {
     bool cursorSupport;
     /** readback support **/
     bool readbackSupport = false;
+    /** Reserve MPP regardless of plug state **/
+    bool forceReserveMPP = false;
 };
 
 typedef struct brightnessState {
