@@ -139,7 +139,7 @@ void ExynosDeviceDrmInterface::updateRestrictions()
                 mDPUInfo.dpuInfo.dpp_chs[channelId].restriction.formats.push_back(halFormat);
             }
         }
-        if (hwcCheckDebugMessages(eDebugDefault))
+        if (hwcCheckDebugMessages(eDebugAttrSetting))
             printDppRestriction(mDPUInfo.dpuInfo.dpp_chs[channelId]);
 
         channelId++;
