@@ -54,6 +54,9 @@ class DrmCrtc {
   const DrmProperty &linear_matrix_property() const;
   const DrmProperty &gamma_matrix_property() const;
   const DrmProperty &partial_region_property() const;
+  const DrmProperty &force_bpc_property() const;
+  const DrmProperty &disp_dither_property() const;
+  const DrmProperty &cgc_dither_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -79,6 +82,9 @@ class DrmCrtc {
   DrmProperty linear_matrix_property_;
   DrmProperty gamma_matrix_property_;
   DrmProperty partial_region_property_;
+  DrmProperty force_bpc_property_;
+  DrmProperty disp_dither_property_;
+  DrmProperty cgc_dither_property_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android
