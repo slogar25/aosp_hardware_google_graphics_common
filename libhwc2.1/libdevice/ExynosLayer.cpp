@@ -323,6 +323,8 @@ int32_t ExynosLayer::doPreProcess()
         priority = ePriorityMax;
     } else if (mIsHdrLayer) {
         priority = ePriorityHigh;
+    } else if (isFormatYUV(mLayerBuffer->format)) {
+        priority = ePriorityHigh;
     } else if ((mDisplay->mDisplayControl.cursorSupport == true) &&
                (mCompositionType == HWC2_COMPOSITION_CURSOR)) {
         priority = ePriorityMid;
