@@ -463,13 +463,13 @@ enum dpp_rotate halTransformToDpuRot(uint32_t halTransform)
     case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
         /*
          * HAL: HAL_TRANSFORM_FLIP_H -> HAL_TRANSFORM_ROT_90
-         * VPP: ROT_90 -> XFLIP
+         * DPP: ROT_90 -> XFLIP
          */
         return DPP_ROT_90_XFLIP;
     case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
         /*
          * HAL: HAL_TRANSFORM_FLIP_V -> HAL_TRANSFORM_ROT_90
-         * VPP: ROT_90 -> YFLIP
+         * DPP: ROT_90 -> YFLIP
          */
         return DPP_ROT_90_YFLIP;
     case HAL_TRANSFORM_ROT_270:
@@ -491,9 +491,17 @@ uint64_t halTransformToDrmRot(uint32_t halTransform)
     case HAL_TRANSFORM_ROT_90:
         return DRM_MODE_ROTATE_90;
     case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
-        return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_Y);
-    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
+        /*
+         * HAL: HAL_TRANSFORM_FLIP_H -> HAL_TRANSFORM_ROT_90
+         * DPP: ROT_90 -> XFLIP
+         */
         return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_X);
+    case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
+        /*
+         * HAL: HAL_TRANSFORM_FLIP_V -> HAL_TRANSFORM_ROT_90
+         * DPP: ROT_90 -> YFLIP
+         */
+        return (DRM_MODE_ROTATE_90|DRM_MODE_REFLECT_Y);
     case HAL_TRANSFORM_ROT_270:
         return DRM_MODE_ROTATE_270;
     default:
