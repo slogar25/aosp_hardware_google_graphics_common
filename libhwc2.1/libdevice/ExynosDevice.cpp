@@ -835,7 +835,7 @@ int32_t ExynosDevice::captureReadbackClass::allocBuffer(
     return NO_ERROR;
 }
 
-void  ExynosDevice::captureReadbackClass::saveToFile()
+void  ExynosDevice::captureReadbackClass::saveToFile(const String8 &fileName)
 {
     if (mBuffer == nullptr) {
         ALOGE("%s:: buffer is null", __func__);
@@ -843,16 +843,11 @@ void  ExynosDevice::captureReadbackClass::saveToFile()
     }
 
     char filePath[MAX_DEV_NAME] = {0};
-    time_t curTime = time(NULL);
-    struct tm *tm = localtime(&curTime);
-    private_handle_t *hnd = private_handle_t::dynamicCast(mBuffer);
     snprintf(filePath, MAX_DEV_NAME,
-            "%s/capture_format%d_%dx%d_%04d-%02d-%02d_%02d_%02d_%02d.raw",
-            WRITEBACK_CAPTURE_PATH, hnd->format, hnd->stride, hnd->vstride,
-            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-            tm->tm_hour, tm->tm_min, tm->tm_sec);
+            "%s/%s", WRITEBACK_CAPTURE_PATH, fileName.string());
     FILE *fp = fopen(filePath, "w");
     if (fp) {
+        private_handle_t *hnd = private_handle_t::dynamicCast(mBuffer);
         uint32_t writeSize =
             hnd->stride * hnd->vstride * formatToBpp(hnd->format)/8;
         void *writebackData = mmap(0, writeSize,
@@ -937,7 +932,14 @@ void ExynosDevice::captureScreenWithReadback(uint32_t displayType)
     }
     hwcFdClose(fence);
 
-    captureClass.saveToFile();
+    String8 fileName;
+    time_t curTime = time(NULL);
+    struct tm *tm = localtime(&curTime);
+    fileName.appendFormat("capture_format%d_%dx%d_%04d-%02d-%02d_%02d_%02d_%02d.raw",
+            outFormat, display->mXres, display->mYres,
+            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+            tm->tm_hour, tm->tm_min, tm->tm_sec);
+    captureClass.saveToFile(fileName);
 }
 
 int32_t ExynosDevice::setDisplayDeviceMode(int32_t display_id, int32_t mode)

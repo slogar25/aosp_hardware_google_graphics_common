@@ -308,7 +308,7 @@ class ExynosDevice {
                 ~captureReadbackClass();
                 int32_t allocBuffer(uint32_t format, uint32_t w, uint32_t h);
                 buffer_handle_t& getBuffer() { return mBuffer; };
-                void saveToFile();
+                void saveToFile(const String8 &fileName);
             private:
                 GrallocWrapper::Allocator* mAllocator = nullptr;
                 GrallocWrapper::Mapper* mMapper = nullptr;
