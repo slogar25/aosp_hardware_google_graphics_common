@@ -447,6 +447,7 @@ class ExynosMPPSource {
         ExynosMPP *mM2mMPP;
 };
 bool exynosMPPSourceComp(const ExynosMPPSource* l, const ExynosMPPSource* r);
+void dump(const restriction_size_t &restrictionSize, String8 &result);
 
 class ExynosMPP {
 private:
