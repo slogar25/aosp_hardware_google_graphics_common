@@ -2460,16 +2460,12 @@ int32_t ExynosDisplay::canSkipValidate() {
     if (mDevice->mGeometryChanged != 0) {
         /* validateDisplay() should be called */
         return SKIP_ERR_GEOMETRY_CHAGNED;
-    } else if (mClientCompositionInfo.mHasCompositionLayer) {
-        /*
-         * SurfaceFlinger doesn't skip validateDisplay when there is
-         * client composition layer.
-         */
-        return SKIP_ERR_HAS_CLIENT_COMP;
     } else {
         for (uint32_t i = 0; i < mLayers.size(); i++) {
-            if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_CLIENT)
+            if (getLayerCompositionTypeForValidationType(i) ==
+                    HWC2_COMPOSITION_CLIENT) {
                 return SKIP_ERR_HAS_CLIENT_COMP;
+            }
         }
 
         if ((mClientCompositionInfo.mSkipStaticInitFlag == true) &&
