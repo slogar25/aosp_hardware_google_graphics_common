@@ -277,7 +277,6 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mLastRetireFence(-1),
     mWindowNumUsed(0),
     mBaseWindowIndex(0),
-    mBlendingNoneIndex(-1),
     mNumMaxPriorityAllowed(1),
     mCursorIndex(-1),
     mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
@@ -496,7 +495,6 @@ void ExynosDisplay::doPreProcessing() {
     uint32_t selfRefresh = 0;
     unsigned int skipProcessing = 1;
     bool hasSingleBuffer = false;
-    mBlendingNoneIndex = -1;
     bool skipStaticLayers = true;
 
     for (size_t i=0; i < mLayers.size(); i++) {
@@ -510,14 +508,6 @@ void ExynosDisplay::doPreProcessing() {
 #endif
         {
             hasSingleBuffer = true;
-        }
-        /* Prepare to Source copy layer blending exception */
-        if ((i != 0) && (mLayers[i]->mBlending == HWC2_BLEND_MODE_NONE)) {
-            if (handle == NULL)
-                mBlendingNoneIndex = i;
-            else if ((mLayers[i]->mOverlayPriority < ePriorityHigh) &&
-                     formatHasAlphaChannel(handle->format))
-                mBlendingNoneIndex = i;
         }
         if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_CLIENT)
             skipStaticLayers = false;
@@ -3495,32 +3485,6 @@ int32_t ExynosDisplay::addClientCompositionLayer(uint32_t layerIndex)
             layer->resetAssignedResource();
             layer->mValidateCompositionType = HWC2_COMPOSITION_CLIENT;
             layer->mOverlayInfo |= eSandwitchedBetweenGLES;
-        }
-    }
-
-    /* handle source over blending */
-    if ((mBlendingNoneIndex != -1) && (mLayers.size() > 0)) {
-        if ((mLayers[layerIndex]->mOverlayPriority < ePriorityHigh) &&
-            (layerIndex <= (uint32_t)mBlendingNoneIndex)) {
-            DISPLAY_LOGD(eDebugResourceManager, "\tmBlendingNoneIndex(%d), layerIndex(%d)", mBlendingNoneIndex, layerIndex);
-            for (int32_t i = mBlendingNoneIndex; i >= 0; i--) {
-                ExynosLayer *layer = mLayers[i];
-                if (layer->mOverlayPriority >= ePriorityHigh)
-                    continue;
-
-                DISPLAY_LOGD(eDebugResourceManager, "\t[%d] layer: %d", i, layer->mValidateCompositionType);
-                if (layer->mValidateCompositionType != HWC2_COMPOSITION_CLIENT)
-                {
-                    DISPLAY_LOGD(eDebugResourceManager, "\t[%d] layer changed", i);
-                    if (layer->mValidateCompositionType == HWC2_COMPOSITION_EXYNOS)
-                        exynosCompositionChanged = true;
-                    layer->resetAssignedResource();
-                    layer->mValidateCompositionType = HWC2_COMPOSITION_CLIENT;
-                    layer->mOverlayInfo |= eSourceOverBelow;
-                    mClientCompositionInfo.mFirstIndex = min(mClientCompositionInfo.mFirstIndex, (int32_t)i);
-                    mClientCompositionInfo.mLastIndex = max(mClientCompositionInfo.mLastIndex, (int32_t)i);
-                }
-            }
         }
     }
 

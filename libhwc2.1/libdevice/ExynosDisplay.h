@@ -396,7 +396,6 @@ class ExynosDisplay {
         uint32_t mMaxWindowNum;
         uint32_t mWindowNumUsed;
         uint32_t mBaseWindowIndex;
-        int32_t mBlendingNoneIndex;
 
         // Priority
         uint32_t mNumMaxPriorityAllowed;

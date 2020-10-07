@@ -1113,12 +1113,6 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
 
     if (!(display->mDisplayId == HWC_DISPLAY_VIRTUAL &&
         ((ExynosVirtualDisplay *)display)->mIsWFDState == (int)LLWFD))
-    /* Process to Source copy layer blending exception */
-    if ((display->mBlendingNoneIndex != -1) && (display->mLayers.size() > 0)) {
-        if ((layer->mOverlayPriority < ePriorityHigh) &&
-            ((int)index <= display->mBlendingNoneIndex))
-            return eSourceOverBelow;
-    }
 
     if (layer->mLayerBuffer == NULL)
         return eInvalidHandle;
@@ -1376,12 +1370,11 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
     }
 
     if ((validateFlag == NO_ERROR) || (validateFlag == eInsufficientWindow) ||
-        (validateFlag == eDimLayer) || (validateFlag == eSourceOverBelow)) {
+        (validateFlag == eDimLayer)) {
         bool isAssignable = false;
         uint64_t isSupported = 0;
         /* 1. Find available otfMPP */
-        if ((validateFlag != eInsufficientWindow) &&
-            (validateFlag != eSourceOverBelow)) {
+        if (validateFlag != eInsufficientWindow) {
             for (uint32_t j = 0; j < mOtfMPPs.size(); j++) {
                 if ((layer->mSupportedMPPFlag & mOtfMPPs[j]->mLogicalType) != 0)
                     isAssignable = mOtfMPPs[j]->isAssignable(display, src_img, dst_img);
@@ -1413,10 +1406,9 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
             /* Only G2D can be assigned if layer is supported by G2D
              * when window is not sufficient
              */
-            if (((validateFlag == eInsufficientWindow) ||
-                 (validateFlag == eSourceOverBelow)) &&
-                    (mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_RGB) &&
-                    (mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_COMBO)) {
+            if ((validateFlag == eInsufficientWindow) &&
+                (mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_RGB) &&
+                (mM2mMPPs[j]->mLogicalType != MPP_LOGICAL_G2D_COMBO)) {
                 HDEBUGLOGD(eDebugResourceManager, "\t\tInsufficient window but exynosComposition is not assigned");
                 continue;
             }
