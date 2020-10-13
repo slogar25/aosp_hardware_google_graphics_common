@@ -25,10 +25,6 @@
 #include "ExynosExternalDisplay.h"
 
 #include "VendorVideoAPI.h"
-#include "VendorGraphicBuffer.h"
-
-using namespace android;
-using vendor::graphics::VendorGraphicBufferMeta;
 
 /**
  * ExynosLayer implementation

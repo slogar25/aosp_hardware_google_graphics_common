@@ -338,6 +338,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mLowFpsLayerInfo.initializeInfos();
 
     mUseDpu = true;
+    mBrightnessState.reset();
     return;
 }
 
@@ -2616,6 +2617,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             DISPLAY_LOGD(eDebugSkipValidate, "validate is skipped");
         }
 
+        updateBrightnessState();
+
         if (updateColorConversionInfo() != NO_ERROR) {
             DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
                     __func__, ret);
@@ -2827,6 +2830,8 @@ err:
         printDebugInfos(errString);
     }
     mDisplayInterface->setForcePanic();
+
+    mBrightnessState.reset();
 
     ret = -EINVAL;
     return ret;
@@ -3045,10 +3050,19 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness)
     if (mBrightnessFd == NULL)
         return HWC2_ERROR_UNSUPPORTED;
 
+    mBrightnessValue = brightness;
+    int32_t ret = mDisplayInterface->updateBrightness();
+
+    if (ret == HWC2_ERROR_NONE) return ret;
+
+    if (ret != HWC2_ERROR_UNSUPPORTED) {
+        ALOGE("Fail to update brightness, ret(%d), brightness =%f", ret, brightness);
+        return ret;
+    }
+
     char val[MAX_BRIGHTNESS_LEN]= {0};
     uint32_t scaledBrightness = static_cast<uint32_t>(round(brightness * mMaxBrightness));
 
-    int32_t ret = 0;
     if ((ret = snprintf(val, MAX_BRIGHTNESS_LEN, "%d", scaledBrightness)) > 0) {
         fwrite(val, sizeof(val), 1, mBrightnessFd);
         if (ferror(mBrightnessFd)){
@@ -3228,6 +3242,9 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
         getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD,
                 (int32_t*)&mVsyncPeriod);
 
+    /* Update mYuvHdrHbmThresholdArea */
+    mYuvHdrHbmThresholdArea = mXres * mYres * kHbmThresholdPct;
+
     return NO_ERROR;
 }
 
@@ -3360,6 +3377,7 @@ int ExynosDisplay::clearDisplay(bool readback) {
     /* Update last retire fence */
     mLastRetireFence = fence_close(mLastRetireFence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
 
+    mBrightnessState.reset();
     return ret;
 }
 
@@ -4774,4 +4792,15 @@ void ExynosDisplay::traceLayerTypes() {
     ATRACE_INT("HWComposer: GPU Layer", gpu_count);
     ATRACE_INT("HWComposer: Cached Layer", skip_count);
     ATRACE_INT("HWComposer: Total Layer", mLayers.size());
+}
+
+void ExynosDisplay::updateBrightnessState() {
+    mBrightnessState.reset();
+    for (size_t i = 0; i < mLayers.size(); i++) {
+        if (mLayers[i]->mIsHdrLayer && mLayers[i]->isLayerFormatYuv() &&
+            (mLayers[i]->getDisplayFrameArea() > mYuvHdrHbmThresholdArea)) {
+            mBrightnessState.boost_brightness = true;
+            break;
+        }
+    }
 }

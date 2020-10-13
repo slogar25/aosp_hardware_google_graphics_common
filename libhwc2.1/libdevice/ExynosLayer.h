@@ -17,21 +17,27 @@
 #ifndef _EXYNOSLAYER_H
 #define _EXYNOSLAYER_H
 
-#include <array>
-#include <system/graphics.h>
-#include <unordered_map>
-#include <log/log.h>
-#include <utils/Timers.h>
 #include <hardware/hwcomposer2.h>
-#include "ExynosHWC.h"
+#include <log/log.h>
+#include <system/graphics.h>
+#include <utils/Timers.h>
+
+#include <array>
+#include <unordered_map>
+
 #include "ExynosDisplay.h"
-#include "VendorVideoAPI.h"
+#include "ExynosHWC.h"
 #include "ExynosHWCHelper.h"
+#include "VendorGraphicBuffer.h"
+#include "VendorVideoAPI.h"
 
 #ifndef HWC2_HDR10_PLUS_SEI
 /* based on android.hardware.composer.2_3 */
 #define HWC2_HDR10_PLUS_SEI 12
 #endif
+
+using namespace android;
+using namespace vendor::graphics;
 
 class ExynosMPP;
 
@@ -416,6 +422,15 @@ class ExynosLayer : public ExynosMPPSource {
         int32_t resetAssignedResource();
 
         bool isDrm() {return ((mLayerBuffer != NULL) && (getDrmMode(mLayerBuffer) != NO_DRM));};
+        bool isLayerFormatRgb() {
+            return ((mLayerBuffer != NULL) &&
+                    isFormatRgb(VendorGraphicBufferMeta::get_internal_format(mLayerBuffer)));
+        }
+        bool isLayerFormatYuv() {
+            return ((mLayerBuffer != NULL) &&
+                    isFormatYUV(VendorGraphicBufferMeta::get_internal_format(mLayerBuffer)));
+        }
+        size_t getDisplayFrameArea() { return HEIGHT(mDisplayFrame) * WIDTH(mDisplayFrame); }
         void setGeometryChanged(uint64_t changedBit);
         void clearGeometryChanged() {mGeometryChanged = 0;};
         bool isDimLayer();

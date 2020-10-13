@@ -228,6 +228,8 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     chosePreferredConfig();
 
+    getBrightnessInterfaceSupport();
+
     return;
 }
 
@@ -363,6 +365,8 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
             dpms_value)) != NO_ERROR) {
         HWC_LOGE(mExynosDisplay, "setPower mode ret (%d)", ret);
     }
+
+    if (mode == HWC_POWER_MODE_OFF) mBrightnessState.reset();
     return ret;
 }
 
@@ -1220,6 +1224,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         mExynosDisplay->traceLayerTypes();
     }
 
+    if (isBrightnessStateChange()) {
+        setupBrightnessConfig();
+        // TODO:setup drm property
+    }
+
     uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
     if (mExynosDisplay->mDpuData.enable_readback)
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
@@ -1728,4 +1737,50 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     *outPort = mDrmConnector->id();
 
     return HWC2_ERROR_NONE;
+}
+
+void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
+    // TODO: get supported and brightness capabilitiy
+    mBrightnessState.reset();
+    mBrightnessHbmOn = false;
+    mBrightnessDimmingOn = true;
+    return;
+}
+
+int32_t ExynosDisplayDrmInterface::updateBrightness() {
+    if (!mBrightntessIntfSupported) return HWC2_ERROR_UNSUPPORTED;
+
+    setupBrightnessConfig();
+    // TODO: write sysfs
+
+    return HWC2_ERROR_NONE;
+}
+
+bool ExynosDisplayDrmInterface::isBrightnessStateChange() {
+    if (!mBrightntessIntfSupported) return false;
+
+    return !(mExynosDisplay->getBrightnessState() == mBrightnessState);
+}
+
+void ExynosDisplayDrmInterface::setupBrightnessConfig() {
+    if (!mBrightntessIntfSupported) return;
+
+    Mutex::Autolock lock(mBrightnessUpdateMutex);
+    brightnessState_t brightness_state = mExynosDisplay->getBrightnessState();
+
+    mBrightnessDimmingOn = (!mBrightnessState.instant_hbm && !brightness_state.instant_hbm);
+
+    if (brightness_state.peak_hbm) {
+        mScaledBrightness = 1.0;
+    } else if (brightness_state.boost_brightness) {
+        mScaledBrightness = mBrightnessHdrRatio * mExynosDisplay->getBrightnessValue();
+    } else {
+        mScaledBrightness = mExynosDisplay->getBrightnessValue();
+    }
+
+    mBrightnessState = brightness_state;
+
+    // TODO:mapping and setup mBrightnessLevel and mBrightnessHbmOn
+
+    return;
 }

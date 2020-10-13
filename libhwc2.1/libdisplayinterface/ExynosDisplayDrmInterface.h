@@ -168,6 +168,8 @@ class ExynosDisplayDrmInterface :
                 const std::unique_ptr<DrmPlane> &plane,
                 const exynos_win_config_data& config)
         { return NO_ERROR;};
+        virtual int32_t updateBrightness();
+
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -289,6 +291,21 @@ class ExynosDisplayDrmInterface :
 
     private:
         DrmMode mDozeDrmMode;
+
+    protected:
+        void getBrightnessInterfaceSupport();
+        bool isBrightnessStateChange();
+        void setupBrightnessConfig();
+        bool mBrightntessIntfSupported = false;
+        /* boost brightness ratio for HDR */
+        float mBrightnessHdrRatio = 1.0;
+
+        Mutex mBrightnessUpdateMutex;
+        brightnessState_t mBrightnessState;
+        uint32_t mBrightnessLevel;
+        float mScaledBrightness;
+        bool mBrightnessDimmingOn;
+        bool mBrightnessHbmOn;
 };
 
 #endif
