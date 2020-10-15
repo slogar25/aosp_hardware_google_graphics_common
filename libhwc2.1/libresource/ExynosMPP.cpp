@@ -188,9 +188,9 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     }
 
     /* Basic feature supported flags */
-    for (int i = 0; i < MPP_P_TYPE_MAX; i++) {
-        if (feature_table[i].hwType == mPhysicalType)
-            mAttr = feature_table[i].attr;
+    for (const auto &feature: feature_table) {
+        if (feature.hwType == mPhysicalType)
+            mAttr = feature.attr;
     }
 
     if (mPhysicalType == MPP_MSC) {
