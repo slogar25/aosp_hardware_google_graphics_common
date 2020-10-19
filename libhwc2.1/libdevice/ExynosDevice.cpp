@@ -40,6 +40,7 @@ class ExynosDevice;
 extern void vsync_callback(hwc2_callback_data_t callbackData,
         hwc2_display_t displayId, int64_t timestamp);
 extern uint32_t mFenceLogSize;
+extern void PixelDisplayInit(ExynosDevice *device);
 
 int hwcDebug;
 int hwcFenceDebug[FENCE_IP_ALL];
@@ -143,6 +144,15 @@ ExynosDevice::ExynosDevice()
     if (mInterfaceType == INTERFACE_TYPE_DRM) {
         /* disable vblank immediately after updates */
         setVBlankOffDelay(-1);
+    }
+
+    PixelDisplayInit(this);
+
+    char value[PROPERTY_VALUE_MAX];
+    property_get("vendor.display.lbe.supported", value, "0");
+    mLbeSupported = atoi(value) ? true : false;
+    if (mLbeSupported) {
+        primary_display->initLbe();
     }
 }
 
@@ -978,4 +988,32 @@ void ExynosDevice::setVBlankOffDelay(int vblankOffDelay) {
     static constexpr const char *kVblankOffDelayPath = "/sys/module/drm/parameters/vblankoffdelay";
 
     writeIntToFile(kVblankOffDelayPath, vblankOffDelay);
+}
+
+bool ExynosDevice::isLbeSupported() {
+    return mLbeSupported;
+}
+
+void ExynosDevice::setLbeState(LbeState state) {
+    if (mLbeSupported) {
+        ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
+        primary_display->setLbeState(state);
+        invalidate();
+    }
+}
+
+void ExynosDevice::setLbeAmbientLight(int value) {
+    if (mLbeSupported) {
+        ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
+        primary_display->setLbeAmbientLight(value);
+        invalidate();
+    }
+}
+
+LbeState ExynosDevice::getLbeState() {
+    if (mLbeSupported) {
+        ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
+        return primary_display->getLbeState();
+    }
+    return LbeState::OFF;
 }
