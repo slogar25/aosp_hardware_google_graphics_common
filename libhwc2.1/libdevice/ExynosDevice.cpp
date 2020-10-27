@@ -369,6 +369,9 @@ void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
             localTime->tm_hour, localTime->tm_min,
             localTime->tm_sec, updateTimeInfo.lastPresentTime.tv_usec/1000);
 
+    result.appendFormat("\n");
+    mResourceManager->dump(result);
+
     display->dump(result);
 
     if (external_display->mPlugState == true) {

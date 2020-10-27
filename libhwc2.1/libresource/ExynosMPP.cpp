@@ -69,6 +69,25 @@ bool exynosMPPSourceComp(const ExynosMPPSource* l, const ExynosMPPSource* r)
     return (l->mSrcImg.zOrder < r->mSrcImg.zOrder);
 }
 
+void dump(const restriction_size_t &restrictionSize, String8 &result) {
+    result.appendFormat("    maxDownScale = %u, maxUpscale = %u\n", restrictionSize.maxDownScale,
+                        restrictionSize.maxUpScale);
+    result.appendFormat("    maxFullWidth = %u, maxFullHeight = %u\n", restrictionSize.maxFullWidth,
+                        restrictionSize.maxFullHeight);
+    result.appendFormat("    minFullWidth = %u, minFullHeight = %u\n", restrictionSize.minFullWidth,
+                        restrictionSize.minFullHeight);
+    result.appendFormat("    fullWidthAlign = %u, fullHeightAlign = %u\n",
+                        restrictionSize.fullWidthAlign, restrictionSize.fullHeightAlign);
+    result.appendFormat("    maxCropWidth = %u, maxCropHeight = %u\n", restrictionSize.maxCropWidth,
+                        restrictionSize.maxCropHeight);
+    result.appendFormat("    minCropWidth = %u, minCropHeight = %u\n", restrictionSize.minCropWidth,
+                        restrictionSize.minCropHeight);
+    result.appendFormat("    cropXAlign = %u, cropYAlign = %u\n", restrictionSize.cropXAlign,
+                        restrictionSize.cropYAlign);
+    result.appendFormat("    cropWidthAlign = %u, cropHeightAlign = %u\n",
+                        restrictionSize.cropWidthAlign, restrictionSize.cropHeightAlign);
+}
+
 ExynosMPPSource::ExynosMPPSource()
     : mSourceType(MPP_SOURCE_NO_TYPE),
     mSource(NULL),

@@ -172,6 +172,8 @@ class ExynosResourceManager {
         virtual bool hasHDR10PlusMPP();
         float getAssignedCapacity(uint32_t physicalType);
 
+        void dump(String8 &result);
+
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,
                 uint32_t layer_index, exynos_image m2m_out_img, ExynosMPP *m2mMPP, ExynosMPP *otfMPP);

@@ -2418,3 +2418,25 @@ float ExynosResourceManager::getM2MCapa(uint32_t physicalType)
 
     return ret;
 }
+
+void ExynosResourceManager::dump(String8 &result) {
+    result.appendFormat("Resource Manager:\n");
+
+    const auto rgbRestrictions = mSizeRestrictions[RESTRICTION_RGB];
+    result.appendFormat("[RGB Restrictions]\n");
+
+    for (int i = 0; i < mSizeRestrictionCnt[RESTRICTION_RGB]; ++i) {
+        result.appendFormat("Type %u:\n", rgbRestrictions[i].key.hwType);
+        ::dump(rgbRestrictions[i].sizeRestriction, result);
+        result.appendFormat("\n");
+    }
+
+    const auto yuvRestrictions = mSizeRestrictions[RESTRICTION_YUV];
+    result.appendFormat("[YUV Restrictions]\n");
+
+    for (int i = 0; i < mSizeRestrictionCnt[RESTRICTION_YUV]; ++i) {
+        result.appendFormat("Type %u:\n", yuvRestrictions[i].key.hwType);
+        ::dump(yuvRestrictions[i].sizeRestriction, result);
+        result.appendFormat("\n");
+    }
+}
