@@ -234,17 +234,27 @@ void ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
 {
     if ((mExynosDevice == nullptr) || (mExynosDisplay == nullptr))
         return;
+    if (mExynosDisplay->mVsyncState != HWC2_VSYNC_ENABLE)
+        return;
 
     mExynosDevice->compareVsyncPeriod();
     if (mExynosDevice->mVsyncDisplay == (int)mExynosDisplay->mDisplayId) {
-        hwc2_callback_data_t callbackData =
-            mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC].callbackData;
-        HWC2_PFN_VSYNC callbackFunc =
-            (HWC2_PFN_VSYNC)mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC].funcPointer;
-        if ((mExynosDisplay->mVsyncState == HWC2_VSYNC_ENABLE) &&
-            (callbackFunc != NULL)) {
-            callbackFunc(callbackData, mExynosDisplay->mDisplayId, timestamp);
-        }
+        auto vsyncCallbackInfo =
+            mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
+        if (vsyncCallbackInfo.funcPointer &&
+            vsyncCallbackInfo.callbackData)
+            ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(
+                    vsyncCallbackInfo.callbackData,
+                    mExynosDisplay->mDisplayId, timestamp);
+
+        auto vsync_2_4CallbackInfo =
+            mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
+        if (vsync_2_4CallbackInfo.funcPointer &&
+            vsync_2_4CallbackInfo.callbackData)
+            ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
+                    vsync_2_4CallbackInfo.callbackData,
+                    mExynosDisplay->mDisplayId,
+                    timestamp, mExynosDisplay->mVsyncPeriod);
     }
 }
 
