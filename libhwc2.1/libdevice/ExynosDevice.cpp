@@ -1,0 +1,961 @@
+/*
+ * Copyright (C) 2012 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "ExynosDevice.h"
+#include "ExynosDisplay.h"
+#include "ExynosLayer.h"
+#include "ExynosPrimaryDisplayModule.h"
+#include "ExynosResourceManagerModule.h"
+#include "ExynosExternalDisplayModule.h"
+#include "ExynosVirtualDisplayModule.h"
+#include "ExynosHWCDebug.h"
+#include "ExynosHWCHelper.h"
+#include "ExynosDeviceDrmInterface.h"
+#include <unistd.h>
+#include <sync/sync.h>
+#include <sys/mman.h>
+
+/**
+ * ExynosDevice implementation
+ */
+
+class ExynosDevice;
+
+extern void vsync_callback(hwc2_callback_data_t callbackData,
+        hwc2_display_t displayId, int64_t timestamp);
+extern uint32_t mFenceLogSize;
+
+int hwcDebug;
+int hwcFenceDebug[FENCE_IP_ALL];
+struct exynos_hwc_control exynosHWCControl;
+struct update_time_info updateTimeInfo;
+char fence_names[FENCE_MAX][32];
+
+GrallocWrapper::Mapper* ExynosDevice::mMapper = NULL;
+GrallocWrapper::Allocator* ExynosDevice::mAllocator = NULL;
+
+uint32_t getDeviceInterfaceType()
+{
+    if (access(DRM_DEVICE_PATH, F_OK) == NO_ERROR)
+        return INTERFACE_TYPE_DRM;
+    else
+        return INTERFACE_TYPE_FB;
+}
+
+ExynosDevice::ExynosDevice()
+    : mGeometryChanged(0),
+    mVsyncFd(-1),
+    mExtVsyncFd(-1),
+    mVsyncDisplay(HWC_DISPLAY_PRIMARY),
+    mTimestamp(0),
+    mDisplayMode(0),
+    mInterfaceType(INTERFACE_TYPE_FB)
+{
+    exynosHWCControl.forceGpu = false;
+    exynosHWCControl.windowUpdate = true;
+    exynosHWCControl.forcePanic = false;
+    exynosHWCControl.skipStaticLayers = true;
+    exynosHWCControl.skipM2mProcessing = true;
+    exynosHWCControl.skipResourceAssign = true;
+    exynosHWCControl.multiResolution = true;
+    exynosHWCControl.dumpMidBuf = false;
+    exynosHWCControl.displayMode = DISPLAY_MODE_NUM;
+    exynosHWCControl.setDDIScaler = false;
+    exynosHWCControl.skipWinConfig = false;
+    exynosHWCControl.skipValidate = true;
+    exynosHWCControl.doFenceFileDump = false;
+    exynosHWCControl.fenceTracer = 0;
+    exynosHWCControl.sysFenceLogging = false;
+
+    mInterfaceType = getDeviceInterfaceType();
+
+    ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
+    mResourceManager = new ExynosResourceManagerModule(this);
+
+    ExynosPrimaryDisplayModule *primary_display = new ExynosPrimaryDisplayModule(HWC_DISPLAY_PRIMARY, this);
+
+    primary_display->mPlugState = true;
+    ExynosMPP::mainDisplayWidth = primary_display->mXres;
+    if (ExynosMPP::mainDisplayWidth <= 0) {
+        ExynosMPP::mainDisplayWidth = 1440;
+    }
+    ExynosMPP::mainDisplayHeight = primary_display->mYres;
+    if (ExynosMPP::mainDisplayHeight <= 0) {
+        ExynosMPP::mainDisplayHeight = 2560;
+    }
+
+    ExynosExternalDisplayModule *external_display = new ExynosExternalDisplayModule(HWC_DISPLAY_EXTERNAL, this);
+
+    ExynosVirtualDisplayModule *virtual_display = new ExynosVirtualDisplayModule(HWC_DISPLAY_VIRTUAL, this);
+    mNumVirtualDisplay = 0;
+
+    mDisplays.add((ExynosDisplay*) primary_display);
+    mDisplays.add((ExynosDisplay*) external_display);
+    mDisplays.add((ExynosDisplay*) virtual_display);
+
+    memset(mCallbackInfos, 0, sizeof(mCallbackInfos));
+#ifndef FORCE_DISABLE_DR
+    exynosHWCControl.useDynamicRecomp = (primary_display->mDREnable) || (external_display->mDREnable) ||
+                                        (virtual_display->mDREnable);
+#else
+    exynosHWCControl.useDynamicRecomp = false;
+#endif
+
+    dynamicRecompositionThreadCreate();
+
+    hwcDebug = 0;
+    for (uint32_t i = 0; i < FENCE_IP_ALL; i++)
+        hwcFenceDebug[i] = 0;
+
+    for (uint32_t i = 0; i < FENCE_MAX; i++) {
+        memset(fence_names[i], 0, sizeof(fence_names[0]));
+        sprintf(fence_names[i], "_%2dh", i);
+    }
+
+    String8 saveString;
+    saveString.appendFormat("ExynosDevice is initialized");
+    uint32_t errFileSize = saveErrorLog(saveString);
+    ALOGI("Initial errlog size: %d bytes\n", errFileSize);
+
+    /*
+     * This order should not be changed
+     * new ExynosResourceManager ->
+     * create displays and add them to the list ->
+     * initDeviceInterface() ->
+     * ExynosResourceManager::updateRestrictions()
+     */
+    initDeviceInterface(mInterfaceType);
+    mResourceManager->updateRestrictions();
+}
+
+void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
+{
+    if (interfaceType == INTERFACE_TYPE_DRM) {
+        mDeviceInterface = std::make_unique<ExynosDeviceDrmInterface>(this);
+    } else {
+        LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
+                __func__, interfaceType);
+    }
+
+    /*
+     * This order should not be changed
+     * initDisplayInterface() of each display ->
+     * ExynosDeviceInterface::init()
+     */
+    for (uint32_t i = 0; i < mDisplays.size(); i++)
+        mDisplays[i]->initDisplayInterface(interfaceType);
+    mDeviceInterface->init(this);
+}
+
+ExynosDevice::~ExynosDevice() {
+
+    ExynosDisplay *primary_display = getDisplay(HWC_DISPLAY_PRIMARY);
+
+    mDRLoopStatus = false;
+    mDRThread.join();
+
+    if (mMapper != NULL)
+        delete mMapper;
+    if (mAllocator != NULL)
+        delete mAllocator;
+
+    delete primary_display;
+}
+
+bool ExynosDevice::isFirstValidate()
+{
+    for (uint32_t i = 0; i < mDisplays.size(); i++) {
+        if ((mDisplays[i]->mDisplayId != HWC_DISPLAY_VIRTUAL) &&
+            (mDisplays[i]->mPowerModeState == (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
+            continue;
+        if ((mDisplays[i]->mPlugState == true) &&
+            ((mDisplays[i]->mRenderingState != RENDERING_STATE_NONE) &&
+             (mDisplays[i]->mRenderingState != RENDERING_STATE_PRESENTED)))
+            return false;
+    }
+
+    return true;
+}
+
+bool ExynosDevice::isLastValidate(ExynosDisplay *display)
+{
+    for (uint32_t i = 0; i < mDisplays.size(); i++) {
+        if (mDisplays[i] == display)
+            continue;
+        if ((mDisplays[i]->mDisplayId != HWC_DISPLAY_VIRTUAL) &&
+            (mDisplays[i]->mPowerModeState == (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
+            continue;
+        if ((mDisplays[i]->mPlugState == true) &&
+            (mDisplays[i]->mRenderingState != RENDERING_STATE_VALIDATED) &&
+            (mDisplays[i]->mRenderingState != RENDERING_STATE_ACCEPTED_CHANGE))
+            return false;
+    }
+    return true;
+}
+
+bool ExynosDevice::isDynamicRecompositionThreadAlive()
+{
+    android_atomic_acquire_load(&mDRThreadStatus);
+    return (mDRThreadStatus > 0);
+}
+
+void ExynosDevice::checkDynamicRecompositionThread()
+{
+    // If thread was destroyed, create thread and run. (resume status)
+    if (isDynamicRecompositionThreadAlive() == false) {
+        for (uint32_t i = 0; i < mDisplays.size(); i++) {
+            if (mDisplays[i]->mDREnable) {
+                dynamicRecompositionThreadCreate();
+                return;
+            }
+        }
+    } else {
+    // If thread is running and all displays turnned off DR, destroy the thread.
+        for (uint32_t i = 0; i < mDisplays.size(); i++) {
+            if (mDisplays[i]->mDREnable)
+                return;
+        }
+        mDRLoopStatus = false;
+        mDRThread.join();
+    }
+}
+
+void ExynosDevice::dynamicRecompositionThreadCreate()
+{
+    if (exynosHWCControl.useDynamicRecomp == true) {
+        mDRLoopStatus = true;
+        mDRThread = std::thread(&dynamicRecompositionThreadLoop, this);
+    }
+}
+
+void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
+{
+    ExynosDevice *dev = (ExynosDevice *)data;
+    ExynosDisplay *display[HWC_NUM_DISPLAY_TYPES];
+    uint64_t event_cnt[HWC_NUM_DISPLAY_TYPES];
+
+    for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+        display[i] = (ExynosDisplay *)dev->getDisplay(i);
+        event_cnt[i] = 0;
+    }
+    android_atomic_inc(&(dev->mDRThreadStatus));
+
+    while (dev->mDRLoopStatus) {
+        uint32_t result = 0;
+        for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++)
+            event_cnt[i] = display[i]->mUpdateEventCnt;
+
+        /*
+         * If there is no update for more than 100ms, favor the 3D composition mode.
+         * If all other conditions are met, mode will be switched to 3D composition.
+         */
+        usleep(100000);
+        for (uint32_t i = 0; i < HWC_NUM_DISPLAY_TYPES; i++) {
+            if (display[i]->mDREnable &&
+                display[i]->mPlugState == true &&
+                event_cnt[i] == display[i]->mUpdateEventCnt) {
+                if (display[i]->checkDynamicReCompMode() == DEVICE_2_CLIENT) {
+                    display[i]->mUpdateEventCnt = 0;
+                    display[i]->setGeometryChanged(GEOMETRY_DISPLAY_DYNAMIC_RECOMPOSITION);
+                    result = 1;
+                }
+            }
+        }
+        if (result)
+            dev->invalidate();
+    }
+
+    android_atomic_dec(&(dev->mDRThreadStatus));
+
+    return NULL;
+}
+/**
+ * @param display
+ * @return ExynosDisplay
+ */
+ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
+    uint32_t physical_display_num = HWC_NUM_DISPLAY_TYPES - 1;
+
+    if (mDisplays.isEmpty()) {
+        ALOGE("mDisplays.size(%zu), requested display(%d)",
+                mDisplays.size(), display);
+        return NULL;
+    }
+
+    if ((display <= physical_display_num) && (mDisplays[display]->mDisplayId == display)) {
+        return (ExynosDisplay*)mDisplays[display];
+    } else  {
+        for (size_t i = (physical_display_num + 1); i < mDisplays.size(); i++) {
+            if (mDisplays[i]->mDisplayId == display) {
+                return (ExynosDisplay*)mDisplays[i];
+            }
+        }
+    }
+
+    ALOGE("mDisplays.size(%zu), requested display(%d)",
+            mDisplays.size(), display);
+    return NULL;
+}
+
+/**
+ * Device Functions for HWC 2.0
+ */
+
+int32_t ExynosDevice::createVirtualDisplay(
+        uint32_t width, uint32_t height, int32_t* /*android_pixel_format_t*/ format, ExynosDisplay* display) {
+    ((ExynosVirtualDisplay*)display)->createVirtualDisplay(width, height, format);
+    return 0;
+}
+
+/**
+ * @param *display
+ * @return int32_t
+ */
+int32_t ExynosDevice::destroyVirtualDisplay(ExynosDisplay* display) {
+    ((ExynosVirtualDisplay *)display)->destroyVirtualDisplay();
+    return 0;
+}
+
+void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
+    /* TODO : Dump here */
+
+    if (outSize == NULL) {
+        ALOGE("%s:: outSize is null", __func__);
+        return;
+    }
+
+    ExynosDisplay *display = mDisplays[HWC_DISPLAY_PRIMARY];
+    ExynosDisplay *external_display = mDisplays[HWC_DISPLAY_EXTERNAL];
+    ExynosDisplay *virtual_display = mDisplays[HWC_DISPLAY_VIRTUAL];
+
+    android::String8 result;
+    result.append("\n\n");
+
+    struct tm* localTime = (struct tm*)localtime((time_t*)&updateTimeInfo.lastUeventTime.tv_sec);
+    result.appendFormat("lastUeventTime(%02d:%02d:%02d.%03lu) lastTimestamp(%" PRIu64 ")\n",
+            localTime->tm_hour, localTime->tm_min,
+            localTime->tm_sec, updateTimeInfo.lastUeventTime.tv_usec/1000, mTimestamp);
+
+    localTime = (struct tm*)localtime((time_t*)&updateTimeInfo.lastEnableVsyncTime.tv_sec);
+    result.appendFormat("lastEnableVsyncTime(%02d:%02d:%02d.%03lu)\n",
+            localTime->tm_hour, localTime->tm_min,
+            localTime->tm_sec, updateTimeInfo.lastEnableVsyncTime.tv_usec/1000);
+
+    localTime = (struct tm*)localtime((time_t*)&updateTimeInfo.lastDisableVsyncTime.tv_sec);
+    result.appendFormat("lastDisableVsyncTime(%02d:%02d:%02d.%03lu)\n",
+            localTime->tm_hour, localTime->tm_min,
+            localTime->tm_sec, updateTimeInfo.lastDisableVsyncTime.tv_usec/1000);
+
+    localTime = (struct tm*)localtime((time_t*)&updateTimeInfo.lastValidateTime.tv_sec);
+    result.appendFormat("lastValidateTime(%02d:%02d:%02d.%03lu)\n",
+            localTime->tm_hour, localTime->tm_min,
+            localTime->tm_sec, updateTimeInfo.lastValidateTime.tv_usec/1000);
+
+    localTime = (struct tm*)localtime((time_t*)&updateTimeInfo.lastPresentTime.tv_sec);
+    result.appendFormat("lastPresentTime(%02d:%02d:%02d.%03lu)\n",
+            localTime->tm_hour, localTime->tm_min,
+            localTime->tm_sec, updateTimeInfo.lastPresentTime.tv_usec/1000);
+
+    result.appendFormat("\n");
+    mResourceManager->dump(result);
+
+    display->dump(result);
+
+    if (external_display->mPlugState == true) {
+        external_display->dump(result);
+    }
+
+    if (virtual_display->mPlugState == true) {
+        virtual_display->dump(result);
+    }
+
+    if (outBuffer == NULL) {
+        *outSize = (uint32_t)result.length();
+    } else {
+        if (*outSize == 0) {
+            ALOGE("%s:: outSize is 0", __func__);
+            return;
+        }
+        uint32_t copySize = *outSize;
+        if (*outSize > result.size())
+            copySize = (uint32_t)result.size();
+        ALOGI("HWC dump:: resultSize(%zu), outSize(%d), copySize(%d)", result.size(), *outSize, copySize);
+        strlcpy(outBuffer, result.string(), copySize);
+    }
+
+    return;
+}
+
+uint32_t ExynosDevice::getMaxVirtualDisplayCount() {
+#ifdef USES_VIRTUAL_DISPLAY
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+int32_t ExynosDevice::registerCallback (
+        int32_t descriptor, hwc2_callback_data_t callbackData,
+        hwc2_function_pointer_t point) {
+    if (descriptor < 0 || descriptor > HWC2_CALLBACK_VSYNC)
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    mCallbackInfos[descriptor].callbackData = callbackData;
+    mCallbackInfos[descriptor].funcPointer = point;
+
+    /* Call hotplug callback for primary display*/
+    if (descriptor == HWC2_CALLBACK_HOTPLUG) {
+        HWC2_PFN_HOTPLUG callbackFunc =
+            (HWC2_PFN_HOTPLUG)mCallbackInfos[descriptor].funcPointer;
+        if (callbackFunc != NULL)
+            callbackFunc(callbackData, HWC_DISPLAY_PRIMARY, HWC2_CONNECTION_CONNECTED);
+    }
+
+    if (descriptor == HWC2_CALLBACK_VSYNC)
+        mResourceManager->doPreProcessing();
+
+    return HWC2_ERROR_NONE;
+}
+
+void ExynosDevice::invalidate()
+{
+    HWC2_PFN_REFRESH callbackFunc =
+        (HWC2_PFN_REFRESH)mCallbackInfos[HWC2_CALLBACK_REFRESH].funcPointer;
+    if (callbackFunc != NULL)
+        callbackFunc(mCallbackInfos[HWC2_CALLBACK_REFRESH].callbackData,
+                HWC_DISPLAY_PRIMARY);
+    else
+        ALOGE("%s:: refresh callback is not registered", __func__);
+
+}
+
+void ExynosDevice::setHWCDebug(unsigned int debug)
+{
+    hwcDebug = debug;
+}
+
+uint32_t ExynosDevice::getHWCDebug()
+{
+    return hwcDebug;
+}
+
+void ExynosDevice::setHWCFenceDebug(uint32_t typeNum, uint32_t ipNum, uint32_t mode)
+{
+    if (typeNum > FENCE_TYPE_ALL || typeNum < 0 || ipNum > FENCE_IP_ALL || ipNum < 0
+            || mode > 1 || mode < 0) {
+        ALOGE("%s:: input is not valid type(%u), IP(%u), mode(%d)", __func__, typeNum, ipNum, mode);
+        return;
+    }
+
+    uint32_t value = 0;
+
+    if (typeNum == FENCE_TYPE_ALL)
+        value = (1 << FENCE_TYPE_ALL) - 1;
+    else
+        value = 1 << typeNum;
+
+    if (ipNum == FENCE_IP_ALL) {
+        for (uint32_t i = 0; i < FENCE_IP_ALL; i++) {
+            if (mode)
+                hwcFenceDebug[i] |= value;
+            else
+                hwcFenceDebug[i] &= (~value);
+        }
+    } else {
+        if (mode)
+            hwcFenceDebug[ipNum] |= value;
+        else
+            hwcFenceDebug[ipNum] &= (~value);
+    }
+
+}
+
+void ExynosDevice::getHWCFenceDebug()
+{
+    for (uint32_t i = 0; i < FENCE_IP_ALL; i++)
+        ALOGE("[HWCFenceDebug] IP_Number(%d) : Debug(%x)", i, hwcFenceDebug[i]);
+}
+
+void ExynosDevice::setHWCControl(uint32_t display, uint32_t ctrl, int32_t val)
+{
+    ExynosDisplay *exynosDisplay = NULL;
+    switch (ctrl) {
+        case HWC_CTL_FORCE_GPU:
+            ALOGI("%s::HWC_CTL_FORCE_GPU on/off=%d", __func__, val);
+            exynosHWCControl.forceGpu = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            invalidate();
+            break;
+        case HWC_CTL_WINDOW_UPDATE:
+            ALOGI("%s::HWC_CTL_WINDOW_UPDATE on/off=%d", __func__, val);
+            exynosHWCControl.windowUpdate = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            invalidate();
+            break;
+        case HWC_CTL_FORCE_PANIC:
+            ALOGI("%s::HWC_CTL_FORCE_PANIC on/off=%d", __func__, val);
+            exynosHWCControl.forcePanic = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            break;
+        case HWC_CTL_SKIP_STATIC:
+            ALOGI("%s::HWC_CTL_SKIP_STATIC on/off=%d", __func__, val);
+            exynosHWCControl.skipStaticLayers = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            break;
+        case HWC_CTL_SKIP_M2M_PROCESSING:
+            ALOGI("%s::HWC_CTL_SKIP_M2M_PROCESSING on/off=%d", __func__, val);
+            exynosHWCControl.skipM2mProcessing = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            break;
+        case HWC_CTL_SKIP_RESOURCE_ASSIGN:
+            ALOGI("%s::HWC_CTL_SKIP_RESOURCE_ASSIGN on/off=%d", __func__, val);
+            exynosHWCControl.skipResourceAssign = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            invalidate();
+            break;
+        case HWC_CTL_SKIP_VALIDATE:
+            ALOGI("%s::HWC_CTL_SKIP_VALIDATE on/off=%d", __func__, val);
+            exynosHWCControl.skipValidate = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            invalidate();
+            break;
+        case HWC_CTL_DUMP_MID_BUF:
+            ALOGI("%s::HWC_CTL_DUMP_MID_BUF on/off=%d", __func__, val);
+            exynosHWCControl.dumpMidBuf = (unsigned int)val;
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            invalidate();
+            break;
+        case HWC_CTL_CAPTURE_READBACK:
+            captureScreenWithReadback(HWC_DISPLAY_PRIMARY);
+            break;
+        case HWC_CTL_DISPLAY_MODE:
+            ALOGI("%s::HWC_CTL_DISPLAY_MODE mode=%d", __func__, val);
+            setDisplayMode((uint32_t)val);
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            invalidate();
+            break;
+        // Support DDI scalser {
+        case HWC_CTL_DDI_RESOLUTION_CHANGE:
+            ALOGI("%s::HWC_CTL_DDI_RESOLUTION_CHANGE mode=%d", __func__, val);
+            exynosDisplay = (ExynosDisplay*)getDisplay(display);
+            uint32_t width, height;
+
+            /* TODO: Add branch here for each resolution/index */
+            switch(val) {
+            case 1:
+            case 2:
+            case 3:
+            default:
+                width = 1440; height = 2960;
+                break;
+            }
+
+            if (exynosDisplay == NULL) {
+                for (uint32_t i = 0; i < mDisplays.size(); i++) {
+                    mDisplays[i]->setDDIScalerEnable(width, height);
+                }
+            } else {
+                exynosDisplay->setDDIScalerEnable(width, height);
+            }
+            setGeometryChanged(GEOMETRY_DISPLAY_RESOLUTION_CHANGED);
+            invalidate();
+            break;
+        // } Support DDI scaler
+        case HWC_CTL_ENABLE_COMPOSITION_CROP:
+        case HWC_CTL_ENABLE_EXYNOSCOMPOSITION_OPT:
+        case HWC_CTL_ENABLE_CLIENTCOMPOSITION_OPT:
+        case HWC_CTL_USE_MAX_G2D_SRC:
+        case HWC_CTL_ENABLE_HANDLE_LOW_FPS:
+        case HWC_CTL_ENABLE_EARLY_START_MPP:
+            exynosDisplay = (ExynosDisplay*)getDisplay(display);
+            if (exynosDisplay == NULL) {
+                for (uint32_t i = 0; i < mDisplays.size(); i++) {
+                    mDisplays[i]->setHWCControl(ctrl, val);
+                }
+            } else {
+                exynosDisplay->setHWCControl(ctrl, val);
+            }
+            setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+            invalidate();
+            break;
+        case HWC_CTL_DYNAMIC_RECOMP:
+            ALOGI("%s::HWC_CTL_DYNAMIC_RECOMP on/off = %d", __func__, val);
+            setDynamicRecomposition((unsigned int)val);
+            break;
+        case HWC_CTL_ENABLE_FENCE_TRACER:
+            ALOGI("%s::HWC_CTL_ENABLE_FENCE_TRACER on/off=%d", __func__, val);
+            exynosHWCControl.fenceTracer = (unsigned int)val;
+            break;
+        case HWC_CTL_SYS_FENCE_LOGGING:
+            ALOGI("%s::HWC_CTL_SYS_FENCE_LOGGING on/off=%d", __func__, val);
+            exynosHWCControl.sysFenceLogging = (unsigned int)val;
+            break;
+        case HWC_CTL_DO_FENCE_FILE_DUMP:
+            ALOGI("%s::HWC_CTL_DO_FENCE_FILE_DUMP on/off=%d", __func__, val);
+            exynosHWCControl.doFenceFileDump = (unsigned int)val;
+            break;
+        default:
+            ALOGE("%s: unsupported HWC_CTL (%d)", __func__, ctrl);
+            break;
+    }
+}
+
+void ExynosDevice::setDisplayMode(uint32_t displayMode)
+{
+    exynosHWCControl.displayMode = displayMode;
+}
+
+void ExynosDevice::setDynamicRecomposition(unsigned int on)
+{
+    exynosHWCControl.useDynamicRecomp = on;
+}
+
+uint32_t ExynosDevice::checkConnection(uint32_t display)
+{
+    int ret = 0;
+	ExynosExternalDisplay *external_display = (ExynosExternalDisplay *)mDisplays[HWC_DISPLAY_EXTERNAL];
+	ExynosVirtualDisplay *virtual_display = NULL;
+	virtual_display = (ExynosVirtualDisplay *)mDisplays[HWC_DISPLAY_VIRTUAL];
+
+    switch(display) {
+        case HWC_DISPLAY_PRIMARY:
+            return 1;
+        case HWC_DISPLAY_EXTERNAL:
+            if (external_display->mPlugState)
+                return 1;
+            else
+                return 0;
+        case HWC_DISPLAY_VIRTUAL:
+            if (virtual_display->mPlugState)
+                return 1;
+            else
+                return 0;
+        default:
+            return 0;
+    }
+    return ret;
+}
+void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t* outCapabilities)
+{
+    uint32_t capabilityNum = 0;
+#ifdef HWC_SUPPORT_COLOR_TRANSFORM
+    capabilityNum++;
+#endif
+#ifdef HWC_SKIP_VALIDATE
+    capabilityNum++;
+#endif
+    if (outCapabilities == NULL) {
+        *outCount = capabilityNum;
+        return;
+    }
+    if (capabilityNum != *outCount) {
+        ALOGE("%s:: invalid outCount(%d), should be(%d)", __func__, *outCount, capabilityNum);
+        return;
+    }
+#if defined(HWC_SUPPORT_COLOR_TRANSFORM) || defined(HWC_SKIP_VALIDATE)
+    uint32_t index = 0;
+#endif
+#ifdef HWC_SUPPORT_COLOR_TRANSFORM
+    outCapabilities[index++] = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM;
+#endif
+#ifdef HWC_SKIP_VALIDATE
+    outCapabilities[index++] = HWC2_CAPABILITY_SKIP_VALIDATE;
+#endif
+    return;
+}
+
+void ExynosDevice::getAllocator(GrallocWrapper::Mapper** mapper, GrallocWrapper::Allocator** allocator)
+{
+    if ((mMapper == NULL) && (mAllocator == NULL)) {
+        ALOGI("%s:: Allocator is created", __func__);
+        mMapper = new GrallocWrapper::Mapper();
+        mAllocator = new GrallocWrapper::Allocator(*mMapper);
+    }
+    *mapper = mMapper;
+    *allocator = mAllocator;
+}
+
+void ExynosDevice::clearGeometryChanged()
+{
+    mGeometryChanged = 0;
+}
+
+bool ExynosDevice::canSkipValidate()
+{
+    /*
+     * This should be called by presentDisplay()
+     * when presentDisplay() is called without validateDisplay() call
+     */
+
+    int ret = 0;
+    if (exynosHWCControl.skipValidate == false)
+        return false;
+
+    for (uint32_t i = 0; i < mDisplays.size(); i++) {
+        /*
+         * Check all displays.
+         * Resource assignment can have problem if validateDisplay is skipped
+         * on only some displays.
+         * All display's validateDisplay should be skipped or all display's validateDisplay
+         * should not be skipped.
+         */
+        if (mDisplays[i]->mPlugState) {
+            /*
+             * presentDisplay is called without validateDisplay.
+             * Call functions that should be called in validateDiplay
+             */
+            mDisplays[i]->doPreProcessing();
+            mDisplays[i]->checkLayerFps();
+
+            if ((ret = mDisplays[i]->canSkipValidate()) != NO_ERROR) {
+                HDEBUGLOGD(eDebugSkipValidate, "Display[%d] can't skip validate (%d), renderingState(%d), geometryChanged(0x%" PRIx64 ")",
+                        mDisplays[i]->mType, ret,
+                        mDisplays[i]->mRenderingState, mGeometryChanged);
+                return false;
+            } else {
+                HDEBUGLOGD(eDebugSkipValidate, "Display[%d] can skip validate (%d), renderingState(%d), geometryChanged(0x%" PRIx64 ")",
+                        mDisplays[i]->mType, ret,
+                        mDisplays[i]->mRenderingState, mGeometryChanged);
+            }
+        }
+    }
+    return true;
+}
+
+bool ExynosDevice::validateFences(ExynosDisplay *display) {
+
+    if (!validateFencePerFrame(display)) {
+        String8 errString;
+        errString.appendFormat("You should doubt fence leak!\n");
+        ALOGE("%s", errString.string());
+        saveFenceTrace(display);
+        return false;
+    }
+
+    if (fenceWarn(display, MAX_FENCE_THRESHOLD)) {
+        String8 errString;
+        errString.appendFormat("Fence leak!\n");
+        printLeakFds(display);
+        ALOGE("Fence leak! --");
+        saveFenceTrace(display);
+        return false;
+    }
+
+    if (exynosHWCControl.doFenceFileDump) {
+        ALOGE("Fence file dump !");
+        if (mFenceLogSize != 0)
+            ALOGE("Fence file not empty!");
+        saveFenceTrace(display);
+        exynosHWCControl.doFenceFileDump = false;
+    }
+
+    return true;
+}
+
+void ExynosDevice::compareVsyncPeriod() {
+
+    ExynosDisplay *primary_display = mDisplays[HWC_DISPLAY_PRIMARY];
+    ExynosDisplay *external_display = mDisplays[HWC_DISPLAY_EXTERNAL];
+
+    mVsyncDisplay = HWC_DISPLAY_PRIMARY;
+
+    if (external_display->mPowerModeState == HWC2_POWER_MODE_OFF) {
+        return;
+    } else if (primary_display->mPowerModeState == HWC2_POWER_MODE_OFF) {
+        mVsyncDisplay = HWC_DISPLAY_EXTERNAL;
+        return;
+    } else if (((primary_display->mPowerModeState == HWC2_POWER_MODE_DOZE) ||
+            (primary_display->mPowerModeState == HWC2_POWER_MODE_DOZE_SUSPEND)) &&
+            (external_display->mVsyncPeriod >= DOZE_VSYNC_PERIOD)) { /*30fps*/
+        mVsyncDisplay = HWC_DISPLAY_EXTERNAL;
+        return;
+    } else if (primary_display->mVsyncPeriod <= external_display->mVsyncPeriod) {
+        mVsyncDisplay = HWC_DISPLAY_EXTERNAL;
+        return;
+    }
+
+    return;
+}
+
+ExynosDevice::captureReadbackClass::captureReadbackClass(
+        ExynosDevice *device) :
+    mDevice(device)
+{
+    if (device == nullptr)
+        return;
+    mDevice->getAllocator(&mMapper, &mAllocator);
+}
+
+ExynosDevice::captureReadbackClass::~captureReadbackClass()
+{
+    if ((mBuffer != nullptr) && (mMapper != nullptr))
+        mMapper->freeBuffer(mBuffer);
+
+    if (mDevice != nullptr)
+        mDevice->clearWaitingReadbackReqDone();
+}
+
+
+int32_t ExynosDevice::captureReadbackClass::allocBuffer(
+        uint32_t format, uint32_t w, uint32_t h)
+{
+    if (mAllocator == nullptr) {
+        ALOGE("%s:: Failed to get allocator", __func__);
+        return -EINVAL;
+    }
+
+    uint32_t dstStride = 0;
+    GrallocWrapper::IMapper::BufferDescriptorInfo info = {};
+    info.width = w;
+    info.height = h;
+    info.layerCount = 1;
+    info.format = static_cast<GrallocWrapper::PixelFormat>(format);
+    info.usage = static_cast<uint64_t>(GRALLOC1_CONSUMER_USAGE_HWCOMPOSER |
+            GRALLOC1_CONSUMER_USAGE_CPU_READ_OFTEN);
+    GrallocWrapper::Error error = GrallocWrapper::Error::NONE;
+    error = mAllocator->allocate(info, &dstStride, &mBuffer);
+    if ((error != GrallocWrapper::Error::NONE) || (mBuffer == nullptr)) {
+        ALOGE("failed to allocate destination buffer(%dx%d): %d",
+                info.width, info.height, error);
+        return static_cast<int32_t>(error);
+    }
+    return NO_ERROR;
+}
+
+void  ExynosDevice::captureReadbackClass::saveToFile()
+{
+    if (mBuffer == nullptr) {
+        ALOGE("%s:: buffer is null", __func__);
+        return;
+    }
+
+    char filePath[MAX_DEV_NAME] = {0};
+    time_t curTime = time(NULL);
+    struct tm *tm = localtime(&curTime);
+    private_handle_t *hnd = private_handle_t::dynamicCast(mBuffer);
+    snprintf(filePath, MAX_DEV_NAME,
+            "%s/capture_format%d_%dx%d_%04d-%02d-%02d_%02d_%02d_%02d.raw",
+            WRITEBACK_CAPTURE_PATH, hnd->format, hnd->stride, hnd->vstride,
+            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
+            tm->tm_hour, tm->tm_min, tm->tm_sec);
+    FILE *fp = fopen(filePath, "w");
+    if (fp) {
+        uint32_t writeSize =
+            hnd->stride * hnd->vstride * formatToBpp(hnd->format)/8;
+        void *writebackData = mmap(0, writeSize,
+                PROT_READ|PROT_WRITE, MAP_SHARED, hnd->fd, 0);
+        if (writebackData != MAP_FAILED && writebackData != NULL) {
+            size_t result = fwrite(writebackData, writeSize, 1, fp);
+            munmap(writebackData, writeSize);
+            ALOGD("Success to write %zu data, size(%d)", result, writeSize);
+        } else {
+            ALOGE("Fail to mmap");
+        }
+    } else {
+        ALOGE("Fail to open %s", filePath);
+    }
+}
+
+void ExynosDevice::signalReadbackDone()
+{
+    if (mIsWaitingReadbackReqDone) {
+        Mutex::Autolock lock(mCaptureMutex);
+        mCaptureCondition.signal();
+    }
+}
+
+void ExynosDevice::captureScreenWithReadback(uint32_t displayType)
+{
+    ExynosDisplay *display = getDisplay(displayType);
+    if (display == nullptr) {
+        ALOGE("There is no display(%d)", displayType);
+        return;
+    }
+
+    int32_t outFormat;
+    int32_t outDataspace;
+    int32_t ret = 0;
+    if ((ret = display->getReadbackBufferAttributes(
+                &outFormat, &outDataspace)) != HWC2_ERROR_NONE) {
+        ALOGE("getReadbackBufferAttributes fail, ret(%d)", ret);
+        return;
+    }
+
+    captureReadbackClass captureClass(this);
+    if ((ret = captureClass.allocBuffer(outFormat, display->mXres, display->mYres))
+            != NO_ERROR) {
+        return;
+    }
+
+    mIsWaitingReadbackReqDone = true;
+
+    if (display->setReadbackBuffer(captureClass.getBuffer(), -1) != HWC2_ERROR_NONE) {
+        ALOGE("setReadbackBuffer fail");
+        return;
+    }
+
+    /* Update screen */
+    invalidate();
+
+    /* Wait for handling readback */
+    uint32_t waitPeriod = display->mVsyncPeriod * 3;
+    {
+        Mutex::Autolock lock(mCaptureMutex);
+        status_t err = mCaptureCondition.waitRelative(
+                mCaptureMutex, us2ns(waitPeriod));
+        if (err == TIMED_OUT) {
+            ALOGE("timeout, readback is not requested");
+            return;
+        } else if (err != NO_ERROR) {
+            ALOGE("error waiting for readback request: %s (%d)", strerror(-err), err);
+            return;
+        } else {
+            ALOGD("readback request is done");
+        }
+    }
+
+    int32_t fence = -1;
+    if (display->getReadbackBufferFence(&fence) != HWC2_ERROR_NONE) {
+        ALOGE("getReadbackBufferFence fail");
+        return;
+    }
+    if (sync_wait(fence, 1000) < 0) {
+        ALOGE("sync wait error, fence(%d)", fence);
+    }
+    hwcFdClose(fence);
+
+    captureClass.saveToFile();
+}
+
+int32_t ExynosDevice::setDisplayDeviceMode(int32_t display_id, int32_t mode)
+{
+    int32_t ret = HWC2_ERROR_NONE;
+
+    if (display_id == HWC_DISPLAY_PRIMARY) {
+        if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::PAUSE) ||
+            mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME)) {
+            ret = mDisplays[display_id]->setPowerMode(mode);
+            if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME) && ret == HWC2_ERROR_NONE) {
+                invalidate();
+            }
+            return ret;
+        } else {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+    } else {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+}
