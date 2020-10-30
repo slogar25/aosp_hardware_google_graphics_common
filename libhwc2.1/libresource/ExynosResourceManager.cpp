@@ -2137,6 +2137,37 @@ void ExynosResourceManager::enableMPP(uint32_t physicalType, uint32_t physicalIn
     }
 }
 
+void ExynosResourceManager::setScaleDownRatio(uint32_t physicalType,
+        uint32_t physicalIndex, uint32_t logicalIndex, uint32_t scaleDownRatio)
+{
+    ExynosMPP *findMpp = nullptr;
+
+    auto mpp_compare = [=](ExynosMPP *mpp)->bool {
+        return ((mpp->mPhysicalType == physicalType) &&
+                (mpp->mPhysicalIndex == physicalIndex) &&
+                (mpp->mLogicalIndex == logicalIndex));
+    };
+
+    auto otfMPP = std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
+            mpp_compare);
+    if (otfMPP != mOtfMPPs.end()) {
+        findMpp = *otfMPP;
+    } else {
+        auto m2mMPP = std::find_if(mM2mMPPs.begin(), mM2mMPPs.end(),
+                mpp_compare);
+        findMpp = m2mMPP == mM2mMPPs.end() ? nullptr : *m2mMPP;
+    }
+
+    if (findMpp == nullptr) {
+        ALOGE("%s:: Invalid mpp (type: %d, index: %d, %d)",
+                __func__, physicalType, physicalIndex, logicalIndex);
+        return;
+    }
+    for (uint32_t i = RESTRICTION_RGB; i < RESTRICTION_MAX; i++) {
+        findMpp->mDstSizeRestrictions[i].maxDownScale = scaleDownRatio;
+    }
+}
+
 int32_t  ExynosResourceManager::prepareResources()
 {
     int ret = NO_ERROR;

@@ -54,6 +54,8 @@ public:
     virtual int getExternalHdrCapabilities() = 0;
     virtual void setBootFinished(void) = 0;
     virtual void enableMPP(uint32_t physicalType, uint32_t physicalIndex, uint32_t logicalIndex, uint32_t enable) = 0;
+    virtual void setScaleDownRatio(uint32_t physicalType, uint32_t physicalIndex,
+            uint32_t logicalIndex, uint32_t scaleDownRatio) = 0;
     virtual void setHWCDebug(int debug) = 0;
     virtual uint32_t getHWCDebug() = 0;
     virtual void setHWCFenceDebug(uint32_t ipNum, uint32_t fenceNum, uint32_t mode) = 0;

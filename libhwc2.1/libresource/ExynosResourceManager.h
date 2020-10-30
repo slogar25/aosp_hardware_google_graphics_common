@@ -127,6 +127,9 @@ class ExynosResourceManager {
         static ExynosMPP* getExynosMPP(uint32_t type);
         static ExynosMPP* getExynosMPP(uint32_t physicalType, uint32_t physicalIndex);
         static void enableMPP(uint32_t physicalType, uint32_t physicalIndex, uint32_t logicalIndex, uint32_t enable);
+        static void setScaleDownRatio(uint32_t physicalType,
+                uint32_t physicalIndex, uint32_t logicalIndex,
+                uint32_t scaleDownRatio);
         int32_t updateSupportedMPPFlag(ExynosDisplay * display);
         int32_t resetResources();
         int32_t preAssignResources();

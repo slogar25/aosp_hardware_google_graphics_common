@@ -57,6 +57,8 @@ public:
     void setBootFinishedCallback(void (*callback)(ExynosHWCCtx *));
     virtual void setBootFinished(void);
     virtual void enableMPP(uint32_t physicalType, uint32_t physicalIndex, uint32_t logicalIndex, uint32_t enable);
+    virtual void setScaleDownRatio(uint32_t physicalType, uint32_t physicalIndex,
+            uint32_t logicalIndex, uint32_t scaleDownRatio);
     virtual void setHWCDebug(int debug);
     virtual uint32_t getHWCDebug();
     virtual void setHWCFenceDebug(uint32_t ipNum, uint32_t fenceNum, uint32_t mode);

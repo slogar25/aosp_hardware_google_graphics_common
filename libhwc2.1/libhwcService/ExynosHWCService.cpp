@@ -246,6 +246,16 @@ void ExynosHWCService::enableMPP(uint32_t physicalType, uint32_t physicalIndex, 
     mHWCCtx->device->invalidate();
 }
 
+void ExynosHWCService::setScaleDownRatio(uint32_t physicalType,
+        uint32_t physicalIndex, uint32_t logicalIndex, uint32_t scaleDownRatio)
+{
+    ALOGD("%s:: type(%d), index(%d, %d), scaleDownRatio(%d)",
+            __func__, physicalType, physicalIndex, logicalIndex, scaleDownRatio);
+    ExynosResourceManager::setScaleDownRatio(physicalType, physicalIndex, logicalIndex, scaleDownRatio);
+    mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+    mHWCCtx->device->invalidate();
+}
+
 void ExynosHWCService::setHWCDebug(int debug)
 {
     ALOGD_IF(HWC_SERVICE_DEBUG, "%s, debug %d", __func__, debug);

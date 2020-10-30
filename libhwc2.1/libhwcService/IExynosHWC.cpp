@@ -49,6 +49,7 @@ enum {
     SET_EXTERNAL_VSYNC,
     SET_DDISCALER,
     GET_EXTERNAL_HDR_CAPA,
+    SET_SCALE_DOWN_RATIO,
 #if 0
     NOTIFY_PSR_EXIT,
 #endif
@@ -278,6 +279,20 @@ public:
             ALOGE("ENABLE_MPP transact error(%d)", result);
     }
 
+    virtual void setScaleDownRatio(uint32_t physicalType, uint32_t physicalIndex,
+            uint32_t logicalIndex, uint32_t scaleDownRatio)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(physicalType);
+        data.writeInt32(physicalIndex);
+        data.writeInt32(logicalIndex);
+        data.writeInt32(scaleDownRatio);
+        int result = remote()->transact(SET_SCALE_DOWN_RATIO, data, &reply);
+        if (result != NO_ERROR)
+            ALOGE("SET_SCALE_DOWN_RATIO transact error(%d)", result);
+    }
+
     virtual void setHWCDebug(int debug)
     {
         Parcel data, reply;
@@ -495,6 +510,15 @@ status_t BnExynosHWCService::onTransact(
             uint32_t logicalIdx = data.readInt32();
             uint32_t enable = data.readInt32();
             enableMPP(type, physicalIdx, logicalIdx, enable);
+            return NO_ERROR;
+        } break;
+        case SET_SCALE_DOWN_RATIO: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t type = data.readInt32();
+            uint32_t physicalIdx = data.readInt32();
+            uint32_t logicalIdx = data.readInt32();
+            uint32_t scaleDownRatio = data.readInt32();
+            setScaleDownRatio(type, physicalIdx, logicalIdx, scaleDownRatio);
             return NO_ERROR;
         } break;
         case SET_HWC_DEBUG: {
