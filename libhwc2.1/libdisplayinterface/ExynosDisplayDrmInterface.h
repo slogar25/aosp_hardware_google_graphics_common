@@ -93,11 +93,17 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         };
         class ExynosVsyncCallback: public VsyncCallback {
             public:
+                void enableVSync(bool enable) { mVsyncEnabled = enable; };
+                uint64_t getVsyncTimeStamp() { return mVsyncTimeStamp; };
+                uint64_t getVsyncPeriod() { return mVsyncPeriod; };
                 void Callback(int display, int64_t timestamp) override;
                 void init(ExynosDevice *exynosDevice, ExynosDisplay *exynosDisplay);
             private:
                 ExynosDevice *mExynosDevice;
                 ExynosDisplay *mExynosDisplay;
+                bool mVsyncEnabled = false;
+                uint64_t mVsyncTimeStamp = 0;
+                uint64_t mVsyncPeriod = 0;
         };
         ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay);
         ~ExynosDisplayDrmInterface();
@@ -225,7 +231,7 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         DrmCrtc *mDrmCrtc;
         DrmConnector *mDrmConnector;
         VSyncWorker mDrmVSyncWorker;
-        ExynosVsyncCallback mVsyncCallbak;
+        ExynosVsyncCallback mVsyncCallback;
         ModeState mModeState;
         PartialRegionState mPartialRegionState;
         /* Mapping plane id to ExynosMPP, key is plane id */

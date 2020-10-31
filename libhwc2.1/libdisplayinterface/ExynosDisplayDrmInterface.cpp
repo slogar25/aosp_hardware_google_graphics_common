@@ -206,9 +206,11 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     mOldFbIds.assign(getMaxWindowNum(), 0);
 
-    mVsyncCallbak.init(mExynosDisplay->mDevice, mExynosDisplay);
+    mVsyncCallback.init(mExynosDisplay->mDevice, mExynosDisplay);
     mDrmVSyncWorker.Init(mDrmDevice, mExynosDisplay->mDisplayId);
-    mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(&mVsyncCallbak));
+    mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(&mVsyncCallback));
+    /* Always get vsync timestamp */
+    mDrmVSyncWorker.VSyncControl(true);
 
     if (!mDrmDevice->planes().empty()) {
         auto &plane = mDrmDevice->planes().front();
@@ -233,9 +235,12 @@ void ExynosDisplayDrmInterface::ExynosVsyncCallback::init(
 void ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
         int display, int64_t timestamp)
 {
+    mVsyncPeriod = timestamp - mVsyncTimeStamp;
+    mVsyncTimeStamp = timestamp;
+
     if ((mExynosDevice == nullptr) || (mExynosDisplay == nullptr))
         return;
-    if (mExynosDisplay->mVsyncState != HWC2_VSYNC_ENABLE)
+    if (!mVsyncEnabled)
         return;
 
     mExynosDevice->compareVsyncPeriod();
@@ -320,7 +325,7 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
 
 int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
 {
-    mDrmVSyncWorker.VSyncControl(HWC2_VSYNC_ENABLE == enabled);
+    mVsyncCallback.enableVSync(HWC2_VSYNC_ENABLE == enabled);
     return NO_ERROR;
 }
 
