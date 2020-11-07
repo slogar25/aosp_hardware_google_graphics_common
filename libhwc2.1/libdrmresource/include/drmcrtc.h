@@ -57,6 +57,7 @@ class DrmCrtc {
   const DrmProperty &force_bpc_property() const;
   const DrmProperty &disp_dither_property() const;
   const DrmProperty &cgc_dither_property() const;
+  DrmProperty &adjusted_vblank_property();
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -85,6 +86,7 @@ class DrmCrtc {
   DrmProperty force_bpc_property_;
   DrmProperty disp_dither_property_;
   DrmProperty cgc_dither_property_;
+  DrmProperty adjusted_vblank_property_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android

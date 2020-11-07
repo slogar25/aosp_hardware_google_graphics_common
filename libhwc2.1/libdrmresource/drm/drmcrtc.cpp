@@ -72,6 +72,8 @@ int DrmCrtc::Init() {
     ALOGI("Failed to get &disp_dither property");
   if (drm_->GetCrtcProperty(*this, "cgc_dither", &cgc_dither_property_))
     ALOGI("Failed to get &cgc_dither property");
+  if (drm_->GetCrtcProperty(*this, "adjusted_vblank", &adjusted_vblank_property_))
+    ALOGI("Failed to get &adjusted_vblank property");
 
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
@@ -87,6 +89,7 @@ int DrmCrtc::Init() {
   properties_.push_back(&force_bpc_property_);
   properties_.push_back(&disp_dither_property_);
   properties_.push_back(&cgc_dither_property_);
+  properties_.push_back(&adjusted_vblank_property_);
 
   return 0;
 }
@@ -165,6 +168,10 @@ const DrmProperty &DrmCrtc::disp_dither_property() const {
 
 const DrmProperty &DrmCrtc::cgc_dither_property() const {
     return cgc_dither_property_;
+}
+
+DrmProperty &DrmCrtc::adjusted_vblank_property() {
+    return adjusted_vblank_property_;
 }
 
 }  // namespace android
