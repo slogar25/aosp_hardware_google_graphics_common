@@ -66,6 +66,12 @@ int DrmCrtc::Init() {
     ALOGI("Failed to get &linear_matrix property");
   if (drm_->GetCrtcProperty(*this, "gamma_matrix", &gamma_matrix_property_))
     ALOGI("Failed to get &gamma_matrix property");
+  if (drm_->GetCrtcProperty(*this, "force_bpc", &force_bpc_property_))
+    ALOGI("Failed to get &force_bpc_property_");
+  if (drm_->GetCrtcProperty(*this, "disp_dither", &disp_dither_property_))
+    ALOGI("Failed to get &disp_dither property");
+  if (drm_->GetCrtcProperty(*this, "cgc_dither", &cgc_dither_property_))
+    ALOGI("Failed to get &cgc_dither property");
 
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
@@ -78,6 +84,9 @@ int DrmCrtc::Init() {
   properties_.push_back(&linear_matrix_property_);
   properties_.push_back(&gamma_matrix_property_);
   properties_.push_back(&partial_region_property_);
+  properties_.push_back(&force_bpc_property_);
+  properties_.push_back(&disp_dither_property_);
+  properties_.push_back(&cgc_dither_property_);
 
   return 0;
 }
@@ -144,6 +153,18 @@ const DrmProperty &DrmCrtc::gamma_matrix_property() const {
 
 const DrmProperty &DrmCrtc::partial_region_property() const {
     return partial_region_property_;
+}
+
+const DrmProperty &DrmCrtc::force_bpc_property() const {
+    return force_bpc_property_;
+}
+
+const DrmProperty &DrmCrtc::disp_dither_property() const {
+    return disp_dither_property_;
+}
+
+const DrmProperty &DrmCrtc::cgc_dither_property() const {
+    return cgc_dither_property_;
 }
 
 }  // namespace android
