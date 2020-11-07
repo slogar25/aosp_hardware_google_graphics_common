@@ -69,6 +69,7 @@ class DrmDevice {
                       DrmProperty *property);
   int GetConnectorProperty(const DrmConnector &connector, const char *prop_name,
                            DrmProperty *property);
+  int UpdateCrtcProperty(const DrmCrtc &crtc, DrmProperty *property);
 
   const std::vector<std::unique_ptr<DrmCrtc>> &crtcs() const;
   uint32_t next_mode_id();

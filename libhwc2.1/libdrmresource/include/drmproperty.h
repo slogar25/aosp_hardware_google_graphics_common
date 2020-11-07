@@ -54,6 +54,7 @@ class DrmProperty {
   std::tuple<int, uint64_t> range_min() const;
   std::tuple<int, uint64_t> range_max() const;
 
+  void UpdateValue(const uint64_t value);
   void printProperty() const;
 
  private:

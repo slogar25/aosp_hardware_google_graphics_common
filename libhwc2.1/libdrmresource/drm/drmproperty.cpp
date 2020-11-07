@@ -154,4 +154,8 @@ std::tuple<uint64_t, int> DrmProperty::GetEnumValueWithName(
 
   return std::make_tuple(UINT64_MAX, -EINVAL);
 }
+
+void DrmProperty::UpdateValue(uint64_t value) {
+  value_ = value;
+}
 }  // namespace android

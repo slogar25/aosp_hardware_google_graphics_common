@@ -441,8 +441,27 @@ int32_t ExynosDisplayDrmInterface::getConfigChangeDuration()
 int32_t ExynosDisplayDrmInterface::getVsyncAppliedTime(
         hwc2_config_t config, int64_t* actualChangeTime)
 {
-    *actualChangeTime = mVsyncCallback.getVsyncTimeStamp() +
-        (mExynosDisplay->mVsyncPeriod) * getConfigChangeDuration();
+    if (mDrmCrtc->adjusted_vblank_property().id() == 0) {
+        *actualChangeTime = mVsyncCallback.getVsyncTimeStamp() +
+            (mExynosDisplay->mVsyncPeriod) * getConfigChangeDuration();
+        return HWC2_ERROR_NONE;
+    }
+
+    int ret = 0;
+    if ((ret = mDrmDevice->UpdateCrtcProperty(*mDrmCrtc,
+            &mDrmCrtc->adjusted_vblank_property())) != 0) {
+        HWC_LOGE(mExynosDisplay, "Failed to update vblank property");
+        return ret;
+    }
+
+    uint64_t timestamp;
+    std::tie(ret, timestamp) = mDrmCrtc->adjusted_vblank_property().value();
+    if (ret < 0) {
+        HWC_LOGE(mExynosDisplay, "Failed to get vblank property");
+        return ret;
+    }
+
+    *actualChangeTime = static_cast<int64_t>(timestamp);
     return HWC2_ERROR_NONE;
 }
 

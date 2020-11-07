@@ -490,4 +490,24 @@ int DrmDevice::GetConnectorProperty(const DrmConnector &connector,
   return GetProperty(connector.id(), DRM_MODE_OBJECT_CONNECTOR, prop_name,
                      property);
 }
+
+int DrmDevice::UpdateCrtcProperty(const DrmCrtc &crtc, DrmProperty *property) {
+    drmModeObjectPropertiesPtr props;
+    props = drmModeObjectGetProperties(fd(), crtc.id(), DRM_MODE_OBJECT_CRTC);
+    if (!props) {
+        ALOGE("Failed to get properties for crtc %s", property->name().c_str());
+        return -ENODEV;
+    }
+    bool found = false;
+    for (int i = 0; !found && (size_t)i < props->count_props; ++i) {
+        drmModePropertyPtr p = drmModeGetProperty(fd(), props->props[i]);
+        if (props->props[i] == property->id()) {
+            property->UpdateValue(props->prop_values[i]);
+            found = true;
+        }
+        drmModeFreeProperty(p);
+    }
+    drmModeFreeObjectProperties(props);
+    return found ? 0 : -ENOENT;
+}
 }  // namespace android
