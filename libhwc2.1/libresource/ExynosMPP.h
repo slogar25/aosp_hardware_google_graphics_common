@@ -92,7 +92,7 @@ class Allocator;
 #endif
 
 #ifndef VPP_CLOCK
-#define VPP_CLOCK       400000000
+#define VPP_CLOCK       666000000
 #endif
 #ifndef VPP_MIC_FACTOR
 #define VPP_MIC_FACTOR  2
