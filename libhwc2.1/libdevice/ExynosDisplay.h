@@ -311,12 +311,20 @@ typedef struct brightnessState {
             bool boost_brightness;
         };
     };
-    void reset() { mData = {false, false, false}; }
+    float dim_sdr_ratio;
+    void reset() {
+        mData = {false, false, false};
+        dim_sdr_ratio = 1.0;
+    }
     brightnessState& operator=(const brightnessState& a) {
         mData = a.mData;
+        dim_sdr_ratio = a.dim_sdr_ratio;
         return *this;
     }
-    bool operator==(const brightnessState& a) const { return a.mData == mData; }
+    bool operator==(const brightnessState& a) const {
+        return a.mData == mData &&
+            a.dim_sdr_ratio != dim_sdr_ratio;
+    }
 } brightnessState_t;
 
 class ExynosDisplay {

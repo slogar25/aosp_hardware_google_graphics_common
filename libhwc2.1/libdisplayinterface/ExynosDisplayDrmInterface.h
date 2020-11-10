@@ -169,6 +169,7 @@ class ExynosDisplayDrmInterface :
                 const exynos_win_config_data& config)
         { return NO_ERROR;};
         virtual int32_t updateBrightness();
+        virtual float getSdrDimRatio();
 
     protected:
         struct ModeState {
@@ -213,7 +214,6 @@ class ExynosDisplayDrmInterface :
                 uint32_t &fbId);
 
         int32_t setupPartialRegion(DrmModeAtomicReq &drmReq);
-
         static void parseEnums(const DrmProperty& property,
                 const std::vector<std::pair<uint32_t, const char *>> &enums,
                 DrmPropertyMap &out_enums);

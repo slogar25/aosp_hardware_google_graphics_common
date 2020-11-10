@@ -3513,6 +3513,8 @@ int32_t ExynosDisplay::validateDisplay(
         mDisplayInterface->setForcePanic();
     }
 
+    updateBrightnessState();
+
     if ((ret = updateColorConversionInfo()) != NO_ERROR) {
         validateError = true;
         DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
@@ -4795,12 +4797,40 @@ void ExynosDisplay::traceLayerTypes() {
 }
 
 void ExynosDisplay::updateBrightnessState() {
+    static constexpr float kMaxCll = 10000.0;
+    bool client_rgb_hdr = false;
+
     mBrightnessState.reset();
     for (size_t i = 0; i < mLayers.size(); i++) {
-        if (mLayers[i]->mIsHdrLayer && mLayers[i]->isLayerFormatYuv() &&
-            (mLayers[i]->getDisplayFrameArea() > mYuvHdrHbmThresholdArea)) {
-            mBrightnessState.boost_brightness = true;
-            break;
+        if (mLayers[i]->mIsHdrLayer) {
+            if (mLayers[i]->isLayerFormatRgb()) {
+                auto meta = mLayers[i]->getMetaParcel();
+                if ((meta != nullptr) && (meta->eType & VIDEO_INFO_TYPE_HDR_STATIC) &&
+                    meta->sHdrStaticInfo.sType1.mMaxContentLightLevel >= kMaxCll) {
+                    // if there are one or more such layers and any one of them
+                    // is composed by GPU, we won't dim sdr layers
+                    if (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT) {
+                        client_rgb_hdr = true;
+                    }
+                    mBrightnessState.peak_hbm = true;
+                    mBrightnessState.instant_hbm = true;
+                }
+            } else if (mLayers[i]->getDisplayFrameArea() > mYuvHdrHbmThresholdArea) {
+                mBrightnessState.boost_brightness = true;
+            }
         }
     }
+
+    if (mBrightnessState.instant_hbm && !client_rgb_hdr) {
+        // SDR dim ratio = display_nit_current / display_nit_after_hbm_on
+        // mDisplayInterface has the panel caps to calculate current nits.
+        float dim_sdr_ratio = mDisplayInterface->getSdrDimRatio();
+
+        char value[PROPERTY_VALUE_MAX];
+        const float ratio = property_get("debug.hwc.dim_sdr", value, nullptr) > 0 ?
+                                  std::atof(value) : dim_sdr_ratio;
+
+        mBrightnessState.dim_sdr_ratio = ratio;
+    }
+    ATRACE_INT("GHBM", mBrightnessState.dim_sdr_ratio != 1.0);
 }

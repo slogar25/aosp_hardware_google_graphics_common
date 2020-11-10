@@ -1823,6 +1823,40 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     return;
 }
 
+float ExynosDisplayDrmInterface::getSdrDimRatio()
+{
+    float sdr_nits = 0;
+    auto sz = BrightnessRange::MAX;
+    if (sz == 0) {
+        ALOGW("%s: no brightness table", __func__);
+        return 1.0;
+    }
+
+    //TODO: keep in normal brightness range before DisplayManager HBM impl ready
+    auto brightness = mExynosDisplay->getBrightnessValue() *
+                       mBrightnessTable[BrightnessRange::NORMAL].mBriEnd;
+
+    if (mBrightnessTable[sz - 1].mBriEnd < brightness) {
+        ALOGE("%s: invalid brightness table, max brightness(float) %f", __func__,
+              mBrightnessTable[sz - 1].mBriEnd);
+        return 1.0;
+    }
+
+    for (int i = 0; i < sz; i++) {
+        if (brightness <= mBrightnessTable[i].mBriEnd) {
+            sdr_nits =
+                    (brightness - mBrightnessTable[i].mBriStart) /
+                            (mBrightnessTable[i].mBriEnd - mBrightnessTable[i].mBriStart) *
+                            (mBrightnessTable[i].mNitsEnd - mBrightnessTable[i].mNitsStart) +
+                    mBrightnessTable[i].mNitsStart;
+            break;
+        }
+    }
+
+    float peak = mBrightnessTable[sz - 1].mNitsEnd;
+    return sdr_nits/peak;
+}
+
 int32_t ExynosDisplayDrmInterface::updateBrightness() {
     if (!mBrightntessIntfSupported) return HWC2_ERROR_UNSUPPORTED;
 
