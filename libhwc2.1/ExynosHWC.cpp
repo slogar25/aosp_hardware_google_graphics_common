@@ -1228,9 +1228,11 @@ int32_t exynos_SetLayerGenericMetadata(hwc2_device_t* dev, hwc2_display_t displa
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, display);
         if (exynosDisplay) {
             ExynosLayer *exynosLayer = checkLayer(exynosDisplay, layer);
-            if (exynosLayer)
-                return exynosLayer->setLayerGenericMetadata(layer,
-                        keyLength, key, mandatory, valueLength, value);
+            if (exynosLayer == nullptr)
+                return HWC2_ERROR_BAD_LAYER;
+
+            return exynosLayer->setLayerGenericMetadata(layer,
+                    keyLength, key, mandatory, valueLength, value);
         }
     }
 
