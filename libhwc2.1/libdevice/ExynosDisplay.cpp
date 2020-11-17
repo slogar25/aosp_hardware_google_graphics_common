@@ -3153,6 +3153,8 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
             mVsyncPeriodChangeConstraints.desiredTimeNanos,
             outTimeline->newVsyncAppliedTimeNanos);
 
+    /* mActiveConfig should be changed immediately for internal status */
+    mActiveConfig = config;
     mVsyncAppliedTimeLine = *outTimeline;
 
     return HWC2_ERROR_NONE;
