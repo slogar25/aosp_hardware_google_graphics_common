@@ -1128,7 +1128,8 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
 
 bool ExynosMPP::canUsePrevFrame()
 {
-    if (exynosHWCControl.skipM2mProcessing == false)
+    if ((mAssignedDisplay && !mAssignedDisplay->mDisplayControl.skipM2mProcessing) ||
+        !exynosHWCControl.skipM2mProcessing)
         return false;
 
     /* virtual display always require composition */
