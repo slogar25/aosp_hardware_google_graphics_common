@@ -70,6 +70,7 @@ class DrmConnector {
   const DrmProperty &max_avg_luminance() const;
   const DrmProperty &min_luminance() const;
   const DrmProperty &hdr_formats() const;
+  const DrmProperty &lp_mode() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -117,6 +118,7 @@ class DrmConnector {
   DrmProperty max_avg_luminance_;
   DrmProperty min_luminance_;
   DrmProperty hdr_formats_;
+  DrmProperty lp_mode_;
   std::vector<DrmProperty *> properties_;
 
   std::vector<DrmEncoder *> possible_encoders_;

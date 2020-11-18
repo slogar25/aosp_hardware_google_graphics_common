@@ -27,6 +27,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         ~ExynosPrimaryDisplay();
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
+        virtual int32_t setActiveConfig(hwc2_config_t config) override;
+        virtual int32_t getActiveConfig(hwc2_config_t* outConfig) override;
 
         virtual void initDisplayInterface(uint32_t interfaceType);
     protected:
@@ -38,11 +40,18 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
          * Returns HWC2_ERROR_NONE or the following error:
          *   HWC2_ERROR_UNSUPPORTED when DOZE mode not support
          */
-        virtual int32_t setPowerMode(int32_t mode);
+        virtual int32_t setPowerMode(int32_t mode) override;
         virtual bool getHDRException(ExynosLayer* __unused layer);
     public:
         // Prepare multi resolution
         ResolutionInfo mResolutionInfo;
+
+    private:
+        int32_t applyPendingConfig();
+        int32_t setPowerOn();
+        int32_t setPowerOff();
+        int32_t setPowerDoze();
+        hwc2_config_t mPendActiveConfig = UINT_MAX;
 };
 
 #endif

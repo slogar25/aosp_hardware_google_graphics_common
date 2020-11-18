@@ -103,6 +103,10 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         ~ExynosDisplayDrmInterface();
         virtual void init(ExynosDisplay *exynosDisplay);
         virtual int32_t setPowerMode(int32_t mode);
+        virtual int32_t setLowPowerMode() override;
+        virtual bool isDozeModeAvailable() const {
+            return mDozeDrmMode.h_display() > 0 && mDozeDrmMode.v_display() > 0;
+        };
         virtual int32_t setVsyncEnabled(uint32_t enabled);
         virtual int32_t getDisplayAttribute(
                 hwc2_config_t config,
@@ -168,6 +172,11 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         void parseRangeEnums(const DrmProperty& property);
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
+
+    private:
+        int32_t getLowPowerDrmModeModeInfo();
+        int32_t setActiveDrmMode(DrmMode const &mode);
+
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -233,6 +242,9 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
         DrmPropertyMap mRangeEnums;
 
         DrmReadbackInfo mReadbackInfo;
+
+    private:
+        DrmMode mDozeDrmMode;
 };
 
 #endif
