@@ -1501,6 +1501,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     } else {
         *outDataSize = blob->length;
     }
+    drmModeFreePropertyBlob(blob);
     *outPort = mDrmConnector->id();
 
     return HWC2_ERROR_NONE;
