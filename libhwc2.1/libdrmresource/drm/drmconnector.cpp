@@ -107,6 +107,11 @@ int DrmConnector::Init() {
     ALOGE("Could not get hdr_formats property\n");
   }
 
+  ret = drm_->GetConnectorProperty(*this, "lp_mode", &lp_mode_);
+  if (ret) {
+      ALOGE("Could not get lp_mode property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   properties_.push_back(&edid_property_);
@@ -119,6 +124,7 @@ int DrmConnector::Init() {
   properties_.push_back(&max_avg_luminance_);
   properties_.push_back(&min_luminance_);
   properties_.push_back(&hdr_formats_);
+  properties_.push_back(&lp_mode_);
 
   return 0;
 }
@@ -263,6 +269,10 @@ const DrmProperty &DrmConnector::min_luminance() const {
 
 const DrmProperty &DrmConnector::hdr_formats() const {
   return hdr_formats_;
+}
+
+const DrmProperty &DrmConnector::lp_mode() const {
+    return lp_mode_;
 }
 
 DrmEncoder *DrmConnector::encoder() const {

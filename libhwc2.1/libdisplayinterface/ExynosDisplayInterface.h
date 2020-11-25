@@ -33,6 +33,8 @@ class ExynosDisplayInterface {
         virtual ~ExynosDisplayInterface();
         virtual void init(ExynosDisplay* __unused exynosDisplay) {};
         virtual int32_t setPowerMode(int32_t __unused mode) {return NO_ERROR;};
+        virtual int32_t setLowPowerMode() { return HWC2_ERROR_UNSUPPORTED; };
+        virtual bool isDozeModeAvailable() const { return false; };
         virtual int32_t setVsyncEnabled(uint32_t __unused enabled) {return NO_ERROR;};
         virtual int32_t getDisplayAttribute(
                 hwc2_config_t __unused config,

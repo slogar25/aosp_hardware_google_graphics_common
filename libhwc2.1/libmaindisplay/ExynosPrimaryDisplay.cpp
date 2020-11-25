@@ -118,85 +118,136 @@ int ExynosPrimaryDisplay::getDDIScalerMode(int width, int height) {
     return 1; // WQHD
 }
 
-int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
-    Mutex::Autolock lock(mDisplayMutex);
-
-    if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::PAUSE)) {
-        mPauseDisplay = true;
-        /**
-         * TODO(b/165712292): This is a temp fix.
-         *
-         * There is no power state check in common path.
-         * Repeated RESUME or HWC2_POWER_MODE_ON mode set triggers device reset.
-         * Add state check in PAUSE/RESUME path to fix repeated mode set issue
-         * triggered by factory or desense tool.
-         * Should add generic state check in common path later.
-         */
-        if (mPowerModeState == HWC2_POWER_MODE_OFF) {
-            ALOGD("Skip PAUSE mode set due to no power mode change");
-            return HWC2_ERROR_NONE;
-        }
-        mode = HWC2_POWER_MODE_OFF;
-    } else if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME)) {
-        mPauseDisplay = false;
-        if (mPowerModeState == HWC2_POWER_MODE_ON) {
-            ALOGD("Skip RESUME mode set due to no power mode change");
-            return HWC2_ERROR_NONE;
-        }
-        mode = HWC2_POWER_MODE_ON;
+int32_t ExynosPrimaryDisplay::getActiveConfig(hwc2_config_t *outConfig) {
+    if (outConfig && mPendActiveConfig != UINT_MAX) {
+        *outConfig = mPendActiveConfig;
+        return HWC2_ERROR_NONE;
     }
+    return ExynosDisplay::getActiveConfig(outConfig);
+}
 
-#ifndef USES_DOZEMODE
-    if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND))
-        return HWC2_ERROR_UNSUPPORTED;
-#endif
+int32_t ExynosPrimaryDisplay::setActiveConfig(hwc2_config_t config) {
+    hwc2_config_t cur_config;
 
-    /* TODO state check routine should be added */
-    int fb_blank = -1;
+    getActiveConfig(&cur_config);
+    if (cur_config == config) {
+        ALOGI("%s:: Same display config is set", __func__);
+        return HWC2_ERROR_NONE;
+    }
+    if (mPowerModeState != HWC2_POWER_MODE_ON) {
+        mPendActiveConfig = config;
+        return HWC2_ERROR_NONE;
+    }
+    return ExynosDisplay::setActiveConfig(config);
+}
 
-    if (mode == HWC_POWER_MODE_DOZE ||
-        mode == HWC_POWER_MODE_DOZE_SUSPEND) {
-        if (mPowerModeState != HWC_POWER_MODE_DOZE &&
-            mPowerModeState != HWC_POWER_MODE_OFF &&
-            mPowerModeState != HWC_POWER_MODE_DOZE_SUSPEND) {
-            fb_blank = FB_BLANK_POWERDOWN;
-            clearDisplay();
-        } else {
-            ALOGE("DOZE or Power off called twice, mPowerModeState : %d", mPowerModeState);
-        }
-    } else if (mode == HWC_POWER_MODE_OFF) {
-        fb_blank = FB_BLANK_POWERDOWN;
-        clearDisplay();
-        ALOGV("HWC2: Clear display (power off)");
+int32_t ExynosPrimaryDisplay::applyPendingConfig() {
+    hwc2_config_t config;
+
+    if (mPendActiveConfig != UINT_MAX) {
+        config = mPendActiveConfig;
+        mPendActiveConfig = UINT_MAX;
     } else {
-        fb_blank = FB_BLANK_UNBLANK;
+        getActiveConfig(&config);
+    }
+    return ExynosDisplay::setActiveConfig(config);
+}
+
+int32_t ExynosPrimaryDisplay::setPowerOn() {
+    ATRACE_CALL();
+
+    int ret = applyPendingConfig();
+
+    if (mPowerModeState == HWC2_POWER_MODE_OFF) {
+        // check the dynamic recomposition thread by following display
+        mDevice->checkDynamicRecompositionThread();
+        if (ret) {
+            mDisplayInterface->setPowerMode(HWC2_POWER_MODE_ON);
+        }
+        setGeometryChanged(GEOMETRY_DISPLAY_POWER_ON);
     }
 
-    ALOGD("%s:: FBIOBLANK mode(%d), blank(%d)", __func__, mode, fb_blank);
+    mPowerModeState = HWC2_POWER_MODE_ON;
 
-    if (fb_blank == FB_BLANK_POWERDOWN)
-        mDREnable = false;
-    else if (fb_blank == FB_BLANK_UNBLANK)
-        mDREnable = mDRDefault;
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosPrimaryDisplay::setPowerOff() {
+    ATRACE_CALL();
+
+    clearDisplay();
 
     // check the dynamic recomposition thread by following display
     mDevice->checkDynamicRecompositionThread();
 
-    mDisplayInterface->setPowerMode(mode);
-    mPowerModeState = (hwc2_power_mode_t)mode;
+    mDisplayInterface->setPowerMode(HWC2_POWER_MODE_OFF);
+    mPowerModeState = HWC2_POWER_MODE_OFF;
 
-    ALOGD("%s:: S3CFB_POWER_MODE mode(%d), blank(%d)", __func__, mode, fb_blank);
+    /* It should be called from validate() when the screen is on */
+    mSkipFrame = true;
+    setGeometryChanged(GEOMETRY_DISPLAY_POWER_OFF);
+    if ((mRenderingState >= RENDERING_STATE_VALIDATED) &&
+        (mRenderingState < RENDERING_STATE_PRESENTED))
+        closeFencesForSkipFrame(RENDERING_STATE_VALIDATED);
+    mRenderingState = RENDERING_STATE_NONE;
 
-    if (mode == HWC_POWER_MODE_OFF) {
-        /* It should be called from validate() when the screen is on */
-        mSkipFrame = true;
-        setGeometryChanged(GEOMETRY_DISPLAY_POWER_OFF);
-        if ((mRenderingState >= RENDERING_STATE_VALIDATED) &&
-            (mRenderingState < RENDERING_STATE_PRESENTED))
-            closeFencesForSkipFrame(RENDERING_STATE_VALIDATED);
-        mRenderingState = RENDERING_STATE_NONE;
-    } else {
-        setGeometryChanged(GEOMETRY_DISPLAY_POWER_ON);
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosPrimaryDisplay::setPowerDoze() {
+    ATRACE_CALL();
+
+    if (!mDisplayInterface->isDozeModeAvailable()) {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    if (mDisplayInterface->setLowPowerMode()) {
+        ALOGI("Not support LP mode.");
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    mPowerModeState = HWC2_POWER_MODE_DOZE;
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
+    Mutex::Autolock lock(mDisplayMutex);
+
+    if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::PAUSE)) {
+        mode = HWC2_POWER_MODE_OFF;
+        mPauseDisplay = true;
+    } else if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME)) {
+        mode = HWC2_POWER_MODE_ON;
+        mPauseDisplay = false;
+    }
+
+    if (mode == static_cast<int32_t>(mPowerModeState)) {
+        ALOGI("Skip power mode transition due to the same power state.");
+        return HWC2_ERROR_NONE;
+    }
+
+    int fb_blank = (mode != HWC2_POWER_MODE_OFF) ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
+    ALOGD("%s:: FBIOBLANK mode(%d), blank(%d)", __func__, mode, fb_blank);
+
+    if (fb_blank == FB_BLANK_POWERDOWN)
+        mDREnable = false;
+    else
+        mDREnable = mDRDefault;
+
+    switch (mode) {
+        case HWC2_POWER_MODE_DOZE_SUSPEND:
+            return HWC2_ERROR_UNSUPPORTED;
+        case HWC2_POWER_MODE_DOZE:
+            return setPowerDoze();
+        case HWC2_POWER_MODE_OFF:
+            setPowerOff();
+            break;
+        case HWC2_POWER_MODE_ON:
+            setPowerOn();
+            break;
+        default:
+            return HWC2_ERROR_BAD_PARAMETER;
     }
 
     return HWC2_ERROR_NONE;

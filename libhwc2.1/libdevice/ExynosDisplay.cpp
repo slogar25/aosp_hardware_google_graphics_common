@@ -2395,11 +2395,12 @@ int32_t ExynosDisplay::getDisplayType(
 
 int32_t ExynosDisplay::getDozeSupport(
         int32_t* outSupport) {
-#ifdef USES_DOZEMODE
-    *outSupport = 1;
-#else
-    *outSupport = 0;
-#endif
+    if (mDisplayInterface->isDozeModeAvailable()) {
+        *outSupport = 1;
+    } else {
+        *outSupport = 0;
+    }
+
     return 0;
 }
 
@@ -2907,9 +2908,9 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
     if (mBrightnessFd != NULL)
         capabilityNum++;
 
-#ifdef USES_DOZEMODE
-    capabilityNum++;
-#endif
+    if (mDisplayInterface->isDozeModeAvailable()) {
+        capabilityNum++;
+    }
 
     if (outCapabilities == NULL) {
         *outNumCapabilities = capabilityNum;
@@ -2924,9 +2925,9 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
     if (mBrightnessFd != NULL)
         outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_BRIGHTNESS;
 
-#ifdef USES_DOZEMODE
-    outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_DOZE;
-#endif
+    if (mDisplayInterface->isDozeModeAvailable()) {
+        outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_DOZE;
+    }
 
     return HWC2_ERROR_NONE;
 }
@@ -2993,10 +2994,10 @@ int32_t ExynosDisplay::setPowerMode(
         int32_t /*hwc2_power_mode_t*/ mode) {
     Mutex::Autolock lock(mDisplayMutex);
 
-#ifndef USES_DOZEMODE
-    if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND))
+    if (!mDisplayInterface->isDozeModeAvailable() &&
+        (mode == HWC2_POWER_MODE_DOZE || mode == HWC2_POWER_MODE_DOZE_SUSPEND)) {
         return HWC2_ERROR_UNSUPPORTED;
-#endif
+    }
 
     if (mode == HWC_POWER_MODE_OFF) {
         mDevice->mPrimaryBlank = true;

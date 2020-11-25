@@ -65,7 +65,7 @@ void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
     mDrmDevice = NULL;
     mDrmCrtc = NULL;
     mDrmConnector = NULL;
-    mActiveConfig = -1;
+    mActiveConfig = UINT_MAX;
 }
 
 void ExynosDisplayDrmInterface::parseEnums(const DrmProperty& property,
@@ -201,6 +201,8 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
         return;
     }
 
+    getLowPowerDrmModeModeInfo();
+
     mOldFbIds.assign(getMaxWindowNum(), 0);
 
     mVsyncCallbak.init(mExynosDisplay->mDevice, mExynosDisplay);
@@ -244,6 +246,35 @@ void ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
             callbackFunc(callbackData, mExynosDisplay->mDisplayId, timestamp);
         }
     }
+}
+
+int32_t ExynosDisplayDrmInterface::getLowPowerDrmModeModeInfo() {
+    int ret;
+    uint64_t blobId;
+
+    std::tie(ret, blobId) = mDrmConnector->lp_mode().value();
+    if (ret) {
+        ALOGE("Fail to get blob id for lp mode");
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+    drmModePropertyBlobPtr blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
+    if (!blob) {
+        ALOGE("Fail to get blob for lp mode(%" PRId64 ")", blobId);
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+    drmModeModeInfo dozeModeInfo = *static_cast<drmModeModeInfoPtr>(blob->data);
+    mDozeDrmMode = DrmMode(&dozeModeInfo);
+    drmModeFreePropertyBlob(blob);
+
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplayDrmInterface::setLowPowerMode() {
+    if (!isDozeModeAvailable()) {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    return setActiveDrmMode(mDozeDrmMode);
 }
 
 int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
@@ -386,45 +417,24 @@ int32_t ExynosDisplayDrmInterface::setColorMode(int32_t mode)
     return 0;
 }
 
-int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config)
-{
-    ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
-
-    if (mActiveConfig == config) {
-        ALOGI("%s:: Same display config is set", __func__);
-        return NO_ERROR;
-    }
-
-    auto mode = std::find_if(mDrmConnector->modes().begin(),
-            mDrmConnector->modes().end(),
-            [config](DrmMode const &m) {
-            return m.id() == config;
-            });
-    if (mode == mDrmConnector->modes().end()) {
-        HWC_LOGE(mExynosDisplay, "Could not find active mode for %d", config);
-        return HWC2_ERROR_BAD_CONFIG;
-    }
-
+int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     uint32_t mm_width = mDrmConnector->mm_width();
     uint32_t mm_height = mDrmConnector->mm_height();
 
-    mActiveConfig = mode->id();
-    mExynosDisplay->mXres = mode->h_display();
-    mExynosDisplay->mYres = mode->v_display();
+    mExynosDisplay->mXres = mode.h_display();
+    mExynosDisplay->mYres = mode.v_display();
     // in nanoseconds
-    mExynosDisplay->mVsyncPeriod = 1000 * 1000 * 1000 / mode->v_refresh();
+    mExynosDisplay->mVsyncPeriod = 1000 * 1000 * 1000 / mode.v_refresh();
     // Dots per 1000 inches
-    mExynosDisplay->mXdpi = mm_width ? (mode->h_display() * kUmPerInch) / mm_width : -1;
+    mExynosDisplay->mXdpi = mm_width ? (mode.h_display() * kUmPerInch) / mm_width : -1;
     // Dots per 1000 inches
-    mExynosDisplay->mYdpi = mm_height ? (mode->v_display() * kUmPerInch) / mm_height : -1;
+    mExynosDisplay->mYdpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
 
-    mModeState.mode = *mode;
-    if (mModeState.blob_id)
-        mDrmDevice->DestroyPropertyBlob(mModeState.blob_id);
+    mModeState.mode = mode;
 
     struct drm_mode_modeinfo drm_mode;
     memset(&drm_mode, 0, sizeof(drm_mode));
-    mode->ToDrmModeModeInfo(&drm_mode);
+    mode.ToDrmModeModeInfo(&drm_mode);
 
     uint32_t id = 0;
     int ret = mDrmDevice->CreatePropertyBlob(&drm_mode, sizeof(drm_mode),
@@ -433,12 +443,33 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config)
         HWC_LOGE(mExynosDisplay, "Failed to create mode property blob %d", ret);
         return ret;
     }
+
+    if (mModeState.blob_id) {
+        mDrmDevice->DestroyPropertyBlob(mModeState.blob_id);
+    }
+
     mModeState.blob_id = id;
     mModeState.needs_modeset = true;
 
-    if (applyDisplayMode() < 0)
+    if (applyDisplayMode() < 0) {
         HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
                 __func__);
+    }
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
+    auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
+                             [config](DrmMode const &m) { return m.id() == config; });
+    if (mode == mDrmConnector->modes().end()) {
+        HWC_LOGE(mExynosDisplay, "Could not find active mode for %d", config);
+        return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    mActiveConfig = mode->id();
+    if (!setActiveDrmMode(*mode))
+        ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
+
     return 0;
 }
 
