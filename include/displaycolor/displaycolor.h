@@ -159,7 +159,8 @@ struct DisplayScene {
                dpu_bit_depth == rhs.dpu_bit_depth &&
                color_mode == rhs.color_mode &&
                render_intent == rhs.render_intent &&
-               matrix == rhs.matrix;
+               matrix == rhs.matrix &&
+               force_hdr == rhs.force_hdr;
     }
 
     /// A vector of layer color data.
@@ -179,6 +180,9 @@ struct DisplayScene {
         0.0, 0.0, 0.0, 1.0
     };
     // clang-format on
+    /// When this bit is set, process hdr layers and the layer matrix even if
+    //it's in native color mode.
+    bool force_hdr;
 };
 
 /// An interface specifying functions that are HW-agnostic.
