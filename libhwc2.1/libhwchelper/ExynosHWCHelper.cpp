@@ -136,6 +136,19 @@ unsigned int isNarrowRgb(int format, android_dataspace data_space)
     }
 }
 
+const format_description_t *halFormatToExynosFormat(int format, uint32_t compressType) {
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++) {
+        const int halFormat = exynos_format_desc[i].halFormat;
+        const uint32_t compType = exynos_format_desc[i].getCompression();
+
+        if ((halFormat == format) &&
+            ((compType == COMP_ANY) || (compressType == COMP_ANY) || (compType == compressType))) {
+            return &exynos_format_desc[i];
+        }
+    }
+    return nullptr;
+}
+
 uint8_t formatToBpp(int format)
 {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
@@ -288,7 +301,7 @@ bool formatHasAlphaChannel(int format)
 
 bool checkCompressionFd(const private_handle_t *handle)
 {
-    if ((getBufferNumOfFormat(handle->format) == 1) && (handle->fd1 > 0)) {
+    if ((getBufferNumOfFormat(handle->format, COMP_ANY) == 1) && (handle->fd1 > 0)) {
         void *_map = NULL;
         uint32_t *isAFBC = NULL;
         _map = mmap(0, sizeof(uint32_t), PROT_READ|PROT_WRITE, MAP_SHARED, handle->fd1, 0);
@@ -310,14 +323,17 @@ bool checkCompressionFd(const private_handle_t *handle)
     return false;
 }
 
-bool isCompressed(const private_handle_t *handle)
-{
+bool isAFBCCompressed(const private_handle_t *handle) {
     if (handle != NULL) {
         if (checkCompressionFd(handle))
             return true;
     }
 
     return false;
+}
+
+uint32_t getAFBCCompressionType(const private_handle_t *handle) {
+    return isAFBCCompressed(handle) ? AFBC : 0;
 }
 
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space)
@@ -337,17 +353,12 @@ uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space)
     return V4L2_COLORSPACE_DEFAULT;
 }
 
-enum decon_pixel_format halFormatToDpuFormat(int format)
-{
-    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if (exynos_format_desc[i].halFormat == format)
-            return exynos_format_desc[i].s3cFormat;
-    }
-    return DECON_PIXEL_FORMAT_MAX;
+enum decon_pixel_format halFormatToDpuFormat(int format, uint32_t compressType) {
+    auto exynosFormat = halFormatToExynosFormat(format, compressType);
+    return (exynosFormat != nullptr) ? exynosFormat->s3cFormat : DECON_PIXEL_FORMAT_MAX;
 }
 
-uint32_t DpuFormatToHalFormat(int format)
-{
+uint32_t DpuFormatToHalFormat(int format, uint32_t /*compressType*/) {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
         if (exynos_format_desc[i].s3cFormat == static_cast<decon_pixel_format>(format))
             return exynos_format_desc[i].halFormat;
@@ -357,18 +368,8 @@ uint32_t DpuFormatToHalFormat(int format)
 
 int halFormatToDrmFormat(int format, uint32_t compressType)
 {
-    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        const int halFormat = exynos_format_desc[i].halFormat;
-        const uint32_t compType = exynos_format_desc[i].getCompression();
-
-        if ((halFormat == format) &&
-            ((compType == COMP_ANY) ||
-             (compressType == COMP_ANY) ||
-             (compType == compressType))) {
-                return exynos_format_desc[i].drmFormat;
-        }
-    }
-    return DRM_FORMAT_UNDEFINED;
+    auto exynosFormat = halFormatToExynosFormat(format, compressType);
+    return (exynosFormat != nullptr) ? exynosFormat->drmFormat : DRM_FORMAT_UNDEFINED;
 }
 
 int32_t drmFormatToHalFormats(int format, std::vector<uint32_t> *halFormats)
@@ -476,22 +477,23 @@ void dumpExynosImage(uint32_t type, exynos_image &img)
 {
     if (!hwcCheckDebugMessages(type))
         return;
-    ALOGD("\tbufferHandle: %p, fullWidth: %d, fullHeight: %d, x: %d, y: %d, w: %d, h: %d, format: %s",
-            img.bufferHandle, img.fullWidth, img.fullHeight, img.x, img.y, img.w, img.h, getFormatStr(img.format).string());
-    ALOGD("\tusageFlags: 0x%" PRIx64 ", layerFlags: 0x%8x, acquireFenceFd: %d, releaseFenceFd: %d",
-            img.usageFlags, img.layerFlags, img.acquireFenceFd, img.releaseFenceFd);
-    ALOGD("\tdataSpace(%d), blending(%d), transform(0x%2x), compressed(%d)",
-            img.dataSpace, img.blending, img.transform, img.compressed);
+
+    String8 result;
+    dumpExynosImage(result, img);
+
+    ALOGD("%s", result.string());
 }
 
 void dumpExynosImage(String8& result, exynos_image &img)
 {
-    result.appendFormat("\tbufferHandle: %p, fullWidth: %d, fullHeight: %d, x: %d, y: %d, w: %d, h: %d, format: %s\n",
-            img.bufferHandle, img.fullWidth, img.fullHeight, img.x, img.y, img.w, img.h, getFormatStr(img.format).string());
+    result.appendFormat("\tbufferHandle: %p, fullWidth: %d, fullHeight: %d, x: %d, y: %d, w: %d, "
+                        "h: %d, format: %s\n",
+                        img.bufferHandle, img.fullWidth, img.fullHeight, img.x, img.y, img.w, img.h,
+                        getFormatStr(img.format, img.compressed ? AFBC : 0).string());
     result.appendFormat("\tusageFlags: 0x%" PRIx64 ", layerFlags: 0x%8x, acquireFenceFd: %d, releaseFenceFd: %d\n",
             img.usageFlags, img.layerFlags, img.acquireFenceFd, img.releaseFenceFd);
-    result.appendFormat("\tdataSpace(%d), blending(%d), transform(0x%2x), compressed(%d)\n",
-            img.dataSpace, img.blending, img.transform, img.compressed);
+    result.appendFormat("\tdataSpace(%d), blending(%d), transform(0x%2x), afbc(%d)\n",
+                        img.dataSpace, img.blending, img.transform, img.compressed);
     if (img.bufferHandle != NULL) {
         result.appendFormat("\tbuffer's stride: %d, %d\n", img.bufferHandle->stride, img.bufferHandle->vstride);
     }
@@ -567,11 +569,13 @@ bool hasHdr10Plus(exynos_image &img) {
     return (img.metaType & VIDEO_INFO_TYPE_HDR_DYNAMIC) ? true : false;
 }
 
-String8 getFormatStr(int format) {
-    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if (exynos_format_desc[i].halFormat == format)
-            return exynos_format_desc[i].name;
+String8 getFormatStr(int format, uint32_t compressType) {
+    auto exynosFormat = halFormatToExynosFormat(format, compressType);
+
+    if (exynosFormat != nullptr) {
+        return exynosFormat->name;
     }
+
     String8 result;
     result.appendFormat("? %08x", format);
     return result;
@@ -597,22 +601,14 @@ void adjustRect(hwc_rect_t &rect, int32_t width, int32_t height)
         rect.bottom = height;
 }
 
-uint32_t getBufferNumOfFormat(int format)
-{
-    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if (exynos_format_desc[i].halFormat == format)
-            return exynos_format_desc[i].bufferNum;
-    }
-    return 0;
+uint32_t getBufferNumOfFormat(int format, uint32_t compressType) {
+    auto exynosFormat = halFormatToExynosFormat(format, compressType);
+    return (exynosFormat != nullptr) ? exynosFormat->bufferNum : 0;
 }
 
-uint32_t getPlaneNumOfFormat(int format)
-{
-    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++){
-        if (exynos_format_desc[i].halFormat == format)
-            return exynos_format_desc[i].planeNum;
-    }
-    return 0;
+uint32_t getPlaneNumOfFormat(int format, uint32_t compressType) {
+    auto exynosFormat = halFormatToExynosFormat(format, compressType);
+    return (exynosFormat != nullptr) ? exynosFormat->planeNum : 0;
 }
 
 void setFenceName(int fenceFd, hwc_fence_type fenceType)
@@ -740,7 +736,7 @@ uint32_t getExynosBufferCbCrLength(uint32_t width, uint32_t height, int format)
 
 int getBufLength(private_handle_t *handle, uint32_t planerNum, size_t *length, int format, uint32_t width, uint32_t height)
 {
-    uint32_t bufferNumber = getBufferNumOfFormat(format);
+    uint32_t bufferNumber = getBufferNumOfFormat(format, getAFBCCompressionType(handle));
     if ((bufferNumber == 0) || (bufferNumber > planerNum))
         return -EINVAL;
 

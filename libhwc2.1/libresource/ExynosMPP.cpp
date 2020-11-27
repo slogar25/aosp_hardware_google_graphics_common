@@ -1200,7 +1200,7 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
     int bufFds[MAX_HW2D_PLANES];
     size_t bufLength[MAX_HW2D_PLANES];
     uint32_t attribute = 0;
-    uint32_t bufferNum = getBufferNumOfFormat(srcHandle->format);
+    uint32_t bufferNum = getBufferNumOfFormat(srcHandle->format, getAFBCCompressionType(srcHandle));
     android_dataspace_t dataspace = src.dataSpace;
     if (dataspace == HAL_DATASPACE_UNKNOWN)
     {
@@ -1340,7 +1340,8 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
     int bufFds[MAX_HW2D_PLANES];
     size_t bufLength[MAX_HW2D_PLANES];
     uint32_t attribute = 0;
-    uint32_t bufferNum = getBufferNumOfFormat(dstImgInfo->format);
+    uint32_t bufferNum =
+            getBufferNumOfFormat(dstImgInfo->format, getAFBCCompressionType(dstHandle));
     if (bufferNum == 0)
     {
         MPP_LOGE("%s:: Fail to get bufferNum(%d), format(0x%8x)", __func__, bufferNum, dstImgInfo->format);

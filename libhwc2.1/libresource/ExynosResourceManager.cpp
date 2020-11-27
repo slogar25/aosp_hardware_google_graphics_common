@@ -2258,11 +2258,11 @@ void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table) {
 
     mFormatRestrictions[mFormatRestrictionCnt] = table;
 
-    HDEBUGLOGD(eDebugDefault, "MPP : %s, %d, %s, %d"
-            ,getMPPStr(mFormatRestrictions[mFormatRestrictionCnt].hwType).string()
-            ,mFormatRestrictions[mFormatRestrictionCnt].nodeType
-            ,getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format).string()
-            ,mFormatRestrictions[mFormatRestrictionCnt].reserved);
+    HDEBUGLOGD(eDebugDefault, "MPP : %s, %d, %s, %d",
+               getMPPStr(mFormatRestrictions[mFormatRestrictionCnt].hwType).string(),
+               mFormatRestrictions[mFormatRestrictionCnt].nodeType,
+               getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format, COMP_ANY).string(),
+               mFormatRestrictions[mFormatRestrictionCnt].reserved);
     mFormatRestrictionCnt++;
 }
 

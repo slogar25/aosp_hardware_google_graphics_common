@@ -645,21 +645,25 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
         else if (isFormatSBWC(config.format))
             compressType = COMP_ANY;
 
-        drmFormat = halFormatToDrmFormat(config.format, compressType);
+        auto exynosFormat = halFormatToExynosFormat(config.format, compressType);
+        if (exynosFormat == nullptr) {
+            HWC_LOGE(mExynosDisplay, "%s:: unknown HAL format (%d)", __func__, config.format);
+            return -EINVAL;
+        }
+
+        drmFormat = exynosFormat->drmFormat;
         if (drmFormat == DRM_FORMAT_UNDEFINED) {
-            HWC_LOGE(mExynosDisplay, "%s:: known drm format (%d)",
-                    __func__, config.format);
+            HWC_LOGE(mExynosDisplay, "%s:: unknown drm format (%d)", __func__, config.format);
             return -EINVAL;
         }
 
         bpp = getBytePerPixelOfPrimaryPlane(config.format);
-        if ((bufferNum = getBufferNumOfFormat(config.format)) == 0) {
+        if ((bufferNum = exynosFormat->bufferNum) == 0) {
             HWC_LOGE(mExynosDisplay, "%s:: getBufferNumOfFormat(%d) error",
                     __func__, config.format);
             return -EINVAL;
         }
-        if (((planeNum = getPlaneNumOfFormat(config.format)) == 0) ||
-             (planeNum > MAX_PLANE_NUM)) {
+        if (((planeNum = exynosFormat->planeNum) == 0) || (planeNum > MAX_PLANE_NUM)) {
             HWC_LOGE(mExynosDisplay, "%s:: getPlaneNumOfFormat(%d) error, planeNum(%d)",
                     __func__, config.format, planeNum);
             return -EINVAL;
@@ -1267,7 +1271,7 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
     if (loggingForDebug)
         dumpAtomicCommitInfo(result, true);
     if (ret < 0) {
-        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "commit error");
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "commit error: %d", ret);
         setError(ret);
     }
 
