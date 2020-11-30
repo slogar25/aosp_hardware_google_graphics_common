@@ -74,6 +74,10 @@ int DrmCrtc::Init() {
     ALOGI("Failed to get &cgc_dither property");
   if (drm_->GetCrtcProperty(*this, "adjusted_vblank", &adjusted_vblank_property_))
     ALOGI("Failed to get &adjusted_vblank property");
+  if (drm_->GetCrtcProperty(*this, "ppc", &ppc_property_))
+    ALOGI("Failed to get &ppc property");
+  if (drm_->GetCrtcProperty(*this, "max_disp_freq", &max_disp_freq_property_))
+    ALOGI("Failed to get &max_disp_freq property");
 
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
@@ -90,6 +94,8 @@ int DrmCrtc::Init() {
   properties_.push_back(&disp_dither_property_);
   properties_.push_back(&cgc_dither_property_);
   properties_.push_back(&adjusted_vblank_property_);
+  properties_.push_back(&ppc_property_);
+  properties_.push_back(&max_disp_freq_property_);
 
   return 0;
 }
@@ -172,6 +178,14 @@ const DrmProperty &DrmCrtc::cgc_dither_property() const {
 
 DrmProperty &DrmCrtc::adjusted_vblank_property() {
     return adjusted_vblank_property_;
+}
+
+const DrmProperty &DrmCrtc::ppc_property() const {
+    return ppc_property_;
+}
+
+const DrmProperty &DrmCrtc::max_disp_freq_property() const {
+    return max_disp_freq_property_;
 }
 
 }  // namespace android
