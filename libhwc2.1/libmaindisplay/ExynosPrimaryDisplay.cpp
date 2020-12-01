@@ -15,15 +15,50 @@
  */
 //#define LOG_NDEBUG 0
 
-#include "ExynosHWCDebug.h"
 #include "ExynosPrimaryDisplay.h"
+
+#include <fstream>
+
 #include "ExynosDevice.h"
-#include "ExynosHWCHelper.h"
-#include "ExynosExternalDisplay.h"
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosDisplayDrmInterfaceModule.h"
+#include "ExynosExternalDisplay.h"
+#include "ExynosHWCDebug.h"
+#include "ExynosHWCHelper.h"
 
 extern struct exynos_hwc_control exynosHWCControl;
+
+static const std::map<const DisplayType, const std::string> panelSysfsPath =
+        {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
+         {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}};
+
+static std::string loadPanelGammaCalibration(const std::string &file) {
+    std::ifstream ifs(file);
+
+    if (!ifs.is_open()) {
+        ALOGW("Unable to open gamma calibration '%s', error = %s", file.c_str(), strerror(errno));
+        return {};
+    }
+
+    std::string raw_data, gamma;
+    char ch;
+    while (std::getline(ifs, raw_data, '\r')) {
+        gamma.append(raw_data);
+        gamma.append(1, ' ');
+        ifs.get(ch);
+        if (ch != '\n') {
+            gamma.append(1, ch);
+        }
+    }
+    ifs.close();
+
+    /* eliminate space character in the last byte */
+    if (!gamma.empty()) {
+        gamma.pop_back();
+    }
+
+    return gamma;
+}
 
 ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice *device)
     :   ExynosDisplay(HWC_DISPLAY_PRIMARY, device)
@@ -82,7 +117,6 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice 
         ALOGE("Brightness node is not opened");
     }
 #endif
-
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
@@ -169,6 +203,10 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
 
     mPowerModeState = HWC2_POWER_MODE_ON;
 
+    if (mFirstPowerOn) {
+        firstPowerOn();
+    }
+
     return HWC2_ERROR_NONE;
 }
 
@@ -253,6 +291,11 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     return HWC2_ERROR_NONE;
 }
 
+void ExynosPrimaryDisplay::firstPowerOn() {
+    SetCurrentPanelGammaSource(DisplayType::DISPLAY_PRIMARY, PanelGammaSource::GAMMA_CALIBRATION);
+    mFirstPowerOn = false;
+}
+
 bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
 {
     return false;
@@ -266,4 +309,90 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
         LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
                 __func__, interfaceType);
     mDisplayInterface->init(this);
+}
+
+std::string ExynosPrimaryDisplay::getPanelSysfsPath(const DisplayType &type) {
+    if ((type < DisplayType::DISPLAY_PRIMARY) || (type >= DisplayType::DISPLAY_MAX)) {
+        ALOGE("Invalid display panel type %d", type);
+        return {};
+    }
+
+    auto iter = panelSysfsPath.find(type);
+    if (iter == panelSysfsPath.end()) {
+        return {};
+    }
+
+    return iter->second;
+}
+
+int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
+                                                         const PanelGammaSource &source) {
+    std::string &&panel_sysfs_path = getPanelSysfsPath(type);
+    if (panel_sysfs_path.empty()) {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    std::ifstream ifs;
+    std::string &&path = panel_sysfs_path + "panel_name";
+    ifs.open(path, std::ifstream::in);
+    if (!ifs.is_open()) {
+        ALOGW("Unable to access panel name path '%s' (%s)", path.c_str(), strerror(errno));
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+    std::string panel_name;
+    std::getline(ifs, panel_name);
+    ifs.close();
+
+    path = panel_sysfs_path + "serial_number";
+    ifs.open(path, std::ifstream::in);
+    if (!ifs.is_open()) {
+        ALOGW("Unable to access panel id path '%s' (%s)", path.c_str(), strerror(errno));
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+    std::string panel_id;
+    std::getline(ifs, panel_id);
+    ifs.close();
+
+    std::string gamma_node = panel_sysfs_path + "gamma";
+    if (access(gamma_node.c_str(), W_OK)) {
+        ALOGW("Unable to access panel gamma calibration node '%s' (%s)", gamma_node.c_str(),
+              strerror(errno));
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    std::string &&gamma_data = "default";
+    if (source == PanelGammaSource::GAMMA_CALIBRATION) {
+        std::string gamma_cal_file(kDisplayCalFilePath);
+        gamma_cal_file.append(kPanelGammaCalFilePrefix)
+                .append(1, '_')
+                .append(panel_name)
+                .append(1, '_')
+                .append(panel_id)
+                .append(".cal");
+        if (access(gamma_cal_file.c_str(), R_OK)) {
+            ALOGI("Fail to access `%s` (%s), try golden gamma calibration", gamma_cal_file.c_str(),
+                  strerror(errno));
+            gamma_cal_file = kDisplayCalFilePath;
+            gamma_cal_file.append(kPanelGammaCalFilePrefix)
+                    .append(1, '_')
+                    .append(panel_name)
+                    .append(".cal");
+        }
+        gamma_data = loadPanelGammaCalibration(gamma_cal_file);
+    }
+
+    if (gamma_data.empty()) {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    std::ofstream ofs(gamma_node);
+    if (!ofs.is_open()) {
+        ALOGW("Unable to open gamma node '%s', error = %s", gamma_node.c_str(), strerror(errno));
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+    ofs.write(gamma_data.c_str(), gamma_data.size());
+    ofs.close();
+
+    currentPanelGammaSource = source;
+    return HWC2_ERROR_NONE;
 }
