@@ -39,7 +39,10 @@ using namespace android;
 using DrmPropertyMap = std::unordered_map<uint32_t, uint64_t>;
 
 class ExynosDevice;
-class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
+class ExynosDisplayDrmInterface :
+    public ExynosDisplayInterface,
+    public VsyncCallback
+{
     public:
         class DrmModeAtomicReq {
             public:
@@ -91,20 +94,34 @@ class ExynosDisplayDrmInterface : public ExynosDisplayInterface {
                 std::vector<uint32_t> mOldBlobs;
                 int drmFd() const { return mDrmDisplayInterface->mDrmDevice->fd(); }
         };
-        class ExynosVsyncCallback: public VsyncCallback {
+        class ExynosVsyncCallback {
             public:
-                void enableVSync(bool enable) { mVsyncEnabled = enable; };
+                void enableVSync(bool enable) {
+                    mVsyncEnabled = enable;
+                    resetVsyncTimeStamp();
+                };
+                bool getVSyncEnabled() { return mVsyncEnabled; };
+                void setDesiredVsyncPeriod(uint64_t period) {
+                    mDesiredVsyncPeriod = period;
+                    resetVsyncTimeStamp();
+                };
+                uint64_t getDesiredVsyncPeriod() { return mDesiredVsyncPeriod;};
                 uint64_t getVsyncTimeStamp() { return mVsyncTimeStamp; };
                 uint64_t getVsyncPeriod() { return mVsyncPeriod; };
-                void Callback(int display, int64_t timestamp) override;
+                bool Callback(int display, int64_t timestamp);
                 void init(ExynosDevice *exynosDevice, ExynosDisplay *exynosDisplay);
+                void resetVsyncTimeStamp() { mVsyncTimeStamp = 0; };
+                Mutex mMutex;
             private:
                 ExynosDevice *mExynosDevice;
                 ExynosDisplay *mExynosDisplay;
                 bool mVsyncEnabled = false;
                 uint64_t mVsyncTimeStamp = 0;
                 uint64_t mVsyncPeriod = 0;
+                uint64_t mDesiredVsyncPeriod = 0;
         };
+        void Callback(int display, int64_t timestamp) override;
+
         ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay);
         ~ExynosDisplayDrmInterface();
         virtual void init(ExynosDisplay *exynosDisplay);
