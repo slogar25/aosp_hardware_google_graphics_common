@@ -145,6 +145,32 @@ void ExynosDeviceDrmInterface::updateRestrictions()
         channelId++;
     }
 
+    DrmCrtc *drmCrtc = mDrmDevice->GetCrtcForDisplay(0);
+    if (drmCrtc != nullptr) {
+        /*
+         * Run makeDPURestrictions() even if there is error
+         * in getting the value
+         */
+        if (drmCrtc->ppc_property().id()) {
+            auto [ret_ppc, value] = drmCrtc->ppc_property().value();
+            if (ret_ppc < 0) {
+                ALOGE("Failed to get ppc property");
+            } else {
+                mDPUInfo.dpuInfo.ppc = static_cast<uint32_t>(value);
+            }
+        }
+        if (drmCrtc->max_disp_freq_property().id()) {
+            auto [ret_max_freq, value] = drmCrtc->max_disp_freq_property().value();
+            if (ret_max_freq < 0) {
+                ALOGE("Failed to get max_disp_freq property");
+            } else {
+                mDPUInfo.dpuInfo.max_disp_freq = static_cast<uint32_t>(value);
+            }
+        }
+    } else {
+        ALOGE("%s:: Fail to get DrmCrtc", __func__);
+    }
+
     if (ret != NO_ERROR) {
         ALOGI("Fail to get restriction (ret: %d)", ret);
         mUseQuery = false;

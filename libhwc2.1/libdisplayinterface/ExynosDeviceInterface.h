@@ -57,6 +57,8 @@ struct hwc_dpp_ch_restriction {
 struct hwc_dpp_restrictions_info {
   uint32_t ver;
   std::vector<hwc_dpp_ch_restriction> dpp_chs;
+  uint32_t ppc = 0;
+  uint32_t max_disp_freq = 0;
 };
 
 /* for restriction query */

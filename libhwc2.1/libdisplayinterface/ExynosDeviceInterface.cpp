@@ -151,6 +151,14 @@ int32_t ExynosDeviceInterface::makeDPURestrictions() {
 
         resourceManager->makeSizeRestrictions(hwType, rSize, RESTRICTION_YUV);
     }
+
+    for (auto it: resourceManager->getOtfMPPs()) {
+        if (mDPUInfo.dpuInfo.ppc)
+            it->setPPC(static_cast<float>(mDPUInfo.dpuInfo.ppc));
+        if (mDPUInfo.dpuInfo.max_disp_freq)
+            it->setClockKhz(mDPUInfo.dpuInfo.max_disp_freq);
+    }
+
     return ret;
 }
 

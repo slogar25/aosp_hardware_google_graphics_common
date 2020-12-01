@@ -92,7 +92,7 @@ class Allocator;
 #endif
 
 #ifndef VPP_CLOCK
-#define VPP_CLOCK       666000000
+#define VPP_CLOCK 664000
 #endif
 #ifndef VPP_MIC_FACTOR
 #define VPP_MIC_FACTOR  2
@@ -643,7 +643,7 @@ public:
     void resetUsedCapacity();
     int prioritize(int priority);
 
-    uint32_t getMPPClock();
+    uint32_t getMPPClockKhz() { return mClockKhz; };
 
     void dump(String8& result);
     uint32_t increaseDstBuffIndex();
@@ -661,6 +661,9 @@ public:
     void updateAttr();
     dstMetaInfo getDstMetaInfo(android_dataspace_t dstDataspace);
     float getAssignedCapacity();
+
+    void setPPC(float ppc) { mPPC = ppc; };
+    void setClockKhz(uint32_t clock) { mClockKhz = clock; };
 
 protected:
     uint32_t getBufferType(uint64_t usage);
@@ -684,6 +687,7 @@ protected:
             const struct exynos_image &criteria,
             const struct exynos_image *assignCheckSrc = NULL,
             const struct exynos_image *assignCheckDst = NULL);
+    float getPPC() { return mPPC; };
 
     /* format and rotation index are defined by indexImage */
     void getPPCIndex(const struct exynos_image &indexImage,
@@ -699,6 +703,9 @@ protected:
      * This function checks additional restriction for color space conversion
      */
     virtual bool checkCSCRestriction(struct exynos_image &src, struct exynos_image &dst);
+
+    uint32_t mClockKhz = 0;
+    float mPPC = 0;
 };
 
 #endif //_EXYNOSMPP_H

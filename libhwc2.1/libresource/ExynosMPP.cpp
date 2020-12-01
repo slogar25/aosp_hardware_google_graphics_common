@@ -169,8 +169,13 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     mAttr(0),
     mNeedSolidColorLayer(false)
 {
+    if (mPhysicalType < MPP_DPP_NUM) {
+        mClockKhz = VPP_CLOCK;
+        mPPC = VPP_PIXEL_PER_CLOCK;
+    }
 
     if (mPhysicalType == MPP_G2D) {
+        mClockKhz = G2D_CLOCK;
         if (mLogicalType == MPP_LOGICAL_G2D_RGB) {
 
             char value[256];
@@ -208,6 +213,7 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     }
 
     if (mPhysicalType == MPP_MSC) {
+        mClockKhz = MSC_CLOCK;
         /* To do
         * Capacity should be set
         */
@@ -504,25 +510,28 @@ uint32_t ExynosMPP::getMaxDownscale(ExynosDisplay &display, struct exynos_image 
 {
     uint32_t idx = getRestrictionClassification(src);
 
-    bool isPerpendicular = !!(dst.transform & HAL_TRANSFORM_ROT_90);
-    float scaleRatio_H = 1;
-    float scaleRatio_V = 1;
-    if (isPerpendicular) {
-        scaleRatio_H = (float)src.w/(float)dst.h;
-        scaleRatio_V = (float)src.h/(float)dst.w;
-    } else {
-        scaleRatio_H = (float)src.w/(float)dst.w;
-        scaleRatio_V = (float)src.h/(float)dst.h;
-    }
-    float dstW = (float)dst.w;
-    float displayW = (float)display.mXres;
-    float displayH = (float)display.mYres;
-    float resolClock = displayW * displayH * VPP_RESOL_CLOCK_FACTOR;
+    if (mDstSizeRestrictions[idx].maxDownScale <= 1)
+        return mDstSizeRestrictions[idx].maxDownScale;
 
-    if ((mPhysicalType == MPP_DPP_VGS) ||
-        (mPhysicalType == MPP_DPP_VGFS) ||
-        (mPhysicalType == MPP_DPP_VGRFS)) {
-        if ((float)VPP_CLOCK < ((resolClock * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR)/VPP_PIXEL_PER_CLOCK * (dstW/displayW)))
+    if (mPhysicalType < MPP_DPP_NUM) {
+        bool isPerpendicular = !!(dst.transform & HAL_TRANSFORM_ROT_90);
+        float scaleRatio_H = 1;
+        float scaleRatio_V = 1;
+        if (isPerpendicular) {
+            scaleRatio_H = float(src.w) / float(dst.h);
+            scaleRatio_V = float(src.h) / float(dst.w);
+        } else {
+            scaleRatio_H = float(src.w) / float(dst.w);
+            scaleRatio_V = float(src.h) / float(dst.h);
+        }
+        float dstW = float(dst.w);
+        float displayW = float(display.mXres);
+        float displayH = float(display.mYres);
+        float resolClock = displayW * displayH * VPP_RESOL_CLOCK_FACTOR;
+
+        if (float(mClockKhz) * 1000.0 <
+            ((resolClock * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR) / mPPC *
+             (dstW / displayW)))
             return 1;
     }
 
@@ -2534,7 +2543,7 @@ float ExynosMPP::getAssignedCapacity()
                 i, srcCycles, baseCycles, PPC, srcResolution, dstResolution, mAssignedSources[i]->mSrcImg.transform);
     }
 
-    capacity = baseCycles/getMPPClock();
+    capacity = baseCycles / mClockKhz;
 
     return capacity;
 }
@@ -2605,7 +2614,7 @@ float ExynosMPP::getRequiredCapacity(ExynosDisplay *display, struct exynos_image
                     srcCycles, baseCycles, PPC, srcResolution, dstResolution, src.transform);
         }
 
-        capacity = baseCycles/getMPPClock();
+        capacity = baseCycles / mClockKhz;
 
         MPP_LOGD(eDebugCapacity, "baseCycles: %f, capacity: %f",
                 baseCycles, capacity);
@@ -2616,8 +2625,8 @@ float ExynosMPP::getRequiredCapacity(ExynosDisplay *display, struct exynos_image
         /* Just add capacity for current layer */
         float srcPPC = getPPC(src, dst, src);
         float dstPPC = getPPC(src, dst, dst);
-        float srcCapacity = ((float)(src.w*src.h))/(getMPPClock()*srcPPC);
-        float dstCapacity = ((float)(dst.w*dst.h))/(getMPPClock()*dstPPC);
+        float srcCapacity = (float((src.w * src.h))) / (mClockKhz * srcPPC);
+        float dstCapacity = (float((dst.w * dst.h))) / (mClockKhz * dstPPC);
 
         capacity += max(srcCapacity, dstCapacity);
 
@@ -2678,7 +2687,7 @@ bool ExynosMPP::addCapacity(ExynosMPPSource* mppSource)
         else
             mRotatedSrcCropBW += srcResolution;
 
-        mUsedCapacity = mUsedBaseCycles/getMPPClock();
+        mUsedCapacity = mUsedBaseCycles / mClockKhz;
 
         MPP_LOGD(eDebugCapacity, "src num: %zu base cycle is added: %f, mUsedBaseCycles: %f, mUsedCapacity(%f), srcResolution: %d, dstResolution: %d, rot: %d, mNoRotatedSrcCropBW(%d), mRotatedSrcCropBW(%d)",
                 mAssignedSources.size(),
@@ -2713,7 +2722,7 @@ bool ExynosMPP::removeCapacity(ExynosMPPSource* mppSource)
         float baseCycles = getRequiredBaseCycles(mppSource->mSrcImg, mppSource->mMidImg);
         mUsedBaseCycles -= baseCycles;
 
-        mUsedCapacity = mUsedBaseCycles/getMPPClock();
+        mUsedCapacity = mUsedBaseCycles / mClockKhz;
 
         MPP_LOGD(eDebugCapacity, "src num: %zu, base cycle is removed: %f, mUsedBaseCycles: %f, mUsedCapacity(%f), srcResolution: %d, dstResolution: %d, rot: %d, mNoRotatedSrcCropBW(%d), mRotatedSrcCropBW(%d)",
                 mAssignedSources.size(),
@@ -2787,7 +2796,7 @@ int32_t ExynosMPP::updateUsedCapacity()
         }
 
         mUsedBaseCycles = cycles;
-        capacity = cycles/getMPPClock();
+        capacity = cycles / mClockKhz;
 
         mUsedCapacity = capacity;
 
@@ -2795,16 +2804,6 @@ int32_t ExynosMPP::updateUsedCapacity()
     MPP_LOGD(eDebugCapacity, "assigned layer size(%zu), mUsedCapacity: %f", mAssignedSources.size(), mUsedCapacity);
 
     return mUsedCapacity;
-}
-
-uint32_t ExynosMPP::getMPPClock()
-{
-    if (mPhysicalType == MPP_G2D)
-        return G2D_CLOCK;
-    else if (mPhysicalType == MPP_MSC)
-        return MSC_CLOCK;
-    else
-        return 0;
 }
 
 uint32_t ExynosMPP::getRestrictionClassification(struct exynos_image &img)
