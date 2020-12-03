@@ -77,7 +77,7 @@ int ExynosExternalDisplay::openExternalDisplay()
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
     int ret = 0;
-    setVsyncEnabled(HWC2_VSYNC_ENABLE);
+    setVsyncEnabledInternal(HWC2_VSYNC_ENABLE);
 
     mSkipFrameCount = SKIP_FRAME_COUNT;
     mSkipStartFrame = 0;
@@ -97,7 +97,7 @@ void ExynosExternalDisplay::closeExternalDisplay()
 {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
-    setVsyncEnabled(HWC2_VSYNC_DISABLE);
+    setVsyncEnabledInternal(HWC2_VSYNC_DISABLE);
 
     if (mPowerModeState != (hwc2_power_mode_t)HWC_POWER_MODE_OFF) {
         if (mDisplayInterface->setPowerMode(HWC_POWER_MODE_OFF) < 0) {

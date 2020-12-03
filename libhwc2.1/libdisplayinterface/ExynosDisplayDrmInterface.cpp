@@ -212,7 +212,6 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     mOldFbIds.assign(getMaxWindowNum(), 0);
 
-    mVsyncCallback.init(mExynosDisplay->mDevice, mExynosDisplay);
     mDrmVSyncWorker.Init(mDrmDevice, mExynosDisplay->mDisplayId);
     mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(this));
 
@@ -233,19 +232,50 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 void ExynosDisplayDrmInterface::Callback(
         int display, int64_t timestamp)
 {
-    Mutex::Autolock lock(mVsyncCallback.mMutex);
-    bool needDisableVsync = mVsyncCallback.Callback(display, timestamp);
-    if (needDisableVsync) {
-        mDrmVSyncWorker.VSyncControl(false);
-        mVsyncCallback.resetVsyncTimeStamp();
-    }
-}
+    Mutex::Autolock lock(mExynosDisplay->getDisplayMutex());
+    bool configApplied = mVsyncCallback.Callback(display, timestamp);
 
-void ExynosDisplayDrmInterface::ExynosVsyncCallback::init(
-        ExynosDevice *exynosDevice, ExynosDisplay *exynosDisplay)
-{
-    mExynosDevice = exynosDevice;
-    mExynosDisplay = exynosDisplay;
+    if (configApplied) {
+        if (mVsyncCallback.getDesiredVsyncPeriod()) {
+            mExynosDisplay->resetConfigRequestState();
+            mVsyncCallback.resetDesiredVsyncPeriod();
+        }
+
+        /*
+         * Disable vsync if vsync config change is done
+         */
+        if (!mVsyncCallback.getVSyncEnabled()) {
+            mDrmVSyncWorker.VSyncControl(false);
+            mVsyncCallback.resetVsyncTimeStamp();
+        }
+    } else {
+        mExynosDisplay->updateConfigRequestAppliedTime();
+    }
+
+    if (!mVsyncCallback.getVSyncEnabled()) {
+        return;
+    }
+
+    ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
+    exynosDevice->compareVsyncPeriod();
+    if (exynosDevice->mVsyncDisplay == (int)mExynosDisplay->mDisplayId) {
+        auto vsyncCallbackInfo =
+            exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
+        if (vsyncCallbackInfo.funcPointer &&
+            vsyncCallbackInfo.callbackData)
+            ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(
+                    vsyncCallbackInfo.callbackData,
+                    mExynosDisplay->mDisplayId, timestamp);
+
+        auto vsync_2_4CallbackInfo =
+            exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
+        if (vsync_2_4CallbackInfo.funcPointer &&
+            vsync_2_4CallbackInfo.callbackData)
+            ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
+                    vsync_2_4CallbackInfo.callbackData,
+                    mExynosDisplay->mDisplayId,
+                    timestamp, mExynosDisplay->mVsyncPeriod);
+    }
 }
 
 bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
@@ -261,42 +291,17 @@ bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
 
     mVsyncTimeStamp = timestamp;
 
-    if ((mExynosDevice == nullptr) || (mExynosDisplay == nullptr))
-        return false;
-    if (!mVsyncEnabled) {
-        /*
-         * Disable vsync if vsync period is changed
-         * mDesiredVsyncPeriod is nanoseconds
-         * Compare with milliseconds
-         */
-        if (mDesiredVsyncPeriod &&
-            mDesiredVsyncPeriod/microsecsPerSec == mVsyncPeriod/microsecsPerSec)
-        {
-            mDesiredVsyncPeriod = 0;
-            return true;
-        }
-        return false;
-    }
+    /* There was no config chage request */
+    if (!mDesiredVsyncPeriod)
+        return true;
 
-    mExynosDevice->compareVsyncPeriod();
-    if (mExynosDevice->mVsyncDisplay == (int)mExynosDisplay->mDisplayId) {
-        auto vsyncCallbackInfo =
-            mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
-        if (vsyncCallbackInfo.funcPointer &&
-            vsyncCallbackInfo.callbackData)
-            ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(
-                    vsyncCallbackInfo.callbackData,
-                    mExynosDisplay->mDisplayId, timestamp);
+    /*
+     * mDesiredVsyncPeriod is nanoseconds
+     * Compare with milliseconds
+     */
+    if (mDesiredVsyncPeriod/microsecsPerSec == mVsyncPeriod/microsecsPerSec)
+        return true;
 
-        auto vsync_2_4CallbackInfo =
-            mExynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
-        if (vsync_2_4CallbackInfo.funcPointer &&
-            vsync_2_4CallbackInfo.callbackData)
-            ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
-                    vsync_2_4CallbackInfo.callbackData,
-                    mExynosDisplay->mDisplayId,
-                    timestamp, mExynosDisplay->mVsyncPeriod);
-    }
     return false;
 }
 
@@ -361,7 +366,6 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
 
 int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
 {
-    Mutex::Autolock lock(mVsyncCallback.mMutex);
     if (enabled == HWC2_VSYNC_ENABLE) {
         mDrmVSyncWorker.VSyncControl(true);
     } else {
@@ -1233,7 +1237,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     if (mDesiredModeState.needs_modeset) {
-        Mutex::Autolock lock(mVsyncCallback.mMutex);
         mDesiredModeState.apply(mActiveModeState, drmReq);
         mVsyncCallback.setDesiredVsyncPeriod(
                 nsecsPerSec/mActiveModeState.mode.v_refresh());

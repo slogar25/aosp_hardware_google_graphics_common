@@ -472,6 +472,7 @@ class ExynosDisplay {
         void initDisplay();
 
         int getDisplayId();
+        Mutex& getDisplayMutex() {return mDisplayMutex; };
 
         int32_t setCompositionTargetExynosImage(uint32_t targetType, exynos_image *src_img, exynos_image *dst_img);
         int32_t initializeValidateInfos();
@@ -703,6 +704,8 @@ class ExynosDisplay {
          * HWC2_PFN_SET_VSYNC_ENABLED
          */
         virtual int32_t setVsyncEnabled(
+                int32_t /*hwc2_vsync_t*/ enabled);
+        int32_t setVsyncEnabledInternal(
                 int32_t /*hwc2_vsync_t*/ enabled);
 
         /* validateDisplay(..., outNumTypes, outNumRequests)
@@ -959,6 +962,9 @@ class ExynosDisplay {
         bool needNotChangeConfig(hwc2_config_t config);
         int32_t updateInternalDisplayConfigVariables(
                 hwc2_config_t config, bool updateVsync = true);
+        int32_t resetConfigRequestState();
+        int32_t updateConfigRequestAppliedTime();
+        int32_t updateVsyncAppliedTimeLine(int64_t actualChangeTime);
         int32_t getDisplayVsyncPeriodInternal(
                 hwc2_vsync_period_t* outVsyncPeriod);
         int32_t doDisplayConfigPostProcess(ExynosDevice *dev);

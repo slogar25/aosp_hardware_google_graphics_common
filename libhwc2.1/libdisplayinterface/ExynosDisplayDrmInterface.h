@@ -109,12 +109,9 @@ class ExynosDisplayDrmInterface :
                 uint64_t getVsyncTimeStamp() { return mVsyncTimeStamp; };
                 uint64_t getVsyncPeriod() { return mVsyncPeriod; };
                 bool Callback(int display, int64_t timestamp);
-                void init(ExynosDevice *exynosDevice, ExynosDisplay *exynosDisplay);
                 void resetVsyncTimeStamp() { mVsyncTimeStamp = 0; };
-                Mutex mMutex;
+                void resetDesiredVsyncPeriod() { mDesiredVsyncPeriod = 0;};
             private:
-                ExynosDevice *mExynosDevice;
-                ExynosDisplay *mExynosDisplay;
                 bool mVsyncEnabled = false;
                 uint64_t mVsyncTimeStamp = 0;
                 uint64_t mVsyncPeriod = 0;
