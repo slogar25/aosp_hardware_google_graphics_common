@@ -15,20 +15,20 @@
  * limitations under the License.
  */
 
-#include <cstring>
-#include <alloca.h>
-#include <algorithm>
-
-#include <sys/ioctl.h>
-
-#include <system/graphics.h>
-#include <log/log.h>
-
-#include <hardware/hwcomposer2.h>
-
-#include <exynos_format.h> // hardware/smasung_slsi/exynos/include
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
 #include "acrylic_g2d.h"
+
+#include <alloca.h>
+#include <exynos_format.h> // hardware/smasung_slsi/exynos/include
+#include <hardware/hwcomposer2.h>
+#include <log/log.h>
+#include <sys/ioctl.h>
+#include <system/graphics.h>
+#include <utils/Trace.h>
+
+#include <algorithm>
+#include <cstring>
 
 enum {
     G2D_CSC_STD_UNDEFINED = -1,
@@ -1028,6 +1028,7 @@ int AcrylicCompositorG2D::ioctlG2D(void)
 
 bool AcrylicCompositorG2D::executeG2D(int fence[], unsigned int num_fences, bool nonblocking)
 {
+    ATRACE_CALL();
     if (!validateAllLayers())
         return false;
 

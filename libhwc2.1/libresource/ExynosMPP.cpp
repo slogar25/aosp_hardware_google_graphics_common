@@ -1516,10 +1516,7 @@ int32_t ExynosMPP::doPostProcessingInternal()
     int *releaseFences = NULL;
 #endif
 
-    {
-        ATRACE_CALL();
-        acrylicReturn = mAcrylicHandle->execute(releaseFences, usingFenceCnt);
-    }
+    acrylicReturn = mAcrylicHandle->execute(releaseFences, usingFenceCnt);
 
     if (acrylicReturn == false) {
         MPP_LOGE("%s:: fail to excute compositor", __func__);

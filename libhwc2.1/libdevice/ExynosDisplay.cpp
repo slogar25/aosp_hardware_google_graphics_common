@@ -4378,13 +4378,18 @@ void ExynosDisplay::traceLayerTypes() {
     size_t g2d_count = 0;
     size_t dpu_count = 0;
     size_t gpu_count = 0;
+    size_t skip_count = 0;
     for(auto const& layer: mLayers) {
         switch (layer->mExynosCompositionType) {
             case HWC2_COMPOSITION_EXYNOS:
                 g2d_count++;
                 break;
             case HWC2_COMPOSITION_CLIENT:
-                gpu_count++;
+                if (layer->mCompositionType == HWC2_COMPOSITION_DEVICE) {
+                    skip_count++;
+                } else {
+                    gpu_count++;
+                }
                 break;
             case HWC2_COMPOSITION_DEVICE:
                 dpu_count++;
@@ -4393,8 +4398,9 @@ void ExynosDisplay::traceLayerTypes() {
                 break;
         }
     }
-    ATRACE_INT("Layers: DPU", dpu_count);
-    ATRACE_INT("Layers: G2D", g2d_count);
-    ATRACE_INT("Layers: GPU", gpu_count);
-    ATRACE_INT("Layers: Total", mLayers.size());
+    ATRACE_INT("HWComposer: DPU Layer", dpu_count);
+    ATRACE_INT("HWComposer: G2D Layer", g2d_count);
+    ATRACE_INT("HWComposer: GPU Layer", gpu_count);
+    ATRACE_INT("HWComposer: Cached Layer", skip_count);
+    ATRACE_INT("HWComposer: Total Layer", mLayers.size());
 }

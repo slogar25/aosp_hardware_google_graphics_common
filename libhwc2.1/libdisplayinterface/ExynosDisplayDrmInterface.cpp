@@ -1307,6 +1307,7 @@ void ExynosDisplayDrmInterface::DrmModeAtomicReq::freeBufHandle(uint32_t handle)
 
 void ExynosDisplayDrmInterface::DrmModeAtomicReq::removeFbs(std::vector<uint32_t> &fbs)
 {
+    ATRACE_CALL();
     for (auto &fb : fbs) {
         drmModeRmFB(mDrmDisplayInterface->mDrmDevice->fd(), fb);
     }
