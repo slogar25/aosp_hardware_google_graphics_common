@@ -315,22 +315,33 @@ typedef struct restriction_key
 
 typedef struct restriction_size
 {
-    uint32_t maxDownScale;
-    uint32_t maxUpScale;
-    uint32_t maxFullWidth;
-    uint32_t maxFullHeight;
-    uint32_t minFullWidth;
-    uint32_t minFullHeight;
-    uint32_t fullWidthAlign;
-    uint32_t fullHeightAlign;
-    uint32_t maxCropWidth;
-    uint32_t maxCropHeight;
-    uint32_t minCropWidth;
-    uint32_t minCropHeight;
-    uint32_t cropXAlign;
-    uint32_t cropYAlign;
-    uint32_t cropWidthAlign;
-    uint32_t cropHeightAlign;
+    static constexpr size_t kNumofRestriction = 16;
+    union {
+        std::array<uint32_t, kNumofRestriction> mData;
+        struct {
+            uint32_t maxDownScale;
+            uint32_t maxUpScale;
+            uint32_t maxFullWidth;
+            uint32_t maxFullHeight;
+            uint32_t minFullWidth;
+            uint32_t minFullHeight;
+            uint32_t fullWidthAlign;
+            uint32_t fullHeightAlign;
+            uint32_t maxCropWidth;
+            uint32_t maxCropHeight;
+            uint32_t minCropWidth;
+            uint32_t minCropHeight;
+            uint32_t cropXAlign;
+            uint32_t cropYAlign;
+            uint32_t cropWidthAlign;
+            uint32_t cropHeightAlign;
+        };
+    };
+
+    restriction_size() = default;
+    restriction_size(std::array<uint32_t, kNumofRestriction> &&rdata) : mData(rdata){};
+
+    bool operator==(const restriction_size &rhs) const { return rhs.mData == mData; }
 } restriction_size_t;
 
 typedef struct restriction_size_element

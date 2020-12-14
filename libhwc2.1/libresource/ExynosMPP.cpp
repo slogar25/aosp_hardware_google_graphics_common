@@ -170,11 +170,6 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     mNeedSolidColorLayer(false)
 {
 
-    for (int i=0; i<RESTRICTION_MAX; i++){
-        memset(&mSrcSizeRestrictions[i], 0, sizeof(mSrcSizeRestrictions[i]));
-        memset(&mDstSizeRestrictions[i], 0, sizeof(mDstSizeRestrictions[i]));
-    }
-
     if (mPhysicalType == MPP_G2D) {
         if (mLogicalType == MPP_LOGICAL_G2D_RGB) {
 

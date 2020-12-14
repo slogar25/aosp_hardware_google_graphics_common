@@ -2220,8 +2220,8 @@ int32_t ExynosResourceManager::initResourcesState(ExynosDisplay *display)
     return NO_ERROR;
 }
 
-void ExynosResourceManager::makeSizeRestrictions(uint32_t mppId, restriction_size_t size, restriction_classification_t format) {
-
+void ExynosResourceManager::makeSizeRestrictions(uint32_t mppId, const restriction_size_t &size,
+                                                 restriction_classification_t format) {
     mSizeRestrictions[format][mSizeRestrictionCnt[format]].key.hwType = static_cast<mpp_phycal_type_t>(mppId);
     mSizeRestrictions[format][mSizeRestrictionCnt[format]].key.nodeType = NODE_SRC;
     mSizeRestrictions[format][mSizeRestrictionCnt[format]].key.format = HAL_PIXEL_FORMAT_NONE;
@@ -2450,24 +2450,29 @@ float ExynosResourceManager::getM2MCapa(uint32_t physicalType)
     return ret;
 }
 
-void ExynosResourceManager::dump(String8 &result) {
+void ExynosResourceManager::dump(String8 &result) const {
     result.appendFormat("Resource Manager:\n");
 
-    const auto rgbRestrictions = mSizeRestrictions[RESTRICTION_RGB];
     result.appendFormat("[RGB Restrictions]\n");
+    dump(RESTRICTION_RGB, result);
 
-    for (int i = 0; i < mSizeRestrictionCnt[RESTRICTION_RGB]; ++i) {
-        result.appendFormat("Type %u:\n", rgbRestrictions[i].key.hwType);
-        ::dump(rgbRestrictions[i].sizeRestriction, result);
-        result.appendFormat("\n");
-    }
-
-    const auto yuvRestrictions = mSizeRestrictions[RESTRICTION_YUV];
     result.appendFormat("[YUV Restrictions]\n");
+    dump(RESTRICTION_YUV, result);
+}
 
-    for (int i = 0; i < mSizeRestrictionCnt[RESTRICTION_YUV]; ++i) {
-        result.appendFormat("Type %u:\n", yuvRestrictions[i].key.hwType);
-        ::dump(yuvRestrictions[i].sizeRestriction, result);
+void ExynosResourceManager::dump(const restriction_classification_t classification,
+                                 String8 &result) const {
+    const auto &restrictions = mSizeRestrictions[classification];
+    const auto &restrictionCnt = mSizeRestrictionCnt[classification];
+
+    for (int i = 0; i < restrictionCnt; ++i) {
+        result.appendFormat("HW-Node %u-%u:\n", restrictions[i].key.hwType,
+                            restrictions[i].key.nodeType);
+        if (i > 0 && restrictions[i].sizeRestriction == restrictions[i - 1].sizeRestriction) {
+            result.append("Same as above\n");
+        } else {
+            ::dump(restrictions[i].sizeRestriction, result);
+        }
         result.appendFormat("\n");
     }
 }
