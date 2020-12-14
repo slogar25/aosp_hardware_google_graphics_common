@@ -71,6 +71,7 @@ ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice)
 ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface()
 {
     mDrmDevice->event_listener()->UnRegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->UnRegisterTUIHandler(static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
 }
 
 void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
@@ -83,8 +84,14 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
 
     updateRestrictions();
 
-    mExynosDrmEventHandler.init(mExynosDevice);
+    mExynosDrmEventHandler.init(mExynosDevice, mDrmDevice);
     mDrmDevice->event_listener()->RegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->RegisterTUIHandler(static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
+
+    if (mDrmDevice->event_listener()->IsDrmInTUI()) {
+        mExynosDevice->enterToTUI();
+        ALOGD("%s:: device is already in TUI", __func__);
+    }
 }
 
 int32_t ExynosDeviceDrmInterface::initDisplayInterface(
@@ -187,9 +194,10 @@ void ExynosDeviceDrmInterface::updateRestrictions()
     }
 }
 
-void ExynosDeviceDrmInterface::ExynosDrmEventHandler::init(ExynosDevice *exynosDevice)
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::init(ExynosDevice *exynosDevice, DrmDevice *drmDevice)
 {
     mExynosDevice = exynosDevice;
+    mDrmDevice = drmDevice;
 }
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleEvent(uint64_t timestamp_us)
@@ -219,4 +227,22 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleEvent(uint64_t times
         static_cast<ExynosExternalDisplayModule*>(mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0)));
     if (display != NULL)
         display->handleHotplugEvent();
+}
+
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleTUIEvent()
+{
+    if (mDrmDevice->event_listener()->IsDrmInTUI()) {
+        /* Received TUI Enter event */
+        if (!mExynosDevice->isInTUI()) {
+            mExynosDevice->enterToTUI();
+            ALOGV("%s:: DRM device in TUI", __func__);
+        }
+    } else {
+        /* Received TUI Exit event */
+        if (mExynosDevice->isInTUI()) {
+            mExynosDevice->invalidate();
+            mExynosDevice->exitFromTUI();
+            ALOGV("%s:: DRM device out TUI", __func__);
+        }
+    }
 }
