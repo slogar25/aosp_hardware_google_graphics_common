@@ -212,8 +212,8 @@ void ExynosCompositionInfo::dump(String8& result)
     if (mTargetBuffer != NULL) {
         uint64_t internal_format = 0;
         internal_format = mTargetBuffer->internal_format;
-        result.appendFormat("\tinternal_format: 0x%" PRIx64 ", compressed: %d\n",
-                internal_format, isCompressed(mTargetBuffer));
+        result.appendFormat("\tinternal_format: 0x%" PRIx64 ", afbc: %d\n", internal_format,
+                            isAFBCCompressed(mTargetBuffer));
     }
     uint32_t assignedSrcNum = 0;
     if ((mM2mMPP != NULL) &&
@@ -1232,18 +1232,22 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
 
         if (hasHdrInfo(layer.mMidImg)) {
             bool hdr_exception = getHDRException(&layer);
+            uint32_t parcelFdIndex =
+                    getBufferNumOfFormat(layer.mMidImg.format,
+                                         getAFBCCompressionType(layer.mMidImg.bufferHandle));
+            if (parcelFdIndex == 0) {
+                DISPLAY_LOGE("%s:: failed to get parcelFdIndex for midImg with format: %d",
+                             __func__, layer.mMidImg.format);
+                return -EINVAL;
+            }
             if (layer.mBufferHasMetaParcel) {
-                uint32_t parcelFdIndex = getBufferNumOfFormat(layer.mMidImg.format);
-                if (parcelFdIndex > 0) {
-                    if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_2PRIVATE_DATA)
-                        cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd1;
-                    else if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_3PRIVATE_DATA)
-                        cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd2;
-                }
+                if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_2PRIVATE_DATA)
+                    cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd1;
+                else if (layer.mLayerBuffer->flags &
+                         private_handle_t::PRIV_FLAGS_USES_3PRIVATE_DATA)
+                    cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd2;
             } else {
-                uint32_t parcelFdIndex = getBufferNumOfFormat(layer.mMidImg.format);
-                if (parcelFdIndex > 0)
-                    cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
+                cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
             }
 
             if (!hdr_exception)
@@ -1284,9 +1288,15 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
                 cfg.hdr_enable = false;
 
             if (layer.mBufferHasMetaParcel == false) {
-                uint32_t parcelFdIndex = getBufferNumOfFormat(handle->format);
-                if (parcelFdIndex > 0)
-                    cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
+                uint32_t parcelFdIndex =
+                        getBufferNumOfFormat(handle->format, getAFBCCompressionType(handle));
+                if (parcelFdIndex == 0) {
+                    DISPLAY_LOGE("%s:: failed to get parcelFdIndex for srcImg with format: %d",
+                                 __func__, handle->format);
+                    return -EINVAL;
+                }
+
+                cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
             }
 
             /*
@@ -2834,8 +2844,9 @@ int32_t ExynosDisplay::setClientTarget(
     setFenceInfo(acquireFence, this,
             FENCE_TYPE_SRC_RELEASE, FENCE_IP_FB, FENCE_FROM);
 
-    if (handle)
-        mClientCompositionInfo.mCompressed = isCompressed(handle);
+    if (handle) {
+        mClientCompositionInfo.mCompressed = isAFBCCompressed(handle);
+    }
 
     return 0;
 }

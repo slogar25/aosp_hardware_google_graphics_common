@@ -16,9 +16,11 @@
 #ifndef _EXYNOSHWCHELPER_H
 #define _EXYNOSHWCHELPER_H
 
-#include <utils/String8.h>
-#include <hardware/hwcomposer2.h>
 #include <drm/drm_fourcc.h>
+#include <hardware/hwcomposer2.h>
+#include <utils/String8.h>
+
+#include <optional>
 #ifdef GRALLOC_VERSION1
 #include "gralloc1_priv.h"
 #else
@@ -117,8 +119,9 @@ typedef struct format_description {
     uint32_t reserved;
 } format_description_t;
 
-#define HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED 0
-#define DRM_FORMAT_UNDEFINED 0
+constexpr int HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED = 0;
+constexpr int DRM_FORMAT_UNDEFINED = 0;
+
 const format_description_t exynos_format_desc[] = {
     /* RGB */
     {HAL_PIXEL_FORMAT_RGBA_8888, DECON_PIXEL_FORMAT_RGBA_8888, DRM_FORMAT_RGBA8888,
@@ -177,9 +180,13 @@ const format_description_t exynos_format_desc[] = {
         2, 1, 24, YUV420|BIT10|P010, false, String8("EXYNOS_YCbCr_P010"), 0},
 
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_NV12,
-        2, 1, 12, YUV420|BIT8, false, String8("GOOGLE_YCrCb_420_SP"), 0},
+        2, 1, 12, YUV420|BIT8, false, String8("GOOGLE_YCbCr_420_SP"), 0},
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_P010,
         2, 1, 24, YUV420|BIT10, false, String8("GOOGLE_YCbCr_P010"), 0},
+    {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_YUV420_8BIT,
+        1, 1, 12, YUV420|BIT8|AFBC, false, String8("GOOGLE_YCbCr_420_SP_AFBC"), 0},
+    {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_YUV420_10BIT,
+        1, 1, 15, YUV420|BIT10|AFBC, false, String8("GOOGLE_YCbCr_P010_AFBC"), 0},
 
     /* YUV 422 */
     {HAL_PIXEL_FORMAT_EXYNOS_CbYCrY_422_I, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
@@ -234,7 +241,7 @@ const format_description_t exynos_format_desc[] = {
         0, 0, 0, TYPE_UNDEF, false, String8("ImplDef"), 0}
 };
 
-#define FORMAT_MAX_CNT sizeof(exynos_format_desc)/sizeof(format_description)
+constexpr size_t FORMAT_MAX_CNT = sizeof(exynos_format_desc) / sizeof(format_description);
 
 typedef enum hwc_fdebug_fence_type_t {
     FENCE_TYPE_SRC_RELEASE = 1,
@@ -379,15 +386,18 @@ inline int HEIGHT(const hwc_rect &rect) { return rect.bottom - rect.top; }
 inline int WIDTH(const hwc_frect_t &rect) { return (int)(rect.right - rect.left); }
 inline int HEIGHT(const hwc_frect_t &rect) { return (int)(rect.bottom - rect.top); }
 
+const format_description_t *halFormatToExynosFormat(int format, uint32_t compressType);
+
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space);
-enum decon_pixel_format halFormatToDpuFormat(int format);
-uint32_t DpuFormatToHalFormat(int format);
+enum decon_pixel_format halFormatToDpuFormat(int format, uint32_t compressType);
+uint32_t DpuFormatToHalFormat(int format, uint32_t compressType);
 int halFormatToDrmFormat(int format, uint32_t compressType);
 int32_t drmFormatToHalFormats(int format, std::vector<uint32_t> *halFormats);
 int drmFormatToHalFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DpuFormatToBpp(decon_pixel_format format);
 uint64_t halTransformToDrmRot(uint32_t halTransform);
+uint32_t getAFBCCompressionType(const private_handle_t *handle);
 
 bool isFormatRgb(int format);
 bool isFormatYUV(int format);
@@ -401,7 +411,7 @@ bool isFormatSBWC(int format);
 bool isFormatP010(int format);
 bool formatHasAlphaChannel(int format);
 unsigned int isNarrowRgb(int format, android_dataspace data_space);
-bool isCompressed(const private_handle_t *handle);
+bool isAFBCCompressed(const private_handle_t *handle);
 bool isSrcCropFloat(hwc_frect &frect);
 bool isScaled(exynos_image &src, exynos_image &dst);
 bool isScaledDown(exynos_image &src, exynos_image &dst);
@@ -412,11 +422,11 @@ bool hasHdr10Plus(exynos_image &img);
 void dumpExynosImage(uint32_t type, exynos_image &img);
 void dumpExynosImage(String8& result, exynos_image &img);
 void dumpHandle(uint32_t type, private_handle_t *h);
-String8 getFormatStr(int format);
+String8 getFormatStr(int format, uint32_t compressType);
 String8 getMPPStr(int typeId);
 void adjustRect(hwc_rect_t &rect, int32_t width, int32_t height);
-uint32_t getBufferNumOfFormat(int format);
-uint32_t getPlaneNumOfFormat(int format);
+uint32_t getBufferNumOfFormat(int format, uint32_t compressType);
+uint32_t getPlaneNumOfFormat(int format, uint32_t compressType);
 
 int fence_close(int fence, ExynosDisplay* display,
         hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip);

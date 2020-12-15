@@ -383,7 +383,7 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
         fence_close(mAcquireFence);
     mAcquireFence = -1;
 #endif
-    bool compressed = isCompressed(mLayerBuffer);
+    bool compressed = isAFBCCompressed(mLayerBuffer);
     if (mCompressed != compressed)
         setGeometryChanged(GEOMETRY_LAYER_COMPRESSED_CHANGED);
     mCompressed = compressed;
@@ -399,9 +399,10 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
         setLayerDataspace(HAL_DATASPACE_UNKNOWN);
     }
 
-    HDEBUGLOGD(eDebugFence, "layers bufferHandle: %p, mDataSpace: 0x%8x, acquireFence: %d, compressed: %d, internal_format: 0x%" PRIx64 "",
-            mLayerBuffer, mDataSpace, mAcquireFence, mCompressed,
-            internal_format);
+    HDEBUGLOGD(eDebugFence,
+               "layers bufferHandle: %p, mDataSpace: 0x%8x, acquireFence: %d, afbc: %d, "
+               "internal_format: 0x%" PRIx64 "",
+               mLayerBuffer, mDataSpace, mAcquireFence, mCompressed, internal_format);
 
     /* Update fps */
     checkFps();
@@ -891,7 +892,7 @@ void ExynosLayer::dump(String8& result)
     result.appendFormat("|     handle    |     fd     |  tr  | AFBC | dataSpace  |  format   |  blend  | planeAlpha | zOrder |          color         | fps | priority | windowIndex        | \n");
     result.appendFormat("+---------------+------------+------+------+------------+-----------+---------+------------+--------+------------------------+-----+----------+--------------------+\n");
     result.appendFormat("|  %8p | %d, %d, %d | 0x%2x |   %1d  | 0x%8x | %s | 0x%4x  |    %1.3f    |    %d   | 0x%2x, 0x%2x, 0x%2x, 0x%2x |  %2d |    %2d    |    %d               |\n",
-            mLayerBuffer, fd, fd1, fd2, mTransform, mCompressed, mDataSpace, getFormatStr(format).string(),
+            mLayerBuffer, fd, fd1, fd2, mTransform, mCompressed, mDataSpace, getFormatStr(format, mCompressed? AFBC : 0).string(),
             mBlending, mPlaneAlpha, mZOrder, mColor.r, mColor.g, mColor.b, mColor.a, mFps, mOverlayPriority, mWindowIndex);
     result.appendFormat("|---------------+------------+------+------+------+-----+-----------+--------++-----+------+-----+--+-----------+------------++----+----------+--------------------+ \n");
     result.appendFormat("|    colorTr    |            sourceCrop           |          dispFrame       | type | exynosType | validateType | overlayInfo | supportedMPPFlag                   |\n");
@@ -948,7 +949,7 @@ void ExynosLayer::printLayer()
         fd2 = -1;
     }
     result.appendFormat("handle: %p [fd: %d, %d, %d], acquireFence: %d, tr: 0x%2x, AFBC: %1d, dataSpace: 0x%8x, format: %s\n",
-            mLayerBuffer, fd, fd1, fd2, mAcquireFence, mTransform, mCompressed, mDataSpace, getFormatStr(format).string());
+            mLayerBuffer, fd, fd1, fd2, mAcquireFence, mTransform, mCompressed, mDataSpace, getFormatStr(format, mCompressed? AFBC : 0).string());
     result.appendFormat("\tblend: 0x%4x, planeAlpha: %3.1f, zOrder: %d, color[0x%2x, 0x%2x, 0x%2x, 0x%2x]\n",
             mBlending, mPlaneAlpha, mZOrder, mColor.r, mColor.g, mColor.b, mColor.a);
     result.appendFormat("\tfps: %2d, priority: %d, windowIndex: %d\n", mFps, mOverlayPriority, mWindowIndex);
