@@ -301,7 +301,7 @@ bool formatHasAlphaChannel(int format)
 
 bool checkCompressionFd(const private_handle_t *handle)
 {
-    if ((getBufferNumOfFormat(handle->format, COMP_ANY) == 1) && (handle->fd1 > 0)) {
+    if ((getBufferNumOfFormat(handle->format, AFBC) == 1) && (handle->fd1 > 0)) {
         void *_map = NULL;
         uint32_t *isAFBC = NULL;
         _map = mmap(0, sizeof(uint32_t), PROT_READ|PROT_WRITE, MAP_SHARED, handle->fd1, 0);
