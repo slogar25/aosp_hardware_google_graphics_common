@@ -563,4 +563,6 @@ private:
     StringPairVec data;
 };
 
+void writeFileNode(FILE *fd, int value);
+int32_t writeIntToFile(const char *file, uint32_t value);
 #endif
