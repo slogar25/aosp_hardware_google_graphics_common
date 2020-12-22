@@ -28,8 +28,9 @@ using namespace std::chrono_literals;
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
 constexpr float DISPLAY_LUMINANCE_UNIT = 10000;
+constexpr auto nsecsPerMs = std::chrono::nanoseconds(1ms).count();
 constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
-constexpr auto microsecsPerSec = std::chrono::microseconds(1s).count();
+constexpr auto vsyncPeriodTag = "VsyncPeriod";
 
 typedef struct _drmModeAtomicReqItem drmModeAtomicReqItem, *drmModeAtomicReqItemPtr;
 
@@ -259,22 +260,21 @@ void ExynosDisplayDrmInterface::Callback(
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
     exynosDevice->compareVsyncPeriod();
     if (exynosDevice->mVsyncDisplay == (int)mExynosDisplay->mDisplayId) {
-        auto vsyncCallbackInfo =
-            exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
-        if (vsyncCallbackInfo.funcPointer &&
-            vsyncCallbackInfo.callbackData)
-            ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(
-                    vsyncCallbackInfo.callbackData,
-                    mExynosDisplay->mDisplayId, timestamp);
-
         auto vsync_2_4CallbackInfo =
             exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
-        if (vsync_2_4CallbackInfo.funcPointer &&
-            vsync_2_4CallbackInfo.callbackData)
+        if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
             ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
                     vsync_2_4CallbackInfo.callbackData,
                     mExynosDisplay->mDisplayId,
                     timestamp, mExynosDisplay->mVsyncPeriod);
+            ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
+            return;
+        }
+
+        auto vsyncCallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
+        if (vsyncCallbackInfo.funcPointer && vsyncCallbackInfo.callbackData)
+            ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(vsyncCallbackInfo.callbackData,
+                                                            mExynosDisplay->mDisplayId, timestamp);
     }
 }
 
@@ -299,8 +299,7 @@ bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
      * mDesiredVsyncPeriod is nanoseconds
      * Compare with milliseconds
      */
-    if (mDesiredVsyncPeriod/microsecsPerSec == mVsyncPeriod/microsecsPerSec)
-        return true;
+    if (mDesiredVsyncPeriod / nsecsPerMs == mVsyncPeriod / nsecsPerMs) return true;
 
     return false;
 }
@@ -337,7 +336,7 @@ int32_t ExynosDisplayDrmInterface::setLowPowerMode() {
     mExynosDisplay->mXres = mDozeDrmMode.h_display();
     mExynosDisplay->mYres = mDozeDrmMode.v_display();
     // in nanoseconds
-    mExynosDisplay->mVsyncPeriod = 1000 * 1000 * 1000 / mDozeDrmMode.v_refresh();
+    mExynosDisplay->mVsyncPeriod = nsecsPerSec / mDozeDrmMode.v_refresh();
     // Dots per 1000 inches
     mExynosDisplay->mXdpi = mm_width ? (mDozeDrmMode.h_display() * kUmPerInch) / mm_width : -1;
     // Dots per 1000 inches
@@ -374,6 +373,13 @@ int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
     }
 
     mVsyncCallback.enableVSync(HWC2_VSYNC_ENABLE == enabled);
+
+    ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
+    auto vsync_2_4CallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
+    if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
+        ATRACE_INT(vsyncPeriodTag, 0);
+    }
+
     return NO_ERROR;
 }
 
@@ -620,7 +626,6 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
 }
 
 int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
-    ALOGD("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
                              [config](DrmMode const &m) { return m.id() == config; });
     if (mode == mDrmConnector->modes().end()) {
@@ -628,8 +633,11 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
         return HWC2_ERROR_BAD_CONFIG;
     }
 
-    if (!setActiveDrmMode(*mode))
+    if (!setActiveDrmMode(*mode)) {
         ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
+    } else {
+        ALOGE("%s:: %s config(%d) failed", __func__, mExynosDisplay->mDisplayName.string(), config);
+    }
 
     return 0;
 }

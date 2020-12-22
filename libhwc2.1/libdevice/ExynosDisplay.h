@@ -1034,7 +1034,7 @@ class ExynosDisplay {
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
-        virtual int32_t setActiveConfigInternal(hwc2_config_t config);
+        virtual int32_t setActiveConfigInternal(hwc2_config_t config, bool force);
 
     public:
         /**

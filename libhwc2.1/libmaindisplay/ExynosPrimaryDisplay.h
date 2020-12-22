@@ -47,7 +47,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
          */
         virtual int32_t setPowerMode(int32_t mode) override;
         virtual bool getHDRException(ExynosLayer* __unused layer);
-        virtual int32_t setActiveConfigInternal(hwc2_config_t config) override;
+        virtual int32_t setActiveConfigInternal(hwc2_config_t config, bool force) override;
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig) override;
     public:
         // Prepare multi resolution

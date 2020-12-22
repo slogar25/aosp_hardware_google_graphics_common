@@ -160,7 +160,7 @@ int32_t ExynosPrimaryDisplay::getActiveConfigInternal(hwc2_config_t *outConfig) 
     return ExynosDisplay::getActiveConfigInternal(outConfig);
 }
 
-int32_t ExynosPrimaryDisplay::setActiveConfigInternal(hwc2_config_t config) {
+int32_t ExynosPrimaryDisplay::setActiveConfigInternal(hwc2_config_t config, bool force) {
     hwc2_config_t cur_config;
 
     getActiveConfigInternal(&cur_config);
@@ -172,7 +172,7 @@ int32_t ExynosPrimaryDisplay::setActiveConfigInternal(hwc2_config_t config) {
         mPendActiveConfig = config;
         return HWC2_ERROR_NONE;
     }
-    return ExynosDisplay::setActiveConfigInternal(config);
+    return ExynosDisplay::setActiveConfigInternal(config, force);
 }
 
 int32_t ExynosPrimaryDisplay::applyPendingConfig() {
@@ -184,7 +184,8 @@ int32_t ExynosPrimaryDisplay::applyPendingConfig() {
     } else {
         getActiveConfigInternal(&config);
     }
-    return ExynosDisplay::setActiveConfigInternal(config);
+
+    return ExynosDisplay::setActiveConfigInternal(config, true);
 }
 
 int32_t ExynosPrimaryDisplay::setPowerOn() {

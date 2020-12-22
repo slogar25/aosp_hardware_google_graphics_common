@@ -1920,7 +1920,7 @@ int ExynosDisplay::deliverWinConfigData() {
         int32_t waitTime = mVsyncPeriod / 1000000 * 5;
         gettimeofday(&tv_s, NULL);
         if (fence_valid(mLastRetireFence)) {
-            ATRACE_CALL();
+            ATRACE_NAME("waitLastRetireFence");
             if (sync_wait(mLastRetireFence, waitTime) < 0) {
                 DISPLAY_LOGE("%s:: mLastRetireFence(%d) is not released during (%d ms)",
                         __func__, mLastRetireFence, waitTime);
@@ -2850,16 +2850,16 @@ int32_t ExynosDisplay::setActiveConfig(hwc2_config_t config)
 {
     Mutex::Autolock lock(mDisplayMutex);
     DISPLAY_LOGD(eDebugDisplayConfig, "%s:: config(%d)", __func__, config);
-    return setActiveConfigInternal(config);
+    return setActiveConfigInternal(config, false);
 }
 
-int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config)
-{
-    if(isBadConfig(config))
-        return HWC2_ERROR_BAD_CONFIG;
-    /* Don't skip when power was off */
-    if(!mSkipFrame && needNotChangeConfig(config))
+int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config, bool force) {
+    if (isBadConfig(config)) return HWC2_ERROR_BAD_CONFIG;
+
+    if (!force && needNotChangeConfig(config)) {
+        ALOGI("skip same config %d (force %d)", config, force);
         return HWC2_ERROR_NONE;
+    }
 
     DISPLAY_LOGD(eDebugDisplayConfig, "(current %d) : %dx%d, %dms, %d Xdpi, %d Ydpi", mActiveConfig,
             mXres, mYres, mVsyncPeriod, mXdpi, mYdpi);
@@ -3108,10 +3108,9 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
             vsyncPeriodChangeConstraints->seamlessRequired,
             vsyncPeriodChangeConstraints->desiredTimeNanos);
 
-    if(isBadConfig(config))
-        return HWC2_ERROR_BAD_CONFIG;
+    if (isBadConfig(config)) return HWC2_ERROR_BAD_CONFIG;
 
-    if(needNotChangeConfig(config)) {
+    if (needNotChangeConfig(config)) {
         outTimeline->refreshRequired = false;
         outTimeline->newVsyncAppliedTimeNanos = vsyncPeriodChangeConstraints->desiredTimeNanos;
         return HWC2_ERROR_NONE;

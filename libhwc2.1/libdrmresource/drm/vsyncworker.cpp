@@ -14,20 +14,24 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #define LOG_TAG "hwc-vsync-worker"
 
 #include "vsyncworker.h"
-#include "drmdevice.h"
-#include "worker.h"
-
-#include <stdlib.h>
-#include <time.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
-#include <map>
 
 #include <hardware/hardware.h>
 #include <log/log.h>
+#include <stdlib.h>
+#include <time.h>
+#include <utils/Trace.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
+#include <map>
+
+#include "drmdevice.h"
+#include "worker.h"
 
 namespace android {
 
@@ -61,6 +65,7 @@ void VSyncWorker::VSyncControl(bool enabled) {
   last_timestamp_ = -1;
   Unlock();
 
+  ATRACE_INT("HWCVsync", static_cast<int32_t>(enabled));
   Signal();
 }
 
