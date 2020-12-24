@@ -162,7 +162,8 @@ class ExynosResourceManager {
         ExynosMPP* getM2mMPP(uint32_t index) {return mM2mMPPs[index];};
 
         virtual void makeAcrylRestrictions(mpp_phycal_type_t type);
-        void makeSizeRestrictions(uint32_t mppId, restriction_size_t size, restriction_classification_t format);
+        void makeSizeRestrictions(uint32_t mppId, const restriction_size_t &size,
+                                  restriction_classification_t format);
         void makeFormatRestrictions(restriction_key_t table);
 
         void updateRestrictions();
@@ -175,11 +176,12 @@ class ExynosResourceManager {
         virtual bool hasHDR10PlusMPP();
         float getAssignedCapacity(uint32_t physicalType);
 
-        void dump(String8 &result);
+        void dump(String8 &result) const;
 
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,
                 uint32_t layer_index, exynos_image m2m_out_img, ExynosMPP *m2mMPP, ExynosMPP *otfMPP);
+        void dump(const restriction_classification_t, String8 &result) const;
 
         DstBufMgrThread mDstBufMgrThread;
 

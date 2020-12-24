@@ -15,13 +15,17 @@
  */
 
 #include "ExynosDeviceInterface.h"
-#include "ExynosHWCDebug.h"
-#include "ExynosDevice.h"
-#include "ExynosResourceManager.h"
-#include "ExynosMPP.h"
-#include "ExynosResourceRestriction.h"
-#include <unordered_set>
+
+#include <cutils/properties.h>
+
 #include <unordered_map>
+#include <unordered_set>
+
+#include "ExynosDevice.h"
+#include "ExynosHWCDebug.h"
+#include "ExynosMPP.h"
+#include "ExynosResourceManager.h"
+#include "ExynosResourceRestriction.h"
 
 #ifndef USE_MODULE_ATTR
 extern feature_support_t feature_table[];
@@ -125,6 +129,14 @@ int32_t ExynosDeviceInterface::makeDPURestrictions() {
         rSize.cropHeightAlign = r.blk_y_align;
 
         mpp_phycal_type_t hwType = resourceManager->getPhysicalType(i);
+        if (hwType <= MPP_DPP_NUM) {
+            auto newMaxDownscale =
+                    static_cast<unsigned int>(property_get_int32("vendor.hwc.dpp.downscale", 0));
+            if (newMaxDownscale != 0) {
+                rSize.maxDownScale = min(rSize.maxDownScale, newMaxDownscale);
+                ALOGI("%s:: Apply DPP downscale restriction on 1/%d", __func__, rSize.maxDownScale);
+            }
+        }
         resourceManager->makeSizeRestrictions(hwType, rSize, RESTRICTION_RGB);
 
         /* YUV size restrictions */

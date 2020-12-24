@@ -170,11 +170,6 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     mNeedSolidColorLayer(false)
 {
 
-    for (int i=0; i<RESTRICTION_MAX; i++){
-        memset(&mSrcSizeRestrictions[i], 0, sizeof(mSrcSizeRestrictions[i]));
-        memset(&mDstSizeRestrictions[i], 0, sizeof(mDstSizeRestrictions[i]));
-    }
-
     if (mPhysicalType == MPP_G2D) {
         if (mLogicalType == MPP_LOGICAL_G2D_RGB) {
 
@@ -1212,7 +1207,8 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
 
     if (bufferNum == 0)
     {
-        MPP_LOGE("%s:: Fail to get bufferNum(%d), format(0x%8x)", __func__, bufferNum, srcHandle->format);
+        MPP_LOGE("%s:: Fail to get bufferNum(%d), format(0x%8x, afbc %d)", __func__, bufferNum,
+                 srcHandle->format, isAFBCCompressed(srcHandle));
         return -EINVAL;
     }
     bufFds[0] = srcHandle->fd;
@@ -1344,7 +1340,8 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
             getBufferNumOfFormat(dstImgInfo->format, getAFBCCompressionType(dstHandle));
     if (bufferNum == 0)
     {
-        MPP_LOGE("%s:: Fail to get bufferNum(%d), format(0x%8x)", __func__, bufferNum, dstImgInfo->format);
+        MPP_LOGE("%s:: Fail to get bufferNum(%d), format(0x%8x, afbc %d)", __func__, bufferNum,
+                 dstImgInfo->format, isAFBCCompressed(dstHandle));
         return -EINVAL;
     }
 
@@ -1719,6 +1716,7 @@ int32_t ExynosMPP::doPostProcessing(struct exynos_image &src, struct exynos_imag
             MPP_LOGD(eDebugMPP, "dst format is changed (%d -> %d)",
                     mDstImgs[mCurrentDstBuf].format, dst.format);
             mDstImgs[mCurrentDstBuf].format = dst.format;
+            mDstImgs[mCurrentDstBuf].bufferHandle->format = dst.format;
         }
     }
 
