@@ -16,6 +16,10 @@
 #ifndef _EXYNOSHWCHELPER_H
 #define _EXYNOSHWCHELPER_H
 
+#include <sstream>
+#include <string>
+#include <vector>
+
 #include <drm/drm_fourcc.h>
 #include <hardware/hwcomposer2.h>
 #include <utils/String8.h>
@@ -520,4 +524,40 @@ void printLeakFds(ExynosDisplay *display);
 bool validateFencePerFrame(ExynosDisplay *display);
 android_dataspace colorModeToDataspace(android_color_mode_t mode);
 bool hasPPC(uint32_t physicalType, uint32_t formatIndex, uint32_t rotIndex);
+
+class TableBuilder {
+public:
+    template <typename T>
+    TableBuilder& add(const std::string& key, const T& value) {
+        std::stringstream v;
+        v << value;
+        data.emplace_back(std::make_pair(key, v.str()));
+        return *this;
+    }
+
+    template <typename T>
+    TableBuilder& add(const std::string& key, const std::vector<T>& values) {
+        std::stringstream value;
+        for (int i = 0; i < values.size(); i++) {
+            if (i) value << ", ";
+            value << values[i];
+        }
+
+        data.emplace_back(std::make_pair(key, value.str()));
+        return *this;
+    }
+
+    // Template overrides for hex integers
+    TableBuilder& add(const std::string& key, const uint64_t& value, bool toHex);
+    TableBuilder& add(const std::string& key, const std::vector<uint64_t>& values, bool toHex);
+
+    std::string build();
+
+private:
+    std::string buildPaddedString(const std::string& str, int size);
+
+    using StringPairVec = std::vector<std::pair<std::string, std::string>>;
+    StringPairVec data;
+};
+
 #endif

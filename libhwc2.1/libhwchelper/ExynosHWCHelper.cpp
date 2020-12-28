@@ -26,6 +26,7 @@
 #include <linux/videodev2_exynos_media.h>
 #include "VendorVideoAPI.h"
 #include "ExynosResourceRestriction.h"
+#include <iomanip>
 
 #define AFBC_MAGIC  0xafbc
 
@@ -1191,4 +1192,58 @@ bool hasPPC(uint32_t physicalType, uint32_t formatIndex, uint32_t rotIndex) {
         return true;
     }
     return false;
+}
+
+TableBuilder& TableBuilder::add(const std::string& key, const uint64_t& value, bool toHex) {
+    std::stringstream v;
+    if (toHex)
+        v << "0x" << std::hex << value;
+    else
+        v << value;
+    data.emplace_back(std::make_pair(key, v.str()));
+    return *this;
+}
+
+TableBuilder& TableBuilder::add(const std::string& key, const std::vector<uint64_t>& values,
+                                bool toHex) {
+    std::stringstream value;
+    for (int i = 0; i < values.size(); i++) {
+        if (i) value << ", ";
+
+        if (toHex)
+            value << "0x" << std::hex << values[i];
+        else
+            value << values[i];
+    }
+
+    data.emplace_back(std::make_pair(key, value.str()));
+    return *this;
+}
+
+std::string TableBuilder::build() {
+    std::stringstream splitter, header, content;
+    splitter << "+";
+    header << "|";
+    content << "|";
+    for (const auto& [key, value] : data) {
+        int size = std::max(key.size(), value.size()) + 2 /* for spaces around the string */;
+        splitter << std::string(size, '-') << "+";
+        header << buildPaddedString(key, size) << "|";
+        content << buildPaddedString(value, size) << "|";
+    }
+
+    std::string output = splitter.str() + "\n" +
+                         header.str() + "\n" +
+                         splitter.str() + "\n" +
+                         content.str() + "\n" +
+                         splitter.str() + "\n";
+    return output;
+}
+
+std::string TableBuilder::buildPaddedString(const std::string& str, int size) {
+    int totalPadding = size - str.size();
+    int leftPadding = totalPadding / 2.0;
+    int rightPadding = (totalPadding / 2.0) + 0.6; // Poor person's ceil
+
+    return std::string(leftPadding, ' ') + str + std::string(rightPadding, ' ');
 }

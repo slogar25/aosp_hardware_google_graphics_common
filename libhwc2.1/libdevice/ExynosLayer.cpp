@@ -895,21 +895,44 @@ void ExynosLayer::dump(String8& result)
         fd2 = -1;
     }
 
-    result.appendFormat("+---------------+------------+------+------+------------+-----------+---------+------------+--------+------------------------+-----+----------+--------------------+\n");
-    result.appendFormat("|     handle    |     fd     |  tr  | AFBC | dataSpace  |  format   |  blend  | planeAlpha | zOrder |          color         | fps | priority | windowIndex        | \n");
-    result.appendFormat("+---------------+------------+------+------+------------+-----------+---------+------------+--------+------------------------+-----+----------+--------------------+\n");
-    result.appendFormat("|  %8p | %d, %d, %d | 0x%2x |   %1d  | 0x%8x | %s | 0x%4x  |    %1.3f    |    %d   | 0x%2x, 0x%2x, 0x%2x, 0x%2x |  %2d |    %2d    |    %d               |\n",
-            mLayerBuffer, fd, fd1, fd2, mTransform, mCompressed, mDataSpace, getFormatStr(format, mCompressed? AFBC : 0).string(),
-            mBlending, mPlaneAlpha, mZOrder, mColor.r, mColor.g, mColor.b, mColor.a, mFps, mOverlayPriority, mWindowIndex);
-    result.appendFormat("|---------------+------------+------+------+------+-----+-----------+--------++-----+------+-----+--+-----------+------------++----+----------+--------------------+ \n");
-    result.appendFormat("|    colorTr    |            sourceCrop           |          dispFrame       | type | exynosType | validateType | overlayInfo | supportedMPPFlag                   |\n");
-    result.appendFormat("|---------------+---------------------------------+--------------------------+------+------------+--------------+-------------+------------------------------------+ \n");
-    result.appendFormat("|            %2d | %7.1f,%7.1f,%7.1f,%7.1f | %5d,%5d,%5d,%5d  |  %2d  |     %2d     |      %2d      |  0x%8x |    0x%8x                      |\n",
-            mLayerColorTransform.enable,
-            mPreprocessedInfo.sourceCrop.left, mPreprocessedInfo.sourceCrop.top, mPreprocessedInfo.sourceCrop.right, mPreprocessedInfo.sourceCrop.bottom,
-            mPreprocessedInfo.displayFrame.left, mPreprocessedInfo.displayFrame.top, mPreprocessedInfo.displayFrame.right, mPreprocessedInfo.displayFrame.bottom,
-            mCompositionType, mExynosCompositionType, mValidateCompositionType, mOverlayInfo, mSupportedMPPFlag);
-    result.appendFormat("+---------------+---------------------------------+--------------------------+------+------------+--------------+-------------+------------------------------------+\n");
+    result.append(TableBuilder()
+                          .add("handle", mLayerBuffer)
+                          .add("fd", std::vector<int>({fd, fd1, fd2}))
+                          .add("tr", mTransform, true)
+                          .add("AFBC", static_cast<bool>(mCompressed))
+                          .add("dataSpace", mDataSpace, true)
+                          .add("format", getFormatStr(format, mCompressed ? AFBC : 0).string())
+                          .add("blend", mBlending, true)
+                          .add("planeAlpha", mPlaneAlpha)
+                          .add("zOrder", mZOrder)
+                          .add("color",
+                               std::vector<uint64_t>({mColor.r, mColor.g, mColor.b, mColor.a}),
+                               true)
+                          .add("fps", mFps)
+                          .add("priority", mOverlayPriority)
+                          .add("windowIndex", mWindowIndex)
+                          .build()
+                          .c_str());
+
+    result.append(TableBuilder()
+                          .add("colorTr", mLayerColorTransform.enable)
+                          .add("sourceCrop",
+                               std::vector<double>({mPreprocessedInfo.sourceCrop.left,
+                                                    mPreprocessedInfo.sourceCrop.top,
+                                                    mPreprocessedInfo.sourceCrop.right,
+                                                    mPreprocessedInfo.sourceCrop.bottom}))
+                          .add("dispFrame",
+                               std::vector<int>({mPreprocessedInfo.displayFrame.left,
+                                                 mPreprocessedInfo.displayFrame.top,
+                                                 mPreprocessedInfo.displayFrame.right,
+                                                 mPreprocessedInfo.displayFrame.bottom}))
+                          .add("type", mCompositionType)
+                          .add("exynosType", mExynosCompositionType)
+                          .add("validateType", mValidateCompositionType)
+                          .add("overlayInfo", mOverlayInfo, true)
+                          .add("supportedMPPFlag", mSupportedMPPFlag, true)
+                          .build()
+                          .c_str());
 
     if ((mDisplay != NULL) && (mDisplay->mResourceManager != NULL)) {
         result.appendFormat("MPPFlags for otfMPP\n");
