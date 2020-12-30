@@ -1348,8 +1348,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
             cfg.src.f_w = srcMaxWidth;
         if (cfg.src.f_h > srcMaxHeight)
             cfg.src.f_h = srcMaxHeight;
-        cfg.src.f_w = pixel_align_down((unsigned int)cfg.src.f_w, srcWidthAlign);
-        cfg.src.f_h = pixel_align_down((unsigned int)cfg.src.f_h, srcHeightAlign);
+        cfg.src.f_w = pixel_align_down(cfg.src.f_w, srcWidthAlign);
+        cfg.src.f_h = pixel_align_down(cfg.src.f_h, srcHeightAlign);
 
         cfg.src.x = pixel_align(cfg.src.x, srcXAlign);
         cfg.src.y = pixel_align(cfg.src.y, srcYAlign);

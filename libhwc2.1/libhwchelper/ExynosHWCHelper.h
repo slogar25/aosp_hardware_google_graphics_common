@@ -454,12 +454,18 @@ inline hwc_rect expand(const hwc_rect &r1, const hwc_rect &r2)
     return i;
 }
 
-int pixel_align_down(int x, int a);
+template <typename T>
+inline T pixel_align_down(const T x, const uint32_t a) {
+    static_assert(std::numeric_limits<T>::is_integer,
+                  "Integer type is expected as the alignment input");
+    return a ? (x / a) * a : x;
+}
 
-inline int pixel_align(int x, int a) {
-    if ((a != 0) && ((x % a) != 0))
-        return ((x) - (x % a)) + a;
-    return x;
+template <typename T>
+inline T pixel_align(const T x, const uint32_t a) {
+    static_assert(std::numeric_limits<T>::is_integer,
+                  "Integer type is expected as the alignment input");
+    return a ? ((x + a - 1) / a) * a : x;
 }
 
 uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format);

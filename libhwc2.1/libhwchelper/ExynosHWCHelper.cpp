@@ -602,16 +602,6 @@ void setFenceName(int fenceFd, hwc_fence_type fenceType)
     }
 }
 
-int pixel_align_down(int x, int a) {
-    if ((a != 0) && ((x % a) != 0)) {
-        int ret = ((x) - (x % a));
-        if (ret < 0)
-            ret = 0;
-        return ret;
-    }
-    return x;
-}
-
 uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
 {
     switch (format) {
