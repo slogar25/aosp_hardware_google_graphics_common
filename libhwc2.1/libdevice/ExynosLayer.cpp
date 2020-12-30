@@ -895,27 +895,27 @@ void ExynosLayer::dump(String8& result)
         fd2 = -1;
     }
 
-    result.append(TableBuilder()
-                          .add("handle", mLayerBuffer)
-                          .add("fd", std::vector<int>({fd, fd1, fd2}))
-                          .add("tr", mTransform, true)
-                          .add("AFBC", static_cast<bool>(mCompressed))
-                          .add("dataSpace", mDataSpace, true)
-                          .add("format", getFormatStr(format, mCompressed ? AFBC : 0).string())
-                          .add("blend", mBlending, true)
-                          .add("planeAlpha", mPlaneAlpha)
-                          .add("zOrder", mZOrder)
-                          .add("color",
-                               std::vector<uint64_t>({mColor.r, mColor.g, mColor.b, mColor.a}),
-                               true)
-                          .add("fps", mFps)
-                          .add("priority", mOverlayPriority)
-                          .add("windowIndex", mWindowIndex)
-                          .build()
-                          .c_str());
+    {
+        TableBuilder tb;
+        tb.add("zOrder", mZOrder)
+          .add("priority", mOverlayPriority);
+        if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
+            tb.add("color", std::vector<uint64_t>({mColor.r, mColor.g, mColor.b, mColor.a}), true);
+        } else {
+            tb.add("handle", mLayerBuffer)
+              .add("fd", std::vector<int>({fd, fd1, fd2}))
+              .add("AFBC", static_cast<bool>(mCompressed));
+        }
+        tb.add("format", getFormatStr(format, mCompressed ? AFBC : 0).string())
+          .add("dataSpace", mDataSpace, true)
+          .add("colorTr", mLayerColorTransform.enable)
+          .add("blend", mBlending, true)
+          .add("planeAlpha", mPlaneAlpha)
+          .add("fps", mFps);
+        result.append(tb.build().c_str());
+    }
 
     result.append(TableBuilder()
-                          .add("colorTr", mLayerColorTransform.enable)
                           .add("sourceCrop",
                                std::vector<double>({mPreprocessedInfo.sourceCrop.left,
                                                     mPreprocessedInfo.sourceCrop.top,
@@ -926,6 +926,8 @@ void ExynosLayer::dump(String8& result)
                                                  mPreprocessedInfo.displayFrame.top,
                                                  mPreprocessedInfo.displayFrame.right,
                                                  mPreprocessedInfo.displayFrame.bottom}))
+                          .add("tr", mTransform, true)
+                          .add("windowIndex", mWindowIndex)
                           .add("type", mCompositionType)
                           .add("exynosType", mExynosCompositionType)
                           .add("validateType", mValidateCompositionType)
