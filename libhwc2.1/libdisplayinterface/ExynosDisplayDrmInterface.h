@@ -297,8 +297,19 @@ class ExynosDisplayDrmInterface :
         bool isBrightnessStateChange();
         void setupBrightnessConfig();
         bool mBrightntessIntfSupported = false;
+        float mBrightnessHbmMax = 1.0f;
         /* boost brightness ratio for HDR */
         float mBrightnessHdrRatio = 1.0;
+        enum class PanelHbmType {
+            ONE_STEP,
+            CONTINUOUS,
+        };
+        enum BrightnessRange {
+            NORMAL = 0,
+            HBM,
+            MAX,
+        };
+        PanelHbmType mPanelHbmType;
 
         Mutex mBrightnessUpdateMutex;
         brightnessState_t mBrightnessState;
@@ -306,6 +317,24 @@ class ExynosDisplayDrmInterface :
         float mScaledBrightness;
         bool mBrightnessDimmingOn;
         bool mBrightnessHbmOn;
+
+        struct BrightnessTable {
+            float mBriStart;
+            float mBriEnd;
+            uint32_t mBklStart;
+            uint32_t mBklEnd;
+            uint32_t mNitsStart;
+            uint32_t mNitsEnd;
+            BrightnessTable() {}
+            BrightnessTable(const brightness_attribute &attr)
+                  : mBriStart(static_cast<float>(attr.percentage.min) / 100.0f),
+                    mBriEnd(static_cast<float>(attr.percentage.max) / 100.0f),
+                    mBklStart(attr.level.min),
+                    mBklEnd(attr.level.max),
+                    mNitsStart(attr.nits.min),
+                    mNitsEnd(attr.nits.max) {}
+        };
+        struct BrightnessTable mBrightnessTable[BrightnessRange::MAX];
 };
 
 #endif

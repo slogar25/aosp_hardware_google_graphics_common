@@ -112,6 +112,26 @@ int DrmConnector::Init() {
       ALOGE("Could not get lp_mode property\n");
   }
 
+  ret = drm_->GetConnectorProperty(*this, "brightness_capability", &brightness_cap_);
+  if (ret) {
+      ALOGE("Could not get brightness_capability property\n");
+  }
+
+  ret = drm_->GetConnectorProperty(*this, "brightness_level", &brightness_level_);
+  if (ret) {
+      ALOGE("Could not get brightness_level property\n");
+  }
+
+  ret = drm_->GetConnectorProperty(*this, "hbm_on", &hbm_on_);
+  if (ret) {
+      ALOGE("Could not get hbm_on property\n");
+  }
+
+  ret = drm_->GetConnectorProperty(*this, "dimming_on", &dimming_on_);
+  if (ret) {
+      ALOGE("Could not get dimming_on property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   properties_.push_back(&edid_property_);
@@ -125,6 +145,10 @@ int DrmConnector::Init() {
   properties_.push_back(&min_luminance_);
   properties_.push_back(&hdr_formats_);
   properties_.push_back(&lp_mode_);
+  properties_.push_back(&brightness_cap_);
+  properties_.push_back(&brightness_level_);
+  properties_.push_back(&hbm_on_);
+  properties_.push_back(&dimming_on_);
 
   return 0;
 }
@@ -265,6 +289,22 @@ const DrmProperty &DrmConnector::max_avg_luminance() const {
 
 const DrmProperty &DrmConnector::min_luminance() const {
   return min_luminance_;
+}
+
+const DrmProperty &DrmConnector::brightness_cap() const {
+    return brightness_cap_;
+}
+
+const DrmProperty &DrmConnector::brightness_level() const {
+    return brightness_level_;
+}
+
+const DrmProperty &DrmConnector::hbm_on() const {
+    return hbm_on_;
+}
+
+const DrmProperty &DrmConnector::dimming_on() const {
+    return dimming_on_;
 }
 
 const DrmProperty &DrmConnector::hdr_formats() const {
