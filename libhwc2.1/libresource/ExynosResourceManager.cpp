@@ -1148,16 +1148,12 @@ exynos_image ExynosResourceManager::getAlignedImage(exynos_image image, const Ex
 void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
         const ExynosDisplay *display, exynos_image src_img, exynos_image dst_img,
         std::vector<exynos_image> &image_lists) {
-    uint32_t dstW = dst_img.w;
-    uint32_t dstH = dst_img.h;
-    bool isPerpendicular = !!(src_img.transform & HAL_TRANSFORM_ROT_90);
-    if (isPerpendicular) {
-        dstW = dst_img.h;
-        dstH = dst_img.w;
-    }
+    const bool isPerpendicular = !!(src_img.transform & HAL_TRANSFORM_ROT_90);
+    const uint32_t srcWidth = isPerpendicular ? src_img.h : src_img.w;
+    const uint32_t srcHeight = isPerpendicular ? src_img.w : src_img.h;
 
-    const bool scaleUp = (dstW > src_img.w && dstH > src_img.h);
-    const bool scaleDown = (dstW < src_img.w && dstH < src_img.h);
+    const bool scaleUp = (srcWidth < dst_img.w && srcHeight < dst_img.h);
+    const bool scaleDown = (srcWidth > dst_img.w && srcHeight > dst_img.h);
 
     if (!scaleUp && !scaleDown) {
         return;
@@ -1165,7 +1161,8 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
 
     /* otfMPP doesn't rotate image, m2mMPP rotates image */
     exynos_image dst_scale_img = dst_img;
-    src_img.transform = 0;
+    dst_scale_img.transform = 0;
+    dst_img.transform = 0;
 
     if (hasHdrInfo(src_img)) {
         if (isFormatYUV(src_img.format))
@@ -1193,8 +1190,8 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
                          }
                          return false;
                      });
-        const auto reqRatio = max(float(dstW) / float(src_img.w * otfMppRatio),
-                                  float(dstH) / float(src_img.h * otfMppRatio));
+        const auto reqRatio = max(float(dst_img.w) / float(srcWidth * otfMppRatio),
+                                  float(dst_img.h) / float(srcHeight * otfMppRatio));
         std::find_if(mM2mMPPs.begin(), mM2mMPPs.end(),
                      [&src_img, &dst_scale_img, reqRatio, &m2mMpp, &m2mMppRatio](auto m) {
                          float ratio = float(m->getMaxUpscale(src_img, dst_scale_img));
@@ -1218,8 +1215,8 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
                      });
 
         const float resolution = float(display->mXres) * float(display->mYres);
-        const float scaleRatio_H = float(dstW / m2mMppRatio) / float(dst_img.w);
-        const float scaleRatio_V = float(dstH / m2mMppRatio) / float(dst_img.h);
+        const float scaleRatio_H = float(srcWidth / m2mMppRatio) / float(dst_img.w);
+        const float scaleRatio_V = float(srcHeight / m2mMppRatio) / float(dst_img.h);
         const float displayRatio_H = float(dst_img.w) / float(display->mXres);
 
         std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
@@ -1247,8 +1244,8 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
 
     dst_scale_img.x = 0;
     dst_scale_img.y = 0;
-    dst_scale_img.w = scaleDown ? dst_img.w : isPerpendicular ? src_img.h : src_img.w;
-    dst_scale_img.h = scaleDown ? dst_img.h : isPerpendicular ? src_img.w : src_img.h;
+    dst_scale_img.w = scaleDown ? dst_img.w : srcWidth;
+    dst_scale_img.h = scaleDown ? dst_img.h : srcHeight;
 
     HDEBUGLOGD(eDebugResourceManager,
                "scaling w: %d, h: %d, ratio = otfType %d - %d, m2mType %d - %d", dst_scale_img.w,
@@ -1262,11 +1259,11 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
             dst_scale_img.h = uint32_t(ceilf(float(dst_img.h) / float(otfMppRatio)));
         }
     } else {
-        if (dst_scale_img.w * m2mMppRatio < src_img.w) {
-            dst_scale_img.w = uint32_t(ceilf(float(src_img.w) / float(m2mMppRatio)));
+        if (dst_scale_img.w * m2mMppRatio < srcWidth) {
+            dst_scale_img.w = uint32_t(ceilf(float(srcWidth) / float(m2mMppRatio)));
         }
-        if (dst_scale_img.h * m2mMppRatio < src_img.h) {
-            dst_scale_img.h = uint32_t(ceilf(float(src_img.h) / float(m2mMppRatio)));
+        if (dst_scale_img.h * m2mMppRatio < srcHeight) {
+            dst_scale_img.h = uint32_t(ceilf(float(srcHeight) / float(m2mMppRatio)));
         }
     }
     HDEBUGLOGD(eDebugResourceManager,
