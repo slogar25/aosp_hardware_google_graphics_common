@@ -501,12 +501,28 @@ uint32_t ExynosMPP::getMaxUpscale(const struct exynos_image &src,
     return mSrcSizeRestrictions[idx].maxUpScale;
 }
 
+bool ExynosMPP::checkDownscaleCap(const float resolution, const float scaleRatio_H,
+                                  const float scaleRatio_V, const float displayRatio_H) const {
+    if (mPhysicalType >= MPP_DPP_NUM) return true;
+
+    return float(mClockKhz) * 1000.0 >=
+            ((resolution * VPP_RESOL_CLOCK_FACTOR * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR) /
+             mPPC * displayRatio_H);
+}
+
+uint32_t ExynosMPP::getDownscaleRestriction(const struct exynos_image &src,
+                                            const struct exynos_image & /*dst*/) const {
+    auto idx = getRestrictionClassification(src);
+    return mDstSizeRestrictions[idx].maxDownScale;
+}
+
 uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct exynos_image &src,
                                     const struct exynos_image &dst) const {
-    uint32_t idx = getRestrictionClassification(src);
+    uint32_t maxDownscale = getDownscaleRestriction(src, dst);
 
-    if (mDstSizeRestrictions[idx].maxDownScale <= 1)
-        return mDstSizeRestrictions[idx].maxDownScale;
+    if (maxDownscale <= 1) {
+        return maxDownscale;
+    }
 
     if (mPhysicalType < MPP_DPP_NUM) {
         bool isPerpendicular = !!(dst.transform & HAL_TRANSFORM_ROT_90);
@@ -522,18 +538,17 @@ uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct e
         float dstW = float(dst.w);
         float displayW = float(display.mXres);
         float displayH = float(display.mYres);
-        float resolClock = displayW * displayH * VPP_RESOL_CLOCK_FACTOR;
+        float resolution = displayW * displayH;
 
-        scaleRatio_H = std::min(scaleRatio_H, float(mDstSizeRestrictions[idx].maxDownScale));
-        scaleRatio_V = std::min(scaleRatio_V, float(mDstSizeRestrictions[idx].maxDownScale));
+        scaleRatio_H = std::min(scaleRatio_H, float(maxDownscale));
+        scaleRatio_V = std::min(scaleRatio_V, float(maxDownscale));
 
-        if (float(mClockKhz) * 1000.0 <
-            ((resolClock * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR) / mPPC *
-             (dstW / displayW)))
+        if (!checkDownscaleCap(resolution, scaleRatio_H, scaleRatio_V, dstW / displayW)) {
             return 1;
+        }
     }
 
-    return mDstSizeRestrictions[idx].maxDownScale;
+    return maxDownscale;
 }
 
 uint32_t ExynosMPP::getSrcXOffsetAlign(struct exynos_image &src)

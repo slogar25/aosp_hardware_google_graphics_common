@@ -1131,10 +1131,10 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
 
 exynos_image ExynosResourceManager::getAlignedImage(exynos_image image, const ExynosMPP *m2mMpp,
                                                     const ExynosMPP *otfMpp) const {
-    const auto srcCropWidthAlign = otfMpp->getSrcCropWidthAlign(image);
-    const auto srcCropHeightAlign = otfMpp->getSrcCropHeightAlign(image);
-    const auto dstwidthAlign = m2mMpp->getDstWidthAlign(image);
-    const auto dstHeightAlign = m2mMpp->getDstHeightAlign(image);
+    const auto srcCropWidthAlign = otfMpp ? otfMpp->getSrcCropWidthAlign(image) : 1;
+    const auto srcCropHeightAlign = otfMpp ? otfMpp->getSrcCropHeightAlign(image) : 1;
+    const auto dstwidthAlign = m2mMpp ? m2mMpp->getDstWidthAlign(image) : 1;
+    const auto dstHeightAlign = m2mMpp ? m2mMpp->getDstHeightAlign(image) : 1;
 
     const auto widthAlign = std::lcm(srcCropWidthAlign, dstwidthAlign);
     const auto heighAlign = std::lcm(srcCropHeightAlign, dstHeightAlign);
@@ -1165,7 +1165,6 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
 
     /* otfMPP doesn't rotate image, m2mMPP rotates image */
     exynos_image dst_scale_img = dst_img;
-    dst_scale_img.transform = src_img.transform;
     src_img.transform = 0;
 
     if (hasHdrInfo(src_img)) {
@@ -1178,10 +1177,6 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
             dst_scale_img.format = DEFAULT_MPP_DST_YUV_FORMAT;
         }
     }
-
-    const uint32_t reqRatio = (scaleUp ? max((dstW - 1) / src_img.w, (dstH - 1) / src_img.h)
-                                       : max((src_img.w - 1) / dstW, (src_img.h - 1) / dstH)) +
-            1;
 
     ExynosMPP *otfMpp = nullptr;
     ExynosMPP *m2mMpp = nullptr;
@@ -1198,11 +1193,12 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
                          }
                          return false;
                      });
+        const auto reqRatio = max(float(dstW) / float(src_img.w * otfMppRatio),
+                                  float(dstH) / float(src_img.h * otfMppRatio));
         std::find_if(mM2mMPPs.begin(), mM2mMPPs.end(),
-                     [&src_img, &dst_scale_img, otfMppRatio, reqRatio, &m2mMpp,
-                      &m2mMppRatio](auto m) {
-                         auto ratio = m->getMaxUpscale(src_img, dst_scale_img);
-                         if (ratio * otfMppRatio >= reqRatio) {
+                     [&src_img, &dst_scale_img, reqRatio, &m2mMpp, &m2mMppRatio](auto m) {
+                         float ratio = float(m->getMaxUpscale(src_img, dst_scale_img));
+                         if (ratio > reqRatio) {
                              m2mMpp = m;
                              m2mMppRatio = ratio;
                              return true;
@@ -1220,11 +1216,20 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
                          }
                          return false;
                      });
+
+        const float resolution = float(display->mXres) * float(display->mYres);
+        const float scaleRatio_H = float(dstW / m2mMppRatio) / float(dst_img.w);
+        const float scaleRatio_V = float(dstH / m2mMppRatio) / float(dst_img.h);
+        const float displayRatio_H = float(dst_img.w) / float(display->mXres);
+
         std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
-                     [&dst_scale_img, &dst_img, display, m2mMppRatio, reqRatio, &otfMpp,
-                      &otfMppRatio](auto m) {
-                         auto ratio = m->getMaxDownscale(*display, dst_scale_img, dst_img);
-                         if (ratio * m2mMppRatio >= reqRatio) {
+                     [&dst_scale_img, &dst_img, resolution, scaleRatio_H, scaleRatio_V,
+                      displayRatio_H, &otfMpp, &otfMppRatio](auto m) {
+                         auto ratio = m->getDownscaleRestriction(dst_scale_img, dst_img);
+
+                         if (ratio >= scaleRatio_H && ratio >= scaleRatio_V &&
+                             m->checkDownscaleCap(resolution, scaleRatio_H, scaleRatio_V,
+                                                  displayRatio_H)) {
                              otfMpp = m;
                              otfMppRatio = ratio;
                              return true;
@@ -1233,10 +1238,10 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
                      });
     }
 
-    if (!otfMpp || !m2mMpp) {
+    if (!otfMpp && !m2mMpp) {
         HDEBUGLOGD(eDebugResourceManager,
-                   "Cannot find available MPP for scaling w: %d, h: %d, ratio %d", dst_scale_img.w,
-                   dst_scale_img.h, reqRatio);
+                   "Cannot find available MPP for scaling src %d x %d, dst %d x %d", src_img.w,
+                   src_img.h, dst_img.w, dst_img.h);
         return;
     }
 
@@ -1246,9 +1251,9 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
     dst_scale_img.h = scaleDown ? dst_img.h : isPerpendicular ? src_img.w : src_img.h;
 
     HDEBUGLOGD(eDebugResourceManager,
-               "scaling w: %d, h: %d, ratio %d = (otfType %d - %d, m2mType %d - %d)",
-               dst_scale_img.w, dst_scale_img.h, reqRatio, otfMpp->mLogicalType, otfMppRatio,
-               m2mMpp->mLogicalType, m2mMppRatio);
+               "scaling w: %d, h: %d, ratio = otfType %d - %d, m2mType %d - %d", dst_scale_img.w,
+               dst_scale_img.h, otfMpp ? otfMpp->mLogicalType : -1, otfMppRatio,
+               m2mMpp ? m2mMpp->mLogicalType : -1, m2mMppRatio);
     if (scaleUp) {
         if (dst_scale_img.w * otfMppRatio < dst_img.w) {
             dst_scale_img.w = uint32_t(ceilf(float(dst_img.w) / float(otfMppRatio)));
