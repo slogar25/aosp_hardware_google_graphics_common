@@ -525,7 +525,7 @@ uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct e
     }
 
     if (mPhysicalType < MPP_DPP_NUM) {
-        bool isPerpendicular = !!(dst.transform & HAL_TRANSFORM_ROT_90);
+        const bool isPerpendicular = !!(src.transform & HAL_TRANSFORM_ROT_90);
         float scaleRatio_H = 1;
         float scaleRatio_V = 1;
         if (isPerpendicular) {
