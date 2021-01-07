@@ -20,15 +20,14 @@
 #include <hardware/hwcomposer_defs.h>
 #include <hardware/exynos/ion.h>
 #include "ExynosLayer.h"
+#include "ExynosHWCHelper.h"
 #include "ExynosResourceManager.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosExternalDisplay.h"
 
 #include "VendorVideoAPI.h"
-#include "VendorGraphicBuffer.h"
 
 using namespace android;
-using vendor::graphics::VendorGraphicBufferMeta;
 
 /**
  * ExynosLayer implementation
@@ -153,12 +152,10 @@ int32_t ExynosLayer::doPreProcess()
         return NO_ERROR;
     }
 
-    VendorGraphicBufferMeta gmeta(mLayerBuffer);
-
     mPreprocessedInfo.mUsePrivateFormat = false;
-    mPreprocessedInfo.mPrivateFormat = gmeta.format;
+    mPreprocessedInfo.mPrivateFormat = mLayerBuffer->format;
 
-    if (isFormatYUV(gmeta.format)) {
+    if (isFormatYUV(mLayerBuffer->format)) {
         mPreprocessedInfo.sourceCrop.top = (int)mSourceCrop.top;
         mPreprocessedInfo.sourceCrop.left = (int)mSourceCrop.left;
         mPreprocessedInfo.sourceCrop.bottom = (int)(mSourceCrop.bottom + 0.9);
@@ -166,15 +163,15 @@ int32_t ExynosLayer::doPreProcess()
         mPreprocessedInfo.preProcessed = true;
     }
 
-    if (isFormatYUV(gmeta.format)) {
+    if (isFormatYUV(mLayerBuffer->format)) {
 
         ExynosVideoMeta *metaData = NULL;
         int priv_fd = -1;
 
-        if (gmeta.flags & VendorGraphicBufferMeta::PRIV_FLAGS_USES_2PRIVATE_DATA)
-            priv_fd = gmeta.fd1;
-        else if (gmeta.flags & VendorGraphicBufferMeta::PRIV_FLAGS_USES_3PRIVATE_DATA)
-            priv_fd = gmeta.fd2;
+        if (mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_2PRIVATE_DATA)
+            priv_fd = mLayerBuffer->fd1;
+        else if (mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_3PRIVATE_DATA)
+            priv_fd = mLayerBuffer->fd2;
 
         if (priv_fd >= 0) {
 
@@ -207,9 +204,9 @@ int32_t ExynosLayer::doPreProcess()
                 if (metaData->eType & VIDEO_INFO_TYPE_INTERLACED) {
                     mPreprocessedInfo.interlacedType = metaData->data.dec.nInterlacedType;
                     if (mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_BT) {
-                        if ((int)mSourceCrop.left < (int)(gmeta.stride)) {
-                            mPreprocessedInfo.sourceCrop.left = (int)mSourceCrop.left + gmeta.stride;
-                            mPreprocessedInfo.sourceCrop.right = (int)mSourceCrop.right + gmeta.stride;
+                        if ((int)mSourceCrop.left < (int)(mLayerBuffer->stride)) {
+                            mPreprocessedInfo.sourceCrop.left = (int)mSourceCrop.left + mLayerBuffer->stride;
+                            mPreprocessedInfo.sourceCrop.right = (int)mSourceCrop.right + mLayerBuffer->stride;
                         }
                     }
                     if (mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_TB ||
@@ -233,7 +230,7 @@ int32_t ExynosLayer::doPreProcess()
     setSrcExynosImage(&src_img);
     setDstExynosImage(&dst_img);
     ExynosMPP *exynosMPPVG = nullptr;
-    if (isFormatYUV(gmeta.format)) {
+    if (isFormatYUV(mLayerBuffer->format)) {
         auto otfMPPs = ExynosResourceManager::getOtfMPPs();
         auto mpp_it = std::find_if(otfMPPs.begin(), otfMPPs.end(),
                 [&src_img](auto m) { return m->isSrcFormatSupported(src_img); });
@@ -243,7 +240,7 @@ int32_t ExynosLayer::doPreProcess()
     /* Set HDR Flag */
     if(hasHdrInfo(src_img)) mIsHdrLayer = true;
 
-    if (isFormatYUV(gmeta.format) && exynosMPPVG) {
+    if (isFormatYUV(mLayerBuffer->format) && exynosMPPVG) {
         /*
          * layer's sourceCrop should be aligned
          */
@@ -326,7 +323,7 @@ int32_t ExynosLayer::doPreProcess()
         priority = ePriorityMax;
     } else if (mIsHdrLayer) {
         priority = ePriorityHigh;
-    } else if (isFormatYUV(gmeta.format)) {
+    } else if (isFormatYUV(mLayerBuffer->format)) {
         priority = ePriorityHigh;
     } else if ((mDisplay->mDisplayControl.cursorSupport == true) &&
                (mCompositionType == HWC2_COMPOSITION_CURSOR)) {
@@ -352,29 +349,30 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
     /* TODO : Exception here ? */
     //TODO mGeometryChanged  here
 
+    private_handle_t *handle = NULL;
     uint64_t internal_format = 0;
 
     if (mDisplay->mPlugState == false)
         buffer = NULL;
 
     if (buffer != NULL) {
-        if (VendorGraphicBufferMeta::get_fd(buffer,0) < 0)
+        handle = private_handle_t::dynamicCast(buffer);
+        if (handle)
+            internal_format = handle->internal_format;
+        else
             return HWC2_ERROR_BAD_LAYER;
     }
 
-    VendorGraphicBufferMeta gmeta(mLayerBuffer);
-    internal_format = gmeta.format;
-
-    if ((mLayerBuffer == NULL) || (buffer == NULL))
+    if ((mLayerBuffer == NULL) || (handle == NULL))
         setGeometryChanged(GEOMETRY_LAYER_UNKNOWN_CHANGED);
     else {
-        if (getDrmMode(VendorGraphicBufferMeta::get_producer_usage(mLayerBuffer)) != getDrmMode(gmeta.producer_usage))
+        if (getDrmMode(mLayerBuffer) != getDrmMode(handle))
             setGeometryChanged(GEOMETRY_LAYER_DRM_CHANGED);
-        if (VendorGraphicBufferMeta::get_format(mLayerBuffer) != gmeta.format)
+        if (mLayerBuffer->format != handle->format)
             setGeometryChanged(GEOMETRY_LAYER_FORMAT_CHANGED);
     }
 
-    mLayerBuffer = buffer;
+    mLayerBuffer = handle;
     mAcquireFence = fence_close(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_UNDEFINED);
     mAcquireFence = hwcCheckFenceDebug(mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, acquireFence);
     if (mReleaseFence >= 0)
@@ -390,12 +388,12 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
         setGeometryChanged(GEOMETRY_LAYER_COMPRESSED_CHANGED);
     mCompressed = compressed;
 
-    if (buffer != NULL) {
+    if (handle != NULL) {
         /*
          * HAL_DATASPACE_V0_JFIF = HAL_DATASPACE_STANDARD_BT601_625 |
          * HAL_DATASPACE_TRANSFER_SMPTE_170M | HAL_DATASPACE_RANGE_FULL,
          */
-        if (gmeta.format == HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL)
+        if (handle->format == HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL)
             setLayerDataspace(HAL_DATASPACE_V0_JFIF);
     } else {
         setLayerDataspace(HAL_DATASPACE_UNKNOWN);
@@ -469,7 +467,7 @@ int32_t ExynosLayer::setLayerCompositionType(int32_t /*hwc2_composition_t*/ type
 
 int32_t ExynosLayer::setLayerDataspace(int32_t /*android_dataspace_t*/ dataspace) {
     android_dataspace currentDataSpace = (android_dataspace_t)dataspace;
-    if ((mLayerBuffer != NULL) && (VendorGraphicBufferMeta::get_format(mLayerBuffer) == HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL))
+    if ((mLayerBuffer != NULL) && (mLayerBuffer->format == HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL))
         currentDataSpace = HAL_DATASPACE_V0_JFIF;
     else {
         /* Change legacy dataspace */
@@ -694,7 +692,7 @@ void ExynosLayer::resetValidateData()
 
 int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
 {
-    buffer_handle_t handle = mLayerBuffer;
+    private_handle_t *handle = mLayerBuffer;
     if (isDimLayer()) {
         src_img->format = HAL_PIXEL_FORMAT_RGBA_8888;
         src_img->usageFlags = 0xb00;
@@ -732,22 +730,24 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
         src_img->usageFlags = 0x0;
         src_img->bufferHandle = handle;
     } else {
-        VendorGraphicBufferMeta gmeta(handle);
-
         if ((mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_TB) ||
             (mPreprocessedInfo.interlacedType == V4L2_FIELD_INTERLACED_BT))
         {
-            src_img->fullWidth = (gmeta.stride * 2);
-            src_img->fullHeight = pixel_align_down((gmeta.vstride / 2), 2);
+            src_img->fullWidth = (handle->stride * 2);
+            src_img->fullHeight = pixel_align_down((handle->vstride / 2), 2);
         } else {
-            src_img->fullWidth = gmeta.stride;
-            src_img->fullHeight = gmeta.vstride;
+            src_img->fullWidth = handle->stride;
+            src_img->fullHeight = handle->vstride;
         }
         if (!mPreprocessedInfo.mUsePrivateFormat)
-            src_img->format = gmeta.format;
+            src_img->format = handle->format;
         else
             src_img->format = mPreprocessedInfo.mPrivateFormat;
-        src_img->usageFlags = gmeta.producer_usage;
+#ifdef GRALLOC_VERSION1
+        src_img->usageFlags = handle->producer_usage;
+#else
+        src_img->usageFlags = (uint64_t)handle->flags;
+#endif
         src_img->bufferHandle = handle;
     }
     src_img->x = (int)mPreprocessedInfo.sourceCrop.left;
@@ -793,12 +793,16 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
 
 int32_t ExynosLayer::setDstExynosImage(exynos_image *dst_img)
 {
-    buffer_handle_t handle = mLayerBuffer;
+    private_handle_t *handle = mLayerBuffer;
 
     if (handle == NULL) {
         dst_img->usageFlags = 0x0;
     } else {
-        dst_img->usageFlags = VendorGraphicBufferMeta::get_producer_usage(handle);
+#ifdef GRALLOC_VERSION1
+        dst_img->usageFlags = handle->producer_usage;
+#else
+        dst_img->usageFlags = (uint64_t)handle->flags;
+#endif
     }
 
     if (isDimLayer()) {
@@ -880,11 +884,10 @@ void ExynosLayer::dump(String8& result)
     int32_t fd, fd1, fd2;
     if (mLayerBuffer != NULL)
     {
-        VendorGraphicBufferMeta gmeta(mLayerBuffer);
-        format = gmeta.format;
-        fd = gmeta.fd;
-        fd1 = gmeta.fd1;
-        fd2 = gmeta.fd2;
+        format = mLayerBuffer->format;
+        fd = mLayerBuffer->fd;
+        fd1 = mLayerBuffer->fd1;
+        fd2 = mLayerBuffer->fd2;
     } else {
         format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
         fd = -1;
@@ -967,11 +970,10 @@ void ExynosLayer::printLayer()
     String8 result;
     if (mLayerBuffer != NULL)
     {
-        VendorGraphicBufferMeta gmeta(mLayerBuffer);
-        format = gmeta.format;
-        fd = gmeta.fd;
-        fd1 = gmeta.fd1;
-        fd2 = gmeta.fd2;
+        format = mLayerBuffer->format;
+        fd = mLayerBuffer->fd;
+        fd1 = mLayerBuffer->fd1;
+        fd2 = mLayerBuffer->fd2;
     } else {
         format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
         fd = -1;

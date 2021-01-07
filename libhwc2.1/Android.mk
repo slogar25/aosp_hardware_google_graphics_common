@@ -55,9 +55,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
-	libhardware_legacy libutils \
-	libsync libacryl libui libion_google libdrmresource libdrm \
-	libvendorgraphicbuffer
+	libGrallocWrapper libhardware_legacy libutils \
+	libsync libacryl libui libion_google libdrmresource libdrm
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
@@ -99,7 +98,7 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp
 
-LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm libui libvendorgraphicbuffer
+LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm
 
 include $(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/Android.mk
 
@@ -123,8 +122,8 @@ LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_ha
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay libacryl \
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
-	android.hardware.graphics.mapper@2.0
-
+	android.hardware.graphics.mapper@2.0 \
+	libGrallocWrapper
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 LOCAL_PROPRIETARY_MODULE := true
 
@@ -175,7 +174,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
-	libui
+	libGrallocWrapper libui
 
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
