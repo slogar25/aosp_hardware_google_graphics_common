@@ -26,11 +26,7 @@
 #include "ExynosResourceRestriction.h"
 #include <hardware/hwcomposer_defs.h>
 #include <math.h>
-#ifdef GRALLOC_VERSION1
-#include "gralloc1_priv.h"
-#else
-#include "gralloc_priv.h"
-#endif
+#include "VendorGraphicBuffer.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosDisplay.h"
 #include "ExynosVirtualDisplay.h"
@@ -46,6 +42,7 @@
  */
 
 using namespace android;
+using namespace vendor::graphics;
 
 int ExynosMPP::mainDisplayWidth = 0;
 int ExynosMPP::mainDisplayHeight = 0;
@@ -153,8 +150,6 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     mPrevAssignedState(MPP_ASSIGN_STATE_FREE),
     mPrevAssignedDisplayType(-1),
     mReservedDisplay(-1),
-    mAllocator(NULL),
-    mMapper(NULL),
     mResourceManageThread(this),
     mCapacity(-1),
     mUsedCapacity(0),
@@ -852,6 +847,7 @@ bool ExynosMPP::ResourceManageThread::threadLoop()
 
 void ExynosMPP::ResourceManageThread::freeBuffers()
 {
+    VendorGraphicBufferAllocator& gAllocator(VendorGraphicBufferAllocator::get());
     android::List<exynos_mpp_img_info >::iterator it;
     android::List<exynos_mpp_img_info >::iterator end;
     it = mFreedBuffers.begin();
@@ -876,7 +872,7 @@ void ExynosMPP::ResourceManageThread::freeBuffers()
                 fence_close(freeBuffer.acrylicReleaseFenceFd, mExynosMPP->mAssignedDisplay,
                         FENCE_TYPE_SRC_RELEASE, FENCE_IP_ALL);
         }
-        mExynosMPP->mMapper->freeBuffer(freeBuffer.bufferHandle);
+        gAllocator.free(freeBuffer.bufferHandle);
         it = mFreedBuffers.erase(it);
     }
 }
@@ -950,23 +946,16 @@ int32_t ExynosMPP::allocOutBuf(uint32_t w, uint32_t h, uint32_t format, uint64_t
     MPP_LOGD(eDebugMPP|eDebugBuf, "\tw: %d, h: %d, format: 0x%8x, previousBuffer: %p, allocUsage: 0x%" PRIx64 ", usage: 0x%" PRIx64 "",
             w, h, format, freeDstBuf.bufferHandle, allocUsage, usage);
 
-    if ((mAllocator == NULL) && (mMapper == NULL))
-        ExynosDevice::getAllocator(&mMapper, &mAllocator);
-
-    GrallocWrapper::IMapper::BufferDescriptorInfo info = {};
-    info.width = w;
-    info.height = h;
-    info.layerCount = 1;
-    info.format = static_cast<GrallocWrapper::PixelFormat>(format);
-    info.usage = allocUsage;
-    GrallocWrapper::Error error = GrallocWrapper::Error::NONE;
+    status_t error = NO_ERROR;
 
     {
         ATRACE_CALL();
-        error = mAllocator->allocate(info, &dstStride, &dstBuffer);
+
+        VendorGraphicBufferAllocator& gAllocator(VendorGraphicBufferAllocator::get());
+        error = gAllocator.allocate(w, h, format, 1, allocUsage, &dstBuffer, &dstStride, "HWC");
     }
 
-    if ((error != GrallocWrapper::Error::NONE) || (dstBuffer == NULL)) {
+    if ((error != NO_ERROR) || (dstBuffer == NULL)) {
         MPP_LOGE("failed to allocate destination buffer(%dx%d): %d", w, h, error);
         return -EINVAL;
     }
@@ -975,7 +964,7 @@ int32_t ExynosMPP::allocOutBuf(uint32_t w, uint32_t h, uint32_t format, uint64_t
 
     mDstImgs[index].acrylicAcquireFenceFd = -1;
     mDstImgs[index].acrylicReleaseFenceFd = -1;
-    mDstImgs[index].bufferHandle = private_handle_t::dynamicCast(dstBuffer);
+    mDstImgs[index].bufferHandle = dstBuffer;
     mDstImgs[index].bufferType = getBufferType(usage);
     mDstImgs[index].format = format;
 
@@ -1003,8 +992,9 @@ int32_t ExynosMPP::allocOutBuf(uint32_t w, uint32_t h, uint32_t format, uint64_t
 int32_t ExynosMPP::setOutBuf(buffer_handle_t outbuf, int32_t fence) {
     mDstImgs[mCurrentDstBuf].bufferHandle = NULL;
     if (outbuf != NULL) {
-        mDstImgs[mCurrentDstBuf].bufferHandle = private_handle_t::dynamicCast(outbuf);
-        mDstImgs[mCurrentDstBuf].format = mDstImgs[mCurrentDstBuf].bufferHandle->format;
+        mDstImgs[mCurrentDstBuf].bufferHandle = outbuf;
+        mDstImgs[mCurrentDstBuf].format =
+            VendorGraphicBufferMeta::get_format(mDstImgs[mCurrentDstBuf].bufferHandle);
     }
     setDstAcquireFence(fence);
     return NO_ERROR;
@@ -1034,70 +1024,40 @@ uint32_t ExynosMPP::getBufferType(uint64_t usage)
     }
 }
 
-uint32_t ExynosMPP::getBufferType(const private_handle_t *handle)
+uint32_t ExynosMPP::getBufferType(const buffer_handle_t handle)
 {
-#ifdef GRALLOC_VERSION1
-    uint64_t usage = handle->producer_usage;
-#else
-    uint64_t usage = handle->flags;
-#endif
+    uint64_t usage = VendorGraphicBufferMeta::get_usage(handle);
+
     return getBufferType(usage);
 }
 
 uint64_t ExynosMPP::getBufferUsage(uint64_t usage)
 {
     uint64_t allocUsage = 0;
-#ifdef GRALLOC_VERSION1
     if (getBufferType(usage) == MPP_BUFFER_DUMP) {
-        allocUsage = GRALLOC1_PRODUCER_USAGE_CPU_READ_OFTEN |
-            GRALLOC1_PRODUCER_USAGE_CPU_WRITE_OFTEN;
+        allocUsage = BufferUsage::CPU_READ_OFTEN |
+            BufferUsage::CPU_WRITE_OFTEN;
     } else {
-        allocUsage = GRALLOC1_CONSUMER_USAGE_CPU_READ_NEVER |
-            GRALLOC1_PRODUCER_USAGE_CPU_WRITE_NEVER |
-            GRALLOC1_PRODUCER_USAGE_NOZEROED |
-            GRALLOC1_CONSUMER_USAGE_HWCOMPOSER;
+        allocUsage = BufferUsage::CPU_READ_NEVER |
+            BufferUsage::CPU_WRITE_NEVER |
+            VendorGraphicBufferUsage::NOZEROED |
+            BufferUsage::COMPOSER_OVERLAY;
     }
 
     if (getDrmMode(usage) == SECURE_DRM) {
-        allocUsage |= GRALLOC1_PRODUCER_USAGE_PROTECTED;
-        allocUsage &= ~GRALLOC1_PRODUCER_USAGE_PRIVATE_NONSECURE;
+        allocUsage |= BufferUsage::PROTECTED;
+        allocUsage &= ~VendorGraphicBufferUsage::PRIVATE_NONSECURE;
     } else if (getDrmMode(usage) == NORMAL_DRM) {
-        allocUsage |= GRALLOC1_PRODUCER_USAGE_PROTECTED;
-        allocUsage |= GRALLOC1_PRODUCER_USAGE_PRIVATE_NONSECURE;
+        allocUsage |= BufferUsage::PROTECTED;
+        allocUsage |= VendorGraphicBufferUsage::PRIVATE_NONSECURE;
     }
 
     /* HACK: for distinguishing FIMD_VIDEO_region */
-    if (!((allocUsage & GRALLOC1_PRODUCER_USAGE_PROTECTED) &&
-          !(allocUsage & GRALLOC1_PRODUCER_USAGE_PRIVATE_NONSECURE) &&
-          !(allocUsage & GRALLOC1_CONSUMER_USAGE_VIDEO_EXT))) {
-        allocUsage |= (GRALLOC1_CONSUMER_USAGE_GPU_TEXTURE | GRALLOC1_PRODUCER_USAGE_GPU_RENDER_TARGET);
+    if (!((allocUsage & BufferUsage::PROTECTED) &&
+          !(allocUsage & VendorGraphicBufferUsage::PRIVATE_NONSECURE) &&
+          !(allocUsage & VendorGraphicBufferUsage::VIDEO_EXT))) {
+        allocUsage |= (BufferUsage::GPU_TEXTURE | BufferUsage::GPU_RENDER_TARGET);
     }
-#else
-    if (getBufferType(usage) == MPP_BUFFER_DUMP) {
-        allocUsage = GRALLOC_USAGE_SW_READ_OFTEN |
-            GRALLOC_USAGE_SW_WRITE_OFTEN;
-    } else {
-        allocUsage = GRALLOC_USAGE_SW_READ_NEVER |
-            GRALLOC_USAGE_SW_WRITE_NEVER |
-            GRALLOC_USAGE_NOZEROED |
-            GRALLOC_USAGE_HW_COMPOSER;
-    }
-
-    if (getDrmMode(usage) == SECURE_DRM) {
-        allocUsage |= GRALLOC_USAGE_PROTECTED;
-        allocUsage &= ~GRALLOC_USAGE_PRIVATE_NONSECURE;
-    } else if (getDrmMode(usage) == NORMAL_DRM) {
-        allocUsage |= GRALLOC_USAGE_PROTECTED;
-        allocUsage |= GRALLOC_USAGE_PRIVATE_NONSECURE;
-    }
-
-    /* HACK: for distinguishing FIMD_VIDEO_region */
-    if (!((allocUsage & GRALLOC_USAGE_PROTECTED) &&
-          !(allocUsage & GRALLOC_USAGE_PRIVATE_NONSECURE) &&
-          !(allocUsage & GRALLOC_USAGE_VIDEO_EXT))) {
-        allocUsage |= (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_RENDER);
-    }
-#endif
 
     return allocUsage;
 }
@@ -1110,9 +1070,9 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
         MPP_LOGE("%s:: index(%d) is not valid", __func__, index);
         return false;
     }
-    private_handle_t *dst_handle = NULL;
+    buffer_handle_t dst_handle = NULL;
     if (mDstImgs[index].bufferHandle != NULL)
-        dst_handle = private_handle_t::dynamicCast(mDstImgs[index].bufferHandle);
+        dst_handle = mDstImgs[index].bufferHandle;
 
     if (dst_handle == NULL) {
         MPP_LOGD(eDebugMPP|eDebugBuf, "\tDstImag[%d]  handle is NULL", index);
@@ -1127,14 +1087,16 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
         return false;
     }
 
+    VendorGraphicBufferMeta gmeta(dst_handle);
+
     MPP_LOGD(eDebugMPP|eDebugBuf, "\tdst_handle(%p)", dst_handle);
     MPP_LOGD(eDebugMPP|eDebugBuf, "\tAssignedDisplay[%d, %d] format[0x%8x, 0x%8x], bufferType[%d, %d], usageFlags: 0x%" PRIx64 "",
-            mPrevAssignedDisplayType, assignedDisplay, dst_handle->format, dst.format,
+            mPrevAssignedDisplayType, assignedDisplay, gmeta.format, dst.format,
             mDstImgs[index].bufferType, getBufferType(dst.usageFlags), dst.usageFlags);
 
     bool realloc = (mPrevAssignedDisplayType != assignedDisplay) ||
-        (formatToBpp(dst_handle->format) < formatToBpp(dst.format)) ||
-        ((dst_handle->stride * dst_handle->vstride) < (int)(dst.fullWidth * dst.fullHeight)) ||
+        (formatToBpp(gmeta.format) < formatToBpp(dst.format)) ||
+        ((gmeta.stride * gmeta.vstride) < (int)(dst.fullWidth * dst.fullHeight)) ||
         (mDstImgs[index].bufferType != getBufferType(dst.usageFlags));
 
     MPP_LOGD(eDebugMPP|eDebugBuf, "realloc: %d--------", realloc);
@@ -1198,17 +1160,19 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
         return -EINVAL;
     }
 
-    private_handle_t *srcHandle = NULL;
+    buffer_handle_t srcHandle = NULL;
     if (src.bufferHandle != NULL)
-        srcHandle = private_handle_t::dynamicCast(src.bufferHandle);
+        srcHandle = src.bufferHandle;
+
+    VendorGraphicBufferMeta gmeta(srcHandle);
     int bufFds[MAX_HW2D_PLANES];
     size_t bufLength[MAX_HW2D_PLANES];
     uint32_t attribute = 0;
-    uint32_t bufferNum = getBufferNumOfFormat(srcHandle->format, getAFBCCompressionType(srcHandle));
+    uint32_t bufferNum = getBufferNumOfFormat(gmeta.format, getAFBCCompressionType(srcHandle));
     android_dataspace_t dataspace = src.dataSpace;
     if (dataspace == HAL_DATASPACE_UNKNOWN)
     {
-        if (isFormatRgb(srcHandle->format))
+        if (isFormatRgb(gmeta.format))
             dataspace = HAL_DATASPACE_V0_SRGB;
         else
             dataspace = HAL_DATASPACE_V0_BT601_625;
@@ -1217,15 +1181,15 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
     if (bufferNum == 0)
     {
         MPP_LOGE("%s:: Fail to get bufferNum(%d), format(0x%8x, afbc %d)", __func__, bufferNum,
-                 srcHandle->format, isAFBCCompressed(srcHandle));
+                 gmeta.format, isAFBCCompressed(srcHandle));
         return -EINVAL;
     }
-    bufFds[0] = srcHandle->fd;
-    bufFds[1] = srcHandle->fd1;
-    bufFds[2] = srcHandle->fd2;
-    if (getBufLength(srcHandle, MAX_HW2D_PLANES, bufLength, srcHandle->format, src.fullWidth, src.fullHeight) != NO_ERROR) {
+    bufFds[0] = gmeta.fd;
+    bufFds[1] = gmeta.fd1;
+    bufFds[2] = gmeta.fd2;
+    if (getBufLength(srcHandle, MAX_HW2D_PLANES, bufLength, gmeta.format, src.fullWidth, src.fullHeight) != NO_ERROR) {
         MPP_LOGE("%s:: invalid bufferLength(%zu, %zu, %zu), format(0x%8x)", __func__,
-                bufLength[0], bufLength[1], bufLength[2], srcHandle->format);
+                bufLength[0], bufLength[1], bufLength[2], gmeta.format);
         return -EINVAL;
     }
 
@@ -1257,7 +1221,7 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
     MPP_LOGD(eDebugMPP|eDebugFence, "source configuration:");
     MPP_LOGD(eDebugMPP, "\tImageDimension[%d, %d], ImageType[0x%8x, 0x%8x]",
             src.fullWidth, src.fullHeight,
-            srcHandle->format, dataspace);
+            gmeta.format, dataspace);
     MPP_LOGD(eDebugMPP|eDebugFence, "\tImageBuffer handle: %p, fds[%d, %d, %d], bufLength[%zu, %zu, %zu], bufferNum: %d, acquireFence: %d, attribute: %d",
             srcHandle, bufFds[0], bufFds[1], bufFds[2], bufLength[0], bufLength[1], bufLength[2],
             bufferNum, srcImgInfo->acrylicAcquireFenceFd, attribute);
@@ -1267,10 +1231,10 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
 
     srcImgInfo->mppLayer->setImageDimension(src.fullWidth, src.fullHeight);
 
-    if (srcHandle->format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
+    if (gmeta.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
         srcImgInfo->mppLayer->setImageType(HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M, dataspace);
     } else {
-        srcImgInfo->mppLayer->setImageType(srcHandle->format, dataspace);
+        srcImgInfo->mppLayer->setImageType(gmeta.format, dataspace);
     }
 
     if (mPhysicalType == MPP_G2D) {
@@ -1309,9 +1273,9 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
     }
 
     srcImgInfo->acrylicAcquireFenceFd = -1;
-    srcImgInfo->format = srcHandle->format;
+    srcImgInfo->format = gmeta.format;
 
-    if (srcHandle->format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
+    if (gmeta.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV) {
         srcImgInfo->format = HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M;
     }
 
@@ -1341,7 +1305,7 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
 {
     int ret = NO_ERROR;
     bool isComposition = (mMaxSrcLayerNum > 1);
-    private_handle_t *dstHandle = dstImgInfo->bufferHandle;
+    buffer_handle_t dstHandle = dstImgInfo->bufferHandle;
     int bufFds[MAX_HW2D_PLANES];
     size_t bufLength[MAX_HW2D_PLANES];
     uint32_t attribute = 0;
@@ -1355,6 +1319,8 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
     }
 
     android_dataspace_t dataspace = HAL_DATASPACE_UNKNOWN;
+    VendorGraphicBufferMeta gmeta(dstHandle);
+
     if (isComposition) {
         if (isFormatRgb(dstImgInfo->format)) {
             if ((mAssignedDisplay != NULL) &&
@@ -1376,11 +1342,11 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
             dataspace = HAL_DATASPACE_V0_BT601_625;
     }
 
-    bufFds[0] = dstHandle->fd;
-    bufFds[1] = dstHandle->fd1;
-    bufFds[2] = dstHandle->fd2;
+    bufFds[0] = gmeta.fd;
+    bufFds[1] = gmeta.fd1;
+    bufFds[2] = gmeta.fd2;
     if (getBufLength(dstHandle, MAX_HW2D_PLANES, bufLength, dstImgInfo->format,
-                dstHandle->stride, dstHandle->vstride) != NO_ERROR) {
+                gmeta.stride, gmeta.vstride) != NO_ERROR) {
         MPP_LOGE("%s:: invalid bufferLength(%zu, %zu, %zu), format(0x%8x)", __func__,
                 bufLength[0], bufLength[1], bufLength[2], dstImgInfo->format);
         return -EINVAL;
@@ -1440,7 +1406,7 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
 
     MPP_LOGD(eDebugMPP|eDebugFence, "destination configuration:");
     MPP_LOGD(eDebugMPP, "\tImageDimension[%d, %d], ImageType[0x%8x, %d], target luminance[%d, %d]",
-            dstHandle->stride, dstHandle->vstride,
+            gmeta.stride, gmeta.vstride,
             dstImgInfo->format, dataspace, metaInfo.minLuminance, metaInfo.maxLuminance);
     MPP_LOGD(eDebugMPP|eDebugFence, "\tImageBuffer handle: %p, fds[%d, %d, %d], bufLength[%zu, %zu, %zu], bufferNum: %d, acquireFence: %d, attribute: %d",
             dstHandle, bufFds[0], bufFds[1], bufFds[2], bufLength[0], bufLength[1], bufLength[2],
@@ -1626,22 +1592,24 @@ int32_t ExynosMPP::doPostProcessingInternal()
                 (sync_wait(mDstImgs[mCurrentDstBuf].acrylicReleaseFenceFd, 1000) < 0)) {
                 ALOGE("%s:: fence sync_wait error to dump image", __func__);
             } else {
-                private_handle_t *dstHandle = mDstImgs[mCurrentDstBuf].bufferHandle;
-                ALOGI("dump image fw: %d, fh:%d, size: %d", dstHandle->stride, dstHandle->vstride, dstHandle->size);
+                buffer_handle_t dstHandle = mDstImgs[mCurrentDstBuf].bufferHandle;
+                VendorGraphicBufferMeta gmeta(dstHandle);
+
+                ALOGI("dump image fw: %d, fh:%d, size: %d", gmeta.stride, gmeta.vstride, gmeta.size);
                 FILE *fp;
                 fp = fopen(MPP_DUMP_PATH,"ab");
 
                 if (fp) {
-                    void *temp = mmap(0, dstHandle->size, PROT_READ|PROT_WRITE, MAP_SHARED, dstHandle->fd, 0);
+                    void *temp = mmap(0, gmeta.size, PROT_READ|PROT_WRITE, MAP_SHARED, gmeta.fd, 0);
                     if (temp) {
                         ALOGI("write...%p", temp);
-                        int write_size = fwrite(temp, dstHandle->size, 1, fp);
+                        int write_size = fwrite(temp, gmeta.size, 1, fp);
                         if (write_size < 0) {
                             ALOGI("write error: %s", strerror(errno));
                         } else {
                             ALOGI("write size: %d", write_size);
                         }
-                        munmap(temp, dstHandle->size);
+                        munmap(temp, gmeta.size);
                     } else {
                         ALOGE("mmap is NULL %s", strerror(errno));
                     }
@@ -1725,7 +1693,6 @@ int32_t ExynosMPP::doPostProcessing(struct exynos_image &src, struct exynos_imag
             MPP_LOGD(eDebugMPP, "dst format is changed (%d -> %d)",
                     mDstImgs[mCurrentDstBuf].format, dst.format);
             mDstImgs[mCurrentDstBuf].format = dst.format;
-            mDstImgs[mCurrentDstBuf].bufferHandle->format = dst.format;
         }
     }
 
@@ -1804,8 +1771,9 @@ int32_t ExynosMPP::getDstImageInfo(exynos_image *img)
         return -EFAULT;
     } else {
         img->bufferHandle = mDstImgs[mCurrentDstBuf].bufferHandle;
-        img->fullWidth = mDstImgs[mCurrentDstBuf].bufferHandle->stride;
-        img->fullHeight = mDstImgs[mCurrentDstBuf].bufferHandle->vstride;
+        VendorGraphicBufferMeta gmeta(img->bufferHandle);
+        img->fullWidth = gmeta.stride;
+        img->fullHeight = gmeta.vstride;
         if ((mLogicalType == MPP_LOGICAL_G2D_RGB) ||
             (mLogicalType == MPP_LOGICAL_G2D_COMBO)) {
             if (mAssignedSources.size() == 1) {

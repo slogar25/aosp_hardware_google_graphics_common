@@ -26,6 +26,8 @@
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
 
+#include <linux/fb.h>
+
 extern struct exynos_hwc_control exynosHWCControl;
 
 static const std::map<const DisplayType, const std::string> panelSysfsPath =

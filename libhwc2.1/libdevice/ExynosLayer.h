@@ -17,19 +17,16 @@
 #ifndef _EXYNOSLAYER_H
 #define _EXYNOSLAYER_H
 
+#include <array>
 #include <system/graphics.h>
 #include <unordered_map>
 #include <log/log.h>
 #include <utils/Timers.h>
 #include <hardware/hwcomposer2.h>
 #include "ExynosHWC.h"
-#ifdef GRALLOC_VERSION1
-#include "gralloc1_priv.h"
-#else
-#include "gralloc_priv.h"
-#endif
 #include "ExynosDisplay.h"
 #include "VendorVideoAPI.h"
+#include "ExynosHWCHelper.h"
 
 #ifndef HWC2_HDR10_PLUS_SEI
 /* based on android.hardware.composer.2_3 */
@@ -159,12 +156,12 @@ class ExynosLayer : public ExynosMPPSource {
         /**
          * Previous buffer's handle
          */
-        private_handle_t *mLastLayerBuffer;
+        buffer_handle_t mLastLayerBuffer;
 
         /**
          * Display buffer handle
          */
-        private_handle_t *mLayerBuffer;
+        buffer_handle_t mLayerBuffer;
 
         /**
          * Surface Damage
@@ -222,7 +219,7 @@ class ExynosLayer : public ExynosMPPSource {
          * user defined flag
          */
         int32_t mLayerFlag;
-        
+
         /**
          * HDR flags
          */
