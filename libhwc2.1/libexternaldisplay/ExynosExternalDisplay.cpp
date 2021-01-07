@@ -362,9 +362,9 @@ int32_t ExynosExternalDisplay::presentDisplay(
 int32_t ExynosExternalDisplay::setClientTarget(
         buffer_handle_t target,
         int32_t acquireFence, int32_t /*android_dataspace_t*/ dataspace) {
-    buffer_handle_t handle = NULL;
+    private_handle_t *handle = NULL;
     if (target != NULL)
-        handle = target;
+        handle = private_handle_t::dynamicCast(target);
     if ((mClientCompositionInfo.mHasCompositionLayer == true) &&
         (handle == NULL) &&
         (mClientCompositionInfo.mSkipFlag == false)) {

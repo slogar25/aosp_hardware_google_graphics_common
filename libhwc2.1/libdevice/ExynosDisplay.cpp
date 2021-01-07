@@ -28,16 +28,15 @@
 #include <map>
 
 #include "ExynosExternalDisplay.h"
+#include "ExynosHWCHelper.h"
 #include "ExynosLayer.h"
 #include "exynos_format.h"
 
-#include "VendorGraphicBuffer.h"
 /**
  * ExynosDisplay implementation
  */
 
 using namespace android;
-using namespace vendor::graphics;
 
 extern struct exynos_hwc_control exynosHWCControl;
 extern struct update_time_info updateTimeInfo;
@@ -169,7 +168,7 @@ void ExynosCompositionInfo::initializeInfos(ExynosDisplay *display)
     }
 }
 
-void ExynosCompositionInfo::setTargetBuffer(ExynosDisplay *display, buffer_handle_t handle,
+void ExynosCompositionInfo::setTargetBuffer(ExynosDisplay *display, private_handle_t *handle,
         int32_t acquireFence, android_dataspace dataspace)
 {
     mTargetBuffer = handle;
@@ -213,7 +212,7 @@ void ExynosCompositionInfo::dump(String8& result)
     }
     if (mTargetBuffer != NULL) {
         uint64_t internal_format = 0;
-        internal_format = VendorGraphicBufferMeta::get_internal_format(mTargetBuffer);
+        internal_format = mTargetBuffer->internal_format;
         result.appendFormat("\tinternal_format: 0x%" PRIx64 ", afbc: %d\n", internal_format,
                             isAFBCCompressed(mTargetBuffer));
     }
@@ -507,11 +506,14 @@ void ExynosDisplay::doPreProcessing() {
     bool skipStaticLayers = true;
 
     for (size_t i=0; i < mLayers.size(); i++) {
-        buffer_handle_t handle = mLayers[i]->mLayerBuffer;
-        VendorGraphicBufferMeta gmeta(handle);
+        private_handle_t *handle = mLayers[i]->mLayerBuffer;
         /* TODO: This should be checked **/
         if ((handle != NULL) &&
-            (gmeta.consumer_usage & VendorGraphicBufferUsage::DAYDREAM_SINGLE_BUFFER_MODE))
+#ifdef GRALLOC_VERSION1
+            (handle->consumer_usage & GRALLOC1_CONSUMER_USAGE_DAYDREAM_SINGLE_BUFFER_MODE))
+#else
+            (handle->flags & GRALLOC_USAGE_DAYDREAM_SINGLE_BUFFER_MODE))
+#endif
         {
             hasSingleBuffer = true;
         }
@@ -1099,7 +1101,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
 {
     /* TODO : this is hardcoded */
     int32_t ret = NO_ERROR;
-    buffer_handle_t handle = NULL;
+    private_handle_t *handle = NULL;
     int32_t blending = 0x0100;
     uint32_t x = 0, y = 0;
     uint32_t w = WIDTH(layer.mPreprocessedInfo.displayFrame);
@@ -1190,17 +1192,15 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
         return ret;
     }
 
-    VendorGraphicBufferMeta gmeta(handle);
-
     if (!layer.mPreprocessedInfo.mUsePrivateFormat)
-        cfg.format = gmeta.format;
+        cfg.format = handle->format;
     else
         cfg.format = layer.mPreprocessedInfo.mPrivateFormat;
 
-    cfg.fd_idma[0] = gmeta.fd;
-    cfg.fd_idma[1] = gmeta.fd1;
-    cfg.fd_idma[2] = gmeta.fd2;
-    cfg.protection = (getDrmMode(gmeta.producer_usage) == SECURE_DRM) ? 1 : 0;
+    cfg.fd_idma[0] = handle->fd;
+    cfg.fd_idma[1] = handle->fd1;
+    cfg.fd_idma[2] = handle->fd2;
+    cfg.protection = (getDrmMode(handle) == SECURE_DRM) ? 1 : 0;
 
     exynos_image src_img = layer.mSrcImg;
 
@@ -1247,11 +1247,11 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
                 return -EINVAL;
             }
             if (layer.mBufferHasMetaParcel) {
-                VendorGraphicBufferMeta layer_buffer_gmeta(layer.mLayerBuffer);
-                if (layer_buffer_gmeta.flags & VendorGraphicBufferMeta::PRIV_FLAGS_USES_2PRIVATE_DATA)
-                    cfg.fd_idma[parcelFdIndex] = layer_buffer_gmeta.fd1;
-                else if (layer_buffer_gmeta.flags & VendorGraphicBufferMeta::PRIV_FLAGS_USES_3PRIVATE_DATA)
-                    cfg.fd_idma[parcelFdIndex] = layer_buffer_gmeta.fd2;
+                if (layer.mLayerBuffer->flags & private_handle_t::PRIV_FLAGS_USES_2PRIVATE_DATA)
+                    cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd1;
+                else if (layer.mLayerBuffer->flags &
+                         private_handle_t::PRIV_FLAGS_USES_3PRIVATE_DATA)
+                    cfg.fd_idma[parcelFdIndex] = layer.mLayerBuffer->fd2;
             } else {
                 cfg.fd_idma[parcelFdIndex] = layer.mMetaParcelFd;
             }
@@ -1295,10 +1295,10 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
 
             if (layer.mBufferHasMetaParcel == false) {
                 uint32_t parcelFdIndex =
-                        getBufferNumOfFormat(gmeta.format, getAFBCCompressionType(handle));
+                        getBufferNumOfFormat(handle->format, getAFBCCompressionType(handle));
                 if (parcelFdIndex == 0) {
                     DISPLAY_LOGE("%s:: failed to get parcelFdIndex for srcImg with format: %d",
-                                 __func__, gmeta.format);
+                                 __func__, handle->format);
                     return -EINVAL;
                 }
 
@@ -1368,12 +1368,12 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
         cfg.src.h = pixel_align_down(cfg.src.h, srcCropHeightAlign);
     }
 
-    uint64_t bufSize = gmeta.size * formatToBpp(gmeta.format);
+    uint64_t bufSize = handle->size * formatToBpp(handle->format);
     uint64_t srcSize = cfg.src.f_w * cfg.src.f_h * formatToBpp(cfg.format);
 
-    if (!isFormatLossy(gmeta.format) && (bufSize < srcSize)) {
+    if (!isFormatLossy(handle->format) && (bufSize < srcSize)) {
         DISPLAY_LOGE("%s:: buffer size is smaller than source size, buf(size: %d, format: %d), src(w: %d, h: %d, format: %d)",
-                __func__, gmeta.size, gmeta.format, cfg.src.f_w, cfg.src.f_h, cfg.format);
+                __func__, handle->size, handle->format, cfg.src.f_w, cfg.src.f_h, cfg.format);
         return -EINVAL;
     }
 
@@ -1396,8 +1396,7 @@ int32_t ExynosDisplay::configureOverlay(ExynosLayer *layer, exynos_win_config_da
 int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
 {
     int32_t windowIndex = compositionInfo.mWindowIndex;
-    buffer_handle_t handle = compositionInfo.mTargetBuffer;
-    VendorGraphicBufferMeta gmeta(compositionInfo.mTargetBuffer);
+    private_handle_t *handle = compositionInfo.mTargetBuffer;
 
     if ((windowIndex < 0) || (windowIndex >= (int32_t)mDpuData.configs.size()))
     {
@@ -1429,23 +1428,23 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
         }
     }
 
-    config.fd_idma[0] = gmeta.fd;
-    config.fd_idma[1] = gmeta.fd1;
-    config.fd_idma[2] = gmeta.fd2;
-    config.protection = (getDrmMode(gmeta.producer_usage) == SECURE_DRM) ? 1 : 0;
+    config.fd_idma[0] = handle->fd;
+    config.fd_idma[1] = handle->fd1;
+    config.fd_idma[2] = handle->fd2;
+    config.protection = (getDrmMode(handle) == SECURE_DRM) ? 1 : 0;
     config.state = config.WIN_STATE_BUFFER;
 
     config.assignedMPP = compositionInfo.mOtfMPP;
 
     config.dst.f_w = mXres;
     config.dst.f_h = mYres;
-    config.format = gmeta.format;
+    config.format = handle->format;
     if (compositionInfo.mType == COMPOSITION_EXYNOS) {
         config.src.f_w = pixel_align(mXres, G2D_JUSTIFIED_DST_ALIGN);
         config.src.f_h = pixel_align(mYres, G2D_JUSTIFIED_DST_ALIGN);
     } else {
-        config.src.f_w = gmeta.stride;
-        config.src.f_h = gmeta.vstride;
+        config.src.f_w = handle->stride;
+        config.src.f_h = handle->vstride;
     }
     config.compression = compositionInfo.mCompressed;
     if (compositionInfo.mCompressed) {
@@ -1579,11 +1578,11 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
             compositionInfo.mType, windowIndex);
     dumpConfig(config);
 
-    uint64_t bufSize = gmeta.size * formatToBpp(gmeta.format);
+    uint64_t bufSize = handle->size * formatToBpp(handle->format);
     uint64_t srcSize = config.src.f_w * config.src.f_h * formatToBpp(config.format);
-    if (!isFormatLossy(gmeta.format) && (bufSize < srcSize)) {
+    if (!isFormatLossy(handle->format) && (bufSize < srcSize)) {
         DISPLAY_LOGE("%s:: buffer size is smaller than source size, buf(size: %d, format: %d), src(w: %d, h: %d, format: %d)",
-                __func__, gmeta.size, gmeta.format, config.src.f_w, config.src.f_h, config.format);
+                __func__, handle->size, handle->format, config.src.f_w, config.src.f_h, config.format);
         return -EINVAL;
     }
 
@@ -2880,9 +2879,9 @@ int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config, bool force)
 int32_t ExynosDisplay::setClientTarget(
         buffer_handle_t target,
         int32_t acquireFence, int32_t /*android_dataspace_t*/ dataspace) {
-    buffer_handle_t handle = NULL;
+    private_handle_t *handle = NULL;
     if (target != NULL)
-        handle = target;
+        handle = private_handle_t::dynamicCast(target);
 
 #ifdef DISABLE_FENCE
     if (acquireFence >= 0)
@@ -2898,20 +2897,18 @@ int32_t ExynosDisplay::setClientTarget(
             DISPLAY_LOGE("\t%s:: mRenderingState(%d)",__func__, mRenderingState);
         }
     } else {
-        VendorGraphicBufferMeta gmeta(handle);
-
         DISPLAY_LOGD(eDebugOverlaySupported, "ClientTarget handle: %p [fd: %d, %d, %d]",
-                handle, gmeta.fd, gmeta.fd1, gmeta.fd2);
+                handle, handle->fd, handle->fd1, handle->fd2);
         if ((mClientCompositionInfo.mSkipFlag == true) &&
-                ((mClientCompositionInfo.mLastWinConfigData.fd_idma[0] != gmeta.fd) ||
-                 (mClientCompositionInfo.mLastWinConfigData.fd_idma[1] != gmeta.fd1) ||
-                 (mClientCompositionInfo.mLastWinConfigData.fd_idma[2] != gmeta.fd2))) {
+                ((mClientCompositionInfo.mLastWinConfigData.fd_idma[0] != handle->fd) ||
+                 (mClientCompositionInfo.mLastWinConfigData.fd_idma[1] != handle->fd1) ||
+                 (mClientCompositionInfo.mLastWinConfigData.fd_idma[2] != handle->fd2))) {
             String8 errString;
             DISPLAY_LOGE("skip flag is enabled but buffer is updated lastConfig[%d, %d, %d], handle[%d, %d, %d]\n",
                     mClientCompositionInfo.mLastWinConfigData.fd_idma[0],
                     mClientCompositionInfo.mLastWinConfigData.fd_idma[1],
                     mClientCompositionInfo.mLastWinConfigData.fd_idma[2],
-                    gmeta.fd, gmeta.fd1, gmeta.fd2);
+                    handle->fd, handle->fd1, handle->fd2);
             DISPLAY_LOGE("last win config");
             for (size_t i = 0; i < mLastDpuData.configs.size(); i++) {
                 errString.appendFormat("config[%zu]\n", i);
@@ -3738,10 +3735,12 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
 
     if (compositionInfo.mTargetBuffer != NULL) {
         src_img->bufferHandle = compositionInfo.mTargetBuffer;
-
-        VendorGraphicBufferMeta gmeta(compositionInfo.mTargetBuffer);
-        src_img->format = gmeta.format;
-        src_img->usageFlags = gmeta.producer_usage;
+        src_img->format = compositionInfo.mTargetBuffer->format;
+#ifdef GRALLOC_VERSION1
+        src_img->usageFlags = compositionInfo.mTargetBuffer->producer_usage;
+#else
+        src_img->usageFlags = compositionInfo.mTargetBuffer->flags;
+#endif
     } else {
         src_img->bufferHandle = NULL;
         src_img->format = HAL_PIXEL_FORMAT_RGBA_8888;
@@ -4697,8 +4696,10 @@ void ExynosDisplay::setReadbackBufferInternal(buffer_handle_t buffer, int32_t re
     }
     mDpuData.readback_info.rel_fence = releaseFence;
 
+    private_handle_t *handle = NULL;
     if (buffer != NULL)
-        mDpuData.readback_info.handle = buffer;
+        handle = private_handle_t::dynamicCast(buffer);
+    mDpuData.readback_info.handle = handle;
 }
 
 int32_t ExynosDisplay::getReadbackBufferFence(int32_t* outFence)
