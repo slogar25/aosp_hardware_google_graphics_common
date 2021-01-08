@@ -422,7 +422,7 @@ bool isAFBCCompressed(const buffer_handle_t handle);
 bool isSrcCropFloat(hwc_frect &frect);
 bool isScaled(exynos_image &src, exynos_image &dst);
 bool isScaledDown(exynos_image &src, exynos_image &dst);
-bool hasHdrInfo(exynos_image &img);
+bool hasHdrInfo(const exynos_image &img);
 bool hasHdrInfo(android_dataspace dataSpace);
 bool hasHdr10Plus(exynos_image &img);
 

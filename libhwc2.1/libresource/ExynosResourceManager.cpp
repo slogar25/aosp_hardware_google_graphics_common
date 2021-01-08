@@ -1146,7 +1146,7 @@ exynos_image ExynosResourceManager::getAlignedImage(exynos_image image, const Ex
 }
 
 void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
-        const ExynosDisplay *display, exynos_image src_img, exynos_image dst_img,
+        const ExynosDisplay *display, const exynos_image &src_img, const exynos_image &dst_img,
         std::vector<exynos_image> &image_lists) {
     const bool isPerpendicular = !!(src_img.transform & HAL_TRANSFORM_ROT_90);
     const uint32_t srcWidth = isPerpendicular ? src_img.h : src_img.w;
@@ -1161,8 +1161,6 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
 
     /* otfMPP doesn't rotate image, m2mMPP rotates image */
     exynos_image dst_scale_img = dst_img;
-    dst_scale_img.transform = 0;
-    dst_img.transform = 0;
 
     if (hasHdrInfo(src_img)) {
         if (isFormatYUV(src_img.format))
@@ -1290,7 +1288,6 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     exynos_image dst_img;
     layer->setSrcExynosImage(&src_img);
     layer->setDstExynosImage(&dst_img);
-    dst_img.transform = 0;
     /* Position is (0, 0) */
     dst_img.x = 0;
     dst_img.y = 0;
@@ -1519,8 +1516,13 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                         dumpExynosImage(eDebugResourceManager, otf_src_img);
                         exynos_image m2m_src_img = src_img;
                         /* transform is already handled by m2mMPP */
-                        otf_src_img.transform = 0;
-                        otf_dst_img.transform = 0;
+                        if (CC_UNLIKELY(otf_src_img.transform != 0 || otf_dst_img.transform != 0)) {
+                            ALOGE("%s:: transform should be handled by m2mMPP. otf_src_img "
+                                  "transform %d, otf_dst_img transform %d",
+                                  __func__, otf_src_img.transform, otf_dst_img.transform);
+                            otf_src_img.transform = 0;
+                            otf_dst_img.transform = 0;
+                        }
 
                         /*
                          * This is the case that layer color transform should be
