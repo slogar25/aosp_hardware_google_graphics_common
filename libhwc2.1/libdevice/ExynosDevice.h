@@ -35,16 +35,11 @@
 
 #include <hardware/hwcomposer2.h>
 
+#include <display_common.h>
+
 #include "ExynosHWC.h"
 #include "ExynosHWCModule.h"
 #include "ExynosHWCHelper.h"
-
-#ifdef GRALLOC_VERSION1
-#include "gralloc1_priv.h"
-#else
-#include "gralloc_priv.h"
-#endif
-#include "GrallocWrapper.h"
 
 #define MAX_DEV_NAME 128
 #define ERROR_LOG_PATH0 "/data/vendor/log/hwc"
@@ -63,14 +58,6 @@
 #ifndef WRITEBACK_CAPTURE_PATH
 #define WRITEBACK_CAPTURE_PATH "/data/vendor/log/hwc"
 #endif
-
-namespace android {
-namespace GrallocWrapper {
-class Mapper;
-class Allocator;
-}
-}
-
 
 using namespace android;
 
@@ -172,9 +159,6 @@ class ExynosDevice {
          * Resource manager object that is used to manage HW resources and assign resources to each layers
          */
         ExynosResourceManager *mResourceManager;
-
-        static GrallocWrapper::Mapper* mMapper;
-        static GrallocWrapper::Allocator*  mAllocator;
 
         /**
          * Geometry change will be saved by bit map.
@@ -294,7 +278,6 @@ class ExynosDevice {
         void setDisplayMode(uint32_t displayMode);
         uint32_t checkConnection(uint32_t display);
         void getCapabilities(uint32_t *outCount, int32_t* outCapabilities);
-        static void getAllocator(GrallocWrapper::Mapper** mapper, GrallocWrapper::Allocator**  allocator);
         void setGeometryChanged(uint64_t changedBit) { mGeometryChanged|= changedBit;};
         void clearGeometryChanged();
         void setDynamicRecomposition(unsigned int on);
@@ -314,8 +297,6 @@ class ExynosDevice {
                 buffer_handle_t& getBuffer() { return mBuffer; };
                 void saveToFile(const String8 &fileName);
             private:
-                GrallocWrapper::Allocator* mAllocator = nullptr;
-                GrallocWrapper::Mapper* mMapper = nullptr;
                 buffer_handle_t mBuffer = nullptr;
                 ExynosDevice* mDevice = nullptr;
         };

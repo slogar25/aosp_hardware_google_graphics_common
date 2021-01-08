@@ -32,19 +32,11 @@
 #include <map>
 #include "ExynosHWCModule.h"
 #include "ExynosHWCHelper.h"
-#include "GrallocWrapper.h"
 #include "ExynosMPPType.h"
 
 class ExynosDisplay;
 class ExynosMPP;
 class ExynosResourceManager;
-
-namespace android {
-namespace GrallocWrapper {
-class Mapper;
-class Allocator;
-}
-}
 
 #ifndef NUM_MPP_DST_BUFS
 #define NUM_MPP_DST_BUFS_DEFAULT 3
@@ -230,7 +222,7 @@ typedef enum {
 #endif
 
 typedef struct exynos_mpp_img_info {
-    private_handle_t *bufferHandle;
+    buffer_handle_t bufferHandle;
     uint32_t bufferType;
     uint32_t format;
     android_dataspace_t dataspace;
@@ -514,8 +506,6 @@ public:
     int32_t mPrevAssignedDisplayType;
     int32_t mReservedDisplay;
 
-    GrallocWrapper::Allocator* mAllocator;
-    GrallocWrapper::Mapper* mMapper;
     ResourceManageThread mResourceManageThread;
     float mCapacity;
     float mUsedCapacity;
@@ -667,7 +657,7 @@ public:
 
 protected:
     uint32_t getBufferType(uint64_t usage);
-    uint32_t getBufferType(const private_handle_t *handle);
+    uint32_t getBufferType(const buffer_handle_t handle);
     uint64_t getBufferUsage(uint64_t usage);
     bool needDstBufRealloc(struct exynos_image &dst, uint32_t index);
     bool canUsePrevFrame();

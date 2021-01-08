@@ -46,6 +46,8 @@ struct _drmModeAtomicReq {
     drmModeAtomicReqItemPtr items;
 };
 
+using namespace vendor::graphics;
+
 extern struct exynos_hwc_control exynosHWCControl;
 static const int32_t kUmPerInch = 25400;
 ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
@@ -1590,15 +1592,17 @@ int32_t ExynosDisplayDrmInterface::setupWritebackCommit(DrmModeAtomicReq &drmReq
 
     uint32_t writeback_fb_id = 0;
     exynos_win_config_data writeback_config;
+    VendorGraphicBufferMeta gmeta(mExynosDisplay->mDpuData.readback_info.handle);
+
     writeback_config.state = exynos_win_config_data::WIN_STATE_BUFFER;
     writeback_config.format = mReadbackInfo.mReadbackFormat;
     writeback_config.src = {0, 0, mExynosDisplay->mXres, mExynosDisplay->mYres,
         mExynosDisplay->mXres, mExynosDisplay->mYres};
     writeback_config.dst = {0, 0, mExynosDisplay->mXres, mExynosDisplay->mYres,
         mExynosDisplay->mXres, mExynosDisplay->mYres};
-    writeback_config.fd_idma[0] = mExynosDisplay->mDpuData.readback_info.handle->fd;
-    writeback_config.fd_idma[1] = mExynosDisplay->mDpuData.readback_info.handle->fd1;
-    writeback_config.fd_idma[2] = mExynosDisplay->mDpuData.readback_info.handle->fd2;
+    writeback_config.fd_idma[0] = gmeta.fd;
+    writeback_config.fd_idma[1] = gmeta.fd1;
+    writeback_config.fd_idma[2] = gmeta.fd2;
     if ((ret = addFBFromDisplayConfig(drmReq, writeback_config, writeback_fb_id)) < 0) {
         ALOGE("%s: addFBFromDisplayConfig() fail ret(%d)",__func__, ret);
         return ret;

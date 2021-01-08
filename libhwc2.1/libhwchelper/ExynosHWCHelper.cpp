@@ -28,6 +28,10 @@
 #include "ExynosResourceRestriction.h"
 #include <iomanip>
 
+using vendor::graphics::BufferUsage;
+using vendor::graphics::VendorGraphicBufferUsage;
+using vendor::graphics::VendorGraphicBufferMeta;
+
 #define AFBC_MAGIC  0xafbc
 
 #define FT_LOGD(msg, ...) \
@@ -79,41 +83,25 @@ uint32_t getHWC1CompType(int32_t type) {
 
 uint32_t getDrmMode(uint64_t flags)
 {
-#ifdef GRALLOC_VERSION1
-    if (flags & GRALLOC1_PRODUCER_USAGE_PROTECTED) {
-        if (flags & GRALLOC1_PRODUCER_USAGE_PRIVATE_NONSECURE)
+    if (flags & BufferUsage::PROTECTED) {
+        if (flags & VendorGraphicBufferUsage::PRIVATE_NONSECURE)
             return NORMAL_DRM;
         else
             return SECURE_DRM;
     }
-#else
-    if (flags & GRALLOC_USAGE_PROTECTED) {
-        if (flags & GRALLOC_USAGE_PRIVATE_NONSECURE)
-            return NORMAL_DRM;
-        else
-            return SECURE_DRM;
-    }
-#endif
     return NO_DRM;
 }
 
-uint32_t getDrmMode(const private_handle_t *handle)
+uint32_t getDrmMode(const buffer_handle_t handle)
 {
-#ifdef GRALLOC_VERSION1
-    if (handle->producer_usage & GRALLOC1_PRODUCER_USAGE_PROTECTED) {
-        if (handle->producer_usage & GRALLOC1_PRODUCER_USAGE_PRIVATE_NONSECURE)
+    uint64_t usage = VendorGraphicBufferMeta::get_usage(handle);
+    if (usage & BufferUsage::PROTECTED) {
+        if (usage & VendorGraphicBufferUsage::PRIVATE_NONSECURE)
             return NORMAL_DRM;
         else
             return SECURE_DRM;
     }
-#else
-    if (handle->flags & GRALLOC_USAGE_PROTECTED) {
-        if (handle->flags & GRALLOC_USAGE_PRIVATE_NONSECURE)
-            return NORMAL_DRM;
-        else
-            return SECURE_DRM;
-    }
-#endif
+
     return NO_DRM;
 }
 
@@ -300,40 +288,15 @@ bool formatHasAlphaChannel(int format)
     return false;
 }
 
-bool checkCompressionFd(const private_handle_t *handle)
-{
-    if ((getBufferNumOfFormat(handle->format, AFBC) == 1) && (handle->fd1 > 0)) {
-        void *_map = NULL;
-        uint32_t *isAFBC = NULL;
-        _map = mmap(0, sizeof(uint32_t), PROT_READ|PROT_WRITE, MAP_SHARED, handle->fd1, 0);
-        if (_map == NULL) {
-            ALOGE("%s, map is NULL", __func__);
-        } else if (_map == MAP_FAILED) {
-            ALOGE("%s, map failed", __func__);
-        } else {
-            isAFBC = static_cast<uint32_t *>(_map);
-            if ((isAFBC != NULL) && (*isAFBC == AFBC_MAGIC)) {
-                munmap(isAFBC, sizeof(uint32_t));
-                return true;
-            } else {
-                if (isAFBC != NULL) munmap(isAFBC, sizeof(uint32_t));
-                return false;
-            }
-        }
-    }
-    return false;
-}
-
-bool isAFBCCompressed(const private_handle_t *handle) {
+bool isAFBCCompressed(const buffer_handle_t handle) {
     if (handle != NULL) {
-        if (checkCompressionFd(handle))
-            return true;
+        return VendorGraphicBufferMeta::is_afbc(handle);
     }
 
     return false;
 }
 
-uint32_t getAFBCCompressionType(const private_handle_t *handle) {
+uint32_t getAFBCCompressionType(const buffer_handle_t handle) {
     return isAFBCCompressed(handle) ? AFBC : 0;
 }
 
@@ -466,12 +429,15 @@ uint64_t halTransformToDrmRot(uint32_t halTransform)
     }
 }
 
-void dumpHandle(uint32_t type, private_handle_t *h)
+void dumpHandle(uint32_t type, buffer_handle_t h)
 {
     if (h == NULL)
         return;
+
+    VendorGraphicBufferMeta gmeta(h);
+
     HDEBUGLOGD(type, "\t\tformat = %d, width = %u, height = %u, stride = %u, vstride = %u",
-            h->format, h->width, h->height, h->stride, h->vstride);
+            gmeta.format, gmeta.width, gmeta.height, gmeta.stride, gmeta.vstride);
 }
 
 void dumpExynosImage(uint32_t type, exynos_image &img)
@@ -496,7 +462,8 @@ void dumpExynosImage(String8& result, exynos_image &img)
     result.appendFormat("\tdataSpace(%d), blending(%d), transform(0x%2x), afbc(%d)\n",
                         img.dataSpace, img.blending, img.transform, img.compressed);
     if (img.bufferHandle != NULL) {
-        result.appendFormat("\tbuffer's stride: %d, %d\n", img.bufferHandle->stride, img.bufferHandle->vstride);
+        VendorGraphicBufferMeta gmeta(img.bufferHandle);
+        result.appendFormat("\tbuffer's stride: %d, %d\n", gmeta.stride, gmeta.vstride);
     }
 }
 
@@ -735,20 +702,22 @@ uint32_t getExynosBufferCbCrLength(uint32_t width, uint32_t height, int format)
     return NV12M_CBCR_SIZE(width, height);
 }
 
-int getBufLength(private_handle_t *handle, uint32_t planerNum, size_t *length, int format, uint32_t width, uint32_t height)
+int getBufLength(buffer_handle_t handle, uint32_t planerNum, size_t *length, int format, uint32_t width, uint32_t height)
 {
     uint32_t bufferNumber = getBufferNumOfFormat(format, getAFBCCompressionType(handle));
     if ((bufferNumber == 0) || (bufferNumber > planerNum))
         return -EINVAL;
 
+    VendorGraphicBufferMeta gmeta(handle);
+
     switch (bufferNumber) {
         case 1:
-            length[0] = handle->size;
+            length[0] = gmeta.size;
             break;
         case 2:
             HDEBUGLOGD(eDebugMPP, "-- %s x : %d y : %d format : %d",__func__, width, height, format);
-            length[0] = handle->size;
-            length[1] = handle->size1;
+            length[0] = gmeta.size;
+            length[1] = gmeta.size1;
             HDEBUGLOGD(eDebugMPP, "Y size : %zu CbCr size : %zu", length[0], length[1]);
             break;
         case 3:

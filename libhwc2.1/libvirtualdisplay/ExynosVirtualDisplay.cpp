@@ -21,11 +21,10 @@
 #include "../libdevice/ExynosLayer.h"
 
 #include "ExynosHWCHelper.h"
-#ifdef GRALLOC_VERSION1
-#include "gralloc1_priv.h"
-#else
-#include "gralloc_priv.h"
-#endif
+#include "VendorGraphicBuffer.h"
+
+using vendor::graphics::BufferUsage;
+using vendor::graphics::VendorGraphicBufferUsage;
 
 extern struct exynos_hwc_control exynosHWCControl;
 
@@ -52,7 +51,7 @@ ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t __unused type, ExynosDevice 
     mOutputBuffer = NULL;
     mCompositionType = COMPOSITION_GLES;
     mGLESFormat = HAL_PIXEL_FORMAT_RGBA_8888;
-    mSinkUsage = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_VIDEO_ENCODER;
+    mSinkUsage = BufferUsage::COMPOSER_OVERLAY | BufferUsage::VIDEO_ENCODER;
     mIsSecureDRM = false;
     mIsNormalDRM = false;
     mNeedReloadResourceForHWFC = false;
@@ -361,7 +360,7 @@ bool ExynosVirtualDisplay::checkFrameValidation()
         return false;
     }
 
-    private_handle_t *outbufHandle = private_handle_t::dynamicCast(mOutputBuffer);
+    buffer_handle_t outbufHandle = mOutputBuffer;
     if (outbufHandle == NULL) {
         handleAcquireFence();
         return false;
@@ -380,13 +379,13 @@ bool ExynosVirtualDisplay::checkFrameValidation()
 
 void ExynosVirtualDisplay::setSinkBufferUsage()
 {
-    mSinkUsage = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_VIDEO_ENCODER;
+    mSinkUsage = BufferUsage::COMPOSER_OVERLAY | BufferUsage::VIDEO_ENCODER;
     if (mIsSecureDRM) {
-        mSinkUsage |= GRALLOC_USAGE_SW_READ_NEVER |
-            GRALLOC_USAGE_SW_WRITE_NEVER |
-            GRALLOC_USAGE_PROTECTED;
+        mSinkUsage |= BufferUsage::CPU_READ_NEVER |
+            BufferUsage::CPU_WRITE_NEVER |
+            BufferUsage::PROTECTED;
     } else if (mIsNormalDRM)
-        mSinkUsage |= GRALLOC_USAGE_PRIVATE_NONSECURE;
+        mSinkUsage |= VendorGraphicBufferUsage::PRIVATE_NONSECURE;
 }
 
 void ExynosVirtualDisplay::setCompositionType()
@@ -425,7 +424,7 @@ void ExynosVirtualDisplay::initPerFrameData()
     mIsSecureDRM = false;
     mIsNormalDRM = false;
     mCompositionType = COMPOSITION_HWC;
-    mSinkUsage = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_VIDEO_ENCODER;
+    mSinkUsage = BufferUsage::COMPOSER_OVERLAY | BufferUsage::VIDEO_ENCODER;
 }
 
 bool ExynosVirtualDisplay::checkSkipFrame()
@@ -491,7 +490,7 @@ void ExynosVirtualDisplay::handleSkipFrame()
     mIsSecureDRM = false;
     mIsNormalDRM = false;
     mCompositionType = COMPOSITION_HWC;
-    mSinkUsage = GRALLOC_USAGE_HW_COMPOSER | GRALLOC_USAGE_HW_VIDEO_ENCODER;
+    mSinkUsage = BufferUsage::COMPOSER_OVERLAY | BufferUsage::VIDEO_ENCODER;
     DISPLAY_LOGD(eDebugVirtualDisplay, "handleSkipFrame()");
 }
 
