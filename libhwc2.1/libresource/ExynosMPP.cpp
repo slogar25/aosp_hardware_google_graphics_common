@@ -495,14 +495,14 @@ bool ExynosMPP::isDstFormatSupported(struct exynos_image &dst)
     return false;
 }
 
-uint32_t ExynosMPP::getMaxUpscale(struct exynos_image &src, struct exynos_image __unused &dst)
-{
+uint32_t ExynosMPP::getMaxUpscale(const struct exynos_image &src,
+                                  const struct exynos_image __unused &dst) const {
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].maxUpScale;
 }
 
-uint32_t ExynosMPP::getMaxDownscale(ExynosDisplay &display, struct exynos_image &src, struct exynos_image &dst)
-{
+uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct exynos_image &src,
+                                    const struct exynos_image &dst) const {
     uint32_t idx = getRestrictionClassification(src);
 
     if (mDstSizeRestrictions[idx].maxDownScale <= 1)
@@ -523,6 +523,9 @@ uint32_t ExynosMPP::getMaxDownscale(ExynosDisplay &display, struct exynos_image 
         float displayW = float(display.mXres);
         float displayH = float(display.mYres);
         float resolClock = displayW * displayH * VPP_RESOL_CLOCK_FACTOR;
+
+        scaleRatio_H = std::min(scaleRatio_H, float(mDstSizeRestrictions[idx].maxDownScale));
+        scaleRatio_V = std::min(scaleRatio_V, float(mDstSizeRestrictions[idx].maxDownScale));
 
         if (float(mClockKhz) * 1000.0 <
             ((resolClock * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR) / mPPC *
@@ -657,8 +660,7 @@ uint32_t ExynosMPP::getSrcMinCropHeight(struct exynos_image &src)
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].minCropHeight;
 }
-uint32_t ExynosMPP::getSrcCropWidthAlign(struct exynos_image &src)
-{
+uint32_t ExynosMPP::getSrcCropWidthAlign(const struct exynos_image &src) const {
     if (((src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B) ||
          (src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B)) &&
         (mPhysicalType == MPP_G2D))
@@ -668,8 +670,7 @@ uint32_t ExynosMPP::getSrcCropWidthAlign(struct exynos_image &src)
 }
 
 /* This is used for only otfMPP */
-uint32_t ExynosMPP::getSrcCropWidthAlign(uint32_t idx)
-{
+uint32_t ExynosMPP::getSrcCropWidthAlign(uint32_t idx) const {
     if (idx >= RESTRICTION_MAX)
     {
         MPP_LOGE("invalid idx: %d", idx);
@@ -677,8 +678,7 @@ uint32_t ExynosMPP::getSrcCropWidthAlign(uint32_t idx)
     }
     return mSrcSizeRestrictions[idx].cropWidthAlign;
 }
-uint32_t ExynosMPP::getSrcCropHeightAlign(struct exynos_image &src)
-{
+uint32_t ExynosMPP::getSrcCropHeightAlign(const struct exynos_image &src) const {
     if (((src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B) ||
          (src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B)) &&
         (mPhysicalType == MPP_G2D))
@@ -689,8 +689,7 @@ uint32_t ExynosMPP::getSrcCropHeightAlign(struct exynos_image &src)
 }
 
 /* This is used for only otfMPP */
-uint32_t ExynosMPP::getSrcCropHeightAlign(uint32_t idx)
-{
+uint32_t ExynosMPP::getSrcCropHeightAlign(uint32_t idx) const {
     if (idx >= RESTRICTION_MAX)
     {
         MPP_LOGE("invalid idx: %d", idx);
@@ -737,8 +736,7 @@ uint32_t ExynosMPP::getDstMinHeight(struct exynos_image &dst)
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].minCropHeight;
 }
-uint32_t ExynosMPP::getDstWidthAlign(struct exynos_image &dst)
-{
+uint32_t ExynosMPP::getDstWidthAlign(const struct exynos_image &dst) const {
     if (((dst.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B) ||
          (dst.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B)) &&
         (mPhysicalType == MPP_G2D))
@@ -754,8 +752,7 @@ uint32_t ExynosMPP::getDstWidthAlign(struct exynos_image &dst)
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropWidthAlign;
 }
-uint32_t ExynosMPP::getDstHeightAlign(struct exynos_image &dst)
-{
+uint32_t ExynosMPP::getDstHeightAlign(const struct exynos_image &dst) const {
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
 
@@ -2773,8 +2770,7 @@ int32_t ExynosMPP::updateUsedCapacity()
     return mUsedCapacity;
 }
 
-uint32_t ExynosMPP::getRestrictionClassification(struct exynos_image &img)
-{
+uint32_t ExynosMPP::getRestrictionClassification(const struct exynos_image &img) const {
     return !!(isFormatRgb(img.format) == false);
 }
 
