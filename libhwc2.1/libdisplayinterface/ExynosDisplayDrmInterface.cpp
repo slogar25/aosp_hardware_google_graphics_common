@@ -835,7 +835,7 @@ int32_t ExynosDisplayDrmInterface::addFBFromDisplayConfig(
         uint32_t compressType = 0;
         if (config.compression)
             compressType = AFBC;
-        else if (isFormatSBWC(config.format))
+        else if (isFormatSBWC(config.format)) // TODO: b/175381083, change to new API
             compressType = COMP_ANY;
 
         auto exynosFormat = halFormatToExynosFormat(config.format, compressType);

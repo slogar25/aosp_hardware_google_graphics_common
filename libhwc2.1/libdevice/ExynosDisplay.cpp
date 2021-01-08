@@ -1241,7 +1241,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
             bool hdr_exception = getHDRException(&layer);
             uint32_t parcelFdIndex =
                     getBufferNumOfFormat(layer.mMidImg.format,
-                                         getAFBCCompressionType(layer.mMidImg.bufferHandle));
+                                         getCompressionType(layer.mMidImg.bufferHandle));
             if (parcelFdIndex == 0) {
                 DISPLAY_LOGE("%s:: failed to get parcelFdIndex for midImg with format: %d",
                              __func__, layer.mMidImg.format);
@@ -1296,7 +1296,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
 
             if (layer.mBufferHasMetaParcel == false) {
                 uint32_t parcelFdIndex =
-                        getBufferNumOfFormat(gmeta.format, getAFBCCompressionType(handle));
+                        getBufferNumOfFormat(gmeta.format, getCompressionType(handle));
                 if (parcelFdIndex == 0) {
                     DISPLAY_LOGE("%s:: failed to get parcelFdIndex for srcImg with format: %d",
                                  __func__, gmeta.format);

@@ -125,13 +125,19 @@ unsigned int isNarrowRgb(int format, android_dataspace data_space)
     }
 }
 
-const format_description_t *halFormatToExynosFormat(int format, uint32_t compressType) {
+const format_description_t* halFormatToExynosFormat(int inHalFormat, uint32_t inCompressType) {
     for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++) {
-        const int halFormat = exynos_format_desc[i].halFormat;
-        const uint32_t compType = exynos_format_desc[i].getCompression();
+        const int descHalFormat = exynos_format_desc[i].halFormat;
+        uint32_t descCompressType = exynos_format_desc[i].getCompression();
 
-        if ((halFormat == format) &&
-            ((compType == COMP_ANY) || (compressType == COMP_ANY) || (compType == compressType))) {
+        // TODO: b/175381083, Skip checking SBWC compression type
+        if (descCompressType == SBWC || descCompressType == SBWC_LOSSY) {
+            descCompressType = COMP_ANY;
+        }
+
+        if ((inHalFormat == descHalFormat) &&
+            ((inCompressType == COMP_ANY) || (descCompressType == COMP_ANY) ||
+             (inCompressType == descCompressType))) {
             return &exynos_format_desc[i];
         }
     }
@@ -296,8 +302,13 @@ bool isAFBCCompressed(const buffer_handle_t handle) {
     return false;
 }
 
-uint32_t getAFBCCompressionType(const buffer_handle_t handle) {
-    return isAFBCCompressed(handle) ? AFBC : 0;
+uint32_t getCompressionType(const buffer_handle_t handle) {
+    if (isAFBCCompressed(handle)) {
+        return AFBC;
+    }
+
+    // TODO: b/175381083, Add SBWC check here or make a function in gralloc
+    return 0;
 }
 
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space)
@@ -704,7 +715,7 @@ uint32_t getExynosBufferCbCrLength(uint32_t width, uint32_t height, int format)
 
 int getBufLength(buffer_handle_t handle, uint32_t planerNum, size_t *length, int format, uint32_t width, uint32_t height)
 {
-    uint32_t bufferNumber = getBufferNumOfFormat(format, getAFBCCompressionType(handle));
+    uint32_t bufferNumber = getBufferNumOfFormat(format, getCompressionType(handle));
     if ((bufferNumber == 0) || (bufferNumber > planerNum))
         return -EINVAL;
 

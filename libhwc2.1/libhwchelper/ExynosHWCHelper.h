@@ -404,7 +404,7 @@ int drmFormatToHalFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DpuFormatToBpp(decon_pixel_format format);
 uint64_t halTransformToDrmRot(uint32_t halTransform);
-uint32_t getAFBCCompressionType(const buffer_handle_t handle);
+uint32_t getCompressionType(const buffer_handle_t handle);
 
 bool isFormatRgb(int format);
 bool isFormatYUV(int format);
