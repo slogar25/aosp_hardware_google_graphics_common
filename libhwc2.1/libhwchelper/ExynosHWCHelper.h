@@ -21,16 +21,13 @@
 #include <utils/String8.h>
 
 #include <optional>
-#ifdef GRALLOC_VERSION1
-#include "gralloc1_priv.h"
-#else
-#include "gralloc_priv.h"
-#endif
+
 #include "DeconCommonHeader.h"
 #include "VendorVideoAPI.h"
 #include "exynos_sync.h"
 
 #include "exynos_format.h"
+#include "VendorGraphicBuffer.h"
 
 #define MAX_FENCE_NAME 64
 #define MAX_FENCE_THRESHOLD 500
@@ -359,7 +356,7 @@ typedef struct exynos_image {
     uint32_t layerFlags = 0;
     int acquireFenceFd = -1;
     int releaseFenceFd = -1;
-    private_handle_t *bufferHandle = NULL;
+    buffer_handle_t bufferHandle = NULL;
     android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
     uint32_t blending = 0;
     uint32_t transform = 0;
@@ -385,7 +382,7 @@ typedef struct exynos_image {
 uint32_t getHWC1CompType(int32_t /*hwc2_composition_t*/ type);
 
 uint32_t getDrmMode(uint64_t flags);
-uint32_t getDrmMode(const private_handle_t *handle);
+uint32_t getDrmMode(const buffer_handle_t handle);
 
 inline int WIDTH(const hwc_rect &rect) { return rect.right - rect.left; }
 inline int HEIGHT(const hwc_rect &rect) { return rect.bottom - rect.top; }
@@ -403,7 +400,7 @@ int drmFormatToHalFormat(int format);
 uint8_t formatToBpp(int format);
 uint8_t DpuFormatToBpp(decon_pixel_format format);
 uint64_t halTransformToDrmRot(uint32_t halTransform);
-uint32_t getAFBCCompressionType(const private_handle_t *handle);
+uint32_t getAFBCCompressionType(const buffer_handle_t handle);
 
 bool isFormatRgb(int format);
 bool isFormatYUV(int format);
@@ -417,7 +414,7 @@ bool isFormatSBWC(int format);
 bool isFormatP010(int format);
 bool formatHasAlphaChannel(int format);
 unsigned int isNarrowRgb(int format, android_dataspace data_space);
-bool isAFBCCompressed(const private_handle_t *handle);
+bool isAFBCCompressed(const buffer_handle_t handle);
 bool isSrcCropFloat(hwc_frect &frect);
 bool isScaled(exynos_image &src, exynos_image &dst);
 bool isScaledDown(exynos_image &src, exynos_image &dst);
@@ -427,7 +424,7 @@ bool hasHdr10Plus(exynos_image &img);
 
 void dumpExynosImage(uint32_t type, exynos_image &img);
 void dumpExynosImage(String8& result, exynos_image &img);
-void dumpHandle(uint32_t type, private_handle_t *h);
+void dumpHandle(uint32_t type, buffer_handle_t h);
 String8 getFormatStr(int format, uint32_t compressType);
 String8 getMPPStr(int typeId);
 void adjustRect(hwc_rect_t &rect, int32_t width, int32_t height);
@@ -462,7 +459,7 @@ inline int pixel_align(int x, int a) {
 }
 
 uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format);
-int getBufLength(private_handle_t *handle, uint32_t planer_num, size_t *length, int format, uint32_t width, uint32_t height);
+int getBufLength(buffer_handle_t handle, uint32_t planer_num, size_t *length, int format, uint32_t width, uint32_t height);
 
 //class hwc_fence_info(sync_fence_info_data* data, sync_pt_info* info) {
 struct tm* getHwcFenceTime();

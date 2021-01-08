@@ -25,7 +25,6 @@
 #include "ExynosMPPModule.h"
 #include "ExynosLayer.h"
 #include "ExynosHWCDebug.h"
-#include "ExynosHWCHelper.h"
 #include "hardware/exynos/acryl.h"
 #include "ExynosPrimaryDisplayModule.h"
 #include "ExynosVirtualDisplay.h"
@@ -78,6 +77,7 @@ feature_support_t feature_table[] =
 #endif
 
 using namespace android;
+using namespace vendor::graphics;
 
 ExynosMPPVector ExynosResourceManager::mOtfMPPs;
 ExynosMPPVector ExynosResourceManager::mM2mMPPs;
@@ -379,12 +379,9 @@ int32_t ExynosResourceManager::checkScenario(ExynosDisplay __unused *display)
         if ((exynosDisplay != NULL) && (exynosDisplay->mPlugState == true)) {
             for (uint32_t i = 0; i < exynosDisplay->mLayers.size(); i++) {
                 ExynosLayer *layer = exynosDisplay->mLayers[i];
+                VendorGraphicBufferMeta gmeta(layer->mLayerBuffer);
                 if ((layer->mLayerBuffer != NULL) &&
-#ifdef GRALLOC_VERSION1
-                    (layer->mLayerBuffer->producer_usage & GRALLOC1_PRODUCER_USAGE_CAMERA)) {
-#else
-                    (layer->mLayerBuffer->flags & GRALLOC_USAGE_HW_CAMERA_MASK)) {
-#endif
+                    (gmeta.producer_usage & BufferUsage::CAMERA_OUTPUT)) {
                     mResourceReserved |= (MPP_LOGICAL_G2D_YUV | MPP_LOGICAL_G2D_RGB);
                     break;
                 }
@@ -1076,7 +1073,7 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         return eExceedMaxLayerNum;
 
     if ((layer->mLayerBuffer != NULL) &&
-        (getDrmMode(layer->mLayerBuffer->flags) == NO_DRM) &&
+        (getDrmMode(layer->mLayerBuffer) == NO_DRM) &&
         (display->mDREnable == true) &&
         (display->mDynamicReCompMode == DEVICE_2_CLIENT))
         return eDynamicRecomposition;
