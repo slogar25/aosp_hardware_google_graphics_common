@@ -54,6 +54,22 @@ using namespace vendor::graphics;
 
 extern struct exynos_hwc_control exynosHWCControl;
 static const int32_t kUmPerInch = 25400;
+
+void writeFileNode(FILE *fd, int value) {
+    constexpr uint32_t kMaxWriteFileLen = 16;
+    char val[kMaxWriteFileLen] = {0};
+    if (int32_t ret = snprintf(val, kMaxWriteFileLen, "%d", value) <= 0) {
+        ALOGE("Fail to write file node, ret =%d", ret);
+    } else {
+        fwrite(val, sizeof(val), 1, fd);
+        if (ferror(fd)) {
+            ALOGE("write failed: %s", strerror(errno));
+            clearerr(fd);
+        }
+        rewind(fd);
+    }
+}
+
 ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
 {
     mType = INTERFACE_TYPE_DRM;
@@ -1230,7 +1246,16 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     if (isBrightnessStateChange()) {
         setupBrightnessConfig();
-        // TODO:setup drm property
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->brightness_level(),
+                                            mBrightnessLevel)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
+        }
+
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
+                                            mBrightnessHbmOn)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
+        }
+        // TODO: add dimming_on property
     }
 
     uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
@@ -1791,6 +1816,10 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     mBrightnessState.reset();
     mBrightnessHbmOn = false;
     mBrightnessDimmingOn = true;
+
+    mHbmOnFd = fopen(kHbmOnFileNode, "w+");
+    if (mHbmOnFd == NULL) ALOGE("%s open failed! %s", kHbmOnFileNode, strerror(errno));
+
     return;
 }
 
@@ -1798,7 +1827,13 @@ int32_t ExynosDisplayDrmInterface::updateBrightness() {
     if (!mBrightntessIntfSupported) return HWC2_ERROR_UNSUPPORTED;
 
     setupBrightnessConfig();
-    // TODO: write sysfs
+
+    if (mExynosDisplay->mBrightnessFd)
+        writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel);
+
+    if (mHbmOnFd) writeFileNode(mHbmOnFd, mBrightnessHbmOn);
+
+    // TODO: dimming_on file node
 
     return HWC2_ERROR_NONE;
 }
@@ -1817,13 +1852,16 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
 
     mBrightnessDimmingOn = (!mBrightnessState.instant_hbm && !brightness_state.instant_hbm);
 
+    // TODO: keep in normal brightness range before DisplayManager HBM impl ready
+    float brightness = mExynosDisplay->getBrightnessValue() *
+            mBrightnessTable[BrightnessRange::NORMAL].mBriEnd;
+
     if (brightness_state.peak_hbm) {
         mScaledBrightness = mBrightnessHbmMax;
     } else if (brightness_state.boost_brightness) {
-        mScaledBrightness =
-                min(mBrightnessHdrRatio * mExynosDisplay->getBrightnessValue(), mBrightnessHbmMax);
+        mScaledBrightness = min(mBrightnessHdrRatio * brightness, mBrightnessHbmMax);
     } else {
-        mScaledBrightness = mExynosDisplay->getBrightnessValue();
+        mScaledBrightness = brightness;
     }
 
     uint32_t range;
@@ -1849,8 +1887,6 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
           mBrightnessHbmOn);
 
     mBrightnessState = brightness_state;
-
-    // TODO:mapping and setup mBrightnessLevel and mBrightnessHbmOn
 
     return;
 }

@@ -296,6 +296,7 @@ class ExynosDisplayDrmInterface :
         void getBrightnessInterfaceSupport();
         bool isBrightnessStateChange();
         void setupBrightnessConfig();
+        FILE *mHbmOnFd;
         bool mBrightntessIntfSupported = false;
         float mBrightnessHbmMax = 1.0f;
         /* boost brightness ratio for HDR */
@@ -335,6 +336,11 @@ class ExynosDisplayDrmInterface :
                     mNitsEnd(attr.nits.max) {}
         };
         struct BrightnessTable mBrightnessTable[BrightnessRange::MAX];
+
+        // TODO: hbm in dual display is not supported. It should support it in
+        //      the furture.
+        static constexpr const char *kHbmOnFileNode =
+                "/sys/class/backlight/panel0-backlight/hbm_mode";
 };
 
 #endif
