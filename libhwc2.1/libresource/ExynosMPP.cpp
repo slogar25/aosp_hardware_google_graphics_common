@@ -2044,13 +2044,13 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         rot_dst.h = dst.w;
     }
 
-    if (rot_dst.w > maxDstWidth)
+    if (dst.w > maxDstWidth)
         return -eMPPExeedMaxDstWidth;
-    else if (rot_dst.h > maxDstHeight)
+    else if (dst.h > maxDstHeight)
         return -eMPPExeedMaxDstHeight;
-    else if (rot_dst.w < minDstWidth)
+    else if (dst.w < minDstWidth)
         return -eMPPExeedMinDstWidth;
-    else if (rot_dst.h < minDstHeight)
+    else if (dst.h < minDstHeight)
         return -eMPPExeedMinDstHeight;
     else if (src.isDimLayer()) { // Dim layer
         if (isDimLayerSupported()) {
@@ -2081,7 +2081,7 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         return -eMPPExeedSrcWCropMin;
     else if (src.h < minSrcCropHeight)
         return -eMPPExeedSrcHCropMin;
-    else if ((rot_dst.w % dstWidthAlign != 0) || (rot_dst.h % dstHeightAlign != 0))
+    else if ((dst.w % dstWidthAlign != 0) || (dst.h % dstHeightAlign != 0))
         return -eMPPNotAlignedDstSize;
     else if (src.w > rot_dst.w * maxDownscale)
         return -eMPPExeedMaxDownScale;
