@@ -18,6 +18,7 @@
 #define _EXYNOSDEVICEINTERFACE_H
 
 #include "ExynosHWCHelper.h"
+#include "ExynosDisplayInterface.h"
 
 struct hwc_dpp_size_range {
   uint32_t min;
@@ -77,6 +78,9 @@ class ExynosDeviceInterface {
     public:
         virtual ~ExynosDeviceInterface(){};
         virtual void init(ExynosDevice *exynosDevice) = 0;
+        virtual int32_t initDisplayInterface(
+                std::unique_ptr<ExynosDisplayInterface> &dispInterface)
+        { return 0;};
         /* Fill mDPUInfo according to interface type */
         virtual void updateRestrictions() = 0;
         virtual bool getUseQuery() { return mUseQuery; };

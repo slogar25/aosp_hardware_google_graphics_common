@@ -414,15 +414,15 @@ uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t inde
     return type+index;
 }
 
-void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
+int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 {
     if (mExynosDisplay == NULL) {
         ALOGE("mExynosDisplay is not set");
-        return;
+        return -EINVAL;
     }
     if ((mDrmDevice = drmDevice) == NULL) {
         ALOGE("drmDevice is NULL");
-        return;
+        return -EINVAL;
     }
 
     mFBManager.init(mDrmDevice->fd());
@@ -433,12 +433,12 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     if ((mDrmCrtc = mDrmDevice->GetCrtcForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetCrtcForDisplay is NULL (id: %d)",
                 mExynosDisplay->mDisplayName.string(), drmDisplayId);
-        return;
+        return -EINVAL;
     }
     if ((mDrmConnector = mDrmDevice->GetConnectorForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetConnectorForDisplay is NULL (id: %d)",
                 mExynosDisplay->mDisplayName.string(), drmDisplayId);
-        return;
+        return -EINVAL;
     }
 
     ALOGD("%s:: display type: %d, index: %d, drmDisplayId: %d, "
@@ -459,7 +459,7 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     if (mExynosDisplay->mMaxWindowNum != getMaxWindowNum()) {
         ALOGE("%s:: Invalid max window number (mMaxWindowNum: %d, getMaxWindowNum(): %d",
                 __func__, mExynosDisplay->mMaxWindowNum, getMaxWindowNum());
-        return;
+        return -EINVAL;
     }
 
     getLowPowerDrmModeModeInfo();
@@ -479,7 +479,7 @@ void ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     getBrightnessInterfaceSupport();
 
-    return;
+    return NO_ERROR;
 }
 
 

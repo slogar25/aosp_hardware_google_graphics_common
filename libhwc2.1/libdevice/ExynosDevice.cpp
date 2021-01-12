@@ -180,14 +180,21 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
                 __func__, interfaceType);
     }
 
-    /*
-     * This order should not be changed
-     * initDisplayInterface() of each display ->
-     * ExynosDeviceInterface::init()
-     */
-    for (uint32_t i = 0; i < mDisplays.size(); i++)
-        mDisplays[i]->initDisplayInterface(interfaceType);
     mDeviceInterface->init(this);
+
+    /* Remove display when display interface is not valid */
+    for (uint32_t i = 0; i < mDisplays.size();) {
+        ExynosDisplay* display = mDisplays[i];
+        display->initDisplayInterface(interfaceType);
+        if (mDeviceInterface->initDisplayInterface(
+                    display->mDisplayInterface) != NO_ERROR) {
+            ALOGD("Remove display[%d], Failed to initialize display interface", i);
+            mDisplays.removeAt(i);
+            delete display;
+        } else {
+            i++;
+        }
+    }
 }
 
 ExynosDevice::~ExynosDevice() {

@@ -85,31 +85,14 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
 
     mExynosDrmEventHandler.init(mExynosDevice);
     mDrmDevice->event_listener()->RegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
+}
 
-    uint32_t primaryIndex = 0;
-    uint32_t externalIndex = 0;
-    for (auto &display : mExynosDevice->mDisplays) {
-        if (display->mType == HWC_DISPLAY_PRIMARY) {
-            ExynosDisplay *primaryDisplay =
-                mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, primaryIndex));
-            if (primaryDisplay != NULL) {
-                ExynosDisplayDrmInterface *displayInterface =
-                    static_cast<ExynosDisplayDrmInterface*>(primaryDisplay->mDisplayInterface.get());
-                displayInterface->initDrmDevice(mDrmDevice);
-            }
-            primaryIndex++;
-        } else if (display->mType == HWC_DISPLAY_EXTERNAL) {
-            ExynosDisplay *externalDisplay =
-                mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, externalIndex));
-            if (externalDisplay != NULL) {
-                ExynosDisplayDrmInterface *displayInterface =
-                    static_cast<ExynosDisplayDrmInterface*>(externalDisplay->mDisplayInterface.get());
-                displayInterface->initDrmDevice(mDrmDevice);
-            }
-            externalIndex++;
-        }
-    }
-
+int32_t ExynosDeviceDrmInterface::initDisplayInterface(
+         std::unique_ptr<ExynosDisplayInterface> &dispInterface)
+{
+    ExynosDisplayDrmInterface *displayInterface =
+        static_cast<ExynosDisplayDrmInterface*>(dispInterface.get());
+    return displayInterface->initDrmDevice(mDrmDevice);
 }
 
 void ExynosDeviceDrmInterface::updateRestrictions()
