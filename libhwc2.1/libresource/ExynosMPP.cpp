@@ -1787,6 +1787,8 @@ int32_t ExynosMPP::getDstImageInfo(exynos_image *img)
     img->acquireFenceFd = -1;
     img->releaseFenceFd = -1;
 
+    img->compressed = needCompressDstBuf();
+
     if (mDstImgs[mCurrentDstBuf].bufferHandle == NULL) {
         img->acquireFenceFd = -1;
         img->releaseFenceFd = -1;
