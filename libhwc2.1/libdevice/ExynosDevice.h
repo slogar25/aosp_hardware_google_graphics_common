@@ -107,7 +107,8 @@ enum {
     GEOMETRY_LAYER_BLEND_CHANGED            = 1ULL << 10,
     GEOMETRY_LAYER_FORMAT_CHANGED           = 1ULL << 11,
     GEOMETRY_LAYER_DRM_CHANGED              = 1ULL << 12,
-    GEOMETRY_LAYER_UNKNOWN_CHANGED          = 1ULL << 13,
+    GEOMETRY_LAYER_IGNORE_CHANGED           = 1ULL << 13,
+    GEOMETRY_LAYER_UNKNOWN_CHANGED          = 1ULL << 14,
     /* 1ULL << 14 */
     /* 1ULL << 15 */
     /* 1ULL << 16 */
@@ -138,7 +139,6 @@ enum {
 
     GEOMETRY_ERROR_CASE                     = 1ULL << 63,
 };
-
 
 class ExynosDevice;
 class ExynosDisplay;
