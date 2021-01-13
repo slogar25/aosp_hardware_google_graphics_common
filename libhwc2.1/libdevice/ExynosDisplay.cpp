@@ -522,26 +522,6 @@ void ExynosDisplay::destroyLayers() {
     }
 }
 
-/**
- * @param index
- * @return ExynosLayer
- */
-ExynosLayer *ExynosDisplay::getLayer(uint32_t index) {
-
-    if (mLayers.size() <= index) {
-        HWC_LOGE(this, "HWC2 : %s : size(%zu), index(%d), wrong layer request!",
-                __func__, mLayers.size(), index);
-        return NULL;
-    }
-    if(mLayers[index] != NULL) {
-        return mLayers[index];
-    }
-    else {
-        HWC_LOGE(this, "HWC2 : %s : %d, wrong layer request!", __func__, __LINE__);
-        return NULL;
-    }
-}
-
 ExynosLayer *ExynosDisplay::checkLayer(hwc2_layer_t addr) {
     if (!mLayers.isEmpty()) {
         ExynosLayer *temp = (ExynosLayer *)addr;

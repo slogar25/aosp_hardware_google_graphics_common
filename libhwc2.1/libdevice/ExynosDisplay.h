@@ -554,10 +554,6 @@ class ExynosDisplay {
 
         void destroyLayers();
 
-        /**
-         * @param index
-         */
-        ExynosLayer *getLayer(uint32_t index);
         ExynosLayer *checkLayer(hwc2_layer_t addr);
 
         virtual void doPreProcessing();
