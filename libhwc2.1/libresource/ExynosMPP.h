@@ -195,9 +195,9 @@ enum {
 };
 
 enum {
-    MPP_SOURCE_NO_TYPE = 0,
     MPP_SOURCE_COMPOSITION_TARGET,
-    MPP_SOURCE_LAYER
+    MPP_SOURCE_LAYER,
+    MPP_SOURCE_MAX
 };
 
 /* Based on multi-resolution feature */

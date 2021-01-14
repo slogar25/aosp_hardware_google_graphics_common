@@ -86,7 +86,7 @@ void dump(const restriction_size_t &restrictionSize, String8 &result) {
 }
 
 ExynosMPPSource::ExynosMPPSource()
-    : mSourceType(MPP_SOURCE_NO_TYPE),
+    : mSourceType(MPP_SOURCE_MAX),
     mSource(NULL),
     mOtfMPP(NULL),
     mM2mMPP(NULL)
