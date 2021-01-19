@@ -323,7 +323,7 @@ typedef struct brightnessState {
     }
     bool operator==(const brightnessState& a) const {
         return a.mData == mData &&
-            a.dim_sdr_ratio != dim_sdr_ratio;
+            a.dim_sdr_ratio == dim_sdr_ratio;
     }
 } brightnessState_t;
 
