@@ -665,6 +665,7 @@ protected:
     uint32_t getBufferType(uint64_t usage);
     uint32_t getBufferType(const buffer_handle_t handle);
     uint64_t getBufferUsage(uint64_t usage);
+    bool needCompressDstBuf() const;
     bool needDstBufRealloc(struct exynos_image &dst, uint32_t index);
     bool canUsePrevFrame();
     int32_t setupDst(exynos_mpp_img_info *dstImgInfo);
