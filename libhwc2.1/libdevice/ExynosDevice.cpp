@@ -820,15 +820,10 @@ void  ExynosDevice::captureReadbackClass::saveToFile(const String8 &fileName)
     }
 
     char filePath[MAX_DEV_NAME] = {0};
-    time_t curTime = time(NULL);
-    struct tm *tm = localtime(&curTime);
     VendorGraphicBufferMeta gmeta(mBuffer);
 
     snprintf(filePath, MAX_DEV_NAME,
-            "%s/capture_format%d_%dx%d_%04d-%02d-%02d_%02d_%02d_%02d.raw",
-            WRITEBACK_CAPTURE_PATH, gmeta.format, gmeta.stride, gmeta.vstride,
-            tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-            tm->tm_hour, tm->tm_min, tm->tm_sec);
+            "%s/%s", WRITEBACK_CAPTURE_PATH, fileName.string());
     FILE *fp = fopen(filePath, "w");
     if (fp) {
         uint32_t writeSize =
