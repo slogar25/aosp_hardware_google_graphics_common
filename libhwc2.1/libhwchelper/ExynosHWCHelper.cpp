@@ -516,8 +516,7 @@ bool isScaledDown(exynos_image &src, exynos_image &dst)
     return ((srcW > dstW) || (srcH > dstH));
 }
 
-bool hasHdrInfo(exynos_image &img)
-{
+bool hasHdrInfo(const exynos_image& img) {
     uint32_t dataSpace = img.dataSpace;
 
     /* By reference Layer's dataspace */

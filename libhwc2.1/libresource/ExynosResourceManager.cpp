@@ -19,17 +19,21 @@
  */
 
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
-#include <cutils/properties.h>
-#include <unordered_set>
 #include "ExynosResourceManager.h"
-#include "ExynosMPPModule.h"
-#include "ExynosLayer.h"
+
+#include <cutils/properties.h>
+
+#include <numeric>
+#include <unordered_set>
+
+#include "ExynosDeviceInterface.h"
+#include "ExynosExternalDisplay.h"
 #include "ExynosHWCDebug.h"
-#include "hardware/exynos/acryl.h"
+#include "ExynosLayer.h"
+#include "ExynosMPPModule.h"
 #include "ExynosPrimaryDisplayModule.h"
 #include "ExynosVirtualDisplay.h"
-#include "ExynosExternalDisplay.h"
-#include "ExynosDeviceInterface.h"
+#include "hardware/exynos/acryl.h"
 
 #ifndef USE_MODULE_ATTR
 /* Basic supported features */
@@ -1125,6 +1129,158 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
     return NO_ERROR;
 }
 
+exynos_image ExynosResourceManager::getAlignedImage(exynos_image image, const ExynosMPP *m2mMpp,
+                                                    const ExynosMPP *otfMpp) const {
+    const auto srcCropWidthAlign = otfMpp ? otfMpp->getSrcCropWidthAlign(image) : 1;
+    const auto srcCropHeightAlign = otfMpp ? otfMpp->getSrcCropHeightAlign(image) : 1;
+    const auto dstwidthAlign = m2mMpp ? m2mMpp->getDstWidthAlign(image) : 1;
+    const auto dstHeightAlign = m2mMpp ? m2mMpp->getDstHeightAlign(image) : 1;
+
+    const auto widthAlign = std::lcm(srcCropWidthAlign, dstwidthAlign);
+    const auto heighAlign = std::lcm(srcCropHeightAlign, dstHeightAlign);
+
+    image.w = pixel_align(image.w, widthAlign);
+    image.h = pixel_align(image.h, heighAlign);
+
+    return image;
+}
+
+void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
+        const ExynosDisplay *display, const exynos_image &src_img, const exynos_image &dst_img,
+        std::vector<exynos_image> &image_lists) {
+    const bool isPerpendicular = !!(src_img.transform & HAL_TRANSFORM_ROT_90);
+    const uint32_t srcWidth = isPerpendicular ? src_img.h : src_img.w;
+    const uint32_t srcHeight = isPerpendicular ? src_img.w : src_img.h;
+
+    const bool scaleUp = (srcWidth < dst_img.w && srcHeight < dst_img.h);
+    const bool scaleDown = (srcWidth > dst_img.w && srcHeight > dst_img.h);
+
+    if (!scaleUp && !scaleDown) {
+        return;
+    }
+
+    /* otfMPP doesn't rotate image, m2mMPP rotates image */
+    exynos_image dst_scale_img = dst_img;
+
+    if (hasHdrInfo(src_img)) {
+        if (isFormatYUV(src_img.format))
+            dst_scale_img.format = HAL_PIXEL_FORMAT_YCBCR_P010;
+        else
+            dst_scale_img.format = HAL_PIXEL_FORMAT_RGBA_1010102;
+    } else {
+        if (isFormatYUV(src_img.format)) {
+            dst_scale_img.format = DEFAULT_MPP_DST_YUV_FORMAT;
+        }
+    }
+
+    ExynosMPP *otfMpp = nullptr;
+    ExynosMPP *m2mMpp = nullptr;
+    uint32_t otfMppRatio = 1;
+    uint32_t m2mMppRatio = 1;
+    if (scaleUp) {
+        std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
+                     [&dst_scale_img, &dst_img, &otfMpp, &otfMppRatio](auto m) {
+                         auto ratio = m->getMaxUpscale(dst_scale_img, dst_img);
+                         if (ratio > 1) {
+                             otfMpp = m;
+                             otfMppRatio = ratio;
+                             return true;
+                         }
+                         return false;
+                     });
+        const auto reqRatio = max(float(dst_img.w) / float(srcWidth * otfMppRatio),
+                                  float(dst_img.h) / float(srcHeight * otfMppRatio));
+        std::find_if(mM2mMPPs.begin(), mM2mMPPs.end(),
+                     [&src_img, &dst_scale_img, reqRatio, &m2mMpp, &m2mMppRatio](auto m) {
+                         float ratio = float(m->getMaxUpscale(src_img, dst_scale_img));
+                         if (ratio > reqRatio) {
+                             m2mMpp = m;
+                             m2mMppRatio = ratio;
+                             return true;
+                         }
+                         return false;
+                     });
+    } else {
+        std::find_if(mM2mMPPs.begin(), mM2mMPPs.end(),
+                     [&src_img, &dst_scale_img, display, &m2mMpp, &m2mMppRatio](auto m) {
+                         auto ratio = m->getMaxDownscale(*display, src_img, dst_scale_img);
+                         if (ratio > 1) {
+                             m2mMpp = m;
+                             m2mMppRatio = ratio;
+                             return true;
+                         }
+                         return false;
+                     });
+
+        const float resolution = float(display->mXres) * float(display->mYres);
+        const float scaleRatio_H = float(srcWidth / m2mMppRatio) / float(dst_img.w);
+        const float scaleRatio_V = float(srcHeight / m2mMppRatio) / float(dst_img.h);
+        const float displayRatio_H = float(dst_img.w) / float(display->mXres);
+
+        std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
+                     [&dst_scale_img, &dst_img, resolution, scaleRatio_H, scaleRatio_V,
+                      displayRatio_H, &otfMpp, &otfMppRatio](auto m) {
+                         auto ratio = m->getDownscaleRestriction(dst_scale_img, dst_img);
+
+                         if (ratio >= scaleRatio_H && ratio >= scaleRatio_V &&
+                             m->checkDownscaleCap(resolution, scaleRatio_H, scaleRatio_V,
+                                                  displayRatio_H)) {
+                             otfMpp = m;
+                             otfMppRatio = ratio;
+                             return true;
+                         }
+                         return false;
+                     });
+    }
+
+    if (!otfMpp && !m2mMpp) {
+        HDEBUGLOGD(eDebugResourceManager,
+                   "Cannot find available MPP for scaling src %d x %d, dst %d x %d", src_img.w,
+                   src_img.h, dst_img.w, dst_img.h);
+        return;
+    }
+
+    dst_scale_img.x = 0;
+    dst_scale_img.y = 0;
+    dst_scale_img.w = scaleDown ? dst_img.w : srcWidth;
+    dst_scale_img.h = scaleDown ? dst_img.h : srcHeight;
+
+    HDEBUGLOGD(eDebugResourceManager,
+               "scaling w: %d, h: %d, ratio = otfType %d - %d, m2mType %d - %d", dst_scale_img.w,
+               dst_scale_img.h, otfMpp ? otfMpp->mLogicalType : -1, otfMppRatio,
+               m2mMpp ? m2mMpp->mLogicalType : -1, m2mMppRatio);
+    if (scaleUp) {
+        if (dst_scale_img.w * otfMppRatio < dst_img.w) {
+            dst_scale_img.w = uint32_t(ceilf(float(dst_img.w) / float(otfMppRatio)));
+        }
+        if (dst_scale_img.h * otfMppRatio < dst_img.h) {
+            dst_scale_img.h = uint32_t(ceilf(float(dst_img.h) / float(otfMppRatio)));
+        }
+    } else {
+        if (dst_scale_img.w * m2mMppRatio < srcWidth) {
+            dst_scale_img.w = uint32_t(ceilf(float(srcWidth) / float(m2mMppRatio)));
+        }
+        if (dst_scale_img.h * m2mMppRatio < srcHeight) {
+            dst_scale_img.h = uint32_t(ceilf(float(srcHeight) / float(m2mMppRatio)));
+        }
+    }
+    HDEBUGLOGD(eDebugResourceManager,
+               "\tsrc[%d, %d, %d,%d], dst[%d, %d, %d,%d], mid[%d, %d, %d, %d]", src_img.x,
+               src_img.y, src_img.w, src_img.h, dst_img.x, dst_img.y, dst_img.w, dst_img.h,
+               dst_scale_img.x, dst_scale_img.y, dst_scale_img.w, dst_scale_img.h);
+
+    if (isFormatSBWC(dst_scale_img.format)) {
+        image_lists.emplace_back(getAlignedImage(dst_scale_img, m2mMpp, otfMpp));
+        /*
+         * SBWC format could not be supported in specific dst size
+         * Add uncompressed YUV format to cover this size
+         */
+        dst_scale_img.format = DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT;
+    }
+
+    image_lists.emplace_back(getAlignedImage(dst_scale_img, m2mMpp, otfMpp));
+}
+
 int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *display,
         ExynosLayer *layer, std::vector<exynos_image> &image_lists)
 {
@@ -1132,7 +1288,6 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     exynos_image dst_img;
     layer->setSrcExynosImage(&src_img);
     layer->setDstExynosImage(&dst_img);
-    dst_img.transform = 0;
     /* Position is (0, 0) */
     dst_img.x = 0;
     dst_img.y = 0;
@@ -1144,80 +1299,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
     /* Copy origin source HDR metadata */
     dst_img.metaParcel = src_img.metaParcel;
 
-    uint32_t dstW = dst_img.w;
-    uint32_t dstH = dst_img.h;
-    bool isPerpendicular = !!(src_img.transform & HAL_TRANSFORM_ROT_90);
-    if (isPerpendicular) {
-        dstW = dst_img.h;
-        dstH = dst_img.w;
-    }
-
-    /* Scale up case */
-    if ((dstW > src_img.w) && (dstH > src_img.h))
-    {
-        /* otfMPP doesn't rotate image, m2mMPP rotates image */
-        src_img.transform = 0;
-        exynos_image dst_scale_img = dst_img;
-
-        ExynosMPP *otfMppForScale = nullptr;
-        auto mpp_it = std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
-                [&src_img, &dst_scale_img](auto m) {
-                return (m->getMaxUpscale(src_img, dst_scale_img) > 1);
-                });
-        otfMppForScale = mpp_it == mOtfMPPs.end() ? nullptr : *mpp_it;
-
-        if (hasHdrInfo(src_img)) {
-            if (isFormatYUV(src_img.format))
-                dst_scale_img.format = HAL_PIXEL_FORMAT_YCBCR_P010;
-            else
-                dst_scale_img.format = HAL_PIXEL_FORMAT_RGBA_1010102;
-        } else {
-            if (isFormatYUV(src_img.format)) {
-                dst_scale_img.format = DEFAULT_MPP_DST_YUV_FORMAT;
-            }
-        }
-
-        if (otfMppForScale) {
-            uint32_t upScaleRatio = otfMppForScale->getMaxUpscale(src_img, dst_scale_img);
-            uint32_t downScaleRatio = otfMppForScale->getMaxDownscale(*display, src_img, dst_scale_img);
-            uint32_t srcCropWidthAlign = otfMppForScale->getSrcCropWidthAlign(src_img);
-            uint32_t srcCropHeightAlign = otfMppForScale->getSrcCropHeightAlign(src_img);
-
-            dst_scale_img.x = 0;
-            dst_scale_img.y = 0;
-            if (isPerpendicular) {
-                dst_scale_img.w = pixel_align(src_img.h, srcCropWidthAlign);
-                dst_scale_img.h = pixel_align(src_img.w, srcCropHeightAlign);
-            } else {
-                dst_scale_img.w = pixel_align(src_img.w, srcCropWidthAlign);
-                dst_scale_img.h = pixel_align(src_img.h, srcCropHeightAlign);
-            }
-
-            HDEBUGLOGD(eDebugResourceManager, "scale up w: %d, h: %d, ratio(type: %d, %d, %d)",
-                    dst_scale_img.w, dst_scale_img.h,
-                    otfMppForScale->mLogicalType, upScaleRatio, downScaleRatio);
-            if (dst_scale_img.w * upScaleRatio < dst_img.w) {
-                dst_scale_img.w = pixel_align((uint32_t)ceilf((float)dst_img.w/(float)upScaleRatio), srcCropWidthAlign);
-            }
-            if (dst_scale_img.h * upScaleRatio < dst_img.h) {
-                dst_scale_img.h = pixel_align((uint32_t)ceilf((float)dst_img.h/(float)upScaleRatio), srcCropHeightAlign);
-            }
-            HDEBUGLOGD(eDebugResourceManager, "\tsrc[%d, %d, %d,%d], dst[%d, %d, %d,%d], mid[%d, %d, %d, %d]",
-                    src_img.x, src_img.y, src_img.w, src_img.h,
-                    dst_img.x, dst_img.y, dst_img.w, dst_img.h,
-                    dst_scale_img.x, dst_scale_img.y, dst_scale_img.w, dst_scale_img.h);
-            image_lists.push_back(dst_scale_img);
-
-            if (isFormatSBWC(dst_scale_img.format)) {
-                /*
-                 * SBWC format could not be supported in specific dst size
-                 * Add uncompressed YUV format to cover this size
-                 */
-                dst_scale_img.format = DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT;
-                image_lists.push_back(dst_scale_img);
-            }
-        }
-    }
+    getCandidateScalingM2mMPPOutImages(display, src_img, dst_img, image_lists);
 
     if (isFormatYUV(src_img.format) && !hasHdrInfo(src_img)) {
         dst_img.format = DEFAULT_MPP_DST_YUV_FORMAT;
@@ -1434,8 +1516,13 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                         dumpExynosImage(eDebugResourceManager, otf_src_img);
                         exynos_image m2m_src_img = src_img;
                         /* transform is already handled by m2mMPP */
-                        otf_src_img.transform = 0;
-                        otf_dst_img.transform = 0;
+                        if (CC_UNLIKELY(otf_src_img.transform != 0 || otf_dst_img.transform != 0)) {
+                            ALOGE("%s:: transform should be handled by m2mMPP. otf_src_img "
+                                  "transform %d, otf_dst_img transform %d",
+                                  __func__, otf_src_img.transform, otf_dst_img.transform);
+                            otf_src_img.transform = 0;
+                            otf_dst_img.transform = 0;
+                        }
 
                         /*
                          * This is the case that layer color transform should be

@@ -570,8 +570,14 @@ public:
     bool isSupportedCapability(ExynosDisplay &display, struct exynos_image &src);
     bool isSupportedDRM(struct exynos_image &src);
     virtual bool isSupportedHStrideCrop(struct exynos_image &src);
-    virtual uint32_t getMaxDownscale(ExynosDisplay &display, struct exynos_image &src, struct exynos_image &dst);
-    virtual uint32_t getMaxUpscale(struct exynos_image &src, struct exynos_image &dst);
+    bool checkDownscaleCap(const float resolution, const float scaleRatio_H,
+                           const float scaleRatio_V, const float displayRatio_H) const;
+    virtual uint32_t getDownscaleRestriction(const struct exynos_image &src,
+                                             const struct exynos_image &dst) const;
+    virtual uint32_t getMaxDownscale(const ExynosDisplay &display, const struct exynos_image &src,
+                                     const struct exynos_image &dst) const;
+    virtual uint32_t getMaxUpscale(const struct exynos_image &src,
+                                   const struct exynos_image &dst) const;
     uint32_t getSrcMaxWidth(struct exynos_image &src);
     uint32_t getSrcMaxHeight(struct exynos_image &src);
     uint32_t getSrcMinWidth(struct exynos_image &src);
@@ -589,10 +595,10 @@ public:
     uint32_t getSrcXOffsetAlign(uint32_t idx);
     uint32_t getSrcYOffsetAlign(struct exynos_image &src);
     uint32_t getSrcYOffsetAlign(uint32_t idx);
-    uint32_t getSrcCropWidthAlign(struct exynos_image &src);
-    uint32_t getSrcCropWidthAlign(uint32_t idx);
-    uint32_t getSrcCropHeightAlign(struct exynos_image &src);
-    uint32_t getSrcCropHeightAlign(uint32_t idx);
+    uint32_t getSrcCropWidthAlign(const struct exynos_image &src) const;
+    uint32_t getSrcCropWidthAlign(uint32_t idx) const;
+    uint32_t getSrcCropHeightAlign(const struct exynos_image &src) const;
+    uint32_t getSrcCropHeightAlign(uint32_t idx) const;
     virtual bool isSrcFormatSupported(struct exynos_image &src);
     virtual bool isDimLayerSupported();
     int32_t isSupportThis(uint32_t mSupportAttr);
@@ -601,8 +607,8 @@ public:
     uint32_t getDstMaxHeight(struct exynos_image &dst);
     uint32_t getDstMinWidth(struct exynos_image &dst);
     uint32_t getDstMinHeight(struct exynos_image &dst);
-    virtual uint32_t getDstWidthAlign(struct exynos_image &dst);
-    uint32_t getDstHeightAlign(struct exynos_image &dst);
+    virtual uint32_t getDstWidthAlign(const struct exynos_image &dst) const;
+    uint32_t getDstHeightAlign(const struct exynos_image &dst) const;
     uint32_t getDstXOffsetAlign(struct exynos_image &dst);
     uint32_t getDstYOffsetAlign(struct exynos_image &dst);
     uint32_t getOutBufAlign();
@@ -667,7 +673,7 @@ protected:
             struct exynos_image &src, struct exynos_image &dst);
     virtual int32_t setColorConversionInfo() { return NO_ERROR; };
 
-    uint32_t getRestrictionClassification(struct exynos_image &img);
+    uint32_t getRestrictionClassification(const struct exynos_image &img) const;
 
     /*
      * getPPC for src, dst referencing mppSources in mAssignedSources and

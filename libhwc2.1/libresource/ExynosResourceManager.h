@@ -187,6 +187,12 @@ class ExynosResourceManager {
 
     protected:
         virtual void setFrameRateForPerformance(ExynosMPP &mpp, AcrylicPerformanceRequestFrame *frame);
+        void getCandidateScalingM2mMPPOutImages(const ExynosDisplay *display,
+                                                const exynos_image &src_img,
+                                                const exynos_image &dst_img,
+                                                std::vector<exynos_image> &image_lists);
+        exynos_image getAlignedImage(exynos_image image, const ExynosMPP *m2mMpp,
+                                     const ExynosMPP *otfMpp) const;
         static ExynosMPPVector mOtfMPPs;
         static ExynosMPPVector mM2mMPPs;
         uint32_t mResourceReserved; /* Set MPP logical type for bit operation */

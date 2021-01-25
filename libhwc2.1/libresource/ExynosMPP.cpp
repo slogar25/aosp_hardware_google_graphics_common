@@ -495,21 +495,37 @@ bool ExynosMPP::isDstFormatSupported(struct exynos_image &dst)
     return false;
 }
 
-uint32_t ExynosMPP::getMaxUpscale(struct exynos_image &src, struct exynos_image __unused &dst)
-{
+uint32_t ExynosMPP::getMaxUpscale(const struct exynos_image &src,
+                                  const struct exynos_image __unused &dst) const {
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].maxUpScale;
 }
 
-uint32_t ExynosMPP::getMaxDownscale(ExynosDisplay &display, struct exynos_image &src, struct exynos_image &dst)
-{
-    uint32_t idx = getRestrictionClassification(src);
+bool ExynosMPP::checkDownscaleCap(const float resolution, const float scaleRatio_H,
+                                  const float scaleRatio_V, const float displayRatio_H) const {
+    if (mPhysicalType >= MPP_DPP_NUM) return true;
 
-    if (mDstSizeRestrictions[idx].maxDownScale <= 1)
-        return mDstSizeRestrictions[idx].maxDownScale;
+    return float(mClockKhz) * 1000.0 >=
+            ((resolution * VPP_RESOL_CLOCK_FACTOR * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR) /
+             mPPC * displayRatio_H);
+}
+
+uint32_t ExynosMPP::getDownscaleRestriction(const struct exynos_image &src,
+                                            const struct exynos_image & /*dst*/) const {
+    auto idx = getRestrictionClassification(src);
+    return mDstSizeRestrictions[idx].maxDownScale;
+}
+
+uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct exynos_image &src,
+                                    const struct exynos_image &dst) const {
+    uint32_t maxDownscale = getDownscaleRestriction(src, dst);
+
+    if (maxDownscale <= 1) {
+        return maxDownscale;
+    }
 
     if (mPhysicalType < MPP_DPP_NUM) {
-        bool isPerpendicular = !!(dst.transform & HAL_TRANSFORM_ROT_90);
+        const bool isPerpendicular = !!(src.transform & HAL_TRANSFORM_ROT_90);
         float scaleRatio_H = 1;
         float scaleRatio_V = 1;
         if (isPerpendicular) {
@@ -522,15 +538,17 @@ uint32_t ExynosMPP::getMaxDownscale(ExynosDisplay &display, struct exynos_image 
         float dstW = float(dst.w);
         float displayW = float(display.mXres);
         float displayH = float(display.mYres);
-        float resolClock = displayW * displayH * VPP_RESOL_CLOCK_FACTOR;
+        float resolution = displayW * displayH;
 
-        if (float(mClockKhz) * 1000.0 <
-            ((resolClock * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR) / mPPC *
-             (dstW / displayW)))
+        scaleRatio_H = std::min(scaleRatio_H, float(maxDownscale));
+        scaleRatio_V = std::min(scaleRatio_V, float(maxDownscale));
+
+        if (!checkDownscaleCap(resolution, scaleRatio_H, scaleRatio_V, dstW / displayW)) {
             return 1;
+        }
     }
 
-    return mDstSizeRestrictions[idx].maxDownScale;
+    return maxDownscale;
 }
 
 uint32_t ExynosMPP::getSrcXOffsetAlign(struct exynos_image &src)
@@ -657,8 +675,7 @@ uint32_t ExynosMPP::getSrcMinCropHeight(struct exynos_image &src)
     uint32_t idx = getRestrictionClassification(src);
     return mSrcSizeRestrictions[idx].minCropHeight;
 }
-uint32_t ExynosMPP::getSrcCropWidthAlign(struct exynos_image &src)
-{
+uint32_t ExynosMPP::getSrcCropWidthAlign(const struct exynos_image &src) const {
     if (((src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B) ||
          (src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B)) &&
         (mPhysicalType == MPP_G2D))
@@ -668,8 +685,7 @@ uint32_t ExynosMPP::getSrcCropWidthAlign(struct exynos_image &src)
 }
 
 /* This is used for only otfMPP */
-uint32_t ExynosMPP::getSrcCropWidthAlign(uint32_t idx)
-{
+uint32_t ExynosMPP::getSrcCropWidthAlign(uint32_t idx) const {
     if (idx >= RESTRICTION_MAX)
     {
         MPP_LOGE("invalid idx: %d", idx);
@@ -677,8 +693,7 @@ uint32_t ExynosMPP::getSrcCropWidthAlign(uint32_t idx)
     }
     return mSrcSizeRestrictions[idx].cropWidthAlign;
 }
-uint32_t ExynosMPP::getSrcCropHeightAlign(struct exynos_image &src)
-{
+uint32_t ExynosMPP::getSrcCropHeightAlign(const struct exynos_image &src) const {
     if (((src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B) ||
          (src.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B)) &&
         (mPhysicalType == MPP_G2D))
@@ -689,8 +704,7 @@ uint32_t ExynosMPP::getSrcCropHeightAlign(struct exynos_image &src)
 }
 
 /* This is used for only otfMPP */
-uint32_t ExynosMPP::getSrcCropHeightAlign(uint32_t idx)
-{
+uint32_t ExynosMPP::getSrcCropHeightAlign(uint32_t idx) const {
     if (idx >= RESTRICTION_MAX)
     {
         MPP_LOGE("invalid idx: %d", idx);
@@ -737,8 +751,7 @@ uint32_t ExynosMPP::getDstMinHeight(struct exynos_image &dst)
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].minCropHeight;
 }
-uint32_t ExynosMPP::getDstWidthAlign(struct exynos_image &dst)
-{
+uint32_t ExynosMPP::getDstWidthAlign(const struct exynos_image &dst) const {
     if (((dst.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B) ||
          (dst.format == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B)) &&
         (mPhysicalType == MPP_G2D))
@@ -754,8 +767,7 @@ uint32_t ExynosMPP::getDstWidthAlign(struct exynos_image &dst)
     uint32_t idx = getRestrictionClassification(dst);
     return mDstSizeRestrictions[idx].cropWidthAlign;
 }
-uint32_t ExynosMPP::getDstHeightAlign(struct exynos_image &dst)
-{
+uint32_t ExynosMPP::getDstHeightAlign(const struct exynos_image &dst) const {
     if ((mNeedSolidColorLayer == false) && mNeedCompressedTarget)
         return 16;
 
@@ -2032,13 +2044,13 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         rot_dst.h = dst.w;
     }
 
-    if (rot_dst.w > maxDstWidth)
+    if (dst.w > maxDstWidth)
         return -eMPPExeedMaxDstWidth;
-    else if (rot_dst.h > maxDstHeight)
+    else if (dst.h > maxDstHeight)
         return -eMPPExeedMaxDstHeight;
-    else if (rot_dst.w < minDstWidth)
+    else if (dst.w < minDstWidth)
         return -eMPPExeedMinDstWidth;
-    else if (rot_dst.h < minDstHeight)
+    else if (dst.h < minDstHeight)
         return -eMPPExeedMinDstHeight;
     else if (src.isDimLayer()) { // Dim layer
         if (isDimLayerSupported()) {
@@ -2069,7 +2081,7 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         return -eMPPExeedSrcWCropMin;
     else if (src.h < minSrcCropHeight)
         return -eMPPExeedSrcHCropMin;
-    else if ((rot_dst.w % dstWidthAlign != 0) || (rot_dst.h % dstHeightAlign != 0))
+    else if ((dst.w % dstWidthAlign != 0) || (dst.h % dstHeightAlign != 0))
         return -eMPPNotAlignedDstSize;
     else if (src.w > rot_dst.w * maxDownscale)
         return -eMPPExeedMaxDownScale;
@@ -2773,8 +2785,7 @@ int32_t ExynosMPP::updateUsedCapacity()
     return mUsedCapacity;
 }
 
-uint32_t ExynosMPP::getRestrictionClassification(struct exynos_image &img)
-{
+uint32_t ExynosMPP::getRestrictionClassification(const struct exynos_image &img) const {
     return !!(isFormatRgb(img.format) == false);
 }
 

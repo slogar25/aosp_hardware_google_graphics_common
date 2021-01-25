@@ -838,7 +838,7 @@ int32_t ExynosLayer::setDstExynosImage(exynos_image *dst_img)
         HWC_LOGE(NULL, "mDisplay is NULL");
     }
     dst_img->blending = mBlending;
-    dst_img->transform = mTransform;
+    dst_img->transform = 0;
     dst_img->compressed = 0;
     dst_img->planeAlpha = mPlaneAlpha;
     dst_img->zOrder = mZOrder;
