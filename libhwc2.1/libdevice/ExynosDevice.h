@@ -315,6 +315,7 @@ class ExynosDevice {
         Mutex mCaptureMutex;
         Condition mCaptureCondition;
         std::atomic<bool> mIsWaitingReadbackReqDone = false;
+        void setVBlankOffDelay(int vblankOffDelay);
 };
 
 #endif //_EXYNOSDEVICE_H

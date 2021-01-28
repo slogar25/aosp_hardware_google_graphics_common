@@ -139,6 +139,11 @@ ExynosDevice::ExynosDevice()
      */
     initDeviceInterface(mInterfaceType);
     mResourceManager->updateRestrictions();
+
+    if (mInterfaceType == INTERFACE_TYPE_DRM) {
+        /* disable vblank immediately after updates */
+        setVBlankOffDelay(-1);
+    }
 }
 
 void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
@@ -967,4 +972,10 @@ void ExynosDevice::getLayerGenericMetadataKey(uint32_t __unused keyIndex,
 {
     *outKeyLength = 0;
     return;
+}
+
+void ExynosDevice::setVBlankOffDelay(int vblankOffDelay) {
+    static constexpr const char *kVblankOffDelayPath = "/sys/module/drm/parameters/vblankoffdelay";
+
+    writeIntToFile(kVblankOffDelayPath, vblankOffDelay);
 }
