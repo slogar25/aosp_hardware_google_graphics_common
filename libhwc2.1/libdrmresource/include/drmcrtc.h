@@ -66,6 +66,11 @@ class DrmCrtc {
   const DrmProperty &color_mode_property() const;
   const DrmProperty &expected_present_time_property() const;
 
+  /* Histogram Properties */
+  const DrmProperty &histogram_roi_property() const;
+  const DrmProperty &histogram_weights_property() const;
+  const DrmProperty &histogram_threshold_property() const;
+
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
   }
@@ -100,6 +105,12 @@ class DrmCrtc {
   DrmProperty dqe_enabled_property_;
   DrmProperty color_mode_property_;
   DrmProperty expected_present_time_property_;
+
+  /* Histogram Properties */
+  DrmProperty histogram_roi_property_;
+  DrmProperty histogram_weights_property_;
+  DrmProperty histogram_threshold_property_;
+
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android

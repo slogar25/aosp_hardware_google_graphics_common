@@ -88,6 +88,14 @@ int DrmCrtc::Init() {
   if (drm_->GetCrtcProperty(*this, "expected_present_time", &expected_present_time_property_))
       ALOGI("Failed to get expected_present_time property");
 
+  /* Histogram Properties */
+  if (drm_->GetCrtcProperty(*this, "histogram_roi", &histogram_roi_property_))
+      ALOGI("Failed to get &histogram_roi property");
+  if (drm_->GetCrtcProperty(*this, "histogram_weights", &histogram_weights_property_))
+      ALOGI("Failed to get &histogram_weights property");
+  if (drm_->GetCrtcProperty(*this, "histogram_threshold", &histogram_threshold_property_))
+      ALOGI("Failed to get &histogram_threshold property");
+
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
   properties_.push_back(&out_fence_ptr_property_);
@@ -109,6 +117,11 @@ int DrmCrtc::Init() {
   properties_.push_back(&dqe_enabled_property_);
   properties_.push_back(&color_mode_property_);
   properties_.push_back(&expected_present_time_property_);
+
+  /* Histogram Properties */
+  properties_.push_back(&histogram_roi_property_);
+  properties_.push_back(&histogram_weights_property_);
+  properties_.push_back(&histogram_threshold_property_);
 
   return 0;
 }
@@ -227,6 +240,19 @@ const DrmProperty &DrmCrtc::color_mode_property() const {
 
 const DrmProperty &DrmCrtc::expected_present_time_property() const {
     return expected_present_time_property_;
+}
+
+/* Histogram Properties */
+const DrmProperty &DrmCrtc::histogram_roi_property() const {
+    return histogram_roi_property_;
+}
+
+const DrmProperty &DrmCrtc::histogram_weights_property() const {
+    return histogram_weights_property_;
+}
+
+const DrmProperty &DrmCrtc::histogram_threshold_property() const {
+    return histogram_threshold_property_;
 }
 
 }  // namespace android
