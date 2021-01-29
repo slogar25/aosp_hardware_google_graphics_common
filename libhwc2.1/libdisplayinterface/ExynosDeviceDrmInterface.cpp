@@ -73,6 +73,8 @@ ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice)
 ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface()
 {
     mDrmDevice->event_listener()->UnRegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->UnRegisterHistogramHandler(
+            static_cast<DrmHistogramEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterTUIHandler(static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
 }
 
@@ -88,6 +90,8 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
 
     mExynosDrmEventHandler.init(mExynosDevice, mDrmDevice);
     mDrmDevice->event_listener()->RegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->RegisterHistogramHandler(
+            static_cast<DrmHistogramEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->RegisterTUIHandler(static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
 
     if (mDrmDevice->event_listener()->IsDrmInTUI()) {
@@ -238,6 +242,15 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleEvent(uint64_t times
         static_cast<ExynosExternalDisplayModule*>(mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0)));
     if (display != NULL)
         display->handleHotplugEvent();
+}
+
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleHistogramEvent(void *bin) {
+    ExynosDisplay *primaryDisplay = mExynosDevice->getDisplay(HWC_DISPLAY_PRIMARY);
+    if (primaryDisplay != NULL) {
+        ExynosDisplayDrmInterface *displayInterface =
+                static_cast<ExynosDisplayDrmInterface *>(primaryDisplay->mDisplayInterface.get());
+        displayInterface->setHistogramData(bin);
+    }
 }
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleTUIEvent()
