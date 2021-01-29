@@ -1903,9 +1903,7 @@ float ExynosDisplayDrmInterface::getSdrDimRatio()
         return 1.0;
     }
 
-    //TODO: keep in normal brightness range before DisplayManager HBM impl ready
-    auto brightness = mExynosDisplay->getBrightnessValue() *
-                       mBrightnessTable[BrightnessRange::NORMAL].mBriEnd;
+    auto brightness = mExynosDisplay->getBrightnessValue();
 
     if (mBrightnessTable[sz - 1].mBriEnd < brightness) {
         ALOGE("%s: invalid brightness table, max brightness(float) %f", __func__,
@@ -1957,9 +1955,7 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
 
     mBrightnessDimmingOn = (!mBrightnessState.instant_hbm && !brightness_state.instant_hbm);
 
-    // TODO: keep in normal brightness range before DisplayManager HBM impl ready
-    float brightness = mExynosDisplay->getBrightnessValue() *
-            mBrightnessTable[BrightnessRange::NORMAL].mBriEnd;
+    float brightness = mExynosDisplay->getBrightnessValue();
 
     if (brightness_state.peak_hbm) {
         mScaledBrightness = mBrightnessHbmMax;
