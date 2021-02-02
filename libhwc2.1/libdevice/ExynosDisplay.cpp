@@ -2781,7 +2781,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     if ((mLayers.size() == 0) &&
         (mType != HWC_DISPLAY_VIRTUAL)) {
-        clearDisplay(mDpuData.enable_readback);
+        clearDisplay();
         *outRetireFence = -1;
         mLastRetireFence = fence_close(mLastRetireFence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP);
@@ -3612,9 +3612,9 @@ int32_t ExynosDisplay::setOutputBuffer( buffer_handle_t __unused buffer, int32_t
     return HWC2_ERROR_NONE;
 }
 
-int ExynosDisplay::clearDisplay(bool readback) {
+int ExynosDisplay::clearDisplay() {
 
-    const int ret = mDisplayInterface->clearDisplay(readback);
+    const int ret = mDisplayInterface->clearDisplay();
     if (ret)
         DISPLAY_LOGE("fail to clear display");
 

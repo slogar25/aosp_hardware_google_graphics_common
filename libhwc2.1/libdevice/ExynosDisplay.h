@@ -760,7 +760,7 @@ class ExynosDisplay {
                 buffer_handle_t buffer,
                 int32_t releaseFence);
 
-        virtual int clearDisplay(bool readback = false);
+        virtual int clearDisplay();
 
         /* setPowerMode(..., mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE

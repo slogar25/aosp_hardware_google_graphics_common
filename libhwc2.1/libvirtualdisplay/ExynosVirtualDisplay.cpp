@@ -211,7 +211,7 @@ int32_t ExynosVirtualDisplay::setOutputBuffer(
     return HWC2_ERROR_NONE;
 }
 
-int ExynosVirtualDisplay::clearDisplay(bool readback) {
+int ExynosVirtualDisplay::clearDisplay() {
     return 0;
 }
 
