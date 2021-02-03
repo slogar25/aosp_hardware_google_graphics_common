@@ -303,6 +303,7 @@ struct DisplayControl {
 
 typedef struct brightnessState {
     static constexpr size_t kNumofBrightnessState = 3;
+    static constexpr float kSdrDimRatioNone = 1.0;
     union {
         std::array<bool, kNumofBrightnessState> mData;
         struct {
@@ -311,10 +312,17 @@ typedef struct brightnessState {
             bool boost_brightness;
         };
     };
-    float dim_sdr_ratio;
+    /** dim ratio calculated from current layer stack but will be delayed to apply **/
+    float dim_sdr_target_ratio = kSdrDimRatioNone;
+    /** frames to delay to apply the dim_sdr_target_ratio **/
+    uint32_t dim_delay = 0;
+    /** dim ratio to apply to current frame and is 'dim_delay' frames behind
+     * dim_sdr_target_ratio **/
+    float dim_sdr_ratio = kSdrDimRatioNone;
+
     void reset() {
         mData = {false, false, false};
-        dim_sdr_ratio = 1.0;
+        dim_sdr_target_ratio = kSdrDimRatioNone;
     }
     brightnessState& operator=(const brightnessState& a) {
         mData = a.mData;
@@ -1072,6 +1080,13 @@ class ExynosDisplay {
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
+
+        // send ghbm command after current frame then dim/undim the third frame
+        static constexpr uint32_t kGhbmFrameDelay = 3;
+
+        /// minimum possible dim rate in the case hbm peak is 1000 nits and norml
+        // display brightness is 2 nits
+        static constexpr float kGhbmMinDimRatio = 0.002;
 
         // hbm threshold percentage
         static constexpr float kHbmThresholdPct = 0.5f;

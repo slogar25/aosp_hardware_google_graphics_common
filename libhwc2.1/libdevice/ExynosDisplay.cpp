@@ -4799,6 +4799,7 @@ void ExynosDisplay::traceLayerTypes() {
 void ExynosDisplay::updateBrightnessState() {
     static constexpr float kMaxCll = 10000.0;
     bool client_rgb_hdr = false;
+    auto prev_dim_ratio = mBrightnessState.dim_sdr_target_ratio;
 
     mBrightnessState.reset();
     for (size_t i = 0; i < mLayers.size(); i++) {
@@ -4830,7 +4831,33 @@ void ExynosDisplay::updateBrightnessState() {
         const float ratio = property_get("debug.hwc.dim_sdr", value, nullptr) > 0 ?
                                   std::atof(value) : dim_sdr_ratio;
 
-        mBrightnessState.dim_sdr_ratio = ratio;
+        mBrightnessState.dim_sdr_target_ratio = ratio;
     }
-    ATRACE_INT("GHBM", mBrightnessState.dim_sdr_ratio != 1.0);
+
+    if (prev_dim_ratio == brightnessState::kSdrDimRatioNone &&
+        mBrightnessState.dim_sdr_target_ratio != brightnessState::kSdrDimRatioNone) {
+        mBrightnessState.dim_delay = kGhbmFrameDelay;
+        mBrightnessState.dim_sdr_ratio = brightnessState::kSdrDimRatioNone;
+    } else if (prev_dim_ratio != brightnessState::kSdrDimRatioNone &&
+               mBrightnessState.dim_sdr_target_ratio == brightnessState::kSdrDimRatioNone) {
+        mBrightnessState.dim_delay = kGhbmFrameDelay;
+        mBrightnessState.dim_sdr_ratio = prev_dim_ratio;
+    }
+
+    if (mBrightnessState.dim_delay > 0) {
+        --mBrightnessState.dim_delay;
+    }
+
+    if (mBrightnessState.dim_delay == 0) {
+        mBrightnessState.dim_sdr_ratio = mBrightnessState.dim_sdr_target_ratio;
+    } else {
+        mDevice->invalidate();
+    }
+
+    ATRACE_INT("GHBM_WIN", mBrightnessState.dim_sdr_target_ratio != brightnessState::kSdrDimRatioNone);
+    // In case something wrong and a black screen
+    if (mBrightnessState.dim_sdr_ratio < kGhbmMinDimRatio) {
+        ALOGE("%s: invalid dim ratio %f", __func__, mBrightnessState.dim_sdr_ratio);
+        mBrightnessState.dim_sdr_ratio = kGhbmMinDimRatio;
+    }
 }
