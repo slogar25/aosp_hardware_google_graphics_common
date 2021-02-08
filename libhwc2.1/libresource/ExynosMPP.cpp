@@ -953,6 +953,9 @@ int32_t ExynosMPP::allocOutBuf(uint32_t w, uint32_t h, uint32_t format, uint64_t
     dumpExynosMPPImgInfo(eDebugMPP, mDstImgs[index]);
 
     uint64_t allocUsage = getBufferUsage(usage);
+    if (!needCompressDstBuf()) {
+        allocUsage |= VendorGraphicBufferUsage::NO_AFBC;
+    }
     buffer_handle_t dstBuffer;
 
     MPP_LOGD(eDebugMPP|eDebugBuf, "\tw: %d, h: %d, format: 0x%8x, previousBuffer: %p, allocUsage: 0x%" PRIx64 ", usage: 0x%" PRIx64 "",
@@ -1074,6 +1077,10 @@ uint64_t ExynosMPP::getBufferUsage(uint64_t usage)
     return allocUsage;
 }
 
+bool ExynosMPP::needCompressDstBuf() const {
+    return (mMaxSrcLayerNum > 1) && mNeedCompressedTarget;
+}
+
 bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
 {
     MPP_LOGD(eDebugMPP|eDebugBuf, "index: %d++++++++", index);
@@ -1100,16 +1107,21 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
     }
 
     VendorGraphicBufferMeta gmeta(dst_handle);
+    const bool bufferCompressed = getCompressionType(dst_handle) != 0;
 
-    MPP_LOGD(eDebugMPP|eDebugBuf, "\tdst_handle(%p)", dst_handle);
-    MPP_LOGD(eDebugMPP|eDebugBuf, "\tAssignedDisplay[%d, %d] format[0x%8x, 0x%8x], bufferType[%d, %d], usageFlags: 0x%" PRIx64 "",
-            mPrevAssignedDisplayType, assignedDisplay, gmeta.format, dst.format,
-            mDstImgs[index].bufferType, getBufferType(dst.usageFlags), dst.usageFlags);
+    MPP_LOGD(eDebugMPP | eDebugBuf, "\tdst_handle(%p) compression (%u)", dst_handle,
+             getCompressionType(dst_handle));
+    MPP_LOGD(eDebugMPP | eDebugBuf,
+             "\tAssignedDisplay[%d, %d] format[0x%8x, 0x%8x], bufferType[%d, %d], usageFlags: 0x%" PRIx64 ", need compress %u",
+             mPrevAssignedDisplayType, assignedDisplay, gmeta.format, dst.format,
+             mDstImgs[index].bufferType, getBufferType(dst.usageFlags), dst.usageFlags,
+             needCompressDstBuf());
 
     bool realloc = (mPrevAssignedDisplayType != assignedDisplay) ||
-        (formatToBpp(gmeta.format) < formatToBpp(dst.format)) ||
-        ((gmeta.stride * gmeta.vstride) < (int)(dst.fullWidth * dst.fullHeight)) ||
-        (mDstImgs[index].bufferType != getBufferType(dst.usageFlags));
+            (formatToBpp(gmeta.format) < formatToBpp(dst.format)) ||
+            ((gmeta.stride * gmeta.vstride) < (int)(dst.fullWidth * dst.fullHeight)) ||
+            (mDstImgs[index].bufferType != getBufferType(dst.usageFlags)) ||
+            bufferCompressed != needCompressDstBuf();
 
     MPP_LOGD(eDebugMPP|eDebugBuf, "realloc: %d--------", realloc);
     return realloc;
@@ -1372,8 +1384,9 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
                 pixel_align(mAssignedDisplay->mYres, G2D_JUSTIFIED_DST_ALIGN));
 
     /* setup dst */
-    if (isComposition && mNeedCompressedTarget)
+    if (needCompressDstBuf()) {
         attribute |= AcrylicCanvas::ATTR_COMPRESSED;
+    }
 
     if (mPhysicalType == MPP_G2D) {
         setFenceName(dstImgInfo->acrylicAcquireFenceFd, FENCE_G2D_DST_DPP);
@@ -1682,7 +1695,6 @@ int32_t ExynosMPP::doPostProcessing(struct exynos_image &src, struct exynos_imag
                 dst.format = DEFAULT_MPP_DST_FORMAT;
 
             uint32_t allocFormat = dst.format;
-            uint32_t tempFormat = dst.format;
             if (mFreeOutBufFlag == false)
                 allocFormat = DEFAULT_MPP_DST_FORMAT;
 
@@ -1694,7 +1706,6 @@ int32_t ExynosMPP::doPostProcessing(struct exynos_image &src, struct exynos_imag
             ret = allocOutBuf(ALIGN_UP(mAssignedDisplay->mXres, bufAlign),
                     ALIGN_UP(mAssignedDisplay->mYres, bufAlign),
                     allocFormat, dst.usageFlags, mCurrentDstBuf);
-            allocFormat = tempFormat;
         }
         if (ret < 0) {
             MPP_LOGE("%s:: fail to allocate dst buffer[%d]", __func__, mCurrentDstBuf);
@@ -1775,6 +1786,8 @@ int32_t ExynosMPP::getDstImageInfo(exynos_image *img)
     memset(img, 0, sizeof(exynos_image));
     img->acquireFenceFd = -1;
     img->releaseFenceFd = -1;
+
+    img->compressed = needCompressDstBuf();
 
     if (mDstImgs[mCurrentDstBuf].bufferHandle == NULL) {
         img->acquireFenceFd = -1;
