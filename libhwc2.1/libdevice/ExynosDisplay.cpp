@@ -1212,6 +1212,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
         exynos_image mpp_dst_img;
         if (m2mMPP->getDstImageInfo(&mpp_dst_img) == NO_ERROR) {
             dumpExynosImage(eDebugWinConfig, mpp_dst_img);
+            cfg.compression = mpp_dst_img.compressed;
             cfg.src.f_w = mpp_dst_img.fullWidth;
             cfg.src.f_h = mpp_dst_img.fullHeight;
             cfg.src.x = mpp_dst_img.x;
