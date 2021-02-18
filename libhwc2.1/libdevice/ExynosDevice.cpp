@@ -651,7 +651,7 @@ bool ExynosDevice::checkDisplayConnection(uint32_t displayId)
         return display->mPlugState;
 }
 
-bool ExynosDevice::checkAdditionalConnection()
+bool ExynosDevice::checkNonInternalConnection()
 {
     for (uint32_t i = 0; i < mDisplays.size(); i++) {
         switch(mDisplays[i]->mType) {

@@ -647,7 +647,7 @@ void ExynosDisplay::doPreProcessing() {
         setGeometryChanged(GEOMETRY_DEVICE_SCENARIO_CHANGED);
     }
 #ifndef HWC_SKIP_VALIDATE
-    if (mDevice->checkAdditionalConnection()) {
+    if (mDevice->checkNonInternalConnection()) {
         /* Set any flag to mGeometryChanged */
         mDevice->mGeometryChanged = 0x10;
     }
@@ -1924,7 +1924,7 @@ bool ExynosDisplay::checkConfigChanged(const exynos_dpu_data &lastConfigsData, c
         return true;
 
     /* HWC doesn't skip WIN_CONFIG if other display is connected */
-    if ((mDevice->checkAdditionalConnection()) && (mType == HWC_DISPLAY_PRIMARY))
+    if ((mDevice->checkNonInternalConnection()) && (mType == HWC_DISPLAY_PRIMARY))
         return true;
 
     for (size_t i = 0; i < lastConfigsData.configs.size(); i++) {
