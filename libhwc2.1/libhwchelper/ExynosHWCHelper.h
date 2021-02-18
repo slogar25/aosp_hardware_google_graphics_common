@@ -57,7 +57,7 @@
 #define DRM_FORMAT_YUV420_10BIT fourcc_code('Y', 'U', '1', '0')
 #endif
 
-#define DISPLAYID_MASK_LEN 8
+static constexpr uint32_t DISPLAYID_MASK_LEN = 8;
 
 template<typename T> inline T max(T a, T b) { return (a > b) ? a : b; }
 template<typename T> inline T min(T a, T b) { return (a < b) ? a : b; }

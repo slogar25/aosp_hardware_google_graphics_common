@@ -87,7 +87,7 @@ ExynosDevice::ExynosDevice()
     ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
     mResourceManager = new ExynosResourceManagerModule(this);
 
-    for (size_t i = 0; i < DISPLAY_COUNT; i++) {
+    for (size_t i = 0; i < AVAILABLE_DISPLAY_UNITS.size(); i++) {
         exynos_display_t display_t = AVAILABLE_DISPLAY_UNITS[i];
         ExynosDisplay *exynos_display = NULL;
         ALOGD("Create display[%zu] type: %d, index: %d", i, display_t.type, display_t.index);
@@ -117,8 +117,8 @@ ExynosDevice::ExynosDevice()
                 ALOGE("Unsupported display type(%d)", display_t.type);
                 break;
         }
-        exynos_display->mDeconNodeName.appendFormat("%s", display_t.decon_node_name);
-        exynos_display->mDisplayName.appendFormat("%s", display_t.display_name);
+        exynos_display->mDeconNodeName.appendFormat("%s", display_t.decon_node_name.c_str());
+        exynos_display->mDisplayName.appendFormat("%s", display_t.display_name.c_str());
         mDisplays.add(exynos_display);
 
 #ifndef FORCE_DISABLE_DR

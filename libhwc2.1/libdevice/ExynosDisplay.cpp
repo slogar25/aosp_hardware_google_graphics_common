@@ -308,7 +308,7 @@ String8 ExynosCompositionInfo::getTypeStr()
 
 ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
 :   mDisplayId(HWC_DISPLAY_PRIMARY),
-    mType(HWC_DISPLAY_PRIMARY),
+    mType(HWC_NUM_DISPLAY_TYPES),
     mIndex(index),
     mDeconNodeName(""),
     mXres(1440),
