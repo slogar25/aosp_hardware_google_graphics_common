@@ -648,7 +648,7 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
 
     hwc2_config_t config = mDrmConnector->get_preferred_mode_id();
     ALOGI("Preferred mode id: %d, state: %d", config, mDrmConnector->state());
-    err = setActiveConfig(config);
+
     mExynosDisplay->updateInternalDisplayConfigVariables(config);
     return err;
 }
