@@ -114,11 +114,12 @@ static inline bool area_is_zero(hw2d_rect_t rect)
 
 uint32_t halfmt_to_v4l2(uint32_t halfmt);
 uint32_t halfmt_to_v4l2_deprecated(uint32_t halfmt);
-unsigned int halfmt_plane_count(uint32_t fmt);
+unsigned int halfmt_buf_count(uint32_t fmt);
 size_t halfmt_plane_length(uint32_t fmt, unsigned int plane, uint32_t width, uint32_t height);
 uint32_t haldataspace_to_v4l2(int dataspace, uint32_t width, uint32_t height);
 uint32_t find_format_equivalent(uint32_t fmt);
 uint8_t halfmt_chroma_subsampling(uint32_t fmt);
 unsigned int halfmt_bpp(uint32_t fmt);
+uint8_t halfmt_plane_count(uint32_t fmt);
 
 #endif /* __HARDWARE_EXYNOS_ACRYLIC_INTERNAL_H__ */

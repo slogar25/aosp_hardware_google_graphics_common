@@ -144,36 +144,41 @@ static struct {
     uint8_t  subfactor;             // Horizontal (upper 4 bits)and vertical (lower 4 bits) chroma subsampling factor
     uint8_t  bpp[MAX_HW2D_PLANES];  // bits in a buffer per pixel
     uint32_t equivalent;            // The equivalent format on a single buffer without H/W constraints
+    uint8_t  planecnt;              // the number of planes to describe @fmt
 } __halfmt_plane_bpp[] = {
-    {HAL_PIXEL_FORMAT_RGBA_8888,                    1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_RGBA_8888                },
-    {HAL_PIXEL_FORMAT_BGRA_8888,                    1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_BGRA_8888                },
-    {HAL_PIXEL_FORMAT_RGBA_1010102,                 1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_RGBA_1010102             },
-    {HAL_PIXEL_FORMAT_RGBX_8888,                    1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_RGBX_8888                },
-    {HAL_PIXEL_FORMAT_RGB_888,                      1, 0x11, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_RGB_888                  },
-    {HAL_PIXEL_FORMAT_RGB_565,                      1, 0x11, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_RGB_565                  },
-    {HAL_PIXEL_FORMAT_YCbCr_422_I,                  1, 0x21, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_YCbCr_422_I              },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,           1, 0x21, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I       },
-    {HAL_PIXEL_FORMAT_YCbCr_422_SP,                 1, 0x21, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_YCbCr_422_SP             },
-    {HAL_PIXEL_FORMAT_YV12,                         1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_YV12                     },
-    {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,                3, 0x22, { 8, 2, 2, 0}, HAL_PIXEL_FORMAT_YV12                     },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,           1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P       },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,          1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P       },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,         3, 0x22, { 8, 2, 2, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P       },
-    {HAL_PIXEL_FORMAT_YCrCb_420_SP,                 1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_YCrCb_420_SP             },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,        2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_YCrCb_420_SP             },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,   2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_YCrCb_420_SP             },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,          1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP      },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,         1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP      },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_TILED,   1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP      },
-    {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP,               1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP      },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,        2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP      },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,   2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP      },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED,  2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP      },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,    1, 0x22, {15, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,   2, 0x22, {10, 5, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B},
-    {HAL_PIXEL_FORMAT_YCBCR_P010,                   1, 0x22, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010               },
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,          2, 0x22, {16, 8, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010               },
-    {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B,           1, 0x22, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010               },
+    {HAL_PIXEL_FORMAT_RGBA_8888,                        1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_RGBA_8888,                     1},
+    {HAL_PIXEL_FORMAT_BGRA_8888,                        1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_BGRA_8888,                     1},
+    {HAL_PIXEL_FORMAT_RGBA_1010102,                     1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_RGBA_1010102,                  1},
+    {HAL_PIXEL_FORMAT_RGBX_8888,                        1, 0x11, {32, 0, 0, 0}, HAL_PIXEL_FORMAT_RGBX_8888,                     1},
+    {HAL_PIXEL_FORMAT_RGB_888,                          1, 0x11, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_RGB_888,                       1},
+    {HAL_PIXEL_FORMAT_RGB_565,                          1, 0x11, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_RGB_565,                       1},
+    {HAL_PIXEL_FORMAT_YCbCr_422_I,                      1, 0x21, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_YCbCr_422_I,                   1},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,               1, 0x21, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,            1},
+    {HAL_PIXEL_FORMAT_YCbCr_422_SP,                     1, 0x21, {16, 0, 0, 0}, HAL_PIXEL_FORMAT_YCbCr_422_SP,                  2},
+    {HAL_PIXEL_FORMAT_YV12,                             1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_YV12,                          2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YV12_M,                    3, 0x22, { 8, 2, 2, 0}, HAL_PIXEL_FORMAT_YV12,                          2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,               1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,            2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_PN,              1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,            2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P_M,             3, 0x22, { 8, 2, 2, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_P,            2},
+    {HAL_PIXEL_FORMAT_YCrCb_420_SP,                     1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_YCrCb_420_SP,                  2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M,            2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_YCrCb_420_SP,                  2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,       2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_YCrCb_420_SP,                  2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,              1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,             1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_TILED,       1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
+    {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP,                   1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,            2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,       2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED,      2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,        1, 0x22, {15, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,     4},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,       2, 0x22, {10, 5, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,     4},
+    {HAL_PIXEL_FORMAT_YCBCR_P010,                       1, 0x22, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010,                    2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,              2, 0x22, {16, 8, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010,                    2},
+    {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B,               1, 0x22, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010,                    2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,       2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,     2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,        1, 0x22, {12, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,     2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC,   2, 0x22, {16, 8, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC, 2},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC,    1, 0x22, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC, 2},
 };
 
 #define MFC_PAD_SIZE                256
@@ -234,9 +239,10 @@ unsigned int halfmt_bpp(uint32_t fmt)
         return 0;                                                   \
     }
 
-DEFINE_HALFMT_PROPERTY_GETTER(unsigned int, halfmt_plane_count, bufcnt)
+DEFINE_HALFMT_PROPERTY_GETTER(unsigned int, halfmt_buf_count, bufcnt)
 DEFINE_HALFMT_PROPERTY_GETTER(uint8_t, halfmt_chroma_subsampling, subfactor)
 DEFINE_HALFMT_PROPERTY_GETTER(uint32_t, find_format_equivalent, equivalent)
+DEFINE_HALFMT_PROPERTY_GETTER(uint8_t, halfmt_plane_count, planecnt)
 
 static struct {
     int32_t  hal;

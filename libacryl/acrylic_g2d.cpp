@@ -1233,13 +1233,14 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
     for (int i = 0; i < request->getFrameCount(); i++) {
         AcrylicPerformanceRequestFrame *frame = request->getFrame(i);
         uint64_t bandwidth = 0;
-        bool src_yuv420;
+        bool src_yuv420_8b;
         bool src_rotate;
 
         src_rotate = false;
-        src_yuv420 = false;
+        src_yuv420_8b = false;
 
         unsigned int bpp;
+        uint8_t planecnt;
         for (int idx = 0; idx < frame->getLayerCount(); idx++) {
             AcrylicPerformanceRequestLayer *layer = &(frame->mLayers[idx]);
             uint64_t layer_bw, pixelcount;
@@ -1248,20 +1249,30 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
             uint32_t src_vert = layer->mSourceRect.size.vert;
             uint32_t dst_hori = layer->mTargetRect.size.hori;
             uint32_t dst_vert = layer->mTargetRect.size.vert;
-            pixelcount = std::max(src_hori * src_vert, dst_hori * dst_vert);
             data.frame[i].layer[idx].crop_width = src_hori;
             data.frame[i].layer[idx].crop_height = src_vert;
             data.frame[i].layer[idx].window_width = dst_hori;
             data.frame[i].layer[idx].window_height = dst_vert;
 
-            bpp = halfmt_bpp(layer->mPixFormat);
-            if (bpp == 12) {
+            // Src layer crop size is used when calculating read bandwidth.
+            // Crop coordinates should be aligned in multiples of 16.
+            pixelcount = (ALIGN(layer->mSourceRect.pos.hori + src_hori, 16) -
+                          ALIGN_DOWN(layer->mSourceRect.pos.hori, 16)) *
+                         (ALIGN(layer->mSourceRect.pos.vert + src_vert, 16) -
+                          ALIGN_DOWN(layer->mSourceRect.pos.vert, 16));
+
+            planecnt = halfmt_plane_count(layer->mPixFormat);
+            if (layer->mAttribute & AcrylicCanvas::ATTR_COMPRESSED)
+                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_COMPRESSED;
+            else if (planecnt == 2)
                 data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_YUV2P;
-                src_yuv420 = true;
-            } else if (bpp == 15) {
+            else if (planecnt == 4)
                 data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_YUV2P_82;
-                src_yuv420 = true;
-            }
+
+            // src_yuv420_8b is used when calculating write bandwidth.
+            bpp = halfmt_bpp(layer->mPixFormat);
+            if (bpp == 12)
+                src_yuv420_8b = true;
 
             layer_bw = pixelcount * bpp;
             // Below is checking if scaling is involved.
@@ -1287,9 +1298,6 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
                 data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_SCALING;
             }
 
-            if (layer->mAttribute & AcrylicCanvas::ATTR_COMPRESSED)
-                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_COMPRESSED;
-
             bandwidth += layer_bw;
             ALOGD_TEST("        LAYER[%d]: BW %llu FMT %#x(%u) (%dx%d)@(%dx%d)on(%dx%d) --> (%dx%d)@(%dx%d) TRFM %#x",
                     idx, static_cast<unsigned long long>(layer_bw), layer->mPixFormat, bpp,
@@ -1314,7 +1322,7 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
 
         // RSH 12 : bw * 2 / (bits_per_byte * kilobyte)
         // RHS 13 : bw * 1 / (bits_per_byte * kilobyte)
-        bandwidth >>= ((bpp == 12) && src_yuv420 && src_rotate) ? 12 : 13;
+        bandwidth >>= ((bpp == 12) && src_yuv420_8b && src_rotate) ? 12 : 13;
         data.frame[i].bandwidth_write = static_cast<uint32_t>(bandwidth);
 
         if (frame->mHasBackgroundLayer)
