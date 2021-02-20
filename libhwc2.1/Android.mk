@@ -57,7 +57,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	android.hardware.graphics.mapper@2.0 \
 	libhardware_legacy libutils \
 	libsync libacryl libui libion_google libdrmresource libdrm \
-	libvendorgraphicbuffer
+	libvendorgraphicbuffer libbinder_ndk \
+	android.hardware.power-V1-ndk_platform pixel-power-ext-V1-ndk_platform
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
