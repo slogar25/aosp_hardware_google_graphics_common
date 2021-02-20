@@ -1356,16 +1356,19 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     if (isBrightnessStateChange()) {
         setupBrightnessConfig();
+        /* TODO: Add the hbm/dimming property when the value is changed only. b/182212601 */
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->dimming_on(),
+                                            mBrightnessDimmingOn)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set dimming_on property", __func__);
+        }
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->brightness_level(),
                                             mBrightnessLevel)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
         }
-
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
                                             mBrightnessHbmOn)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
         }
-        // TODO: add dimming_on property
     }
 
     uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
@@ -1937,6 +1940,9 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     mHbmOnFd = fopen(kHbmOnFileNode, "w+");
     if (mHbmOnFd == NULL) ALOGE("%s open failed! %s", kHbmOnFileNode, strerror(errno));
 
+    mDimmingOnFd = fopen(kDimmingOnFileNode, "w+");
+    if (mDimmingOnFd == NULL) ALOGE("%s open failed! %s", kDimmingOnFileNode, strerror(errno));
+
     return;
 }
 
@@ -1977,12 +1983,13 @@ int32_t ExynosDisplayDrmInterface::updateBrightness() {
 
     setupBrightnessConfig();
 
+    /* TODO: set the hbm/dimming on when the value is changed only. b/182212601 */
+    if (mDimmingOnFd) writeFileNode(mDimmingOnFd, mBrightnessDimmingOn);
+
     if (mExynosDisplay->mBrightnessFd)
         writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel);
 
     if (mHbmOnFd) writeFileNode(mHbmOnFd, mBrightnessHbmOn);
-
-    // TODO: dimming_on file node
 
     return HWC2_ERROR_NONE;
 }
