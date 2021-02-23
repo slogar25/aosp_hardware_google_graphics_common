@@ -1403,7 +1403,26 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::clearDisplay()
+int32_t ExynosDisplayDrmInterface::clearDisplayMode(DrmModeAtomicReq &drmReq)
+{
+    int ret = NO_ERROR;
+
+    if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+            mDrmConnector->crtc_id_property(), 0)) < 0)
+        return ret;
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+            mDrmCrtc->mode_property(), 0)) < 0)
+        return ret;
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+           mDrmCrtc->active_property(), 0)) < 0)
+        return ret;
+
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
 {
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);
@@ -1425,6 +1444,14 @@ int32_t ExynosDisplayDrmInterface::clearDisplay()
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                 plane->fb_property(), 0)) < 0)
             return ret;
+    }
+
+    /* Disable ModeSet */
+    if (needModeClear) {
+        if ((ret = clearDisplayMode(drmReq)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Failed to apply display mode", __func__);
+            return ret;
+        }
     }
 
     ret = drmReq.commit(DRM_MODE_ATOMIC_ALLOW_MODESET, true);

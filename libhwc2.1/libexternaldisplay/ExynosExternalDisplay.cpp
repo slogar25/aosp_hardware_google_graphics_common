@@ -421,7 +421,7 @@ int ExynosExternalDisplay::disable()
         return HWC2_ERROR_NONE;
 
     if (mSkipStartFrame > (SKIP_EXTERNAL_FRAME - 1)) {
-        clearDisplay();
+        clearDisplay(true);
     } else {
         ALOGI("Skip clearDisplay to avoid resource conflict");
     }

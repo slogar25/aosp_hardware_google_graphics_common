@@ -217,7 +217,7 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
 int32_t ExynosPrimaryDisplay::setPowerOff() {
     ATRACE_CALL();
 
-    clearDisplay();
+    clearDisplay(true);
 
     // check the dynamic recomposition thread by following display
     mDevice->checkDynamicRecompositionThread();

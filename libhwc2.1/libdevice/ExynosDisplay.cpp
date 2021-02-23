@@ -3612,9 +3612,9 @@ int32_t ExynosDisplay::setOutputBuffer( buffer_handle_t __unused buffer, int32_t
     return HWC2_ERROR_NONE;
 }
 
-int ExynosDisplay::clearDisplay() {
+int ExynosDisplay::clearDisplay(bool needModeClear) {
 
-    const int ret = mDisplayInterface->clearDisplay();
+    const int ret = mDisplayInterface->clearDisplay(needModeClear);
     if (ret)
         DISPLAY_LOGE("fail to clear display");
 
@@ -3641,7 +3641,7 @@ int32_t ExynosDisplay::setPowerMode(
 
     if (mode == HWC_POWER_MODE_OFF) {
         mDevice->mPrimaryBlank = true;
-        clearDisplay();
+        clearDisplay(true);
         ALOGV("HWC2: Clear display (power off)");
     } else {
         mDevice->mPrimaryBlank = false;
