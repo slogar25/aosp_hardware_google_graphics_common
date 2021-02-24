@@ -61,6 +61,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
+LOCAL_STATIC_LIBRARIES += libjsoncpp
 LOCAL_PROPRIETARY_MODULE := true
 
 LOCAL_C_INCLUDES += \

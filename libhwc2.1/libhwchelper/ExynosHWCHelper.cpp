@@ -1216,3 +1216,29 @@ std::string TableBuilder::buildPaddedString(const std::string& str, int size) {
 
     return std::string(leftPadding, ' ') + str + std::string(rightPadding, ' ');
 }
+
+void writeFileNode(FILE* fd, int value) {
+    constexpr uint32_t kMaxWriteFileLen = 16;
+    char val[kMaxWriteFileLen] = {0};
+    if (int32_t ret = snprintf(val, kMaxWriteFileLen, "%d", value) <= 0) {
+        ALOGE("failed to write file node, ret =%d", ret);
+    } else {
+        fwrite(val, sizeof(val), 1, fd);
+        if (ferror(fd)) {
+            ALOGE("write failed: %s", strerror(errno));
+            clearerr(fd);
+        }
+        rewind(fd);
+    }
+}
+
+int32_t writeIntToFile(const char* file, uint32_t value) {
+    FILE* fd = fopen(file, "w+");
+    if (fd == NULL) {
+        ALOGE("%s open failed! %s", file, strerror(errno));
+        return -EINVAL;
+    }
+    writeFileNode(fd, value);
+    fclose(fd);
+    return 0;
+}

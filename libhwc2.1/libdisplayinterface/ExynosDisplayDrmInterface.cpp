@@ -26,6 +26,7 @@
 #include <algorithm>
 
 #include "ExynosHWCDebug.h"
+#include "ExynosHWCHelper.h"
 
 using namespace std::chrono_literals;
 
@@ -54,21 +55,6 @@ using namespace vendor::graphics;
 
 extern struct exynos_hwc_control exynosHWCControl;
 static const int32_t kUmPerInch = 25400;
-
-void writeFileNode(FILE *fd, int value) {
-    constexpr uint32_t kMaxWriteFileLen = 16;
-    char val[kMaxWriteFileLen] = {0};
-    if (int32_t ret = snprintf(val, kMaxWriteFileLen, "%d", value) <= 0) {
-        ALOGE("Fail to write file node, ret =%d", ret);
-    } else {
-        fwrite(val, sizeof(val), 1, fd);
-        if (ferror(fd)) {
-            ALOGE("write failed: %s", strerror(errno));
-            clearerr(fd);
-        }
-        rewind(fd);
-    }
-}
 
 ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
 {
