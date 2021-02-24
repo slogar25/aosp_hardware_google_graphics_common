@@ -35,10 +35,10 @@ cc_library {
     name: "libion_google",
     proprietary: true,
     srcs: [
-        "ion.c",
+        "ion.cpp",
         "dmabuf_container.c",
     ],
-    shared_libs: ["liblog"],
+    shared_libs: ["liblog","libdmabufheap"],
     local_include_dirs: [
         "include",
     ],

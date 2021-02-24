@@ -76,8 +76,8 @@ int exynos_ion_sync_fd_partial(int ion_fd, int fd, off_t offset, size_t len);
 
 const char *exynos_ion_get_heap_name(unsigned int legacy_heap_id);
 
-int exynos_ion_dma_buf_track(int fd);
-int exynos_ion_dma_buf_untrack(int fd);
+int exynos_ion_sync_start(int ion_fd, int fd, int direction);
+int exynos_ion_sync_end(int ion_fd, int fd, int direction);
 
 __END_DECLS
 
