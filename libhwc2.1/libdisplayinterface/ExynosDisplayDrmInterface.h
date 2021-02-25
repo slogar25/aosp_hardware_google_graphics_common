@@ -341,6 +341,9 @@ class ExynosDisplayDrmInterface :
         //      the furture.
         static constexpr const char *kHbmOnFileNode =
                 "/sys/class/backlight/panel0-backlight/hbm_mode";
+
+    private:
+        int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
 };
 
 #endif
