@@ -24,6 +24,7 @@
 #include <xf86drm.h>
 
 #include <algorithm>
+#include <numeric>
 
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
@@ -1704,6 +1705,62 @@ void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace()
         mReadbackFormat = *it;
 }
 
+int32_t ExynosDisplayDrmInterface::getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize,
+                                                      uint8_t *outData) {
+    int width = mExynosDisplay->mXres;
+    int height = mExynosDisplay->mYres;
+    int clock = (width) * (height) * 60 / 10000;
+    std::array<uint8_t, 128> edid_buf{
+            0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, /* header */
+            0x1C, 0xEC,                                     /* manufacturer GGL */
+            0x00, 0x00,                                     /* product */
+            0x00, 0x00, 0x00, 0x00,                         /* serial number */
+            0x01,                                           /* week of manufacture */
+            0x00,                                           /* year of manufacture */
+            0x01, 0x03,                                     /* EDID version */
+            0x80,                                           /* capabilities - digital */
+            0x00,                                           /* horizontal in cm */
+            0x00,                                           /* vertical in cm */
+            0x78,                                           /* gamma 2.2 */
+            0xEE, 0xEE, 0x91, 0xA3, 0x54, 0x4C, 0x99, 0x26, 0x0F, 0x50, 0x54, /* chromaticity */
+            0x00, 0x00, 0x00, /* no default timings */
+            /* no standard timings */
+            0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+            0x01, 0x01,
+            /* descriptor block 1 */
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            /* descriptor block 2 */
+            0x00, 0x00, 0x00, 0xFD, 0x00, 0x00, 0xC8, 0x00, 0xC8, 0x64, 0x00, 0x0A, 0x20, 0x20,
+            0x20, 0x20, 0x20, 0x20,
+            /* descriptor block 3 */
+            0x00, 0x00, 0x00, 0xFC, 0x00, 'C', 'o', 'm', 'm', 'o', 'n', ' ', 'P', 'a', 'n', 'e',
+            'l', '\n',
+            /* descriptor block 4 */
+            0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, /* number of extensions */
+            0x00                          /* checksum */
+    };
+    edid_buf[55] = clock >> 8;
+    edid_buf[56] = width & 0xff;
+    edid_buf[58] = (width >> 4) & 0xf0;
+    edid_buf[59] = height & 0xff;
+    edid_buf[61] = (height >> 4) & 0xf0;
+
+    unsigned int sum = std::accumulate(edid_buf.begin(), edid_buf.end() - 1, 0);
+    edid_buf[127] = (0x100 - (sum & 0xFF)) & 0xFF;
+    if (outData) {
+        outDataSize = std::min<uint32_t>(outDataSize, edid_buf.size());
+        memcpy(outData, edid_buf.data(), outDataSize);
+    } else {
+        outDataSize = static_cast<uint32_t>(edid_buf.size());
+    }
+
+    outPort = mExynosDisplay->mDisplayId;
+    ALOGD("using Display Fake Edid");
+    return HWC2_ERROR_NONE;
+}
+
 int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
         uint8_t* outPort, uint32_t* outDataSize, uint8_t* outData)
 {
@@ -1720,6 +1777,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
         return HWC2_ERROR_UNSUPPORTED;
     }
 
+    if (outPort == nullptr || outDataSize == nullptr) return HWC2_ERROR_BAD_PARAMETER;
+
     drmModePropertyBlobPtr blob;
     int ret;
     uint64_t blobId;
@@ -1732,7 +1791,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     if (blobId == 0) {
         ALOGD("%s: edid_property is supported but blob is not valid",
                 mExynosDisplay->mDisplayName.string());
-        return HWC2_ERROR_UNSUPPORTED;
+        return getDisplayFakeEdid(*outPort, *outDataSize, outData);
     }
 
     blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
