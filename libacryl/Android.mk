@@ -55,6 +55,9 @@ LOCAL_SRC_FILES += acrylic_performance.cpp acrylic_device.cpp
 
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE := libacryl
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 ifeq ($(BOARD_USES_VENDORIMAGE), true)
 LOCAL_PROPRIETARY_MODULE := true
 endif

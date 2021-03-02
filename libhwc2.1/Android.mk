@@ -43,6 +43,9 @@ LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
 
 LOCAL_MODULE := libdrmresource
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 LOCAL_MODULE_TAGS := optional
 
 include $(TOP)/hardware/google/graphics/common/BoardConfigCFlags.mk
@@ -110,6 +113,9 @@ LOCAL_CFLAGS += -DLOG_TAG=\"display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
 
 LOCAL_MODULE := libexynosdisplay
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 LOCAL_MODULE_TAGS := optional
 
 include $(TOP)/hardware/google/graphics/common/BoardConfigCFlags.mk
@@ -160,6 +166,9 @@ LOCAL_SRC_FILES := \
 	libhwcService/ExynosHWCService.cpp
 
 LOCAL_MODULE := libExynosHWCService
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 LOCAL_MODULE_TAGS := optional
 
 include $(TOP)/hardware/google/graphics/common/BoardConfigCFlags.mk
@@ -213,8 +222,10 @@ LOCAL_SRC_FILES := \
 	ExynosHWC.cpp
 
 LOCAL_MODULE := hwcomposer.$(TARGET_BOARD_PLATFORM)
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 LOCAL_MODULE_TAGS := optional
 
 include $(TOP)/hardware/google/graphics/common/BoardConfigCFlags.mk
 include $(BUILD_SHARED_LIBRARY)
-

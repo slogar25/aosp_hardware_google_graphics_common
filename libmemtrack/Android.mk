@@ -23,6 +23,9 @@ LOCAL_HEADER_LIBRARIES := libcutils_headers libsystem_headers libhardware_header
 LOCAL_SHARED_LIBRARIES := liblog libion_google
 LOCAL_SRC_FILES := memtrack_exynos.cpp mali.cpp ion.cpp dmabuf.cpp
 LOCAL_MODULE := memtrack.$(TARGET_BOARD_PLATFORM)
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 LOCAL_PROPRIETARY_MODULE := true
 
 include $(BUILD_SHARED_LIBRARY)

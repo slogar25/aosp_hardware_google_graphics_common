@@ -30,6 +30,9 @@ LOCAL_SHARED_LIBRARIES := \
 	libexynosutils
 
 LOCAL_MODULE := libexynosv4l2
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 LOCAL_PRELINK_MODULE := false
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_CFLAGS += -Wno-unused-parameter -Wno-unused-function
