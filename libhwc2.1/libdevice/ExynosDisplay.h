@@ -45,6 +45,22 @@ class ExynosDevice;
 class ExynosMPP;
 class ExynosMPPSource;
 
+namespace aidl {
+namespace google {
+namespace hardware {
+namespace power {
+namespace extension {
+namespace pixel {
+
+class IPowerExt;
+
+} // namespace pixel
+} // namespace extension
+} // namespace power
+} // namespace hardware
+} // namespace google
+} // namespace aidl
+
 enum dynamic_recomp_mode {
     NO_MODE_SWITCH,
     DEVICE_2_CLIENT,
@@ -1062,10 +1078,15 @@ class ExynosDisplay {
             return PanelGammaSource::GAMMA_DEFAULT;
         }
 
+        int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
         virtual int32_t setActiveConfigInternal(hwc2_config_t config, bool force);
+
+        void removeRefreshRateHint();
+        void restoreRefreshRateHint();
 
     public:
         /**
@@ -1080,6 +1101,8 @@ class ExynosDisplay {
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
+        void connectPowerHalExt();
+        void updateRefreshRateHint();
 
         // send ghbm command after current frame then dim/undim the third frame
         static constexpr uint32_t kGhbmFrameDelay = 3;
@@ -1099,6 +1122,14 @@ class ExynosDisplay {
 
         // current Brightness value
         float mBrightnessValue;
+
+        // for power HAL extension hints
+        std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>
+                mPowerHalExtAidl;
+
+        // previous refresh rate hint
+        std::string mPrevFpsHintStr;
+        bool mRestorePrevFpsHint;
 };
 
 #endif //_EXYNOSDISPLAY_H
