@@ -18,6 +18,7 @@
 //#include <linux/fb.h>
 #include "ExynosDisplay.h"
 
+#include <android/binder_manager.h>
 #include <cutils/properties.h>
 #include <hardware/hwcomposer_defs.h>
 #include <linux/fb.h>
@@ -32,15 +33,25 @@
 #include "exynos_format.h"
 
 #include "VendorGraphicBuffer.h"
+
+#include <aidl/android/hardware/power/IPower.h>
+#include <aidl/google/hardware/power/extension/pixel/IPowerExt.h>
+
 /**
  * ExynosDisplay implementation
  */
 
 using namespace android;
 using namespace vendor::graphics;
+using namespace std::chrono_literals;
+
+using ::aidl::android::hardware::power::IPower;
+using ::aidl::google::hardware::power::extension::pixel::IPowerExt;
 
 extern struct exynos_hwc_control exynosHWCControl;
 extern struct update_time_info updateTimeInfo;
+
+constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
 
 int ExynosSortedLayer::compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs)
 {
@@ -300,7 +311,9 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
     mMaxBrightness(0),
     mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
     mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
-    mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE)
+    mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
+    mPowerHalExtAidl(nullptr),
+    mRestorePrevFpsHint(false)
 {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
@@ -339,6 +352,9 @@ ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
 
     mUseDpu = true;
     mBrightnessState.reset();
+
+    connectPowerHalExt();
+
     return;
 }
 
@@ -3249,12 +3265,115 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     return NO_ERROR;
 }
 
+void ExynosDisplay::connectPowerHalExt() {
+    const std::string kInstance = std::string(IPower::descriptor) + "/default";
+    ndk::SpAIBinder pwBinder = ndk::SpAIBinder(AServiceManager_getService(kInstance.c_str()));
+    ndk::SpAIBinder pwExtBinder;
+
+    if (!mPowerHalExtAidl) {
+        AIBinder_getExtension(pwBinder.get(), pwExtBinder.getR());
+        mPowerHalExtAidl = IPowerExt::fromBinder(pwExtBinder);
+        if (!mPowerHalExtAidl) {
+            DISPLAY_LOGE("failed to connect power HAL extension");
+            return;
+        }
+    }
+}
+
+int32_t ExynosDisplay::sendPowerHalExtHint(const std::string& mode, bool enabled) {
+    bool isSupported = false;
+
+    if (!mPowerHalExtAidl || mode.empty()) return -EINVAL;
+
+    if (!mPowerHalExtAidl->isModeSupported(mode.c_str(), &isSupported).isOk()) {
+        DISPLAY_LOGE("failed to check power HAL extension hint: mode=%s", mode.c_str());
+        return -EINVAL;
+    }
+
+    if (!isSupported) {
+        DISPLAY_LOGW("power HAL extension hint is not supported: mode=%s", mode.c_str());
+        return -EOPNOTSUPP;
+    }
+
+    if (!mPowerHalExtAidl->setMode(mode.c_str(), enabled).isOk()) {
+        DISPLAY_LOGE("failed to send power HAL extension hint: mode=%s, enabled=%d", mode.c_str(),
+                     enabled);
+        return -EINVAL;
+    }
+
+    DISPLAY_LOGD(eDebugHWC, "%s: mode=%s, enabled=%d", __func__, mode.c_str(), enabled);
+
+    return NO_ERROR;
+}
+
+void ExynosDisplay::removeRefreshRateHint() {
+    DISPLAY_LOGD(eDebugHWC, "%s", __func__);
+
+    if (!mPrevFpsHintStr.empty()) {
+        if (sendPowerHalExtHint(mPrevFpsHintStr, false))
+            mRestorePrevFpsHint = false;
+        else
+            mRestorePrevFpsHint = true;
+    }
+}
+
+void ExynosDisplay::restoreRefreshRateHint() {
+    DISPLAY_LOGD(eDebugHWC, "%s", __func__);
+
+    if (mRestorePrevFpsHint && !mPrevFpsHintStr.empty()) {
+        if (sendPowerHalExtHint(mPrevFpsHintStr, true)) mPrevFpsHintStr.clear();
+
+        mRestorePrevFpsHint = false;
+    }
+}
+
+void ExynosDisplay::updateRefreshRateHint() {
+    if (!mVsyncPeriod) return;
+
+    /* TODO: add refresh rate buckets, tracked in b/181100731 */
+    int fps = round(nsecsPerSec / mVsyncPeriod * 0.1f) * 10;
+    std::string fpsHintStr = "REFRESH_" + std::to_string(fps) + "FPS";
+
+    /*
+     * In case we still update mVsyncPeriod after changing to OFF/DOZE mode,
+     * only save the hint for next restoration.
+     */
+    if (mPowerModeState != HWC2_POWER_MODE_ON) {
+        mPrevFpsHintStr = fpsHintStr;
+        DISPLAY_LOGD(eDebugHWC, "%s: power mode is not on, save the hint %s", __func__,
+                     fpsHintStr.c_str());
+        return;
+    }
+
+    if (mPrevFpsHintStr == fpsHintStr) {
+        DISPLAY_LOGD(eDebugHWC, "%s: skip the same hint %s", __func__, fpsHintStr.c_str());
+        return;
+    }
+
+    if (sendPowerHalExtHint(fpsHintStr, true)) {
+        DISPLAY_LOGE("failed to do refresh rate hint: %s", fpsHintStr.c_str());
+        return;
+    }
+
+    if (!mPrevFpsHintStr.empty()) {
+        if (sendPowerHalExtHint(mPrevFpsHintStr, false)) {
+            DISPLAY_LOGE("failed to end refresh rate hint: %s", mPrevFpsHintStr.c_str());
+            return;
+        }
+    }
+
+    mPrevFpsHintStr = fpsHintStr;
+}
+
 int32_t ExynosDisplay::resetConfigRequestState()
 {
     getDisplayAttribute(mDesiredConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD,
             (int32_t*)&mVsyncPeriod);
     DISPLAY_LOGD(eDebugDisplayConfig,"Update mVsyncPeriod %d",
             mVsyncPeriod);
+
+    updateRefreshRateHint();
+
     mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
     return NO_ERROR;
 }
