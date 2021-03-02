@@ -28,6 +28,9 @@ LOCAL_SRC_FILES := hwjpeg-base.cpp hwjpeg-v4l2.cpp ExynosJpegEncoder.cpp \
                    libhwjpeg-exynos.cpp ThumbnailScaler.cpp
 
 LOCAL_MODULE := libhwjpeg
+LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS := notice
+LOCAL_NOTICE_FILE := $(LOCAL_PATH)/NOTICE
 LOCAL_MODULE_TAGS := optional
 
 ifeq ($(BOARD_USES_VENDORIMAGE), true)
