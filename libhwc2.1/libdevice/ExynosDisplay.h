@@ -17,19 +17,19 @@
 #ifndef _EXYNOSDISPLAY_H
 #define _EXYNOSDISPLAY_H
 
+#include <android/hardware/graphics/composer/2.4/types.h>
 #include <hardware/hwcomposer2.h>
 #include <system/graphics.h>
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
-#include <android/hardware/graphics/composer/2.4/types.h>
 
+#include "ExynosDisplayInterface.h"
 #include "ExynosHWC.h"
-#include <hardware/hwcomposer2.h>
+#include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosMPP.h"
 #include "ExynosResourceManager.h"
-#include "ExynosDisplayInterface.h"
-#include "ExynosHWCDebug.h"
+#include "worker.h"
 
 #define HWC_CLEARDISPLAY_WITH_COLORMAP
 #define HWC_PRINT_FRAME_NUM     10
@@ -368,6 +368,23 @@ class ExynosDisplay {
         ExynosDisplay(uint32_t type, ExynosDevice *device);
         /* Destructor */
         virtual ~ExynosDisplay();
+
+        /* Idle hint to notify power hal */
+        class IdleHintWorker : public Worker {
+        public:
+            IdleHintWorker(ExynosDisplay* display);
+
+            void resetIdleTimer();
+
+        protected:
+            void Routine() override;
+
+        private:
+            ExynosDisplay* mExynosDisplay;
+            bool mIdleFlag;
+            bool mNeedResetTimer;
+        };
+        IdleHintWorker mIdleHint;
 
         ExynosDevice *mDevice;
 
