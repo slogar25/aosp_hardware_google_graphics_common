@@ -53,6 +53,52 @@ extern struct update_time_info updateTimeInfo;
 
 constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
 
+ExynosDisplay::IdleHintWorker::IdleHintWorker(ExynosDisplay* display)
+      : Worker("IdleHint", HAL_PRIORITY_URGENT_DISPLAY),
+        mExynosDisplay(display),
+        mIdleFlag(false),
+        mNeedResetTimer(false) {
+    InitWorker();
+}
+
+void ExynosDisplay::IdleHintWorker::resetIdleTimer() {
+    ATRACE_CALL();
+    Lock();
+    mNeedResetTimer = true;
+    Unlock();
+    Signal();
+}
+
+constexpr int64_t nsecsIdleTimeout = std::chrono::nanoseconds(100ms).count();
+void ExynosDisplay::IdleHintWorker::Routine() {
+    Lock();
+    int ret = 0;
+
+    if (!mNeedResetTimer) {
+        if (mIdleFlag) {
+            ret = WaitForSignalOrExitLocked();
+        } else {
+            ret = WaitForSignalOrExitLocked(nsecsIdleTimeout);
+        }
+        if (ret == -EINTR) {
+            Unlock();
+            return;
+        }
+    }
+
+    bool enableIdle = !mNeedResetTimer;
+    mNeedResetTimer = false;
+
+    ATRACE_INT("HWCIdleTimer:", enableIdle);
+    Unlock();
+    if (mIdleFlag != enableIdle) {
+        if (mExynosDisplay->sendPowerHalExtHint("DISPLAY_IDLE", enableIdle)) {
+            ALOGE("failed to send DISPLAY_IDLE hint: %d", enableIdle);
+        }
+        mIdleFlag = enableIdle;
+    }
+}
+
 int ExynosSortedLayer::compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs)
 {
     ExynosLayer *left = *((ExynosLayer**)(lhs));
@@ -260,61 +306,61 @@ String8 ExynosCompositionInfo::getTypeStr()
     }
 }
 
-ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice *device)
-: mType(type),
-    mXres(1440),
-    mYres(2960),
-    mXdpi(25400),
-    mYdpi(25400),
-    mVsyncPeriod(16666666),
-    mDevice(device),
-    mDisplayId(HWC_DISPLAY_PRIMARY),
-    mDisplayName(android::String8("PrimaryDisplay")),
-    mPlugState(false),
-    mHasSingleBuffer(false),
-    mResourceManager(NULL),
-    mClientCompositionInfo(COMPOSITION_CLIENT),
-    mExynosCompositionInfo(COMPOSITION_EXYNOS),
-    mGeometryChanged(0x0),
-    mRenderingState(RENDERING_STATE_NONE),
-    mHWCRenderingState(RENDERING_STATE_NONE),
-    mDisplayBW(0),
-    mDynamicReCompMode(NO_MODE_SWITCH),
-    mDREnable(false),
-    mDRDefault(false),
-    mLastFpsTime(0),
-    mFrameCount(0),
-    mLastFrameCount(0),
-    mErrorFrameCount(0),
-    mUpdateEventCnt(0),
-    mUpdateCallCnt(0),
-    mDefaultDMA(MAX_DECON_DMA_TYPE),
-    mLastRetireFence(-1),
-    mWindowNumUsed(0),
-    mBaseWindowIndex(0),
-    mNumMaxPriorityAllowed(1),
-    mCursorIndex(-1),
-    mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
-    mMaxLuminance(0),
-    mMaxAverageLuminance(0),
-    mMinLuminance(0),
-    mHWC1LayerList(NULL),
-    /* Support DDI scalser */
-    mOldScalerMode(0),
-    mNewScaledWidth(0),
-    mNewScaledHeight(0),
-    mDeviceXres(0),
-    mDeviceYres(0),
-    mColorMode(HAL_COLOR_MODE_NATIVE),
-    mSkipFrame(false),
-    mBrightnessFd(NULL),
-    mMaxBrightness(0),
-    mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
-    mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
-    mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
-    mPowerHalExtAidl(nullptr),
-    mRestorePrevFpsHint(false)
-{
+ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice* device)
+      : mType(type),
+        mXres(1440),
+        mYres(2960),
+        mXdpi(25400),
+        mYdpi(25400),
+        mVsyncPeriod(16666666),
+        mIdleHint(this),
+        mDevice(device),
+        mDisplayId(HWC_DISPLAY_PRIMARY),
+        mDisplayName(android::String8("PrimaryDisplay")),
+        mPlugState(false),
+        mHasSingleBuffer(false),
+        mResourceManager(NULL),
+        mClientCompositionInfo(COMPOSITION_CLIENT),
+        mExynosCompositionInfo(COMPOSITION_EXYNOS),
+        mGeometryChanged(0x0),
+        mRenderingState(RENDERING_STATE_NONE),
+        mHWCRenderingState(RENDERING_STATE_NONE),
+        mDisplayBW(0),
+        mDynamicReCompMode(NO_MODE_SWITCH),
+        mDREnable(false),
+        mDRDefault(false),
+        mLastFpsTime(0),
+        mFrameCount(0),
+        mLastFrameCount(0),
+        mErrorFrameCount(0),
+        mUpdateEventCnt(0),
+        mUpdateCallCnt(0),
+        mDefaultDMA(MAX_DECON_DMA_TYPE),
+        mLastRetireFence(-1),
+        mWindowNumUsed(0),
+        mBaseWindowIndex(0),
+        mNumMaxPriorityAllowed(1),
+        mCursorIndex(-1),
+        mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
+        mMaxLuminance(0),
+        mMaxAverageLuminance(0),
+        mMinLuminance(0),
+        mHWC1LayerList(NULL),
+        /* Support DDI scalser */
+        mOldScalerMode(0),
+        mNewScaledWidth(0),
+        mNewScaledHeight(0),
+        mDeviceXres(0),
+        mDeviceYres(0),
+        mColorMode(HAL_COLOR_MODE_NATIVE),
+        mSkipFrame(false),
+        mBrightnessFd(NULL),
+        mMaxBrightness(0),
+        mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
+        mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
+        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
+        mPowerHalExtAidl(nullptr),
+        mRestorePrevFpsHint(false) {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
@@ -2740,6 +2786,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         errString.appendFormat("handleStaticLayers error\n");
         goto err;
     }
+
+    mIdleHint.resetIdleTimer();
 
     handleWindowUpdate();
 
