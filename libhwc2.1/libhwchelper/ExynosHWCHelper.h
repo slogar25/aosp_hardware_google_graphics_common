@@ -434,6 +434,7 @@ String8 getMPPStr(int typeId);
 void adjustRect(hwc_rect_t &rect, int32_t width, int32_t height);
 uint32_t getBufferNumOfFormat(int format, uint32_t compressType);
 uint32_t getPlaneNumOfFormat(int format, uint32_t compressType);
+uint32_t getBytePerPixelOfPrimaryPlane(int format);
 
 int fence_close(int fence, ExynosDisplay* display,
         hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip);

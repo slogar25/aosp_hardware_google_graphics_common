@@ -589,6 +589,17 @@ uint32_t getPlaneNumOfFormat(int format, uint32_t compressType) {
     return (exynosFormat != nullptr) ? exynosFormat->planeNum : 0;
 }
 
+uint32_t getBytePerPixelOfPrimaryPlane(int format) {
+    if (isFormatRgb(format))
+        return (formatToBpp(format) / 8);
+    else if (isFormat10BitYUV420(format))
+        return 2;
+    else if (isFormatYUV420(format))
+        return 1;
+    else
+        return 0;
+}
+
 void setFenceName(int fenceFd, hwc_fence_type fenceType)
 {
     if (fenceFd >= 3)
