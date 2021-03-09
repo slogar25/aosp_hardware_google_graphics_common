@@ -17,16 +17,21 @@
 #ifndef _EXYNOSDISPLAYDRMINTERFACE_H
 #define _EXYNOSDISPLAYDRMINTERFACE_H
 
+#include <drm/samsung_drm.h>
+#include <utils/Condition.h>
+#include <utils/Mutex.h>
+#include <xf86drmMode.h>
+
+#include <list>
+#include <unordered_map>
+
+#include "ExynosDisplay.h"
 #include "ExynosDisplayInterface.h"
 #include "ExynosHWC.h"
-#include "drmcrtc.h"
-#include "drmconnector.h"
-#include "vsyncworker.h"
 #include "ExynosMPP.h"
-#include "ExynosDisplay.h"
-#include <unordered_map>
-#include <xf86drmMode.h>
-#include <drm/samsung_drm.h>
+#include "drmconnector.h"
+#include "drmcrtc.h"
+#include "vsyncworker.h"
 
 /* Max plane number of buffer object */
 #define HWC_DRM_BO_MAX_PLANES 4
@@ -39,6 +44,76 @@ using namespace android;
 using DrmPropertyMap = std::unordered_map<uint32_t, uint64_t>;
 
 class ExynosDevice;
+constexpr uint32_t MAX_CACHED_BUFFERS = 32; // TODO: find a good value for this
+
+using BufHandles = std::array<uint32_t, HWC_DRM_BO_MAX_PLANES>;
+class FramebufferManager {
+    public:
+        FramebufferManager(){};
+        ~FramebufferManager();
+        void init(int drmFd);
+
+        // get buffer for provided config, if a buffer with same config is already cached it will be
+        // reused otherwise one will be allocated. returns fbId that can be used to attach to plane, any
+        // buffers allocated/reused with this call will be staged, flip() call is expected after this
+        // when frame is committed
+        int32_t getBuffer(const exynos_win_config_data &config, uint32_t &fbId, bool caching = true);
+
+        // this should be called after frame update
+        // this will move all staged buffers to front of the cached buffers queue
+        // This will also schedule a cleanup of cached buffers if cached buffer list goes
+        // beyond MAX_CACHED_BUFFERS
+        void flip(bool isActiveCommit);
+
+        // release all currently tracked buffers, this can be called for example when display is turned
+        // off
+        void releaseAll();
+
+    private:
+        uint32_t getBufHandleFromFd(int fd);
+        // this struct should contain elements that can be used to identify framebuffer more easily
+        struct Framebuffer {
+            Framebuffer(int fd, BufHandles handles, uint32_t bufNum, uint32_t fb)
+                  : bufHandles(handles), bufferNum(bufNum), fbId(fb), drmFd(fd){};
+            ~Framebuffer() {
+                for (uint32_t i = 0; i < bufferNum; i++) {
+                    if (bufHandles[i]) freeBufHandle(bufHandles[i]);
+                }
+                drmModeRmFB(drmFd, fbId);
+            };
+            void freeBufHandle(uint32_t handle);
+            BufHandles bufHandles;
+            uint32_t bufferNum;
+            uint32_t fbId;
+            int drmFd;
+            nsecs_t lastLookupTime = 0;
+        };
+        int addFB2WithModifiers(uint32_t width, uint32_t height, uint32_t pixel_format,
+                        const BufHandles handles, const uint32_t pitches[4],
+                        const uint32_t offsets[4], const uint64_t modifier[4], uint32_t *buf_id,
+                        uint32_t flags);
+
+        void removeFBsThreadRoutine();
+
+        // releases framebuffers at the back of the cached buffer queue that go beyond
+        // MAX_CACHED_BUFFERS
+        void cleanup();
+
+        // buffers that are going to be committed in the next atomic frame update
+        std::vector<std::unique_ptr<Framebuffer>> mStagingBuffers;
+        // unused buffers that have been used recently, front of the queue has the most recently used
+        // ones
+        std::list<std::unique_ptr<Framebuffer>> mCachedBuffers;
+
+        int mDrmFd = -1;
+        nsecs_t mLastActiveCommitTime = 0;
+
+        std::thread mRmFBThread;
+        bool mRmFBThreadRunning = false;
+        Condition mCondition;
+        Mutex mMutex;
+};
+
 class ExynosDisplayDrmInterface :
     public ExynosDisplayInterface,
     public VsyncCallback
@@ -54,22 +129,12 @@ class ExynosDisplayDrmInterface :
 
                 drmModeAtomicReqPtr pset() { return mPset; };
                 void setError(int err) { mError = err; };
+                int getError() { return mError; };
                 int32_t atomicAddProperty(const uint32_t id,
                         const DrmProperty &property,
                         uint64_t value, bool optional = false);
                 String8& dumpAtomicCommitInfo(String8 &result, bool debugPrint = false);
                 int commit(uint32_t flags, bool loggingForDebug = false);
-                void removeFbs(std::vector<uint32_t> &fbs);
-                void moveTrackedFbs(std::vector<uint32_t> &fbs);
-                void moveTrackedLastFb(uint32_t &fb);
-                int addFB2WithModifiers(
-                        uint32_t width, uint32_t height,
-                        uint32_t pixel_format, const uint32_t bo_handles[4],
-                        const uint32_t pitches[4], const uint32_t offsets[4],
-                        const uint64_t modifier[4], uint32_t *buf_id,
-                        uint32_t flags);
-                uint32_t getBufHandleFromFd(int fd);
-                void freeBufHandle(uint32_t handle);
                 void addOldBlob(uint32_t blob_id) {
                     mOldBlobs.push_back(blob_id);
                 };
@@ -89,7 +154,6 @@ class ExynosDisplayDrmInterface :
                 drmModeAtomicReqPtr mPset;
                 int mError = 0;
                 ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
-                std::vector<uint32_t> mFbIds;
                 /* Destroy old blobs after commit */
                 std::vector<uint32_t> mOldBlobs;
                 int drmFd() const { return mDrmDisplayInterface->mDrmDevice->fd(); }
@@ -197,12 +261,8 @@ class ExynosDisplayDrmInterface :
         int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
-        uint32_t getBytePerPixelOfPrimaryPlane(int format);
         static std::tuple<uint64_t, int> halToDrmEnum(
                 const int32_t halData, const DrmPropertyMap &drmEnums);
-        int32_t addFBFromDisplayConfig(DrmModeAtomicReq &drmReq,
-                const exynos_win_config_data &config,
-                uint32_t &fbId);
         /*
          * This function adds FB and gets new fb id if fbId is 0,
          * if fbId is not 0, this reuses fbId.
@@ -279,8 +339,6 @@ class ExynosDisplayDrmInterface :
         PartialRegionState mPartialRegionState;
         /* Mapping plane id to ExynosMPP, key is plane id */
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;
-        /* TODO: Temporary variable to manage fb id */
-        std::vector<uint32_t> mOldFbIds;
 
         DrmPropertyMap mBlendEnums;
         DrmPropertyMap mStandardEnums;
@@ -341,6 +399,7 @@ class ExynosDisplayDrmInterface :
         //      the furture.
         static constexpr const char *kHbmOnFileNode =
                 "/sys/class/backlight/panel0-backlight/hbm_mode";
+        FramebufferManager mFBManager;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
