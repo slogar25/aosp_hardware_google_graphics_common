@@ -68,7 +68,8 @@ using namespace android;
 static constexpr uint32_t TRANSFORM_MAT_SIZE = 4*4;
 
 enum {
-    EXYNOS_HWC_DIM_LAYER = 0x00000001,
+    EXYNOS_HWC_DIM_LAYER = 1 << 0,
+    EXYNOS_HWC_IGNORE_LAYER = 1 << 1,
 };
 
 enum {
