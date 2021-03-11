@@ -5060,8 +5060,9 @@ void ExynosDisplay::traceLayerTypes() {
     ATRACE_INT("HWComposer: DPU Layer", dpu_count);
     ATRACE_INT("HWComposer: G2D Layer", g2d_count);
     ATRACE_INT("HWComposer: GPU Layer", gpu_count);
-    ATRACE_INT("HWComposer: Cached Layer", skip_count);
-    ATRACE_INT("HWComposer: Total Layer", mLayers.size());
+    ATRACE_INT("HWComposer: DPU Cached Layer", skip_count);
+    ATRACE_INT("HWComposer: SF Cached Layer", mIgnoreLayers.size());
+    ATRACE_INT("HWComposer: Total Layer", mLayers.size() + mIgnoreLayers.size());
 }
 
 void ExynosDisplay::updateBrightnessState() {
