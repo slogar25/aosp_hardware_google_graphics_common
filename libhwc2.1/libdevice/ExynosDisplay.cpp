@@ -602,12 +602,6 @@ void ExynosDisplay::doPreProcessing() {
     for (size_t i=0; i < mLayers.size(); i++) {
         buffer_handle_t handle = mLayers[i]->mLayerBuffer;
         VendorGraphicBufferMeta gmeta(handle);
-        /* TODO: This should be checked **/
-        if ((handle != NULL) &&
-            (gmeta.consumer_usage & VendorGraphicBufferUsage::DAYDREAM_SINGLE_BUFFER_MODE))
-        {
-            hasSingleBuffer = true;
-        }
         if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_CLIENT)
             skipStaticLayers = false;
 
