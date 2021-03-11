@@ -1888,12 +1888,16 @@ int32_t ExynosResourceManager::preAssignResources()
             ExynosDisplay *display = NULL;
             for (size_t j = 0; j < mDevice->mDisplays.size(); j++) {
                 display = mDevice->mDisplays[j];
+                if (display == nullptr)
+                    continue;
                 int checkBit = mOtfMPPs[i]->mPreAssignDisplayList[displayMode] & display->getDisplayPreAssignBit();
                 HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), checkBit(%d)", j, checkBit);
                 if (checkBit) {
                     HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), displayId(%d), display(%p)", j, display->mDisplayId, display);
-                    if ((display != NULL) &&
-                        (display->mDisplayControl.forceReserveMPP || display->mPlugState)) {
+                    if (display->mDisplayControl.forceReserveMPP ||
+                        (display->mPlugState &&
+                         ((display->mType != HWC_DISPLAY_PRIMARY) ||
+                          (display->mPowerModeState != HWC2_POWER_MODE_OFF)))) {
                         HDEBUGLOGD(eDebugResourceManager, "\t\treserve to display %d", display->mDisplayId);
                         mOtfMPPs[i]->reserveMPP(display->mDisplayId);
                         break;
