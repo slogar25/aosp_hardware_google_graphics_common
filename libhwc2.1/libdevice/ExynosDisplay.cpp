@@ -491,14 +491,24 @@ void ExynosDisplay::initDisplay() {
 int32_t ExynosDisplay::destroyLayer(hwc2_layer_t outLayer) {
 
     Mutex::Autolock lock(mDRMutex);
+    ExynosLayer *layer = (ExynosLayer *)outLayer;
 
-    if ((ExynosLayer*)outLayer == NULL)
+    if (layer == nullptr) {
         return HWC2_ERROR_BAD_LAYER;
+    }
 
-    mLayers.remove((ExynosLayer*)outLayer);
+    if (mLayers.remove(layer) < 0) {
+        auto it = std::find(mIgnoreLayers.begin(), mIgnoreLayers.end(), layer);
+        if (it == mIgnoreLayers.end()) {
+            ALOGE("%s:: There is no layer", __func__);
+        } else {
+            mIgnoreLayers.erase(it);
+        }
+    } else {
+        setGeometryChanged(GEOMETRY_DISPLAY_LAYER_REMOVED);
+    }
 
-    delete (ExynosLayer*)outLayer;
-    setGeometryChanged(GEOMETRY_DISPLAY_LAYER_REMOVED);
+    delete layer;
 
     if (mPlugState == false) {
         DISPLAY_LOGI("%s : destroyLayer is done. But display is already disconnected",
@@ -513,49 +523,69 @@ int32_t ExynosDisplay::destroyLayer(hwc2_layer_t outLayer) {
  * @return void
  */
 void ExynosDisplay::destroyLayers() {
-    while (!mLayers.isEmpty()) {
-        ExynosLayer *layer = mLayers[0];
-        if (layer != NULL) {
-            mLayers.remove(layer);
-            delete layer;
-        }
+    for (uint32_t index = 0; index < mLayers.size();) {
+        ExynosLayer *layer = mLayers[index];
+        mLayers.removeAt(index);
+        delete layer;
     }
-}
 
-/**
- * @param index
- * @return ExynosLayer
- */
-ExynosLayer *ExynosDisplay::getLayer(uint32_t index) {
-
-    if (mLayers.size() <= index) {
-        HWC_LOGE(this, "HWC2 : %s : size(%zu), index(%d), wrong layer request!",
-                __func__, mLayers.size(), index);
-        return NULL;
-    }
-    if(mLayers[index] != NULL) {
-        return mLayers[index];
-    }
-    else {
-        HWC_LOGE(this, "HWC2 : %s : %d, wrong layer request!", __func__, __LINE__);
-        return NULL;
+    for (auto it = mIgnoreLayers.begin(); it != mIgnoreLayers.end();) {
+        ExynosLayer *layer = *it;
+        it = mIgnoreLayers.erase(it);
+        delete layer;
     }
 }
 
 ExynosLayer *ExynosDisplay::checkLayer(hwc2_layer_t addr) {
+    ExynosLayer *temp = (ExynosLayer *)addr;
     if (!mLayers.isEmpty()) {
-        ExynosLayer *temp = (ExynosLayer *)addr;
         for (size_t i = 0; i < mLayers.size(); i++) {
             if (mLayers[i] == temp)
                 return mLayers[i];
         }
-    } else {
-        ALOGE("HWC2: mLayers is empty");
-        return NULL;
+    }
+
+    if (mIgnoreLayers.size()) {
+        auto it = std::find(mIgnoreLayers.begin(), mIgnoreLayers.end(), temp);
+        return (it == mIgnoreLayers.end()) ? NULL : *it;
     }
 
     ALOGE("HWC2 : %s : %d, wrong layer request!", __func__, __LINE__);
     return NULL;
+}
+
+void ExynosDisplay::checkIgnoreLayers() {
+    for (auto it = mIgnoreLayers.begin(); it != mIgnoreLayers.end();) {
+        ExynosLayer *layer = *it;
+        if ((layer->mLayerFlag & EXYNOS_HWC_IGNORE_LAYER) == 0) {
+            mLayers.push_back(layer);
+            it = mIgnoreLayers.erase(it);
+        } else {
+            it++;
+        }
+    }
+
+    for (uint32_t index = 0; index < mLayers.size();) {
+        ExynosLayer *layer = mLayers[index];
+        if (layer->mLayerFlag & EXYNOS_HWC_IGNORE_LAYER) {
+            layer->resetValidateData();
+            layer->mValidateCompositionType = HWC2_COMPOSITION_DEVICE;
+            /*
+             * Directly close without counting down
+             * because it was not counted by validate
+             */
+            if (layer->mAcquireFence > 0) {
+                close(layer->mAcquireFence);
+            }
+            layer->mAcquireFence = -1;
+
+            layer->mReleaseFence = -1;
+            mIgnoreLayers.push_back(layer);
+            mLayers.removeAt(index);
+        } else {
+            index++;
+        }
+    }
 }
 
 /**
@@ -1759,6 +1789,25 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
         }
     }
 
+    if (mIgnoreLayers.size()) {
+        result.appendFormat("=======================  dump ignore layers (%zu)  ================================\n",
+                            mIgnoreLayers.size());
+        ALOGD("%s", result.string());
+        if (pFile != NULL) {
+            fwrite(result.string(), 1, result.size(), pFile);
+        }
+        result.clear();
+        for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
+            ExynosLayer *layer = mIgnoreLayers[i];
+            layer->printLayer();
+            if (pFile != NULL) {
+                layer->dump(result);
+                fwrite(result.string(), 1, result.size(), pFile);
+                result.clear();
+            }
+        }
+    }
+
     result.appendFormat("=============================  dump win configs  ===================================\n");
     ALOGD("%s", result.string());
     if (pFile != NULL) {
@@ -2327,32 +2376,54 @@ int32_t ExynosDisplay::getChangedCompositionTypes(
     }
 
     uint32_t count = 0;
-    int32_t type = 0;
 
+    auto set_out_param = [](ExynosLayer *layer, int32_t type, uint32_t &count, uint32_t num,
+                            hwc2_layer_t *out_layers, int32_t *out_types) -> int32_t {
+        if (type == layer->mCompositionType) {
+            return 0;
+        }
+        if (out_layers == NULL || out_types == NULL) {
+            count++;
+        } else {
+            if (count < num) {
+                out_layers[count] = (hwc2_layer_t)layer;
+                out_types[count] = type;
+                count++;
+            } else {
+                return -1;
+            }
+        }
+        return 0;
+    };
+
+    int32_t ret = 0;
     for (size_t i = 0; i < mLayers.size(); i++) {
         DISPLAY_LOGD(eDebugHWC, "[%zu] layer: mCompositionType(%d), mValidateCompositionType(%d), mExynosCompositionType(%d), skipFlag(%d)",
                 i, mLayers[i]->mCompositionType, mLayers[i]->mValidateCompositionType,
                 mLayers[i]->mExynosCompositionType, mClientCompositionInfo.mSkipFlag);
-
-        type = getLayerCompositionTypeForValidationType(i);
-        if (type != mLayers[i]->mCompositionType) {
-            if (outLayers == NULL || outTypes == NULL) {
-                count++;
-            }
-            else {
-                if (count < *outNumElements) {
-                    outLayers[count] = (hwc2_layer_t)mLayers[i];
-                    outTypes[count] = type;
-                    count++;
-                } else {
-                    DISPLAY_LOGE("array size is not valid (%d, %d)", count, *outNumElements);
-                    String8 errString;
-                    errString.appendFormat("array size is not valid (%d, %d)", count, *outNumElements);
-                    printDebugInfos(errString);
-                    return -1;
-                }
+        if ((ret = set_out_param(mLayers[i], getLayerCompositionTypeForValidationType(i), count,
+                                 *outNumElements, outLayers, outTypes)) < 0) {
+            break;
+        }
+    }
+    if (ret == 0) {
+        for (size_t i = 0; i < mIgnoreLayers.size(); i++) {
+            DISPLAY_LOGD(eDebugHWC,
+                         "[%zu] ignore layer: mCompositionType(%d), mValidateCompositionType(%d)",
+                         i, mIgnoreLayers[i]->mCompositionType,
+                         mIgnoreLayers[i]->mValidateCompositionType);
+            if ((ret = set_out_param(mIgnoreLayers[i], mIgnoreLayers[i]->mValidateCompositionType,
+                                     count, *outNumElements, outLayers, outTypes)) < 0) {
+                break;
             }
         }
+    }
+    if (ret < 0) {
+        DISPLAY_LOGE("array size is not valid (%d, %d)", count, *outNumElements);
+        String8 errString;
+        errString.appendFormat("array size is not valid (%d, %d)", count, *outNumElements);
+        printDebugInfos(errString);
+        return ret;
     }
 
     if ((outLayers == NULL) || (outTypes == NULL))
@@ -2534,7 +2605,7 @@ int32_t ExynosDisplay::getReleaseFences(
     if (outLayers == NULL || outFences == NULL)
     {
         uint32_t deviceLayerNum = 0;
-        deviceLayerNum = mLayers.size();
+        deviceLayerNum = mLayers.size() + mIgnoreLayers.size();
         *outNumElements = deviceLayerNum;
     } else {
         uint32_t deviceLayerNum = 0;
@@ -2557,6 +2628,14 @@ int32_t ExynosDisplay::getReleaseFences(
             } else {
                 setFenceName(mLayers[i]->mReleaseFence, FENCE_LAYER_RELEASE_DPP);
             }
+        }
+        for (size_t i = 0; i < mIgnoreLayers.size(); i++) {
+            outLayers[deviceLayerNum] = (hwc2_layer_t)mIgnoreLayers[i];
+            outFences[deviceLayerNum] = -1;
+
+            DISPLAY_LOGD(eDebugHWC, "[%zu] ignore layer deviceLayerNum(%d), release fence: -1", i,
+                         deviceLayerNum);
+            deviceLayerNum++;
         }
     }
     return 0;
@@ -2914,6 +2993,17 @@ int32_t ExynosDisplay::presentPostProcessing()
     if (mDpuData.enable_readback)
         mDevice->signalReadbackDone();
     mDpuData.enable_readback = false;
+
+    for (auto it : mIgnoreLayers) {
+        /*
+         * Directly close without counting down
+         * because it was not counted by validate
+         */
+        if (it->mAcquireFence > 0) {
+            close(it->mAcquireFence);
+        }
+        it->mAcquireFence = -1;
+    }
     return NO_ERROR;
 }
 
@@ -3645,10 +3735,10 @@ int32_t ExynosDisplay::validateDisplay(
     mUpdateCallCnt++;
     mLastUpdateTimeStamp = systemTime(SYSTEM_TIME_MONOTONIC);
 
+    checkIgnoreLayers();
     if (mLayers.size() == 0)
         DISPLAY_LOGI("%s:: validateDisplay layer size is 0", __func__);
-
-    if (mLayers.size() > 1)
+    else
         mLayers.vector_sort();
 
     // Reset current frame flags for Fence Tracer
@@ -3849,9 +3939,19 @@ void ExynosDisplay::dump(String8& result)
 
     result.appendFormat("PanelGammaSource (%d)\n\n", GetCurrentPanelGammaSource());
 
-    for (uint32_t i = 0; i < mLayers.size(); i++) {
-        ExynosLayer *layer = mLayers[i];
-        layer->dump(result);
+    if (mLayers.size()) {
+        result.appendFormat("============================== dump layers ===========================================\n");
+        for (uint32_t i = 0; i < mLayers.size(); i++) {
+            ExynosLayer *layer = mLayers[i];
+            layer->dump(result);
+        }
+    }
+    if (mIgnoreLayers.size()) {
+        result.appendFormat("\n============================== dump ignore layers ===========================================\n");
+        for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
+            ExynosLayer *layer = mIgnoreLayers[i];
+            layer->dump(result);
+        }
     }
     result.appendFormat("\n");
 }
@@ -4960,8 +5060,9 @@ void ExynosDisplay::traceLayerTypes() {
     ATRACE_INT("HWComposer: DPU Layer", dpu_count);
     ATRACE_INT("HWComposer: G2D Layer", g2d_count);
     ATRACE_INT("HWComposer: GPU Layer", gpu_count);
-    ATRACE_INT("HWComposer: Cached Layer", skip_count);
-    ATRACE_INT("HWComposer: Total Layer", mLayers.size());
+    ATRACE_INT("HWComposer: DPU Cached Layer", skip_count);
+    ATRACE_INT("HWComposer: SF Cached Layer", mIgnoreLayers.size());
+    ATRACE_INT("HWComposer: Total Layer", mLayers.size() + mIgnoreLayers.size());
 }
 
 void ExynosDisplay::updateBrightnessState() {
