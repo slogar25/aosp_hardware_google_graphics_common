@@ -193,6 +193,13 @@ class IDisplayColorGeneric {
     struct DisplayStage {
         using ConfigType = T;
 
+        std::function<void(void)> data_applied_notifier = nullptr;
+        void NotifyDataApplied() const {
+            if (data_applied_notifier) {
+                data_applied_notifier();
+            }
+        }
+
         bool enable = false;
         /// A flag indicating if the data has been changed in last Update call.
         // It should be set when enable is changed from false to true.
