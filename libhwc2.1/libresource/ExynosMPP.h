@@ -96,8 +96,12 @@ class ExynosResourceManager;
 #ifndef VPP_MARGIN
 #define VPP_MARGIN 1.1
 #endif
+#ifndef VPP_BUBBLE
+#define VPP_BUBBLE 0.06
+#endif
 
 #define VPP_RESOL_CLOCK_FACTOR (VPP_TE_PERIOD * VPP_MARGIN)
+#define VPP_RESOL_MARGIN (VPP_MARGIN + VPP_BUBBLE)
 #ifndef VPP_DISP_FACTOR
 #define VPP_DISP_FACTOR 1.0
 #endif
@@ -570,8 +574,7 @@ public:
     bool isSupportedCapability(ExynosDisplay &display, struct exynos_image &src);
     bool isSupportedDRM(struct exynos_image &src);
     virtual bool isSupportedHStrideCrop(struct exynos_image &src);
-    bool checkDownscaleCap(const float resolution, const float scaleRatio_H,
-                           const float scaleRatio_V, const float displayRatio_H) const;
+    bool checkDownscaleCap(const float resolution, const float displayRatio_V) const;
     virtual uint32_t getDownscaleRestriction(const struct exynos_image &src,
                                              const struct exynos_image &dst) const;
     virtual uint32_t getMaxDownscale(const ExynosDisplay &display, const struct exynos_image &src,

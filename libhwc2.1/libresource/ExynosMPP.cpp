@@ -501,13 +501,10 @@ uint32_t ExynosMPP::getMaxUpscale(const struct exynos_image &src,
     return mSrcSizeRestrictions[idx].maxUpScale;
 }
 
-bool ExynosMPP::checkDownscaleCap(const float resolution, const float scaleRatio_H,
-                                  const float scaleRatio_V, const float displayRatio_H) const {
+bool ExynosMPP::checkDownscaleCap(const float resolution, const float displayRatio_V) const {
     if (mPhysicalType >= MPP_DPP_NUM) return true;
 
-    return float(mClockKhz) * 1000.0 >=
-            ((resolution * VPP_RESOL_CLOCK_FACTOR * scaleRatio_H * scaleRatio_V * VPP_DISP_FACTOR) /
-             mPPC * displayRatio_H);
+    return float(mClockKhz) >= ((resolution * VPP_RESOL_MARGIN) / (mPPC * displayRatio_V));
 }
 
 uint32_t ExynosMPP::getDownscaleRestriction(const struct exynos_image &src,
@@ -525,25 +522,8 @@ uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct e
     }
 
     if (mPhysicalType < MPP_DPP_NUM) {
-        const bool isPerpendicular = !!(src.transform & HAL_TRANSFORM_ROT_90);
-        float scaleRatio_H = 1;
-        float scaleRatio_V = 1;
-        if (isPerpendicular) {
-            scaleRatio_H = float(src.w) / float(dst.h);
-            scaleRatio_V = float(src.h) / float(dst.w);
-        } else {
-            scaleRatio_H = float(src.w) / float(dst.w);
-            scaleRatio_V = float(src.h) / float(dst.h);
-        }
-        float dstW = float(dst.w);
-        float displayW = float(display.mXres);
-        float displayH = float(display.mYres);
-        float resolution = displayW * displayH;
-
-        scaleRatio_H = std::min(scaleRatio_H, float(maxDownscale));
-        scaleRatio_V = std::min(scaleRatio_V, float(maxDownscale));
-
-        if (!checkDownscaleCap(resolution, scaleRatio_H, scaleRatio_V, dstW / displayW)) {
+        float resolution = float(src.w) * float(src.h) * display.getBtsRefreshRate() / 1000;
+        if (!checkDownscaleCap(resolution, float(dst.h) / float(display.mYres))) {
             return 1;
         }
     }
