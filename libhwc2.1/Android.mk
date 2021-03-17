@@ -63,10 +63,6 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	libvendorgraphicbuffer libbinder_ndk \
 	android.hardware.power-V1-ndk_platform pixel-power-ext-V1-ndk_platform
 
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V1-ndk_platform \
-                          libbinder_ndk \
-                          libbase
-
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 LOCAL_STATIC_LIBRARIES += libjsoncpp
@@ -106,12 +102,9 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDeviceInterface.cpp \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
-	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
-	pixel-display.cpp
+	libdisplayinterface/ExynosDisplayDrmInterface.cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm libui libvendorgraphicbuffer
-
-LOCAL_VINTF_FRAGMENTS         += pixel-display-default.xml
 
 include $(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/Android.mk
 
@@ -139,10 +132,6 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0
-
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V1-ndk_platform \
-                          libbinder_ndk \
-                          libbase
 
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 LOCAL_PROPRIETARY_MODULE := true
@@ -198,10 +187,6 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
 	libui
-
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V1-ndk_platform \
-                          libbinder_ndk \
-                          libbase
 
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
