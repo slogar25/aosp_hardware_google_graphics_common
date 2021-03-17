@@ -17,26 +17,29 @@
 #ifndef _EXYNOSDEVICE_H
 #define _EXYNOSDEVICE_H
 
-#include <aidl/com/google/hardware/pixel/display/BnDisplay.h>
-#include <cutils/atomic.h>
-#include <display_common.h>
-#include <hardware/hwcomposer2.h>
-#include <hardware_legacy/uevent.h>
-#include <sys/resource.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
-#include <utils/Condition.h>
-#include <utils/Mutex.h>
-#include <utils/Trace.h>
-#include <utils/Vector.h>
+#include <hardware_legacy/uevent.h>
 
-#include <atomic>
+#include <utils/Vector.h>
+#include <utils/Trace.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/resource.h>
+#include <cutils/atomic.h>
+
 #include <thread>
+#include <atomic>
+#include <utils/Mutex.h>
+#include <utils/Condition.h>
+
+#include <hardware/hwcomposer2.h>
+
+#include <display_common.h>
 
 #include "ExynosHWC.h"
-#include "ExynosHWCHelper.h"
 #include "ExynosHWCModule.h"
+#include "ExynosHWCHelper.h"
 
 #define MAX_DEV_NAME 128
 #define ERROR_LOG_PATH0 "/data/vendor/log/hwc"
@@ -55,9 +58,6 @@
 #ifndef WRITEBACK_CAPTURE_PATH
 #define WRITEBACK_CAPTURE_PATH "/data/vendor/log/hwc"
 #endif
-
-using HbmState = ::aidl::com::google::hardware::pixel::display::HbmState;
-using LbeState = ::aidl::com::google::hardware::pixel::display::LbeState;
 
 using namespace android;
 
@@ -316,15 +316,6 @@ class ExynosDevice {
         Condition mCaptureCondition;
         std::atomic<bool> mIsWaitingReadbackReqDone = false;
         void setVBlankOffDelay(int vblankOffDelay);
-
-    public:
-        bool isLbeSupported();
-        void setLbeState(LbeState state);
-        void setLbeAmbientLight(int value);
-        LbeState getLbeState();
-
-    private:
-        bool mLbeSupported;
 };
 
 #endif //_EXYNOSDEVICE_H
