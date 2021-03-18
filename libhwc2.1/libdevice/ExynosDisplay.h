@@ -1092,6 +1092,10 @@ class ExynosDisplay {
         virtual PanelGammaSource GetCurrentPanelGammaSource() const {
             return PanelGammaSource::GAMMA_DEFAULT;
         }
+        virtual void initLbe(){};
+        virtual void setLbeState(LbeState __unused state){};
+        virtual void setLbeAmbientLight(int __unused value){};
+        virtual LbeState getLbeState() { return LbeState::OFF; };
 
         int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
