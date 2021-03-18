@@ -1120,7 +1120,7 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
             (formatToBpp(gmeta.format) < formatToBpp(dst.format)) ||
             ((gmeta.stride * gmeta.vstride) < (int)(dst.fullWidth * dst.fullHeight)) ||
             (mDstImgs[index].bufferType != getBufferType(dst.usageFlags)) ||
-            bufferCompressed != needCompressDstBuf();
+            bufferCompressed != needCompressDstBuf() || gmeta.format != dst.format;
 
     MPP_LOGD(eDebugMPP|eDebugBuf, "realloc: %d--------", realloc);
     return realloc;
