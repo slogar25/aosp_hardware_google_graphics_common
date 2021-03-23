@@ -102,11 +102,11 @@ int exynos_ion_sync_fd(int __unused ion_fd, int fd) {
 int exynos_ion_sync_start(int __unused ion_fd, int fd, int direction) {
     auto& bufallocator = exynos_ion_get_allocator();
 
-    return bufallocator.CpuSyncStart(fd, (SyncType)direction);
+    return bufallocator.CpuSyncStart(fd, static_cast<SyncType>(direction));
 }
 
-int exynos_ion_sync_end(int __unused ion_fd, int fd, int __unused direction) {
+int exynos_ion_sync_end(int __unused ion_fd, int fd, int direction) {
     auto& bufallocator = exynos_ion_get_allocator();
 
-    return bufallocator.CpuSyncEnd(fd);
+    return bufallocator.CpuSyncEnd(fd, static_cast<SyncType>(direction));
 }
