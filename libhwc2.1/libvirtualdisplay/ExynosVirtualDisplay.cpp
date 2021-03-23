@@ -28,12 +28,15 @@ using vendor::graphics::VendorGraphicBufferUsage;
 
 extern struct exynos_hwc_control exynosHWCControl;
 
-ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t __unused type, ExynosDevice *device)
-    : ExynosDisplay(HWC_DISPLAY_VIRTUAL, device)
+ExynosVirtualDisplay::ExynosVirtualDisplay(uint32_t index, ExynosDevice *device)
+    : ExynosDisplay(index, device)
 {
     /* Initialization */
-    mDisplayId = HWC_DISPLAY_VIRTUAL;
-    mDisplayName = android::String8("VirtualDisplay");
+    mType = HWC_DISPLAY_VIRTUAL;
+    mIndex = index;
+    mDisplayId = getDisplayId(mType, mIndex);
+
+    mDisplayControl.earlyStartMPP = false;
 
     mOutputBufferAcquireFenceFd = -1;
     mOutputBufferReleaseFenceFd = -1;
@@ -208,7 +211,7 @@ int32_t ExynosVirtualDisplay::setOutputBuffer(
     return HWC2_ERROR_NONE;
 }
 
-int ExynosVirtualDisplay::clearDisplay(bool readback) {
+int ExynosVirtualDisplay::clearDisplay(bool needModeClear) {
     return 0;
 }
 

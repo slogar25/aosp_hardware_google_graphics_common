@@ -85,18 +85,14 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice)
 
     mExynosDrmEventHandler.init(mExynosDevice);
     mDrmDevice->event_listener()->RegisterHotplugHandler(static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
+}
 
-    ExynosDisplay *primaryDisplay = mExynosDevice->getDisplay(HWC_DISPLAY_PRIMARY);
-    if (primaryDisplay != NULL) {
-        ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(primaryDisplay->mDisplayInterface.get());
-        displayInterface->initDrmDevice(mDrmDevice);
-    }
-    ExynosDisplay *externalDisplay = mExynosDevice->getDisplay(HWC_DISPLAY_EXTERNAL);
-    if (externalDisplay != NULL) {
-        ExynosDisplayDrmInterface *displayInterface = static_cast<ExynosDisplayDrmInterface*>(externalDisplay->mDisplayInterface.get());
-        displayInterface->initDrmDevice(mDrmDevice);
-    }
-
+int32_t ExynosDeviceDrmInterface::initDisplayInterface(
+         std::unique_ptr<ExynosDisplayInterface> &dispInterface)
+{
+    ExynosDisplayDrmInterface *displayInterface =
+        static_cast<ExynosDisplayDrmInterface*>(dispInterface.get());
+    return displayInterface->initDrmDevice(mDrmDevice);
 }
 
 void ExynosDeviceDrmInterface::updateRestrictions()
@@ -139,7 +135,7 @@ void ExynosDeviceDrmInterface::updateRestrictions()
                 mDPUInfo.dpuInfo.dpp_chs[channelId].restriction.formats.push_back(halFormat);
             }
         }
-        if (hwcCheckDebugMessages(eDebugDefault))
+        if (hwcCheckDebugMessages(eDebugAttrSetting))
             printDppRestriction(mDPUInfo.dpuInfo.dpp_chs[channelId]);
 
         channelId++;
@@ -198,8 +194,29 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::init(ExynosDevice *exynosD
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::HandleEvent(uint64_t timestamp_us)
 {
+    hwc2_callback_data_t callbackData =
+        mExynosDevice->mCallbackInfos[HWC2_CALLBACK_HOTPLUG].callbackData;
+    HWC2_PFN_HOTPLUG callbackFunc =
+        (HWC2_PFN_HOTPLUG)mExynosDevice->mCallbackInfos[HWC2_CALLBACK_HOTPLUG].funcPointer;
+
+    if (callbackData == NULL || callbackFunc == NULL)
+    {
+        ALOGE("%s:: callback info is NULL", __func__);
+        return;
+    }
+
+    for (auto it : mExynosDevice->mDisplays) {
+        /* Call UpdateModes to get plug status */
+        uint32_t numConfigs;
+        it->getDisplayConfigs(&numConfigs, NULL);
+
+        callbackFunc(callbackData, getDisplayId(it->mType, it->mIndex),
+                it->mPlugState ? HWC2_CONNECTION_CONNECTED : HWC2_CONNECTION_DISCONNECTED);
+    }
+
     /* TODO: Check plug status hear or ExynosExternalDisplay::handleHotplugEvent() */
-    ExynosExternalDisplayModule *display = static_cast<ExynosExternalDisplayModule*>(mExynosDevice->getDisplay(HWC_DISPLAY_EXTERNAL));
+    ExynosExternalDisplayModule *display =
+        static_cast<ExynosExternalDisplayModule*>(mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0)));
     if (display != NULL)
         display->handleHotplugEvent();
 }

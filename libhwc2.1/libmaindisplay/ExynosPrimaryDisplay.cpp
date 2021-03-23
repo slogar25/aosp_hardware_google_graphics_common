@@ -62,15 +62,16 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
     return gamma;
 }
 
-ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t __unused type, ExynosDevice *device)
-    :   ExynosDisplay(HWC_DISPLAY_PRIMARY, device)
+ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
+    :   ExynosDisplay(index, device)
 {
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
 
     /* Initialization */
-    mDisplayId = HWC_DISPLAY_PRIMARY;
-    mDisplayName = android::String8("PrimaryDisplay");
+    mType = HWC_DISPLAY_PRIMARY;
+    mIndex = index;
+    mDisplayId = getDisplayId(mType, mIndex);
 
     // Prepare multi resolution
     // Will be exynosHWCControl.multiResoultion
@@ -216,7 +217,7 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
 int32_t ExynosPrimaryDisplay::setPowerOff() {
     ATRACE_CALL();
 
-    clearDisplay();
+    clearDisplay(true);
 
     // check the dynamic recomposition thread by following display
     mDevice->checkDynamicRecompositionThread();

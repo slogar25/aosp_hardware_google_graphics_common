@@ -25,7 +25,7 @@ class ExynosMPPModule;
 class ExynosPrimaryDisplay : public ExynosDisplay {
     public:
         /* Methods */
-        ExynosPrimaryDisplay(uint32_t type, ExynosDevice *device);
+        ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device);
         ~ExynosPrimaryDisplay();
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);

@@ -256,7 +256,7 @@ int32_t ExynosResourceManager::doPreProcessing()
 {
     int32_t ret = NO_ERROR;
     /* Assign m2mMPP's out buffers */
-    ExynosDisplay *display = mDevice->getDisplay(HWC_DISPLAY_PRIMARY);
+    ExynosDisplay *display = mDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     if (display == NULL)
         return -EINVAL;
     ret = doAllocDstBufs(display->mXres, display->mYres);
@@ -318,7 +318,7 @@ bool ExynosResourceManager::DstBufMgrThread::threadLoop()
         ExynosDevice *device = mExynosResourceManager->mDevice;
         if (device == NULL)
             return false;
-        ExynosDisplay *display = device->getDisplay(HWC_DISPLAY_PRIMARY);
+        ExynosDisplay *display = device->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
         if (display == NULL)
             return false;
 
@@ -378,8 +378,8 @@ int32_t ExynosResourceManager::checkScenario(ExynosDisplay __unused *display)
     mResourceReserved = 0x0;
     /* Check whether camera preview is running */
     ExynosDisplay *exynosDisplay = NULL;
-    for (uint32_t display_type = 0; display_type < HWC_NUM_DISPLAY_TYPES; display_type++) {
-        exynosDisplay = mDevice->getDisplay(display_type);
+    for (uint32_t i = 0; i < mDevice->mDisplays.size(); i++) {
+        exynosDisplay = mDevice->mDisplays[i];
         if ((exynosDisplay != NULL) && (exynosDisplay->mPlugState == true)) {
             for (uint32_t i = 0; i < exynosDisplay->mLayers.size(); i++) {
                 ExynosLayer *layer = exynosDisplay->mLayers[i];
@@ -1083,7 +1083,7 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         return eDynamicRecomposition;
 
     if ((layer->mLayerBuffer != NULL) &&
-            (display->mDisplayId == HWC_DISPLAY_PRIMARY) &&
+            (display->mDisplayId == getDisplayId(HWC_DISPLAY_PRIMARY, 0)) &&
             (mForceReallocState != DST_REALLOC_DONE)) {
         ALOGI("Device type assign skipping by dst reallocation...... ");
         return eReallocOnGoingForDDI;
@@ -1112,7 +1112,7 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         return eDimLayer;
     }
 
-    if (!(display->mDisplayId == HWC_DISPLAY_VIRTUAL &&
+    if (!(display->mType == HWC_DISPLAY_VIRTUAL &&
         ((ExynosVirtualDisplay *)display)->mIsWFDState == (int)LLWFD))
 
     if (layer->mLayerBuffer == NULL)
@@ -1305,7 +1305,8 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
         dst_img.format = DEFAULT_MPP_DST_YUV_FORMAT;
     }
 
-    ExynosExternalDisplay *external_display = (ExynosExternalDisplay*)mDevice->getDisplay(HWC_DISPLAY_EXTERNAL);
+    ExynosExternalDisplay *external_display =
+        (ExynosExternalDisplay*)mDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
 
     /* For HDR through MSC or G2D case but dataspace is not changed */
     if (hasHdrInfo(src_img)) {
@@ -1324,7 +1325,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
          */
         if (hasHdr10Plus(dst_img) ||
             ((external_display != NULL) && (external_display->mPlugState) &&
-             (display->mDisplayId == HWC_DISPLAY_PRIMARY))) {
+             (display->mType == HWC_DISPLAY_PRIMARY))) {
             ExynosMPP *otfMppForHDRPlus = nullptr;
             auto mpp_it = std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
                     [](auto m) {
@@ -1363,7 +1364,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
                 isHdrExternal = true;
         }
 
-        if (isHdrExternal && (display->mDisplayId == HWC_DISPLAY_EXTERNAL)) {
+        if (isHdrExternal && (display->mType == HWC_DISPLAY_EXTERNAL)) {
             dst_img.format = HAL_PIXEL_FORMAT_RGBA_1010102;
             dst_img.dataSpace = src_img.dataSpace;
         } else {
@@ -1386,7 +1387,7 @@ int32_t ExynosResourceManager::getCandidateM2mMPPOutImages(ExynosDisplay *displa
          * if external display is connected
          * because G2D is used only for HDR on exernal display
          */
-        if (!(isExternalPlugged && (display->mDisplayId == HWC_DISPLAY_PRIMARY))) {
+        if (!(isExternalPlugged && (display->mType == HWC_DISPLAY_PRIMARY))) {
             image_lists.push_back(dst_img);
         }
     }
@@ -1885,14 +1886,20 @@ int32_t ExynosResourceManager::preAssignResources()
             HDEBUGLOGD(eDebugResourceManager, "\t%s check, dispMode(%d), 0x%8x", mOtfMPPs[i]->mName.string(), displayMode, mOtfMPPs[i]->mPreAssignDisplayList[displayMode]);
 
             ExynosDisplay *display = NULL;
-            for (uint32_t display_type = 0; display_type < HWC_NUM_DISPLAY_TYPES; display_type++) {
-                HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay_type(%d), checkBit(%d)", display_type, (mOtfMPPs[i]->mPreAssignDisplayList[displayMode] & (1<<display_type)));
-                if (mOtfMPPs[i]->mPreAssignDisplayList[displayMode] & (1<<display_type)) {
-                    display = mDevice->getDisplay(display_type);
-                    HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay_type(%d), display(%p)", display_type, display);
-                    if ((display != NULL) && (display->mPlugState == true)) {
-                        HDEBUGLOGD(eDebugResourceManager, "\t\treserve to display %d", display_type);
-                        mOtfMPPs[i]->reserveMPP(display->mType);
+            for (size_t j = 0; j < mDevice->mDisplays.size(); j++) {
+                display = mDevice->mDisplays[j];
+                if (display == nullptr)
+                    continue;
+                int checkBit = mOtfMPPs[i]->mPreAssignDisplayList[displayMode] & display->getDisplayPreAssignBit();
+                HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), checkBit(%d)", j, checkBit);
+                if (checkBit) {
+                    HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), displayId(%d), display(%p)", j, display->mDisplayId, display);
+                    if (display->mDisplayControl.forceReserveMPP ||
+                        (display->mPlugState &&
+                         ((display->mType != HWC_DISPLAY_PRIMARY) ||
+                          (display->mPowerModeState != HWC2_POWER_MODE_OFF)))) {
+                        HDEBUGLOGD(eDebugResourceManager, "\t\treserve to display %d", display->mDisplayId);
+                        mOtfMPPs[i]->reserveMPP(display->mDisplayId);
                         break;
                     }
                 }
@@ -1914,14 +1921,15 @@ int32_t ExynosResourceManager::preAssignResources()
         HDEBUGLOGD(eDebugResourceManager, "\t%s check, 0x%8x", mM2mMPPs[i]->mName.string(), mM2mMPPs[i]->mPreAssignDisplayList[displayMode]);
         if (mM2mMPPs[i]->mPreAssignDisplayList[displayMode] != 0) {
             ExynosDisplay *display = NULL;
-            for (uint32_t display_type = HWC_DISPLAY_PRIMARY; display_type < HWC_NUM_DISPLAY_TYPES; display_type++) {
-                HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay_type(%d), checkBit(%d)", display_type, (mM2mMPPs[i]->mPreAssignDisplayList[displayMode] & (1<<display_type)));
-                if (mM2mMPPs[i]->mPreAssignDisplayList[displayMode] & (1<<display_type)) {
-                    display = mDevice->getDisplay(display_type);
-                    HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay_type(%d), display(%p)", display_type, display);
+            for (size_t j = 0; j < mDevice->mDisplays.size(); j++) {
+                display = mDevice->mDisplays[j];
+                int checkBit = mM2mMPPs[i]->mPreAssignDisplayList[displayMode] & display->getDisplayPreAssignBit();
+                HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), checkBit(%d)", j, checkBit);
+                if (checkBit) {
+                    HDEBUGLOGD(eDebugResourceManager, "\t\tdisplay index(%zu), displayId(%d), display(%p)", j, display->mDisplayId, display);
                     if ((display != NULL) && (display->mPlugState == true)) {
-                        HDEBUGLOGD(eDebugResourceManager, "\t\treserve to display %d", display->mType);
-                        mM2mMPPs[i]->reserveMPP(display->mType);
+                        HDEBUGLOGD(eDebugResourceManager, "\t\treserve to display %d", display->mDisplayId);
+                        mM2mMPPs[i]->reserveMPP(display->mDisplayId);
                         break;
                     } else {
                         HDEBUGLOGD(eDebugResourceManager, "\t\treserve without display");
@@ -1953,12 +1961,12 @@ void ExynosResourceManager::preAssignWindows()
 {
     ExynosDisplay *display = NULL;
     ExynosPrimaryDisplayModule *primaryDisplay =
-        (ExynosPrimaryDisplayModule *)mDevice->mDisplays[HWC_DISPLAY_PRIMARY];
+        (ExynosPrimaryDisplayModule *)mDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     primaryDisplay->usePreDefinedWindow(false);
 
-    for (uint32_t display_type = 1; display_type < HWC_NUM_DISPLAY_TYPES; display_type++) {
-        display = mDevice->getDisplay(display_type);
-        if ((display == NULL) || (display->mDisplayId != HWC_DISPLAY_EXTERNAL))
+    for (size_t i = 1; i < mDevice->mDisplays.size(); i++) {
+        display = mDevice->mDisplays[i];
+        if ((display == NULL) || (display->mType != HWC_DISPLAY_EXTERNAL))
             continue;
         if (display->mPlugState == true) {
             primaryDisplay->usePreDefinedWindow(true);

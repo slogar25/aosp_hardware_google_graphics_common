@@ -238,7 +238,7 @@ int32_t exynos_createVirtualDisplay(hwc2_device_t *dev, uint32_t width, uint32_t
         return HWC2_ERROR_BAD_PARAMETER;
 
     ExynosDevice *exynosDevice = checkDevice(dev);
-    *outDisplay = HWC_DISPLAY_VIRTUAL;
+    *outDisplay = getDisplayId(HWC_DISPLAY_VIRTUAL, 0);
 
     if (exynosDevice) {
         ExynosDisplay *exynosDisplay = checkDisplay(exynosDevice, *outDisplay);
@@ -1272,8 +1272,9 @@ void exynos_boot_finished(ExynosHWCCtx *dev)
         char val;
         if (read(sw_fd, &val, 1) == 1 && val == '1') {
             ALOGI("%s : try to reconnect displayport", __func__);
-            ExynosExternalDisplayModule *display = (ExynosExternalDisplayModule*)dev->device->getDisplay(HWC_DISPLAY_EXTERNAL);
-            display->handleHotplugEvent();
+            ExynosExternalDisplayModule *display = (ExynosExternalDisplayModule*)dev->device->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
+            if (display != nullptr)
+                display->handleHotplugEvent();
         }
         hwcFdClose(sw_fd);
     }

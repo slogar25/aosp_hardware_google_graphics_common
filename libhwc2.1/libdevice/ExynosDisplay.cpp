@@ -306,70 +306,70 @@ String8 ExynosCompositionInfo::getTypeStr()
     }
 }
 
-ExynosDisplay::ExynosDisplay(uint32_t type, ExynosDevice* device)
-      : mType(type),
-        mXres(1440),
-        mYres(2960),
-        mXdpi(25400),
-        mYdpi(25400),
-        mVsyncPeriod(16666666),
-        mIdleHint(this),
-        mDevice(device),
-        mDisplayId(HWC_DISPLAY_PRIMARY),
-        mDisplayName(android::String8("PrimaryDisplay")),
-        mPlugState(false),
-        mHasSingleBuffer(false),
-        mResourceManager(NULL),
-        mClientCompositionInfo(COMPOSITION_CLIENT),
-        mExynosCompositionInfo(COMPOSITION_EXYNOS),
-        mGeometryChanged(0x0),
-        mRenderingState(RENDERING_STATE_NONE),
-        mHWCRenderingState(RENDERING_STATE_NONE),
-        mDisplayBW(0),
-        mDynamicReCompMode(NO_MODE_SWITCH),
-        mDREnable(false),
-        mDRDefault(false),
-        mLastFpsTime(0),
-        mFrameCount(0),
-        mLastFrameCount(0),
-        mErrorFrameCount(0),
-        mUpdateEventCnt(0),
-        mUpdateCallCnt(0),
-        mDefaultDMA(MAX_DECON_DMA_TYPE),
-        mLastRetireFence(-1),
-        mWindowNumUsed(0),
-        mBaseWindowIndex(0),
-        mNumMaxPriorityAllowed(1),
-        mCursorIndex(-1),
-        mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
-        mMaxLuminance(0),
-        mMaxAverageLuminance(0),
-        mMinLuminance(0),
-        mHWC1LayerList(NULL),
-        /* Support DDI scalser */
-        mOldScalerMode(0),
-        mNewScaledWidth(0),
-        mNewScaledHeight(0),
-        mDeviceXres(0),
-        mDeviceYres(0),
-        mColorMode(HAL_COLOR_MODE_NATIVE),
-        mSkipFrame(false),
-        mBrightnessFd(NULL),
-        mMaxBrightness(0),
-        mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
-        mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
-        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
-        mPowerHalExtAidl(nullptr),
-        mRestorePrevFpsHint(false) {
+ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
+:   mDisplayId(HWC_DISPLAY_PRIMARY),
+    mType(HWC_NUM_DISPLAY_TYPES),
+    mIndex(index),
+    mDeconNodeName(""),
+    mXres(1440),
+    mYres(2960),
+    mXdpi(25400),
+    mYdpi(25400),
+    mVsyncPeriod(16666666),
+    mIdleHint(this),
+    mDevice(device),
+    mDisplayName(""),
+    mPlugState(false),
+    mHasSingleBuffer(false),
+    mResourceManager(NULL),
+    mClientCompositionInfo(COMPOSITION_CLIENT),
+    mExynosCompositionInfo(COMPOSITION_EXYNOS),
+    mGeometryChanged(0x0),
+    mRenderingState(RENDERING_STATE_NONE),
+    mHWCRenderingState(RENDERING_STATE_NONE),
+    mDisplayBW(0),
+    mDynamicReCompMode(NO_MODE_SWITCH),
+    mDREnable(false),
+    mDRDefault(false),
+    mLastFpsTime(0),
+    mFrameCount(0),
+    mLastFrameCount(0),
+    mErrorFrameCount(0),
+    mUpdateEventCnt(0),
+    mUpdateCallCnt(0),
+    mDefaultDMA(MAX_DECON_DMA_TYPE),
+    mLastRetireFence(-1),
+    mWindowNumUsed(0),
+    mBaseWindowIndex(0),
+    mNumMaxPriorityAllowed(1),
+    mCursorIndex(-1),
+    mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
+    mMaxLuminance(0),
+    mMaxAverageLuminance(0),
+    mMinLuminance(0),
+    mHWC1LayerList(NULL),
+    /* Support DDI scalser */
+    mOldScalerMode(0),
+    mNewScaledWidth(0),
+    mNewScaledHeight(0),
+    mDeviceXres(0),
+    mDeviceYres(0),
+    mColorMode(HAL_COLOR_MODE_NATIVE),
+    mSkipFrame(false),
+    mBrightnessFd(NULL),
+    mMaxBrightness(0),
+    mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
+    mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
+    mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
+    mPowerHalExtAidl(nullptr),
+    mRestorePrevFpsHint(false)
+{
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
     mDisplayControl.useMaxG2DSrc = false;
     mDisplayControl.handleLowFpsLayers = false;
-    if (mType == HWC_DISPLAY_VIRTUAL)
-        mDisplayControl.earlyStartMPP = false;
-    else
-        mDisplayControl.earlyStartMPP = true;
+    mDisplayControl.earlyStartMPP = true;
     mDisplayControl.adjustDisplayFrame = false;
     mDisplayControl.cursorSupport = false;
 
@@ -415,7 +415,7 @@ bool ExynosDisplay::comparePreferedLayers() {
     return false;
 }
 
-int ExynosDisplay::getDisplayId() {
+int ExynosDisplay::getId() {
     return mDisplayId;
 }
 
@@ -616,7 +616,7 @@ void ExynosDisplay::doPreProcessing() {
      * mCompositionType  is HWC2_COMPOSITION_CLIENT
      * HWC should not change compositionType if it is HWC2_COMPOSITION_CLIENT
      */
-    if (mDisplayId != HWC_DISPLAY_VIRTUAL)
+    if (mType != HWC_DISPLAY_VIRTUAL)
         mClientCompositionInfo.mEnableSkipStatic = skipStaticLayers;
 
     if (mHasSingleBuffer != hasSingleBuffer) {
@@ -647,8 +647,7 @@ void ExynosDisplay::doPreProcessing() {
         setGeometryChanged(GEOMETRY_DEVICE_SCENARIO_CHANGED);
     }
 #ifndef HWC_SKIP_VALIDATE
-    if (mDevice->checkConnection(HWC_DISPLAY_EXTERNAL) ||
-        mDevice->checkConnection(HWC_DISPLAY_VIRTUAL)) {
+    if (mDevice->checkNonInternalConnection()) {
         /* Set any flag to mGeometryChanged */
         mDevice->mGeometryChanged = 0x10;
     }
@@ -1925,9 +1924,7 @@ bool ExynosDisplay::checkConfigChanged(const exynos_dpu_data &lastConfigsData, c
         return true;
 
     /* HWC doesn't skip WIN_CONFIG if other display is connected */
-    if (((mDevice->checkConnection(HWC_DISPLAY_EXTERNAL) == 1) ||
-         (mDevice->checkConnection(HWC_DISPLAY_VIRTUAL) == 1)) &&
-        (mDisplayId == HWC_DISPLAY_PRIMARY))
+    if ((mDevice->checkNonInternalConnection()) && (mType == HWC_DISPLAY_PRIMARY))
         return true;
 
     for (size_t i = 0; i < lastConfigsData.configs.size(); i++) {
@@ -2102,7 +2099,7 @@ int ExynosDisplay::setReleaseFences() {
                     continue;
                 }
             }
-            if (mDisplayId == HWC_DISPLAY_VIRTUAL)
+            if (mType == HWC_DISPLAY_VIRTUAL)
                 mLayers[i]->mReleaseFence = -1;
             else
                 mLayers[i]->mReleaseFence =
@@ -2783,8 +2780,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     }
 
     if ((mLayers.size() == 0) &&
-        (mDisplayId != HWC_DISPLAY_VIRTUAL)) {
-        clearDisplay(mDpuData.enable_readback);
+        (mType != HWC_DISPLAY_VIRTUAL)) {
+        clearDisplay();
         *outRetireFence = -1;
         mLastRetireFence = fence_close(mLastRetireFence, this,
                 FENCE_TYPE_RETIRE, FENCE_IP_DPP);
@@ -3556,7 +3553,7 @@ int32_t ExynosDisplay::updateVsyncAppliedTimeLine(int64_t actualChangeTime)
             mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos);
 
     if (vsync_callbackFunc != nullptr)
-        vsync_callbackFunc(vsync_callbackData, getDisplayId(),
+        vsync_callbackFunc(vsync_callbackData, getId(),
                 &mVsyncAppliedTimeLine);
     else {
         ALOGD("callback function is null");
@@ -3615,9 +3612,9 @@ int32_t ExynosDisplay::setOutputBuffer( buffer_handle_t __unused buffer, int32_t
     return HWC2_ERROR_NONE;
 }
 
-int ExynosDisplay::clearDisplay(bool readback) {
+int ExynosDisplay::clearDisplay(bool needModeClear) {
 
-    const int ret = mDisplayInterface->clearDisplay(readback);
+    const int ret = mDisplayInterface->clearDisplay(needModeClear);
     if (ret)
         DISPLAY_LOGE("fail to clear display");
 
@@ -3644,7 +3641,7 @@ int32_t ExynosDisplay::setPowerMode(
 
     if (mode == HWC_POWER_MODE_OFF) {
         mDevice->mPrimaryBlank = true;
-        clearDisplay();
+        clearDisplay(true);
         ALOGV("HWC2: Clear display (power off)");
     } else {
         mDevice->mPrimaryBlank = false;

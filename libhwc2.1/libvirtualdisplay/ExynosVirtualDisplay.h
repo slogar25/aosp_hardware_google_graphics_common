@@ -46,7 +46,7 @@ public:
         COMPOSITION_MIXED   = COMPOSITION_GLES | COMPOSITION_HWC
     };
 
-    ExynosVirtualDisplay(uint32_t type, ExynosDevice *device);
+    ExynosVirtualDisplay(uint32_t index, ExynosDevice *device);
     ~ExynosVirtualDisplay();
 
     void createVirtualDisplay(uint32_t width, uint32_t height, int32_t* format);
@@ -72,7 +72,7 @@ public:
             buffer_handle_t buffer,
             int32_t releaseFence);
 
-    virtual int clearDisplay(bool readback = false);
+    virtual int clearDisplay(bool needModeClear = false);
 
     /* validateDisplay(..., outNumTypes, outNumRequests)
      * Descriptor: HWC2_FUNCTION_VALIDATE_DISPLAY

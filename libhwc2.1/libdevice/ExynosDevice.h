@@ -189,7 +189,12 @@ class ExynosDevice {
          */
         int mVsyncFd;
         int mExtVsyncFd;
-        int mVsyncDisplay;
+
+        /**
+         * mDisplayId of display that has the slowest fps.
+         * HWC uses vsync of display that has the slowest fps to main vsync.
+         */
+        uint32_t mVsyncDisplayId;
         uint64_t mTimestamp;
 
         uint32_t mDisplayMode;
@@ -276,7 +281,8 @@ class ExynosDevice {
         void getHWCFenceDebug();
         void setHWCControl(uint32_t display, uint32_t ctrl, int32_t val);
         void setDisplayMode(uint32_t displayMode);
-        uint32_t checkConnection(uint32_t display);
+        bool checkDisplayConnection(uint32_t displayId);
+        bool checkNonInternalConnection();
         void getCapabilities(uint32_t *outCount, int32_t* outCapabilities);
         void setGeometryChanged(uint64_t changedBit) { mGeometryChanged|= changedBit;};
         void clearGeometryChanged();

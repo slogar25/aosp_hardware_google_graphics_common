@@ -38,7 +38,8 @@ class DrmCrtc {
   uint32_t id() const;
   unsigned pipe() const;
 
-  int display() const;
+  const std::vector<int>& displays() const;
+  bool has_display(const int display) const;
   void set_display(int display);
 
   bool can_bind(int display) const;
@@ -70,7 +71,7 @@ class DrmCrtc {
 
   uint32_t id_;
   unsigned pipe_;
-  int display_;
+  std::vector<int> displays_;
 
   DrmMode mode_;
 
