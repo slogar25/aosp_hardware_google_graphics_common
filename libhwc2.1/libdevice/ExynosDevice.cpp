@@ -1009,7 +1009,6 @@ void ExynosDevice::setLbeState(LbeState state) {
     if (mLbeSupported) {
         ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
         primary_display->setLbeState(state);
-        invalidate();
     }
 }
 
@@ -1017,7 +1016,6 @@ void ExynosDevice::setLbeAmbientLight(int value) {
     if (mLbeSupported) {
         ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
         primary_display->setLbeAmbientLight(value);
-        invalidate();
     }
 }
 
