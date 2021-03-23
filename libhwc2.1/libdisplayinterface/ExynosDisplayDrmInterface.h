@@ -357,6 +357,7 @@ class ExynosDisplayDrmInterface :
         bool isBrightnessStateChange();
         void setupBrightnessConfig();
         FILE *mHbmOnFd;
+        FILE *mDimmingOnFd;
         bool mBrightntessIntfSupported = false;
         float mBrightnessHbmMax = 1.0f;
         /* boost brightness ratio for HDR */
@@ -401,6 +402,9 @@ class ExynosDisplayDrmInterface :
         //      the furture.
         static constexpr const char *kHbmOnFileNode =
                 "/sys/class/backlight/panel0-backlight/hbm_mode";
+        static constexpr const char *kDimmingOnFileNode =
+                "/sys/class/backlight/panel0-backlight/dimming_on";
+
         FramebufferManager mFBManager;
 
     private:
