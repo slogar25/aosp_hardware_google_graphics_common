@@ -38,6 +38,11 @@
 #define MAX_BRIGHTNESS_LEN 5
 
 using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
+
+#ifndef SECOND_DISPLAY_START_BIT
+#define SECOND_DISPLAY_START_BIT   4
+#endif
+
 typedef hwc2_composition_t exynos_composition;
 
 class ExynosLayer;
@@ -315,6 +320,8 @@ struct DisplayControl {
     bool cursorSupport;
     /** readback support **/
     bool readbackSupport = false;
+    /** Reserve MPP regardless of plug state **/
+    bool forceReserveMPP = false;
 };
 
 typedef struct brightnessState {
@@ -353,8 +360,10 @@ typedef struct brightnessState {
 
 class ExynosDisplay {
     public:
-
+        uint32_t mDisplayId;
         uint32_t mType;
+        uint32_t mIndex;
+        String8 mDeconNodeName;
         uint32_t mXres;
         uint32_t mYres;
         uint32_t mXdpi;
@@ -365,7 +374,7 @@ class ExynosDisplay {
         int                     mPsrMode;
 
         /* Constructor */
-        ExynosDisplay(uint32_t type, ExynosDevice *device);
+        ExynosDisplay(uint32_t index, ExynosDevice *device);
         /* Destructor */
         virtual ~ExynosDisplay();
 
@@ -388,7 +397,6 @@ class ExynosDisplay {
 
         ExynosDevice *mDevice;
 
-        uint32_t mDisplayId;
         String8 mDisplayName;
 
         Mutex mDisplayMutex;
@@ -534,7 +542,7 @@ class ExynosDisplay {
 
         void initDisplay();
 
-        int getDisplayId();
+        int getId();
         Mutex& getDisplayMutex() {return mDisplayMutex; };
 
         int32_t setCompositionTargetExynosImage(uint32_t targetType, exynos_image *src_img, exynos_image *dst_img);
@@ -752,7 +760,7 @@ class ExynosDisplay {
                 buffer_handle_t buffer,
                 int32_t releaseFence);
 
-        virtual int clearDisplay(bool readback = false);
+        virtual int clearDisplay(bool needModeClear = false);
 
         /* setPowerMode(..., mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
@@ -1099,6 +1107,12 @@ class ExynosDisplay {
 
         int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
+        /* getDisplayPreAssignBit support mIndex up to 1.
+           It supports only dual LCD and 2 external displays */
+        inline uint32_t getDisplayPreAssignBit() {
+            uint32_t type = SECOND_DISPLAY_START_BIT * mIndex + mType;
+            return 1 << type;
+        }
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);

@@ -28,6 +28,8 @@ class ExynosDeviceDrmInterface : public ExynosDeviceInterface {
         ExynosDeviceDrmInterface(ExynosDevice *exynosDevice);
         virtual ~ExynosDeviceDrmInterface();
         virtual void init(ExynosDevice *exynosDevice) override;
+        virtual int32_t initDisplayInterface(
+                std::unique_ptr<ExynosDisplayInterface> &dispInterface) override;
         virtual void updateRestrictions() override;
     protected:
         class ExynosDrmEventHandler: public DrmEventHandler {

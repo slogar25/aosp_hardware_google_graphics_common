@@ -293,22 +293,24 @@ DrmConnector *DrmDevice::AvailableWritebackConnector(int display) const {
 
   // Use another CRTC if available and doesn't have any connector
   for (auto &crtc : crtcs_) {
-    if (crtc->display() == display)
+    if (crtc->has_display(display))
       continue;
-    display_conn = GetConnectorForDisplay(crtc->display());
-    // If we have a display connected don't use it for writeback
-    if (display_conn && display_conn->state() == DRM_MODE_CONNECTED)
-      continue;
-    writeback_conn = GetWritebackConnectorForDisplay(crtc->display());
-    if (writeback_conn)
-      return writeback_conn;
+    for (auto it: crtc->displays()) {
+      display_conn = GetConnectorForDisplay(it);
+      // If we have a display connected don't use it for writeback
+      if (display_conn && display_conn->state() == DRM_MODE_CONNECTED)
+        continue;
+      writeback_conn = GetWritebackConnectorForDisplay(it);
+      if (writeback_conn)
+        return writeback_conn;
+    }
   }
   return NULL;
 }
 
 DrmCrtc *DrmDevice::GetCrtcForDisplay(int display) const {
   for (auto &crtc : crtcs_) {
-    if (crtc->display() == display)
+    if (crtc->has_display(display))
       return crtc.get();
   }
   return NULL;
@@ -335,7 +337,7 @@ int DrmDevice::TryEncoderForDisplay(int display, DrmEncoder *enc) {
   DrmCrtc *crtc = enc->crtc();
   if (crtc && crtc->can_bind(display)) {
     crtc->set_display(display);
-    enc->set_crtc(crtc);
+    enc->set_crtc(crtc, display);
     return 0;
   }
 
@@ -347,7 +349,7 @@ int DrmDevice::TryEncoderForDisplay(int display, DrmEncoder *enc) {
 
     if (crtc->can_bind(display)) {
       crtc->set_display(display);
-      enc->set_crtc(crtc);
+      enc->set_crtc(crtc, display);
       return 0;
     }
   }
@@ -379,6 +381,22 @@ int DrmDevice::CreateDisplayPipe(DrmConnector *connector) {
       return ret;
     }
   }
+
+  /* Create pipe with the first crtc */
+  for (DrmEncoder *enc : connector->possible_encoders()) {
+    if (!enc->can_bind(display))
+      continue;
+    if (enc->possible_crtcs().size() > 0) {
+      DrmCrtc *crtc = enc->possible_crtcs().at(0);
+      crtc->set_display(display);
+      enc->set_crtc(crtc, display);
+      ALOGD("crtc is connected to multiple connector (%zu)",
+          crtc->displays().size());
+      connector->set_encoder(enc);
+      return 0;
+    }
+  }
+
   ALOGE("Could not find a suitable encoder/crtc for display %d",
         connector->display());
   return -ENODEV;
@@ -387,24 +405,30 @@ int DrmDevice::CreateDisplayPipe(DrmConnector *connector) {
 // Attach writeback connector to the CRTC linked to the display_conn
 int DrmDevice::AttachWriteback(DrmConnector *display_conn) {
   DrmCrtc *display_crtc = display_conn->encoder()->crtc();
-  if (GetWritebackConnectorForDisplay(display_crtc->display()) != NULL) {
-    ALOGE("Display already has writeback attach to it");
-    return -EINVAL;
+
+  for (auto it: display_crtc->displays()) {
+    if (GetWritebackConnectorForDisplay(it) != NULL) {
+      ALOGE("Display already has writeback attach to it");
+      return -EINVAL;
+    }
   }
-  for (auto &writeback_conn : writeback_connectors_) {
-    if (writeback_conn->display() >= 0)
-      continue;
-    for (DrmEncoder *writeback_enc : writeback_conn->possible_encoders()) {
-      for (DrmCrtc *possible_crtc : writeback_enc->possible_crtcs()) {
-        if (possible_crtc != display_crtc)
-          continue;
-        // Use just encoders which had not been bound already
-        if (writeback_enc->can_bind(display_crtc->display())) {
-          writeback_enc->set_crtc(display_crtc);
-          writeback_conn->set_encoder(writeback_enc);
-          writeback_conn->set_display(display_crtc->display());
-          writeback_conn->UpdateModes();
-          return 0;
+
+  for (auto it: display_crtc->displays()) {
+    for (auto &writeback_conn : writeback_connectors_) {
+      if (writeback_conn->display() >= 0)
+        continue;
+      for (DrmEncoder *writeback_enc : writeback_conn->possible_encoders()) {
+        for (DrmCrtc *possible_crtc : writeback_enc->possible_crtcs()) {
+          if (possible_crtc != display_crtc)
+            continue;
+          // Use just encoders which had not been bound already
+          if (writeback_enc->can_bind(it)) {
+            writeback_enc->set_crtc(display_crtc, it);
+            writeback_conn->set_encoder(writeback_enc);
+            writeback_conn->set_display(it);
+            writeback_conn->UpdateModes();
+            return 0;
+          }
         }
       }
     }

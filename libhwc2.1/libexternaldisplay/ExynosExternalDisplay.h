@@ -28,7 +28,7 @@ class ExynosExternalDisplay : public ExynosDisplay {
         hwc2_config_t mActiveConfigIndex;
 
         /* Methods */
-        ExynosExternalDisplay(uint32_t type, ExynosDevice *device);
+        ExynosExternalDisplay(uint32_t index, ExynosDevice *device);
         ~ExynosExternalDisplay();
 
         virtual void init();

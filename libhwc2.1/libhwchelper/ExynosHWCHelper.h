@@ -57,6 +57,8 @@
 #define DRM_FORMAT_YUV420_10BIT fourcc_code('Y', 'U', '1', '0')
 #endif
 
+static constexpr uint32_t DISPLAYID_MASK_LEN = 8;
+
 template<typename T> inline T max(T a, T b) { return (a > b) ? a : b; }
 template<typename T> inline T min(T a, T b) { return (a < b) ? a : b; }
 
@@ -567,4 +569,5 @@ private:
 
 void writeFileNode(FILE *fd, int value);
 int32_t writeIntToFile(const char *file, uint32_t value);
+uint32_t getDisplayId(int32_t displayType, int32_t displayIndex = 0);
 #endif

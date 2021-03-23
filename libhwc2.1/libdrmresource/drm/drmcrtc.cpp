@@ -27,7 +27,8 @@
 namespace android {
 
 DrmCrtc::DrmCrtc(DrmDevice *drm, drmModeCrtcPtr c, unsigned pipe)
-    : drm_(drm), id_(c->crtc_id), pipe_(pipe), display_(-1), mode_(&c->mode) {
+    : drm_(drm), id_(c->crtc_id), pipe_(pipe), mode_(&c->mode) {
+        displays_.clear();
 }
 
 int DrmCrtc::Init() {
@@ -108,16 +109,28 @@ unsigned DrmCrtc::pipe() const {
   return pipe_;
 }
 
-int DrmCrtc::display() const {
-  return display_;
+const std::vector<int>& DrmCrtc::displays() const {
+  return displays_;
+}
+
+bool DrmCrtc::has_display(int display) const {
+  auto it = find_if(displays_.begin(), displays_.end(),
+      [&display](auto disp) {
+      return (disp == display);
+      });
+  if (it != displays_.end())
+    return true;
+  return false;
 }
 
 void DrmCrtc::set_display(int display) {
-  display_ = display;
+  displays_.push_back(display);
 }
 
 bool DrmCrtc::can_bind(int display) const {
-  return display_ == -1 || display_ == display;
+  if (displays_.size() == 0)
+    return true;
+  return has_display(display);
 }
 
 const DrmProperty &DrmCrtc::active_property() const {
