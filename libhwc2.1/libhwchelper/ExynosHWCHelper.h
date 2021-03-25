@@ -570,4 +570,22 @@ private:
 void writeFileNode(FILE *fd, int value);
 int32_t writeIntToFile(const char *file, uint32_t value);
 uint32_t getDisplayId(int32_t displayType, int32_t displayIndex = 0);
+
+template <typename T>
+struct CtrlValue {
+public:
+    void store(T value) {
+        if (value == value_) return;
+        dirty_ = true;
+        value_ = value;
+    };
+    const T &get() { return value_; };
+    bool is_dirty() { return dirty_; };
+    void clear_dirty() { dirty_ = false; };
+
+private:
+    T value_;
+    bool dirty_;
+};
+
 #endif

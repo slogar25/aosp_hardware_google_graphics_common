@@ -1356,18 +1356,23 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     if (isBrightnessStateChange()) {
         setupBrightnessConfig();
-        /* TODO: Add the hbm/dimming property when the value is changed only. b/182212601 */
-        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->dimming_on(),
-                                            mBrightnessDimmingOn)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set dimming_on property", __func__);
+        if (mBrightnessDimmingOn.is_dirty()) {
+            if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->dimming_on(),
+                                                mBrightnessDimmingOn.get())) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Fail to set dimming_on property", __func__);
+            }
+            mBrightnessDimmingOn.clear_dirty();
         }
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->brightness_level(),
                                             mBrightnessLevel)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
         }
-        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
-                                            mBrightnessHbmOn)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
+        if (mBrightnessHbmOn.is_dirty()) {
+            if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
+                                                mBrightnessHbmOn.get())) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
+            }
+            mBrightnessHbmOn.clear_dirty();
         }
     }
 
@@ -1934,8 +1939,10 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
 
     mBrightntessIntfSupported = true;
     mBrightnessState.reset();
-    mBrightnessHbmOn = false;
-    mBrightnessDimmingOn = true;
+    mBrightnessHbmOn.store(false);
+    mBrightnessHbmOn.clear_dirty();
+    mBrightnessDimmingOn.store(true);
+    mBrightnessDimmingOn.clear_dirty();
 
     mHbmOnFd = fopen(kHbmOnFileNode, "w+");
     if (mHbmOnFd == NULL) ALOGE("%s open failed! %s", kHbmOnFileNode, strerror(errno));
@@ -1983,13 +1990,18 @@ int32_t ExynosDisplayDrmInterface::updateBrightness() {
 
     setupBrightnessConfig();
 
-    /* TODO: set the hbm/dimming on when the value is changed only. b/182212601 */
-    if (mDimmingOnFd) writeFileNode(mDimmingOnFd, mBrightnessDimmingOn);
+    if (mDimmingOnFd && mBrightnessDimmingOn.is_dirty()) {
+        writeFileNode(mDimmingOnFd, mBrightnessDimmingOn.get());
+        mBrightnessDimmingOn.clear_dirty();
+    }
 
     if (mExynosDisplay->mBrightnessFd)
         writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel);
 
-    if (mHbmOnFd) writeFileNode(mHbmOnFd, mBrightnessHbmOn);
+    if (mHbmOnFd && mBrightnessHbmOn.is_dirty()) {
+        writeFileNode(mHbmOnFd, mBrightnessHbmOn.get());
+        mBrightnessHbmOn.clear_dirty();
+    }
 
     return HWC2_ERROR_NONE;
 }
@@ -2004,9 +2016,10 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     if (!mBrightntessIntfSupported) return;
 
     Mutex::Autolock lock(mBrightnessUpdateMutex);
+
     brightnessState_t brightness_state = mExynosDisplay->getBrightnessState();
 
-    mBrightnessDimmingOn = (!mBrightnessState.instant_hbm && !brightness_state.instant_hbm);
+    mBrightnessDimmingOn.store((!mBrightnessState.instant_hbm && !brightness_state.instant_hbm));
 
     float brightness = mExynosDisplay->getBrightnessValue();
 
@@ -2031,14 +2044,14 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     }
 
     if (mPanelHbmType == PanelHbmType::ONE_STEP && mScaledBrightness == mBrightnessHbmMax) {
-        mBrightnessHbmOn = true;
+        mBrightnessHbmOn.store(true);
     } else if (mPanelHbmType == PanelHbmType::CONTINUOUS && range == BrightnessRange::HBM) {
-        mBrightnessHbmOn = true;
+        mBrightnessHbmOn.store(true);
     } else {
-        mBrightnessHbmOn = false;
+        mBrightnessHbmOn.store(false);
     }
-    ALOGI("level=%d, DimmingOn=%d, HbmOn=%d", mBrightnessLevel, mBrightnessDimmingOn,
-          mBrightnessHbmOn);
+    ALOGI("level=%d, DimmingOn=%d, HbmOn=%d", mBrightnessLevel, mBrightnessDimmingOn.get(),
+          mBrightnessHbmOn.get());
 
     mBrightnessState = brightness_state;
 
