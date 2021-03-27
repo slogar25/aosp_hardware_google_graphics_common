@@ -233,9 +233,10 @@ class ExynosDisplayDrmInterface :
                 const std::unique_ptr<DrmPlane> &plane,
                 const exynos_win_config_data& config)
         { return NO_ERROR;};
-        virtual int32_t updateBrightness();
+        virtual int32_t updateBrightness(bool syncFrame);
         virtual float getSdrDimRatio();
 
+        bool isHbmOn() { return mBrightnessHbmOn.get(); }
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -285,7 +286,6 @@ class ExynosDisplayDrmInterface :
         void parseRangeEnums(const DrmProperty& property);
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
-
     private:
         int32_t getLowPowerDrmModeModeInfo();
         int32_t setActiveDrmMode(DrmMode const &mode);
@@ -354,7 +354,6 @@ class ExynosDisplayDrmInterface :
 
     protected:
         void getBrightnessInterfaceSupport();
-        bool isBrightnessStateChange();
         void setupBrightnessConfig();
         FILE *mHbmOnFd;
         FILE *mDimmingOnFd;
@@ -375,7 +374,7 @@ class ExynosDisplayDrmInterface :
 
         Mutex mBrightnessUpdateMutex;
         brightnessState_t mBrightnessState;
-        uint32_t mBrightnessLevel;
+        CtrlValue<uint32_t> mBrightnessLevel;
         float mScaledBrightness;
         CtrlValue<bool> mBrightnessDimmingOn;
         CtrlValue<bool> mBrightnessHbmOn;

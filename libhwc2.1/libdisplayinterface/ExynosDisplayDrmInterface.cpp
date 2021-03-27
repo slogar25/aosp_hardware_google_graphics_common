@@ -1354,26 +1354,26 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         mExynosDisplay->traceLayerTypes();
     }
 
-    if (isBrightnessStateChange()) {
-        setupBrightnessConfig();
-        if (mBrightnessDimmingOn.is_dirty()) {
-            if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->dimming_on(),
-                                                mBrightnessDimmingOn.get())) < 0) {
-                HWC_LOGE(mExynosDisplay, "%s: Fail to set dimming_on property", __func__);
-            }
-            mBrightnessDimmingOn.clear_dirty();
+    if (mBrightnessDimmingOn.is_dirty()) {
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->dimming_on(),
+                                            mBrightnessDimmingOn.get())) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set dimming_on property", __func__);
         }
+        mBrightnessDimmingOn.clear_dirty();
+    }
+    if (mBrightnessLevel.is_dirty()) {
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->brightness_level(),
-                                            mBrightnessLevel)) < 0) {
+                                            mBrightnessLevel.get())) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
         }
-        if (mBrightnessHbmOn.is_dirty()) {
-            if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
-                                                mBrightnessHbmOn.get())) < 0) {
-                HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
-            }
-            mBrightnessHbmOn.clear_dirty();
+        mBrightnessLevel.clear_dirty();
+    }
+    if (mBrightnessHbmOn.is_dirty()) {
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
+                                            mBrightnessHbmOn.get())) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
         }
+        mBrightnessHbmOn.clear_dirty();
     }
 
     uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
@@ -1985,10 +1985,13 @@ float ExynosDisplayDrmInterface::getSdrDimRatio()
     return sdr_nits/peak;
 }
 
-int32_t ExynosDisplayDrmInterface::updateBrightness() {
+int32_t ExynosDisplayDrmInterface::updateBrightness(bool syncFrame) {
     if (!mBrightntessIntfSupported) return HWC2_ERROR_UNSUPPORTED;
 
     setupBrightnessConfig();
+
+    // this change will be part of next atomic call for frame update
+    if (syncFrame) return NO_ERROR;
 
     if (mDimmingOnFd && mBrightnessDimmingOn.is_dirty()) {
         writeFileNode(mDimmingOnFd, mBrightnessDimmingOn.get());
@@ -1996,7 +1999,7 @@ int32_t ExynosDisplayDrmInterface::updateBrightness() {
     }
 
     if (mExynosDisplay->mBrightnessFd)
-        writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel);
+        writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel.get());
 
     if (mHbmOnFd && mBrightnessHbmOn.is_dirty()) {
         writeFileNode(mHbmOnFd, mBrightnessHbmOn.get());
@@ -2006,18 +2009,12 @@ int32_t ExynosDisplayDrmInterface::updateBrightness() {
     return HWC2_ERROR_NONE;
 }
 
-bool ExynosDisplayDrmInterface::isBrightnessStateChange() {
-    if (!mBrightntessIntfSupported) return false;
-
-    return !(mExynosDisplay->getBrightnessState() == mBrightnessState);
-}
-
 void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     if (!mBrightntessIntfSupported) return;
 
     Mutex::Autolock lock(mBrightnessUpdateMutex);
-
     brightnessState_t brightness_state = mExynosDisplay->getBrightnessState();
+    if (brightness_state == mBrightnessState) return;
 
     mBrightnessDimmingOn.store((!mBrightnessState.instant_hbm && !brightness_state.instant_hbm));
 
@@ -2034,11 +2031,12 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     uint32_t range;
     for (range = 0; range < BrightnessRange::MAX; range++) {
         if (mScaledBrightness <= mBrightnessTable[range].mBriEnd) {
-            mBrightnessLevel = static_cast<uint32_t>(
+            auto bl = static_cast<uint32_t>(
                     (mScaledBrightness - mBrightnessTable[range].mBriStart) /
                             (mBrightnessTable[range].mBriEnd - mBrightnessTable[range].mBriStart) *
                             (mBrightnessTable[range].mBklEnd - mBrightnessTable[range].mBklStart) +
                     mBrightnessTable[range].mBklStart);
+            mBrightnessLevel.store(bl);
             break;
         }
     }
@@ -2050,7 +2048,7 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     } else {
         mBrightnessHbmOn.store(false);
     }
-    ALOGI("level=%d, DimmingOn=%d, HbmOn=%d", mBrightnessLevel, mBrightnessDimmingOn.get(),
+    ALOGI("level=%d, DimmingOn=%d, HbmOn=%d", mBrightnessLevel.get(), mBrightnessDimmingOn.get(),
           mBrightnessHbmOn.get());
 
     mBrightnessState = brightness_state;

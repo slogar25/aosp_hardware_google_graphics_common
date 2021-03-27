@@ -22,8 +22,6 @@
 
 #include <string>
 
-#include "display_common.h"
-
 namespace displaycolor {
 
 namespace hwc {
@@ -37,6 +35,22 @@ using ColorModesMap = std::map<hwc::ColorMode, std::vector<hwc::RenderIntent>>;
 
 /// Image data bit depths.
 enum class BitDepth { kEight, kTen };
+
+/// Display type used to get pipeline or update display scene.
+enum DisplayType {
+    /// builtin primary display
+    DISPLAY_PRIMARY = 0,
+    /// builtin secondary display
+    DISPLAY_SECONDARY = 1,
+    /// number of display
+    DISPLAY_MAX = 2,
+};
+
+enum BrightnessMode {
+    BM_NOMINAL = 0,
+    BM_HBM = 1,
+    BM_MAX = 2,
+};
 
 struct LayerColorData {
     bool operator==(const LayerColorData &rhs) const {
@@ -160,7 +174,8 @@ struct DisplayScene {
                color_mode == rhs.color_mode &&
                render_intent == rhs.render_intent &&
                matrix == rhs.matrix &&
-               force_hdr == rhs.force_hdr;
+               force_hdr == rhs.force_hdr &&
+               bm == rhs.bm;
     }
 
     /// A vector of layer color data.
@@ -183,6 +198,9 @@ struct DisplayScene {
     /// When this bit is set, process hdr layers and the layer matrix even if
     //it's in native color mode.
     bool force_hdr;
+
+    /// display brightness mode
+    BrightnessMode bm;
 };
 
 /// An interface specifying functions that are HW-agnostic.
