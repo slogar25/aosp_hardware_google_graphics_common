@@ -402,4 +402,17 @@ int32_t ExynosHWCService::setPanelGammaTableSource(int32_t display_id, int32_t t
                                                    int32_t source) {
     return mHWCCtx->device->setPanelGammaTableSource(display_id, type, source);
 }
+
+int32_t ExynosHWCService::setDisplayBrightness(int32_t display_id, float brightness) {
+    if (brightness < 0 || brightness > 1.0)
+        return -EINVAL;
+
+    auto display = mHWCCtx->device->getDisplay(display_id);
+
+    if (display != nullptr)
+        return display->setDisplayBrightness(brightness);
+
+    return -EINVAL;
+}
+
 } //namespace android
