@@ -261,6 +261,18 @@ void ExynosHWCService::setScaleDownRatio(uint32_t physicalType,
     mHWCCtx->device->invalidate();
 }
 
+void ExynosHWCService::setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) {
+    ALOGD("%s:: display_id(%d), state(%d), lux(%d)", __func__, display_id, state, lux);
+    if (mHWCCtx) {
+        auto display = mHWCCtx->device->getDisplay(display_id);
+
+        if (display != nullptr) {
+            display->setLbeState(static_cast<LbeState>(state));
+            display->setLbeAmbientLight(lux);
+        }
+    }
+}
+
 void ExynosHWCService::setHWCDebug(int debug)
 {
     ALOGD_IF(HWC_SERVICE_DEBUG, "%s, debug %d", __func__, debug);
