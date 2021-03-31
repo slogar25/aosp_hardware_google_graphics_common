@@ -59,7 +59,10 @@ static const int32_t kUmPerInch = 25400;
 
 FramebufferManager::~FramebufferManager()
 {
-    mRmFBThreadRunning = false;
+    {
+        Mutex::Autolock lock(mMutex);
+        mRmFBThreadRunning = false;
+    }
     mCondition.signal();
     mRmFBThread.join();
 }
@@ -114,10 +117,9 @@ void FramebufferManager::cleanup()
 
 void FramebufferManager::removeFBsThreadRoutine()
 {
-    while (true) {
-        Mutex::Autolock lock(mMutex);
+    Mutex::Autolock lock(mMutex);
+    while (mRmFBThreadRunning) {
         mCondition.wait(mMutex);
-        if (!mRmFBThreadRunning) return;
         cleanup();
     }
 }
