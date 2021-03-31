@@ -97,13 +97,17 @@ int FramebufferManager::addFB2WithModifiers(uint32_t width, uint32_t height, uin
 void FramebufferManager::cleanup()
 {
     auto rit = mCachedBuffers.rbegin();
+    std::vector<decltype(rit)::iterator_type> toErase;
     while ((mCachedBuffers.size() > MAX_CACHED_BUFFERS) && (rit != mCachedBuffers.rend())) {
         /* Can't remove framebuffer in active commit */
         if ((*rit)->lastLookupTime == mLastActiveCommitTime) {
             rit++;
             continue;
         }
-        mCachedBuffers.erase((++rit).base());
+        toErase.push_back((++rit).base());
+    }
+    for (auto it : toErase) {
+        mCachedBuffers.erase(it);
     }
 }
 
