@@ -69,7 +69,8 @@ class ExynosDisplayInterface {
         virtual int32_t getDisplayIdentificationData(uint8_t* __unused outPort,
                 uint32_t* __unused outDataSize, uint8_t* __unused outData) {return 0;}
 
-        virtual int32_t updateBrightness() { return HWC2_ERROR_UNSUPPORTED; }
+        /* frameUpdate: true if the brightness change needs to sync with next frame update */
+        virtual int32_t updateBrightness(bool __unused syncFrame) { return HWC2_ERROR_UNSUPPORTED; }
         virtual float getSdrDimRatio() { return 1.0; }
         bool isPrimary();
         /* For HWC 2.4 APIs */
