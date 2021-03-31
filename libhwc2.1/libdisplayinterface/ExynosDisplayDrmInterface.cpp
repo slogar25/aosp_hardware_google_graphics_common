@@ -98,7 +98,8 @@ void FramebufferManager::cleanup()
 {
     auto rit = mCachedBuffers.rbegin();
     std::vector<decltype(rit)::iterator_type> toErase;
-    while ((mCachedBuffers.size() > MAX_CACHED_BUFFERS) && (rit != mCachedBuffers.rend())) {
+    while (((mCachedBuffers.size() - toErase.size()) > MAX_CACHED_BUFFERS) &&
+           (rit != mCachedBuffers.rend())) {
         /* Can't remove framebuffer in active commit */
         if ((*rit)->lastLookupTime == mLastActiveCommitTime) {
             rit++;
