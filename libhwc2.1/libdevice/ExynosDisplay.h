@@ -343,6 +343,9 @@ typedef struct brightnessState {
      * dim_sdr_target_ratio **/
     float dim_sdr_ratio = kSdrDimRatioNone;
 
+    // current Brightness value
+    float brightness_value;
+
     void reset() {
         mData = {false, false, false};
         dim_sdr_target_ratio = kSdrDimRatioNone;
@@ -350,11 +353,13 @@ typedef struct brightnessState {
     brightnessState& operator=(const brightnessState& a) {
         mData = a.mData;
         dim_sdr_ratio = a.dim_sdr_ratio;
+        brightness_value = a.brightness_value;
         return *this;
     }
     bool operator==(const brightnessState& a) const {
         return a.mData == mData &&
-            a.dim_sdr_ratio == dim_sdr_ratio;
+            a.dim_sdr_ratio == dim_sdr_ratio &&
+            a.brightness_value == brightness_value;
     }
 } brightnessState_t;
 
@@ -1093,7 +1098,7 @@ class ExynosDisplay {
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
-        virtual int32_t SetCurrentPanelGammaSource(const DisplayType /* type */,
+        virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
             return HWC2_ERROR_UNSUPPORTED;
         }
@@ -1130,7 +1135,7 @@ class ExynosDisplay {
         std::unique_ptr<ExynosDisplayInterface> mDisplayInterface;
 
         const brightnessState_t& getBrightnessState() const { return mBrightnessState; }
-        float getBrightnessValue() const { return mBrightnessValue; }
+        float getBrightnessValue() const { return mBrightnessState.brightness_value; }
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
@@ -1152,9 +1157,6 @@ class ExynosDisplay {
 
         // Brightness state
         brightnessState_t mBrightnessState;
-
-        // current Brightness value
-        float mBrightnessValue;
 
         // for power HAL extension hints
         std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>

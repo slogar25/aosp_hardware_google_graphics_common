@@ -3196,8 +3196,8 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness)
     if (mBrightnessFd == NULL)
         return HWC2_ERROR_UNSUPPORTED;
 
-    mBrightnessValue = brightness;
-    int32_t ret = mDisplayInterface->updateBrightness();
+    mBrightnessState.brightness_value = brightness;
+    int32_t ret = mDisplayInterface->updateBrightness(false /* syncFrame */);
 
     if (ret == HWC2_ERROR_NONE) return ret;
 
@@ -5080,6 +5080,10 @@ void ExynosDisplay::updateBrightnessState() {
                 mBrightnessState.boost_brightness = true;
             }
         }
+    }
+
+    if (mDisplayInterface->updateBrightness(true /* syncFrame */) != HWC2_ERROR_NONE) {
+        ALOGW("Failed to update brighntess");
     }
 
     if (mBrightnessState.instant_hbm && !client_rgb_hdr) {

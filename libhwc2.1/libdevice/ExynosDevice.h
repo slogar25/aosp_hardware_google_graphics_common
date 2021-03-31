@@ -19,7 +19,7 @@
 
 #include <aidl/com/google/hardware/pixel/display/BnDisplay.h>
 #include <cutils/atomic.h>
-#include <display_common.h>
+#include <displaycolor/displaycolor.h>
 #include <hardware/hwcomposer2.h>
 #include <hardware_legacy/uevent.h>
 #include <sys/resource.h>

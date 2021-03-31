@@ -59,6 +59,7 @@ enum {
     GET_HWC_FENCE_DEBUG = 108,
     SET_DISPLAY_DEVICE_MODE = 1000,
     SET_PANEL_GAMMA_TABLE_SOURCE = 1001,
+    SET_DISPLAY_BRIGHTNESS = 1002,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -379,6 +380,17 @@ public:
         ALOGD("null func: %s(%d %d %d)", __func__, display_id, type, source);
         return NO_ERROR;
     }
+
+    virtual int32_t setDisplayBrightness(int32_t display_id, float brightness) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(display_id);
+        data.writeFloat(brightness);
+        int result = remote()->transact(SET_DISPLAY_BRIGHTNESS, data, &reply);
+        if (result)
+            ALOGE("SET_DISPLAY_BRIGHTNESS transact error(%d)", result);
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -602,6 +614,15 @@ status_t BnExynosHWCService::onTransact(
             int32_t type = data.readInt32();
             int32_t source = data.readInt32();
             int32_t error = setPanelGammaTableSource(display_id, type, source);
+            reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+
+        case SET_DISPLAY_BRIGHTNESS: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            int32_t display_id = data.readInt32();
+            float brightness = data.readFloat();
+            int32_t error = setDisplayBrightness(display_id, brightness);
             reply->writeInt32(error);
             return NO_ERROR;
         } break;

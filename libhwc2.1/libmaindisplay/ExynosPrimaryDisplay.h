@@ -29,7 +29,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         ~ExynosPrimaryDisplay();
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
-        virtual int32_t SetCurrentPanelGammaSource(const DisplayType type,
+        virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType type,
                                                    const PanelGammaSource& source) override;
         virtual PanelGammaSource GetCurrentPanelGammaSource() const override {
             return currentPanelGammaSource;
@@ -67,7 +67,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t setPowerDoze();
         void firstPowerOn();
 
-        std::string getPanelSysfsPath(const DisplayType& type);
+        std::string getPanelSysfsPath(const displaycolor::DisplayType& type);
 };
 
 #endif
