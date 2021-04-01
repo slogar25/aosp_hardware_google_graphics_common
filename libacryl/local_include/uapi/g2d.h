@@ -291,7 +291,8 @@ struct g2d_task {
 #define G2D_PERF_LAYER_SCALING    (1 << 1)
 #define G2D_PERF_LAYER_YUV2P      (1 << 4)
 #define G2D_PERF_LAYER_SBWC       (1 << 5)
-#define G2D_PERF_LAYER_COMPRESSED (1 << 6)
+#define G2D_PERF_LAYER_RGB_AFBC   (1 << 6)
+#define G2D_PERF_LAYER_YUV_AFBC   (1 << 7)
 
 struct g2d_performance_layer {
     uint16_t crop_width;
