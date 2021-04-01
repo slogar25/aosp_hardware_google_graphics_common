@@ -316,7 +316,6 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
     mXdpi(25400),
     mYdpi(25400),
     mVsyncPeriod(16666666),
-    mIdleHint(this),
     mDevice(device),
     mDisplayName(""),
     mPlugState(false),
@@ -362,7 +361,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
     mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
     mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
     mPowerHalExtAidl(nullptr),
-    mRestorePrevFpsHint(false)
+    mRestorePrevFpsHint(false),
+    mIdleHint(this)
 {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;

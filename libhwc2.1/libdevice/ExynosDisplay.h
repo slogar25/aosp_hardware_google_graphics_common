@@ -383,23 +383,6 @@ class ExynosDisplay {
         /* Destructor */
         virtual ~ExynosDisplay();
 
-        /* Idle hint to notify power hal */
-        class IdleHintWorker : public Worker {
-        public:
-            IdleHintWorker(ExynosDisplay* display);
-
-            void resetIdleTimer();
-
-        protected:
-            void Routine() override;
-
-        private:
-            ExynosDisplay* mExynosDisplay;
-            bool mIdleFlag;
-            bool mNeedResetTimer;
-        };
-        IdleHintWorker mIdleHint;
-
         ExynosDevice *mDevice;
 
         String8 mDisplayName;
@@ -1165,6 +1148,32 @@ class ExynosDisplay {
         // previous refresh rate hint
         std::string mPrevFpsHintStr;
         bool mRestorePrevFpsHint;
+
+        /* Idle hint to notify power hal */
+        class IdleHintWorker : public Worker {
+        public:
+            IdleHintWorker(ExynosDisplay* display);
+
+            void resetIdleTimer();
+
+        protected:
+            void Routine() override;
+
+        private:
+            ExynosDisplay* mExynosDisplay;
+            bool mIdleFlag;
+            bool mNeedResetTimer;
+        };
+
+        /*
+         * This must be the last field in the struct. When this object is
+         * destroyed, the thread on which the Routine() function runs must be
+         * destroyed before any of the other fields because it may otherwise
+         * observe the ExynosDisplay object in a partially destructed state.
+         * The destructor destroys fields in reverse order of their
+         * declarations, so having this field be last ensures this property.
+         */
+        IdleHintWorker mIdleHint;
 };
 
 #endif //_EXYNOSDISPLAY_H
