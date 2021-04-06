@@ -99,19 +99,13 @@ int FramebufferManager::addFB2WithModifiers(uint32_t width, uint32_t height, uin
 
 void FramebufferManager::cleanup()
 {
-    auto rit = mCachedBuffers.rbegin();
-    std::vector<decltype(rit)::iterator_type> toErase;
-    while (((mCachedBuffers.size() - toErase.size()) > MAX_CACHED_BUFFERS) &&
-           (rit != mCachedBuffers.rend())) {
+    for (auto it = mCachedBuffers.end();
+         mCachedBuffers.size() > MAX_CACHED_BUFFERS && it != mCachedBuffers.begin();) {
+        --it;
         /* Can't remove framebuffer in active commit */
-        if ((*rit)->lastLookupTime == mLastActiveCommitTime) {
-            rit++;
-            continue;
+        if ((*it)->lastLookupTime != mLastActiveCommitTime) {
+            it = mCachedBuffers.erase(it);
         }
-        toErase.push_back((++rit).base());
-    }
-    for (auto it : toErase) {
-        mCachedBuffers.erase(it);
     }
 }
 
@@ -228,6 +222,7 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     }
 
     if (caching) {
+        Mutex::Autolock lock(mMutex);
         auto it =
                 std::find_if(mCachedBuffers.begin(), mCachedBuffers.end(),
                              [&handles](auto &buffer) { return (buffer->bufHandles == handles); });
@@ -255,6 +250,7 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     }
 
     if (caching) {
+        Mutex::Autolock lock(mMutex);
         mStagingBuffers.emplace_back(new Framebuffer(mDrmFd, handles, bufferNum, fbId));
     }
 
