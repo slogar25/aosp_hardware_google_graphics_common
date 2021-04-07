@@ -15,6 +15,8 @@
  */
 //#define LOG_NDEBUG 0
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "ExynosPrimaryDisplay.h"
 
 #include <fstream>
@@ -153,6 +155,16 @@ int ExynosPrimaryDisplay::getDDIScalerMode(int width, int height) {
     }
 
     return 1; // WQHD
+}
+
+int32_t ExynosPrimaryDisplay::doDisplayConfigInternal(hwc2_config_t config) {
+    if (mPowerModeState != HWC2_POWER_MODE_ON) {
+        mPendActiveConfig = config;
+        mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
+        DISPLAY_LOGI("%s:: Pending desired Config: %d", __func__, config);
+        return NO_ERROR;
+    }
+    return ExynosDisplay::doDisplayConfigInternal(config);
 }
 
 int32_t ExynosPrimaryDisplay::getActiveConfigInternal(hwc2_config_t *outConfig) {

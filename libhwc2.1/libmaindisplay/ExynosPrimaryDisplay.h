@@ -36,6 +36,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         }
 
         virtual void initDisplayInterface(uint32_t interfaceType);
+        virtual int32_t doDisplayConfigInternal(hwc2_config_t config) override;
+
     protected:
         /* setPowerMode(int32_t mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
