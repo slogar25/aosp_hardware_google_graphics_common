@@ -594,16 +594,15 @@ void ExynosDisplay::checkIgnoreLayers() {
 void ExynosDisplay::doPreProcessing() {
     /* Low persistence setting */
     int ret = 0;
-    uint32_t selfRefresh = 0;
-    unsigned int skipProcessing = 1;
     bool hasSingleBuffer = false;
-    bool skipStaticLayers = true;
+    bool hasClientLayer = false;
 
     for (size_t i=0; i < mLayers.size(); i++) {
         buffer_handle_t handle = mLayers[i]->mLayerBuffer;
         VendorGraphicBufferMeta gmeta(handle);
-        if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_CLIENT)
-            skipStaticLayers = false;
+        if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_CLIENT) {
+            hasClientLayer = true;
+        }
 
         exynos_image srcImg;
         exynos_image dstImg;
@@ -611,27 +610,21 @@ void ExynosDisplay::doPreProcessing() {
         mLayers[i]->setDstExynosImage(&dstImg);
         mLayers[i]->setExynosImage(srcImg, dstImg);
     }
+
     /*
      * Disable skip static layer feature if there is the layer that's
      * mCompositionType  is HWC2_COMPOSITION_CLIENT
      * HWC should not change compositionType if it is HWC2_COMPOSITION_CLIENT
      */
     if (mType != HWC_DISPLAY_VIRTUAL)
-        mClientCompositionInfo.mEnableSkipStatic = skipStaticLayers;
+        mClientCompositionInfo.mEnableSkipStatic = (!hasClientLayer && !hasSingleBuffer);
 
     if (mHasSingleBuffer != hasSingleBuffer) {
-        if (hasSingleBuffer) {
-            selfRefresh = 1;
-            skipProcessing = 0;
-        } else {
-            selfRefresh = 0;
-            skipProcessing = 1;
-        }
-        if ((ret = mDisplayInterface->disableSelfRefresh(selfRefresh)) < 0)
+        if ((ret = mDisplayInterface->disableSelfRefresh(uint32_t(hasSingleBuffer))) < 0)
             DISPLAY_LOGE("ioctl S3CFB_LOW_PERSISTENCE failed: %s ret(%d)", strerror(errno), ret);
+
+        mDisplayControl.skipM2mProcessing = !hasSingleBuffer;
         mHasSingleBuffer = hasSingleBuffer;
-        mDevice->setHWCControl(mDisplayId, HWC_CTL_SKIP_M2M_PROCESSING, skipProcessing);
-        mDevice->setHWCControl(mDisplayId, HWC_CTL_SKIP_STATIC, skipProcessing);
         setGeometryChanged(GEOMETRY_DISPLAY_SINGLEBUF_CHANGED);
     }
 

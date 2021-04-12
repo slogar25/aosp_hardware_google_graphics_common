@@ -322,6 +322,8 @@ struct DisplayControl {
     bool readbackSupport = false;
     /** Reserve MPP regardless of plug state **/
     bool forceReserveMPP = false;
+    /** Skip M2MMPP processing **/
+    bool skipM2mProcessing = true;
 };
 
 typedef struct brightnessState {
