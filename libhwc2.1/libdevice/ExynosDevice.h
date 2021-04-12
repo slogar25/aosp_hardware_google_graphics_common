@@ -211,7 +211,7 @@ class ExynosDevice {
 
         // Con/Destructors
         ExynosDevice();
-        ~ExynosDevice();
+        virtual ~ExynosDevice();
 
         bool isFirstValidate();
         bool isLastValidate(ExynosDisplay *display);

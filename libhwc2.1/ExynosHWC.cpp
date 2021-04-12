@@ -27,6 +27,7 @@
 #include "ExynosDisplay.h"
 #include "ExynosLayer.h"
 #include "ExynosExternalDisplayModule.h"
+#include "ExynosDeviceModule.h"
 
 class ExynosHWCService;
 
@@ -1316,7 +1317,7 @@ int exynos_open(const struct hw_module_t *module, const char *name,
     dev = (struct exynos_hwc2_device_t *)malloc(sizeof(*dev));
     memset(dev, 0, sizeof(*dev));
 
-    dev->device = new ExynosDevice;
+    dev->device = new ExynosDeviceModule;
     g_exynosDevice = dev->device;
 
     dev->base.common.tag = HARDWARE_DEVICE_TAG;
