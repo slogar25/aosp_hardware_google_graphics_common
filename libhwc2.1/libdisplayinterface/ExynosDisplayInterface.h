@@ -76,6 +76,7 @@ class ExynosDisplayInterface {
         /* For HWC 2.4 APIs */
         virtual int32_t getVsyncAppliedTime(hwc2_config_t __unused config, int64_t* __unused actualChangeTime) {return NO_ERROR;}
 
+        virtual int32_t waitVBlank() { return 0; };
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };
