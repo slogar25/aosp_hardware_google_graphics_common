@@ -528,7 +528,7 @@ class ExynosDisplay {
         hwc_request_state_t mConfigRequestState;
         hwc2_config_t mDesiredConfig;
 
-        uint32_t mActiveConfig = UINT_MAX;
+        hwc2_config_t mActiveConfig = UINT_MAX;
 
         void initDisplay();
 
@@ -1027,6 +1027,7 @@ class ExynosDisplay {
         int32_t updateVsyncAppliedTimeLine(int64_t actualChangeTime);
         int32_t getDisplayVsyncPeriodInternal(
                 hwc2_vsync_period_t* outVsyncPeriod);
+        virtual int32_t doDisplayConfigInternal(hwc2_config_t config);
         int32_t doDisplayConfigPostProcess(ExynosDevice *dev);
         int32_t getConfigAppliedTime(const uint64_t desiredTime,
                 const uint64_t actualChangeTime,
