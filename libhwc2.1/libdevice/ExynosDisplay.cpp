@@ -3569,6 +3569,10 @@ int32_t ExynosDisplay::getDisplayVsyncPeriodInternal(hwc2_vsync_period_t* outVsy
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosDisplay::doDisplayConfigInternal(hwc2_config_t config) {
+    return mDisplayInterface->setActiveConfigWithConstraints(config);
+}
+
 int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
 {
     uint64_t current = systemTime(SYSTEM_TIME_MONOTONIC);
@@ -3591,8 +3595,9 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
 
     if (needSetActiveConfig) {
         int32_t ret = NO_ERROR;
-        if ((ret = mDisplayInterface->setActiveConfigWithConstraints(mDesiredConfig)) != NO_ERROR)
+        if ((ret = doDisplayConfigInternal(mDesiredConfig)) != NO_ERROR) {
             return ret;
+        }
 
         mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_REQUESTED;
     }
