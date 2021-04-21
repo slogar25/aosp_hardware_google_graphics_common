@@ -5070,7 +5070,6 @@ void ExynosDisplay::traceLayerTypes() {
 void ExynosDisplay::updateBrightnessState() {
     static constexpr float kMaxCll = 10000.0;
     bool client_rgb_hdr = false;
-    auto prev_dim_ratio = mBrightnessState.dim_sdr_target_ratio;
 
     mBrightnessState.reset();
     for (size_t i = 0; i < mLayers.size(); i++) {
@@ -5093,15 +5092,14 @@ void ExynosDisplay::updateBrightnessState() {
         }
     }
 
-    if (mDisplayInterface->updateBrightness(true /* syncFrame */) != HWC2_ERROR_NONE) {
-        ALOGW("Failed to update brighntess");
-    }
-
     if (mBrightnessState.instant_hbm && !client_rgb_hdr) {
         // SDR dim ratio = display_nit_current / display_nit_after_hbm_on
         // mDisplayInterface has the panel caps to calculate current nits.
         float dim_sdr_ratio = mDisplayInterface->getSdrDimRatio();
-
+        if (dim_sdr_ratio < kGhbmMinDimRatio) {
+            ALOGW("sdr dim ratio %f too small", dim_sdr_ratio);
+            dim_sdr_ratio = kGhbmMinDimRatio;
+        }
         char value[PROPERTY_VALUE_MAX];
         const float ratio = property_get("debug.hwc.dim_sdr", value, nullptr) > 0 ?
                                   std::atof(value) : dim_sdr_ratio;
@@ -5109,30 +5107,7 @@ void ExynosDisplay::updateBrightnessState() {
         mBrightnessState.dim_sdr_target_ratio = ratio;
     }
 
-    if (prev_dim_ratio == brightnessState::kSdrDimRatioNone &&
-        mBrightnessState.dim_sdr_target_ratio != brightnessState::kSdrDimRatioNone) {
-        mBrightnessState.dim_delay = kGhbmFrameDelay;
-        mBrightnessState.dim_sdr_ratio = brightnessState::kSdrDimRatioNone;
-    } else if (prev_dim_ratio != brightnessState::kSdrDimRatioNone &&
-               mBrightnessState.dim_sdr_target_ratio == brightnessState::kSdrDimRatioNone) {
-        mBrightnessState.dim_delay = kGhbmFrameDelay;
-        mBrightnessState.dim_sdr_ratio = prev_dim_ratio;
-    }
-
-    if (mBrightnessState.dim_delay > 0) {
-        --mBrightnessState.dim_delay;
-    }
-
-    if (mBrightnessState.dim_delay == 0) {
-        mBrightnessState.dim_sdr_ratio = mBrightnessState.dim_sdr_target_ratio;
-    } else {
-        mDevice->invalidate();
-    }
-
-    ATRACE_INT("GHBM_WIN", mBrightnessState.dim_sdr_target_ratio != brightnessState::kSdrDimRatioNone);
-    // In case something wrong and a black screen
-    if (mBrightnessState.dim_sdr_ratio < kGhbmMinDimRatio) {
-        ALOGE("%s: invalid dim ratio %f", __func__, mBrightnessState.dim_sdr_ratio);
-        mBrightnessState.dim_sdr_ratio = kGhbmMinDimRatio;
+    if (mDisplayInterface->updateBrightness(true /* syncFrame */) != HWC2_ERROR_NONE) {
+        ALOGW("Failed to update brighntess");
     }
 }
