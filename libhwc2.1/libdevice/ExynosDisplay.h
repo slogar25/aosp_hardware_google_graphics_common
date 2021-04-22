@@ -376,6 +376,7 @@ class ExynosDisplay {
         uint32_t mXdpi;
         uint32_t mYdpi;
         uint32_t mVsyncPeriod;
+        uint32_t mBtsVsyncPeriod;
 
         int                     mPanelType;
         int                     mPsrMode;
@@ -1032,6 +1033,8 @@ class ExynosDisplay {
         int32_t getConfigAppliedTime(const uint64_t desiredTime,
                 const uint64_t actualChangeTime,
                 int64_t &appliedTime, int64_t &refreshTime);
+        void updateBtsVsyncPeriod(uint32_t vsync_period, bool forceUpdate = false);
+        uint32_t getBtsRefreshRate() const;
 
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
@@ -1127,6 +1130,12 @@ class ExynosDisplay {
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
         void connectPowerHalExt();
         void updateRefreshRateHint();
+        inline uint32_t getDisplayVsyncPeriodFromConfig(hwc2_config_t config) {
+            int32_t vsync_period;
+            getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &vsync_period);
+            assert(vsync_period > 0);
+            return static_cast<uint32_t>(vsync_period);
+        }
 
         // send ghbm command after current frame then dim/undim the third frame
         static constexpr uint32_t kGhbmFrameDelay = 3;
