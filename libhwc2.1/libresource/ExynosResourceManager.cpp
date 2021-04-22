@@ -1212,19 +1212,20 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
                          return false;
                      });
 
-        const float resolution = float(display->mXres) * float(display->mYres);
-        const float scaleRatio_H = float(srcWidth / m2mMppRatio) / float(dst_img.w);
-        const float scaleRatio_V = float(srcHeight / m2mMppRatio) / float(dst_img.h);
-        const float displayRatio_H = float(dst_img.w) / float(display->mXres);
+        const float otfSrcWidth = float(srcWidth / m2mMppRatio);
+        const float scaleRatio_H = otfSrcWidth / float(dst_img.w);
+        const float otfSrcHeight = float(srcWidth / m2mMppRatio);
+        const float scaleRatio_V = otfSrcHeight / float(dst_img.h);
+        const float displayRatio_V = float(dst_img.h) / float(display->mYres);
+        const float resolution = otfSrcWidth * otfSrcHeight * display->getBtsRefreshRate() / 1000;
 
         std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
                      [&dst_scale_img, &dst_img, resolution, scaleRatio_H, scaleRatio_V,
-                      displayRatio_H, &otfMpp, &otfMppRatio](auto m) {
+                      displayRatio_V, &otfMpp, &otfMppRatio](auto m) {
                          auto ratio = m->getDownscaleRestriction(dst_scale_img, dst_img);
 
                          if (ratio >= scaleRatio_H && ratio >= scaleRatio_V &&
-                             m->checkDownscaleCap(resolution, scaleRatio_H, scaleRatio_V,
-                                                  displayRatio_H)) {
+                             m->checkDownscaleCap(resolution, displayRatio_V)) {
                              otfMpp = m;
                              otfMppRatio = ratio;
                              return true;

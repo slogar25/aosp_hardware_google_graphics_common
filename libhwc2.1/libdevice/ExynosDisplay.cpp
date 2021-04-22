@@ -307,63 +307,63 @@ String8 ExynosCompositionInfo::getTypeStr()
 }
 
 ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
-:   mDisplayId(HWC_DISPLAY_PRIMARY),
-    mType(HWC_NUM_DISPLAY_TYPES),
-    mIndex(index),
-    mDeconNodeName(""),
-    mXres(1440),
-    mYres(2960),
-    mXdpi(25400),
-    mYdpi(25400),
-    mVsyncPeriod(16666666),
-    mDevice(device),
-    mDisplayName(""),
-    mPlugState(false),
-    mHasSingleBuffer(false),
-    mResourceManager(NULL),
-    mClientCompositionInfo(COMPOSITION_CLIENT),
-    mExynosCompositionInfo(COMPOSITION_EXYNOS),
-    mGeometryChanged(0x0),
-    mRenderingState(RENDERING_STATE_NONE),
-    mHWCRenderingState(RENDERING_STATE_NONE),
-    mDisplayBW(0),
-    mDynamicReCompMode(NO_MODE_SWITCH),
-    mDREnable(false),
-    mDRDefault(false),
-    mLastFpsTime(0),
-    mFrameCount(0),
-    mLastFrameCount(0),
-    mErrorFrameCount(0),
-    mUpdateEventCnt(0),
-    mUpdateCallCnt(0),
-    mDefaultDMA(MAX_DECON_DMA_TYPE),
-    mLastRetireFence(-1),
-    mWindowNumUsed(0),
-    mBaseWindowIndex(0),
-    mNumMaxPriorityAllowed(1),
-    mCursorIndex(-1),
-    mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
-    mMaxLuminance(0),
-    mMaxAverageLuminance(0),
-    mMinLuminance(0),
-    mHWC1LayerList(NULL),
-    /* Support DDI scalser */
-    mOldScalerMode(0),
-    mNewScaledWidth(0),
-    mNewScaledHeight(0),
-    mDeviceXres(0),
-    mDeviceYres(0),
-    mColorMode(HAL_COLOR_MODE_NATIVE),
-    mSkipFrame(false),
-    mBrightnessFd(NULL),
-    mMaxBrightness(0),
-    mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
-    mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
-    mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
-    mPowerHalExtAidl(nullptr),
-    mRestorePrevFpsHint(false),
-    mIdleHint(this)
-{
+      : mDisplayId(HWC_DISPLAY_PRIMARY),
+        mType(HWC_NUM_DISPLAY_TYPES),
+        mIndex(index),
+        mDeconNodeName(""),
+        mXres(1440),
+        mYres(2960),
+        mXdpi(25400),
+        mYdpi(25400),
+        mVsyncPeriod(16666666),
+        mBtsVsyncPeriod(16666666),
+        mDevice(device),
+        mDisplayName(""),
+        mPlugState(false),
+        mHasSingleBuffer(false),
+        mResourceManager(NULL),
+        mClientCompositionInfo(COMPOSITION_CLIENT),
+        mExynosCompositionInfo(COMPOSITION_EXYNOS),
+        mGeometryChanged(0x0),
+        mRenderingState(RENDERING_STATE_NONE),
+        mHWCRenderingState(RENDERING_STATE_NONE),
+        mDisplayBW(0),
+        mDynamicReCompMode(NO_MODE_SWITCH),
+        mDREnable(false),
+        mDRDefault(false),
+        mLastFpsTime(0),
+        mFrameCount(0),
+        mLastFrameCount(0),
+        mErrorFrameCount(0),
+        mUpdateEventCnt(0),
+        mUpdateCallCnt(0),
+        mDefaultDMA(MAX_DECON_DMA_TYPE),
+        mLastRetireFence(-1),
+        mWindowNumUsed(0),
+        mBaseWindowIndex(0),
+        mNumMaxPriorityAllowed(1),
+        mCursorIndex(-1),
+        mColorTransformHint(HAL_COLOR_TRANSFORM_IDENTITY),
+        mMaxLuminance(0),
+        mMaxAverageLuminance(0),
+        mMinLuminance(0),
+        mHWC1LayerList(NULL),
+        /* Support DDI scalser */
+        mOldScalerMode(0),
+        mNewScaledWidth(0),
+        mNewScaledHeight(0),
+        mDeviceXres(0),
+        mDeviceYres(0),
+        mColorMode(HAL_COLOR_MODE_NATIVE),
+        mSkipFrame(false),
+        mBrightnessFd(NULL),
+        mMaxBrightness(0),
+        mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
+        mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
+        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
+        mPowerHalExtAidl(nullptr),
+        mRestorePrevFpsHint(false),
+        mIdleHint(this) {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
@@ -3311,6 +3311,8 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     /* mActiveConfig should be changed immediately for internal status */
     mActiveConfig = config;
     mVsyncAppliedTimeLine = *outTimeline;
+    uint32_t vsync_period = getDisplayVsyncPeriodFromConfig(config);
+    updateBtsVsyncPeriod(vsync_period);
 
     return HWC2_ERROR_NONE;
 }
@@ -3377,14 +3379,25 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_HEIGHT, (int32_t*)&mYres);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_X, (int32_t*)&mXdpi);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_Y, (int32_t*)&mYdpi);
-    if (updateVsync)
-        getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD,
-                (int32_t*)&mVsyncPeriod);
+    if (updateVsync) {
+        mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
+        updateBtsVsyncPeriod(mVsyncPeriod, true);
+    }
 
     /* Update mYuvHdrHbmThresholdArea */
     mYuvHdrHbmThresholdArea = mXres * mYres * kHbmThresholdPct;
 
     return NO_ERROR;
+}
+
+void ExynosDisplay::updateBtsVsyncPeriod(uint32_t vsync_period, bool forceUpdate) {
+    if (forceUpdate || vsync_period < mBtsVsyncPeriod) {
+        mBtsVsyncPeriod = vsync_period;
+    }
+}
+
+uint32_t ExynosDisplay::getBtsRefreshRate() const {
+    return static_cast<uint32_t>(round(nsecsPerSec / mBtsVsyncPeriod * 0.1f) * 10);
 }
 
 void ExynosDisplay::connectPowerHalExt() {
@@ -3489,8 +3502,8 @@ void ExynosDisplay::updateRefreshRateHint() {
 
 int32_t ExynosDisplay::resetConfigRequestState()
 {
-    getDisplayAttribute(mDesiredConfig, HWC2_ATTRIBUTE_VSYNC_PERIOD,
-            (int32_t*)&mVsyncPeriod);
+    mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
+    updateBtsVsyncPeriod(mVsyncPeriod, true);
     DISPLAY_LOGD(eDebugDisplayConfig,"Update mVsyncPeriod %d",
             mVsyncPeriod);
 
