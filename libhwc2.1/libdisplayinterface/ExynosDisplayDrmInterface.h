@@ -88,6 +88,8 @@ class FramebufferManager {
             int drmFd;
             nsecs_t lastLookupTime = 0;
         };
+        using FBList = std::list<std::unique_ptr<Framebuffer>>;
+
         int addFB2WithModifiers(uint32_t width, uint32_t height, uint32_t pixel_format,
                         const BufHandles handles, const uint32_t pitches[4],
                         const uint32_t offsets[4], const uint64_t modifier[4], uint32_t *buf_id,
@@ -97,13 +99,13 @@ class FramebufferManager {
 
         // releases framebuffers at the back of the cached buffer queue that go beyond
         // MAX_CACHED_BUFFERS
-        void cleanup();
+        void cleanup(FBList &cleanupBuffers);
 
         // buffers that are going to be committed in the next atomic frame update
-        std::vector<std::unique_ptr<Framebuffer>> mStagingBuffers;
+        FBList mStagingBuffers;
         // unused buffers that have been used recently, front of the queue has the most recently used
         // ones
-        std::list<std::unique_ptr<Framebuffer>> mCachedBuffers;
+        FBList mCachedBuffers;
 
         int mDrmFd = -1;
         nsecs_t mLastActiveCommitTime = 0;
