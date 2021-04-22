@@ -72,6 +72,7 @@ void FramebufferManager::init(int drmFd)
     mDrmFd = drmFd;
     mRmFBThreadRunning = true;
     mRmFBThread = std::thread(&FramebufferManager::removeFBsThreadRoutine, this);
+    pthread_setname_np(mRmFBThread.native_handle(), "RemoveFBsThread");
 }
 
 uint32_t FramebufferManager::getBufHandleFromFd(int fd)
@@ -97,24 +98,31 @@ int FramebufferManager::addFB2WithModifiers(uint32_t width, uint32_t height, uin
     return ret;
 }
 
-void FramebufferManager::cleanup()
-{
-    for (auto it = mCachedBuffers.end();
-         mCachedBuffers.size() > MAX_CACHED_BUFFERS && it != mCachedBuffers.begin();) {
-        --it;
+void FramebufferManager::cleanup(FBList &cleanupBuffers) {
+    for (auto it = mCachedBuffers.begin();
+         mCachedBuffers.size() > MAX_CACHED_BUFFERS && it != mCachedBuffers.end();) {
+        auto const cit = it++;
         /* Can't remove framebuffer in active commit */
-        if ((*it)->lastLookupTime != mLastActiveCommitTime) {
-            it = mCachedBuffers.erase(it);
+        if ((*cit)->lastLookupTime != mLastActiveCommitTime) {
+            cleanupBuffers.splice(cleanupBuffers.end(), mCachedBuffers, cit);
         }
     }
 }
 
 void FramebufferManager::removeFBsThreadRoutine()
 {
-    Mutex::Autolock lock(mMutex);
-    while (mRmFBThreadRunning) {
-        mCondition.wait(mMutex);
-        cleanup();
+    FBList cleanupBuffers;
+    while (true) {
+        {
+            Mutex::Autolock lock(mMutex);
+            if (!mRmFBThreadRunning) {
+                break;
+            }
+            mCondition.wait(mMutex);
+            cleanup(cleanupBuffers);
+        }
+        ATRACE_NAME("cleanup framebuffers");
+        cleanupBuffers.clear();
     }
 }
 
@@ -228,8 +236,7 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
                              [&handles](auto &buffer) { return (buffer->bufHandles == handles); });
         if (it != mCachedBuffers.end()) {
             fbId = (*it)->fbId;
-            mStagingBuffers.push_back(std::move(*it));
-            mCachedBuffers.erase(it);
+            mStagingBuffers.splice(mStagingBuffers.end(), mCachedBuffers, it);
             return NO_ERROR;
         }
     }
@@ -259,16 +266,17 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
 
 void FramebufferManager::flip(bool isActiveCommit)
 {
-    Mutex::Autolock lock(mMutex);
-    nsecs_t lastCommitTime = systemTime(SYSTEM_TIME_MONOTONIC);
-    if (isActiveCommit) {
-        mLastActiveCommitTime = lastCommitTime;
-        for (auto &it : mStagingBuffers) {
-            it->lastLookupTime = lastCommitTime;
+    {
+        Mutex::Autolock lock(mMutex);
+        nsecs_t lastCommitTime = systemTime(SYSTEM_TIME_MONOTONIC);
+        if (isActiveCommit) {
+            mLastActiveCommitTime = lastCommitTime;
+            for (auto &it : mStagingBuffers) {
+                it->lastLookupTime = lastCommitTime;
+            }
         }
+        mCachedBuffers.splice(mCachedBuffers.end(), mStagingBuffers);
     }
-    std::move(mStagingBuffers.begin(), mStagingBuffers.end(), std::front_inserter(mCachedBuffers));
-    mStagingBuffers.clear();
     mCondition.signal();
 }
 
