@@ -2132,13 +2132,13 @@ int32_t ExynosDisplayDrmInterface::updateBrightness(bool syncFrame) {
         mBrightnessCtrl.DimmingOn.clear_dirty();
     }
 
-    if (mExynosDisplay->mBrightnessFd)
-        writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel.get());
-
     if (mHbmOnFd && mBrightnessCtrl.HbmOn.is_dirty()) {
         writeFileNode(mHbmOnFd, mBrightnessCtrl.HbmOn.get());
         mBrightnessCtrl.HbmOn.clear_dirty();
     }
+
+    if (mExynosDisplay->mBrightnessFd)
+        writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel.get());
 
     return HWC2_ERROR_NONE;
 }
