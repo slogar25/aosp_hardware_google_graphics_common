@@ -574,15 +574,29 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
             __func__, mExynosDisplay->mType, mExynosDisplay->mIndex,
             drmDisplayId, mDrmCrtc->id(), mDrmConnector->id());
 
+    /* Mapping ExynosMPP resource with DPP Planes */
+    uint32_t numWindow = 0;
     for (uint32_t i = 0; i < mDrmDevice->planes().size(); i++) {
         auto &plane = mDrmDevice->planes().at(i);
         uint32_t plane_id = plane->id();
-        ExynosMPP *exynosMPP =
-            mExynosDisplay->mResourceManager->getOtfMPPWithChannel(i);
-        if (exynosMPP == NULL)
-            HWC_LOGE(mExynosDisplay, "getOtfMPPWithChannel fail, ch(%d)", plane_id);
-        mExynosMPPsForPlane[plane_id] = exynosMPP;
+
+        if (!plane->zpos_property().is_immutable()) {
+            /* Plane can be used for composition */
+            ExynosMPP *exynosMPP =
+                mExynosDisplay->mResourceManager->getOtfMPPWithChannel(i);
+            if (exynosMPP == NULL)
+                HWC_LOGE(mExynosDisplay, "getOtfMPPWithChannel fail, ch(%d)", plane_id);
+            mExynosMPPsForPlane[plane_id] = exynosMPP;
+            numWindow++;
+        } else {
+            /*
+             * Plane is special purpose plane which cannot be used for compositon.
+             * It's zpos property is immutable.
+             */
+            mExynosMPPsForPlane[plane_id] = NULL;
+        }
     }
+    setMaxWindowNum(numWindow);
 
     if (mExynosDisplay->mMaxWindowNum != getMaxWindowNum()) {
         ALOGE("%s:: Invalid max window number (mMaxWindowNum: %d, getMaxWindowNum(): %d",
@@ -1892,11 +1906,6 @@ int32_t ExynosDisplayDrmInterface::setForcePanic()
     fclose(forcePanicFd);
 
     return 0;
-}
-
-uint32_t ExynosDisplayDrmInterface::getMaxWindowNum()
-{
-    return mDrmDevice->planes().size();
 }
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::DrmModeAtomicReq(ExynosDisplayDrmInterface *displayInterface)

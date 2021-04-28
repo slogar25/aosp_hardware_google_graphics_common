@@ -1049,3 +1049,31 @@ bool ExynosDevice::getLhbmState() {
     }
     return false;
 }
+
+uint32_t ExynosDevice::getWindowPlaneNum()
+{
+    /*
+     * ExynosDevice supports DPU Window Composition.
+     * The number of windows can be composited is depends on the number of DPP planes.
+     */
+    return mDeviceInterface->getNumDPPChs();
+}
+
+uint32_t ExynosDevice::getSpecialPlaneNum()
+{
+    /*
+     * ExynosDevice might support something special purpose planes.
+     * These planes are different with DPP planes.
+     */
+    return mDeviceInterface->getNumSPPChs();
+}
+
+uint32_t ExynosDevice::getSpecialPlaneId(uint32_t index)
+{
+    return mDeviceInterface->getSPPChId(index);
+}
+
+uint64_t ExynosDevice::getSpecialPlaneAttr(uint32_t index)
+{
+    return mDeviceInterface->getSPPChAttr(index);
+}

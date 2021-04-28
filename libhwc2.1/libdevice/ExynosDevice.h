@@ -313,6 +313,11 @@ class ExynosDevice {
             mIsWaitingReadbackReqDone = false;
         };
 
+        uint32_t getWindowPlaneNum();
+        uint32_t getSpecialPlaneNum();
+        uint32_t getSpecialPlaneId(uint32_t index);
+        uint64_t getSpecialPlaneAttr(uint32_t index);
+
     protected:
         void initDeviceInterface(uint32_t interfaceType);
     protected:

@@ -271,7 +271,7 @@ class ExynosDisplayDrmInterface :
         virtual int getDisplayFd() { return mDrmDevice->fd(); };
         virtual int32_t initDrmDevice(DrmDevice *drmDevice);
         virtual uint32_t getDrmDisplayId(uint32_t type, uint32_t index);
-        virtual uint32_t getMaxWindowNum();
+        virtual uint32_t getMaxWindowNum() { return mMaxWindowNum; };
         virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
                 int32_t* /*android_dataspace_t*/ outDataspace);
         virtual int32_t getDisplayIdentificationData(uint8_t* outPort,
@@ -304,6 +304,7 @@ class ExynosDisplayDrmInterface :
         }
         uint32_t getDbv() { return mBrightnessLevel.get(); }
         float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
+
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -360,6 +361,7 @@ class ExynosDisplayDrmInterface :
         int32_t updateColorSettings(DrmModeAtomicReq &drmReq, uint64_t dqeEnabled);
         int32_t getLowPowerDrmModeModeInfo();
         int32_t setActiveDrmMode(DrmMode const &mode);
+        void setMaxWindowNum(uint32_t num) { mMaxWindowNum = num; };
 
     protected:
         struct PartialRegionState {
@@ -424,6 +426,7 @@ class ExynosDisplayDrmInterface :
 
     private:
         DrmMode mDozeDrmMode;
+        uint32_t mMaxWindowNum = 0;
 
     protected:
         void getBrightnessInterfaceSupport();

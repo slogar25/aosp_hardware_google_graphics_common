@@ -107,17 +107,19 @@ int32_t ExynosDeviceDrmInterface::initDisplayInterface(
 void ExynosDeviceDrmInterface::updateRestrictions()
 {
     int32_t ret = 0;
-
-    mDPUInfo.dpuInfo.dpp_chs.resize(mDrmDevice->planes().size());
     uint32_t channelId = 0;
 
     for (auto &plane : mDrmDevice->planes()) {
+        struct hwc_dpp_ch_restriction hwc_res;
+
         /* Set size restriction information */
         if (plane->hw_restrictions_property().id()) {
             uint64_t blobId;
+
             std::tie(ret, blobId) = plane->hw_restrictions_property().value();
             if (ret)
                 break;
+
             struct dpp_ch_restriction *res;
             drmModePropertyBlobPtr blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
             if (!blob) {
@@ -126,13 +128,14 @@ void ExynosDeviceDrmInterface::updateRestrictions()
                 break;
             }
             res = (struct dpp_ch_restriction *)blob->data;
-            set_dpp_ch_restriction(mDPUInfo.dpuInfo.dpp_chs[channelId], *res);
+            set_dpp_ch_restriction(hwc_res, *res);
             drmModeFreePropertyBlob(blob);
         } else {
             ALOGI("plane[%d] There is no hw restriction information", channelId);
             ret = HWC2_ERROR_UNSUPPORTED;
             break;
         }
+
         /* Set supported format information */
         for (auto format : plane->formats()) {
             std::vector<uint32_t> halFormats;
@@ -141,11 +144,17 @@ void ExynosDeviceDrmInterface::updateRestrictions()
                 continue;
             }
             for (auto halFormat : halFormats) {
-                mDPUInfo.dpuInfo.dpp_chs[channelId].restriction.formats.push_back(halFormat);
+                hwc_res.restriction.formats.push_back(halFormat);
             }
         }
-        if (hwcCheckDebugMessages(eDebugAttrSetting))
-            printDppRestriction(mDPUInfo.dpuInfo.dpp_chs[channelId]);
+
+        if (hwcCheckDebugMessages(eDebugDefault))
+            printDppRestriction(hwc_res);
+
+        if (plane->isFormatSupported(DRM_FORMAT_C8) && plane->getNumFormatSupported() == 1)
+            mDPUInfo.dpuInfo.spp_chs.push_back(hwc_res);
+        else
+            mDPUInfo.dpuInfo.dpp_chs.push_back(hwc_res);
 
         channelId++;
     }
