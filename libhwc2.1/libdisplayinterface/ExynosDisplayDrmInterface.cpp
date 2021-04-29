@@ -1270,6 +1270,36 @@ int32_t ExynosDisplayDrmInterface::setupPartialRegion(DrmModeAtomicReq &drmReq)
     return ret;
 }
 
+int32_t ExynosDisplayDrmInterface::updateColorSettings(DrmModeAtomicReq &drmReq) {
+    int ret = NO_ERROR;
+    if ((ret = setDisplayColorSetting(drmReq)) != 0) {
+        HWC_LOGE(mExynosDisplay, "Failed to set display color setting");
+        return ret;
+    }
+
+    for (size_t i = 0; i < mExynosDisplay->mDpuData.configs.size(); i++) {
+        exynos_win_config_data& config = mExynosDisplay->mDpuData.configs[i];
+        if ((config.state == config.WIN_STATE_BUFFER) ||
+            (config.state == config.WIN_STATE_COLOR)) {
+            int channelId = 0;
+            if ((channelId = getDeconChannel(config.assignedMPP)) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s:: Failed to get channel id (%d)",
+                        __func__, channelId);
+                ret = -EINVAL;
+                return ret;
+            }
+
+            auto &plane = mDrmDevice->planes().at(channelId);
+            if ((ret = setPlaneColorSetting(drmReq, plane, config)) != 0) {
+                HWC_LOGE(mExynosDisplay, "Failed to set plane color setting, config[%zu]", i);
+                return ret;
+            }
+        }
+    }
+
+    return ret;
+}
+
 int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 {
     int ret = NO_ERROR;
@@ -1310,11 +1340,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         planeEnableInfo[plane->id()] = 0;
     }
 
-    if ((ret = setDisplayColorSetting(drmReq)) != 0) {
-        HWC_LOGE(mExynosDisplay, "Failed to set display color setting");
-        return ret;
-    }
-
     for (size_t i = 0; i < mExynosDisplay->mDpuData.configs.size(); i++) {
         exynos_win_config_data& config = mExynosDisplay->mDpuData.configs[i];
         if ((config.state == config.WIN_STATE_BUFFER) ||
@@ -1335,10 +1360,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             uint32_t fbId = 0;
             if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
                 HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
-                return ret;
-            }
-            if ((ret = setPlaneColorSetting(drmReq, plane, config)) != 0) {
-                HWC_LOGE(mExynosDisplay, "Failed to set plane color setting, config[%zu]", i);
                 return ret;
             }
             /* Set this plane is enabled */
@@ -1396,6 +1417,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     if (mExynosDisplay->mDpuData.enable_readback)
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
+    if ((ret = updateColorSettings(drmReq)) != 0) {
+        HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
+        return ret;
+    }
     if ((ret = drmReq.commit(flags, true)) < 0) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in deliverWinConfigData()\n",
                 __func__, ret);
