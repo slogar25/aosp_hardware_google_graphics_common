@@ -289,6 +289,7 @@ class ExynosDisplayDrmInterface :
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
     private:
+        int32_t updateColorSettings(DrmModeAtomicReq &drmReq);
         int32_t getLowPowerDrmModeModeInfo();
         int32_t setActiveDrmMode(DrmMode const &mode);
 
