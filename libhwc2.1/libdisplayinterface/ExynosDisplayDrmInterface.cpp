@@ -1270,6 +1270,18 @@ int32_t ExynosDisplayDrmInterface::setupPartialRegion(DrmModeAtomicReq &drmReq)
     return ret;
 }
 
+int32_t ExynosDisplayDrmInterface::waitVBlank() {
+    drmVBlank vblank;
+    uint32_t high_crtc = (mDrmCrtc->pipe() << DRM_VBLANK_HIGH_CRTC_SHIFT);
+    memset(&vblank, 0, sizeof(vblank));
+    vblank.request.type = (drmVBlankSeqType)(
+        DRM_VBLANK_RELATIVE | (high_crtc & DRM_VBLANK_HIGH_CRTC_MASK));
+    vblank.request.sequence = 1;
+
+    int ret = drmWaitVBlank(mDrmDevice->fd(), &vblank);
+    return ret;
+}
+
 int32_t ExynosDisplayDrmInterface::updateColorSettings(DrmModeAtomicReq &drmReq) {
     int ret = NO_ERROR;
     if ((ret = setDisplayColorSetting(drmReq)) != 0) {
@@ -1405,26 +1417,76 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
         mBrightnessLevel.clear_dirty();
     }
+
+    bool mipi_sync = false;
+    int wait_vsync = 0;
+    auto mipi_sync_action = brightnessState_t::MIPI_SYNC_NONE;
     if (mBrightnessHbmOn.is_dirty()) {
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
                                             mBrightnessHbmOn.get())) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
         }
         mBrightnessHbmOn.clear_dirty();
+
+        // sync mipi command and frame when sdr dimming on/off
+        if (mBrightnessState.dimSdrTransition()) {
+            mipi_sync = true;
+            wait_vsync = 1; // GHBM mipi command has 1 frame delay
+            mipi_sync_action = mBrightnessHbmOn.get()
+                                ? brightnessState_t::MIPI_SYNC_GHBM_ON
+                                : brightnessState_t::MIPI_SYNC_GHBM_OFF;
+        }
     }
 
-    uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
+    uint32_t flags = mipi_sync ? 0 : DRM_MODE_ATOMIC_NONBLOCK;
     if (mExynosDisplay->mDpuData.enable_readback)
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
+
+    if (mipi_sync)
+        drmReq.savePset();
 
     if ((ret = updateColorSettings(drmReq)) != 0) {
         HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
         return ret;
     }
-    if ((ret = drmReq.commit(flags, true)) < 0) {
+    if ((ret = drmReq.commit(flags, true, mipi_sync)) < 0) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in deliverWinConfigData()\n",
                 __func__, ret);
         return ret;
+    }
+
+    if (mipi_sync) {
+        // At this time, the previous commit (block call) starts transferring
+        // the frame, triggered by TE0 rising edge, and all mipi commands are
+        // supposed to be sent out after TE0 falling edge and before TE1 rising
+        // edge. GHBM compensated frame should be transferred at TE2 rising edge.
+        ATRACE_NAME("MIPI_SYNC");
+        while (wait_vsync-- > 0) {
+            if ((ret = waitVBlank()) != NO_ERROR) {
+                HWC_LOGE(mExynosDisplay, "%s:: failed to wait vblank, ret %d",
+                         __func__, ret);
+                return ret;
+            }
+        }
+
+        // frame compensation set/restore
+        mExynosDisplay->updateForMipiSync(mipi_sync_action);
+        if ((ret = mExynosDisplay->updateColorConversionInfo()) != NO_ERROR) {
+            HWC_LOGE(mExynosDisplay, "%s:: updateColorConversionInfo() fail, ret(%d)",
+                    __func__, ret);
+            return ret;
+        }
+        drmReq.restorePset();
+        if ((ret = updateColorSettings(drmReq)) != 0) {
+            HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
+            return ret;
+        }
+        flags |= DRM_MODE_ATOMIC_NONBLOCK;
+        if ((ret = drmReq.commit(flags, true)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s:: Failed to commit gbhm pset ret=%d"
+                     " in deliverWinConfigData()\n", __func__, ret);
+            return ret;
+        }
     }
 
     mExynosDisplay->mDpuData.retire_fence = (int)out_fences[mDrmCrtc->pipe()];
@@ -1547,6 +1609,7 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::DrmModeAtomicReq(ExynosDisplayDrmIn
     : mDrmDisplayInterface(displayInterface)
 {
     mPset = drmModeAtomicAlloc();
+    mSavedPset = NULL;
 }
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
@@ -1670,7 +1733,8 @@ String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
 }
 
 
-int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool loggingForDebug)
+int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool loggingForDebug,
+                                                        bool keepBlob)
 {
     ATRACE_NAME("drmModeAtomicCommit");
     android::String8 result;
@@ -1683,7 +1747,7 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
         setError(ret);
     }
 
-    if ((ret = destroyOldBlobs()) != NO_ERROR) {
+    if (!keepBlob && (ret = destroyOldBlobs()) != NO_ERROR) {
         HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "destroy blob error");
         setError(ret);
     }

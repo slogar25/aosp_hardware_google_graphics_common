@@ -327,6 +327,11 @@ struct DisplayControl {
 };
 
 typedef struct brightnessState {
+    enum MipiSyncType {
+        MIPI_SYNC_NONE,
+        MIPI_SYNC_GHBM_ON,
+        MIPI_SYNC_GHBM_OFF,
+    };
     static constexpr size_t kNumofBrightnessState = 3;
     static constexpr float kSdrDimRatioNone = 1.0;
     union {
@@ -339,8 +344,6 @@ typedef struct brightnessState {
     };
     /** dim ratio calculated from current layer stack but will be delayed to apply **/
     float dim_sdr_target_ratio = kSdrDimRatioNone;
-    /** frames to delay to apply the dim_sdr_target_ratio **/
-    uint32_t dim_delay = 0;
     /** dim ratio to apply to current frame and is 'dim_delay' frames behind
      * dim_sdr_target_ratio **/
     float dim_sdr_ratio = kSdrDimRatioNone;
@@ -352,8 +355,13 @@ typedef struct brightnessState {
         mData = {false, false, false};
         dim_sdr_target_ratio = kSdrDimRatioNone;
     }
+    bool dimSdrTransition() {
+        return dim_sdr_target_ratio != dim_sdr_ratio &&
+            (dim_sdr_target_ratio == kSdrDimRatioNone || dim_sdr_ratio == kSdrDimRatioNone);
+    }
     brightnessState& operator=(const brightnessState& a) {
         mData = a.mData;
+        dim_sdr_target_ratio = a.dim_sdr_target_ratio;
         dim_sdr_ratio = a.dim_sdr_ratio;
         brightness_value = a.brightness_value;
         return *this;
@@ -361,6 +369,7 @@ typedef struct brightnessState {
     bool operator==(const brightnessState& a) const {
         return a.mData == mData &&
             a.dim_sdr_ratio == dim_sdr_ratio &&
+            a.dim_sdr_target_ratio == dim_sdr_target_ratio &&
             a.brightness_value == brightness_value;
     }
 } brightnessState_t;
@@ -1124,6 +1133,12 @@ class ExynosDisplay {
         std::unique_ptr<ExynosDisplayInterface> mDisplayInterface;
 
         const brightnessState_t& getBrightnessState() const { return mBrightnessState; }
+        void updateForMipiSync(brightnessState_t::MipiSyncType type) {
+            if (type == brightnessState_t::MIPI_SYNC_GHBM_ON ||
+                type == brightnessState_t::MIPI_SYNC_GHBM_OFF) {
+                mBrightnessState.dim_sdr_ratio = mBrightnessState.dim_sdr_target_ratio;
+            }
+        }
         float getBrightnessValue() const { return mBrightnessState.brightness_value; }
 
     private:
@@ -1136,9 +1151,6 @@ class ExynosDisplay {
             assert(vsync_period > 0);
             return static_cast<uint32_t>(vsync_period);
         }
-
-        // send ghbm command after current frame then dim/undim the third frame
-        static constexpr uint32_t kGhbmFrameDelay = 3;
 
         /// minimum possible dim rate in the case hbm peak is 1000 nits and norml
         // display brightness is 2 nits
