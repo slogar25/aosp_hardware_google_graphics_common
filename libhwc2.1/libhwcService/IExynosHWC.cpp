@@ -60,6 +60,7 @@ enum {
     SET_DISPLAY_DEVICE_MODE = 1000,
     SET_PANEL_GAMMA_TABLE_SOURCE = 1001,
     SET_DISPLAY_BRIGHTNESS = 1002,
+    SET_DISPLAY_LHBM = 1003,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -391,6 +392,16 @@ public:
             ALOGE("SET_DISPLAY_BRIGHTNESS transact error(%d)", result);
         return result;
     }
+
+    virtual int32_t setDisplayLhbm(int32_t display_id, uint32_t on) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(display_id);
+        data.writeInt32(on);
+        int result = remote()->transact(SET_DISPLAY_LHBM, data, &reply);
+        if (result) ALOGE("SET_DISPLAY_LHBM transact error(%d)", result);
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -623,6 +634,15 @@ status_t BnExynosHWCService::onTransact(
             int32_t display_id = data.readInt32();
             float brightness = data.readFloat();
             int32_t error = setDisplayBrightness(display_id, brightness);
+            reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+
+        case SET_DISPLAY_LHBM: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            int32_t display_id = data.readInt32();
+            uint32_t on = data.readInt32();
+            int32_t error = setDisplayLhbm(display_id, on);
             reply->writeInt32(error);
             return NO_ERROR;
         } break;
