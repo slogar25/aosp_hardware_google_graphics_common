@@ -130,13 +130,27 @@ class ExynosDisplayDrmInterface :
                 DrmModeAtomicReq& operator=(const DrmModeAtomicReq&) = delete;
 
                 drmModeAtomicReqPtr pset() { return mPset; };
+                void savePset() {
+                    if (mSavedPset) {
+                        drmModeAtomicFree(mSavedPset);
+                    }
+                    mSavedPset = drmModeAtomicDuplicate(mPset);
+                }
+                void restorePset() {
+                    if (mPset) {
+                        drmModeAtomicFree(mPset);
+                    }
+                    mPset = mSavedPset;
+                    mSavedPset = NULL;
+                }
+
                 void setError(int err) { mError = err; };
                 int getError() { return mError; };
                 int32_t atomicAddProperty(const uint32_t id,
                         const DrmProperty &property,
                         uint64_t value, bool optional = false);
                 String8& dumpAtomicCommitInfo(String8 &result, bool debugPrint = false);
-                int commit(uint32_t flags, bool loggingForDebug = false);
+                int commit(uint32_t flags, bool loggingForDebug = false, bool keepBlob = false);
                 void addOldBlob(uint32_t blob_id) {
                     mOldBlobs.push_back(blob_id);
                 };
@@ -154,6 +168,7 @@ class ExynosDisplayDrmInterface :
                 };
             private:
                 drmModeAtomicReqPtr mPset;
+                drmModeAtomicReqPtr mSavedPset;
                 int mError = 0;
                 ExynosDisplayDrmInterface *mDrmDisplayInterface = NULL;
                 /* Destroy old blobs after commit */
@@ -289,6 +304,7 @@ class ExynosDisplayDrmInterface :
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
     private:
+        int32_t waitVBlank();
         int32_t updateColorSettings(DrmModeAtomicReq &drmReq);
         int32_t getLowPowerDrmModeModeInfo();
         int32_t setActiveDrmMode(DrmMode const &mode);
