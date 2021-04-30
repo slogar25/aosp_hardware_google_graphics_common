@@ -175,7 +175,9 @@ struct DisplayScene {
                render_intent == rhs.render_intent &&
                matrix == rhs.matrix &&
                force_hdr == rhs.force_hdr &&
-               bm == rhs.bm;
+               bm == rhs.bm &&
+               lhbm_on == rhs.lhbm_on &&
+               (lhbm_on && dbv == rhs.dbv);
     }
 
     /// A vector of layer color data.
@@ -201,6 +203,12 @@ struct DisplayScene {
 
     /// display brightness mode
     BrightnessMode bm;
+
+    /// dbv level
+    uint32_t dbv;
+
+    /// lhbm status
+    bool lhbm_on;
 };
 
 /// An interface specifying functions that are HW-agnostic.
@@ -224,6 +232,15 @@ class IDisplayColorGeneric {
         bool dirty = false;
 
         const ConfigType *config = nullptr;
+    };
+
+    /// Interface for accessing data for panel
+    class IPanel {
+      public:
+        /// Get the adjusted dbv for panel.
+        virtual uint32_t GetAdjustedBrightnessLevel() const = 0;
+
+        virtual ~IPanel() {}
     };
 
     virtual ~IDisplayColorGeneric() {}
