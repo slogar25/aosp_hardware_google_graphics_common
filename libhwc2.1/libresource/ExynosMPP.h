@@ -25,6 +25,7 @@
 #include <utils/Mutex.h>
 #include <utils/Condition.h>
 #include <utils/String8.h>
+#include <utils/StrongPointer.h>
 #include <utils/List.h>
 #include <utils/Vector.h>
 #include <map>
@@ -510,7 +511,7 @@ public:
     int32_t mPrevAssignedDisplayType;
     int32_t mReservedDisplay;
 
-    ResourceManageThread mResourceManageThread;
+    android::sp<ResourceManageThread> mResourceManageThread;
     float mCapacity;
     float mUsedCapacity;
 
