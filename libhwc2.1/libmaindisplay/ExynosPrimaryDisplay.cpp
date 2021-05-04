@@ -248,19 +248,21 @@ int32_t ExynosPrimaryDisplay::setPowerOff() {
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosPrimaryDisplay::setPowerDoze() {
+int32_t ExynosPrimaryDisplay::setPowerDoze(hwc2_power_mode_t mode) {
     ATRACE_CALL();
 
     if (!mDisplayInterface->isDozeModeAvailable()) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    if (mDisplayInterface->setLowPowerMode()) {
-        ALOGI("Not support LP mode.");
-        return HWC2_ERROR_UNSUPPORTED;
+    if ((mPowerModeState == HWC2_POWER_MODE_OFF) || (mPowerModeState == HWC2_POWER_MODE_ON)) {
+        if (mDisplayInterface->setLowPowerMode()) {
+            ALOGI("Not support LP mode.");
+            return HWC2_ERROR_UNSUPPORTED;
+        }
     }
 
-    mPowerModeState = HWC2_POWER_MODE_DOZE;
+    mPowerModeState = mode;
 
     return HWC2_ERROR_NONE;
 }
@@ -296,9 +298,8 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
 
     switch (mode) {
         case HWC2_POWER_MODE_DOZE_SUSPEND:
-            return HWC2_ERROR_UNSUPPORTED;
         case HWC2_POWER_MODE_DOZE:
-            return setPowerDoze();
+            return setPowerDoze(static_cast<hwc2_power_mode_t>(mode));
         case HWC2_POWER_MODE_OFF:
             setPowerOff();
             break;
