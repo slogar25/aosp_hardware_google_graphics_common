@@ -66,7 +66,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t applyPendingConfig();
         int32_t setPowerOn();
         int32_t setPowerOff();
-        int32_t setPowerDoze();
+        int32_t setPowerDoze(hwc2_power_mode_t mode);
         void firstPowerOn();
 
         std::string getPanelSysfsPath(const displaycolor::DisplayType& type);
