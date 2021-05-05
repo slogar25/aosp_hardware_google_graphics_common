@@ -132,6 +132,11 @@ int DrmConnector::Init() {
       ALOGE("Could not get dimming_on property\n");
   }
 
+  ret = drm_->GetConnectorProperty(*this, "local_hbm_mode", &lhbm_on_);
+  if (ret) {
+      ALOGE("Could not get local_hbm_mode property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   properties_.push_back(&edid_property_);
@@ -149,6 +154,7 @@ int DrmConnector::Init() {
   properties_.push_back(&brightness_level_);
   properties_.push_back(&hbm_on_);
   properties_.push_back(&dimming_on_);
+  properties_.push_back(&lhbm_on_);
 
   return 0;
 }
@@ -305,6 +311,10 @@ const DrmProperty &DrmConnector::hbm_on() const {
 
 const DrmProperty &DrmConnector::dimming_on() const {
     return dimming_on_;
+}
+
+const DrmProperty &DrmConnector::lhbm_on() const {
+    return lhbm_on_;
 }
 
 const DrmProperty &DrmConnector::hdr_formats() const {
