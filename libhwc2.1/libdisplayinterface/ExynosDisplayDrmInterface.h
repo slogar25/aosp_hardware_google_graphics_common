@@ -397,6 +397,7 @@ class ExynosDisplayDrmInterface :
         float mScaledBrightness;
         CtrlValue<bool> mBrightnessDimmingOn;
         CtrlValue<bool> mBrightnessHbmOn;
+        CtrlValue<bool> mBrightnessLhbmOn;
 
         struct BrightnessTable {
             float mBriStart;

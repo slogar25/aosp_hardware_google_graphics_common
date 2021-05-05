@@ -70,6 +70,7 @@ public:
     virtual void notifyPSRExit() = 0;
     */
     virtual int32_t setDisplayBrightness(int32_t display_id, float brightness) = 0;
+    virtual int32_t setDisplayLhbm(int32_t display_id, uint32_t on) = 0;
 };
 
 /* Native Interface */

@@ -626,7 +626,12 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
         HWC_LOGE(mExynosDisplay, "setPower mode ret (%d)", ret);
     }
 
-    if (mode == HWC_POWER_MODE_OFF) mBrightnessState.reset();
+    if (mode == HWC_POWER_MODE_OFF) {
+        mBrightnessState.reset();
+        mBrightnessLhbmOn.store(false);
+        mBrightnessLhbmOn.clear_dirty();
+        mExynosDisplay->requestLhbm(false);
+    }
     return ret;
 }
 
@@ -1421,6 +1426,15 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     bool mipi_sync = false;
     int wait_vsync = 0;
     auto mipi_sync_action = brightnessState_t::MIPI_SYNC_NONE;
+
+    if (mBrightnessLhbmOn.is_dirty()) {
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->lhbm_on(),
+                                            mBrightnessLhbmOn.get())) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set lhbm_on property", __func__);
+        }
+        mBrightnessLhbmOn.clear_dirty();
+    }
+
     if (mBrightnessHbmOn.is_dirty()) {
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
                                             mBrightnessHbmOn.get())) < 0) {
@@ -2048,6 +2062,8 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     mBrightnessHbmOn.clear_dirty();
     mBrightnessDimmingOn.store(true);
     mBrightnessDimmingOn.clear_dirty();
+    mBrightnessLhbmOn.store(false);
+    mBrightnessLhbmOn.clear_dirty();
 
     mHbmOnFd = fopen(kHbmOnFileNode, "w+");
     if (mHbmOnFd == NULL) ALOGE("%s open failed! %s", kHbmOnFileNode, strerror(errno));
@@ -2133,6 +2149,8 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
         mScaledBrightness = brightness;
     }
 
+    mBrightnessLhbmOn.store(brightness_state.local_hbm);
+
     uint32_t range;
     for (range = 0; range < BrightnessRange::MAX; range++) {
         if (mScaledBrightness <= mBrightnessTable[range].mBriEnd) {
@@ -2153,8 +2171,8 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     } else {
         mBrightnessHbmOn.store(false);
     }
-    ALOGI("level=%d, DimmingOn=%d, HbmOn=%d", mBrightnessLevel.get(), mBrightnessDimmingOn.get(),
-          mBrightnessHbmOn.get());
+    ALOGI("level=%d, DimmingOn=%d, HbmOn=%d, LhbmOn=%d", mBrightnessLevel.get(),
+          mBrightnessDimmingOn.get(), mBrightnessHbmOn.get(), mBrightnessLhbmOn.get());
 
     mBrightnessState = brightness_state;
 
