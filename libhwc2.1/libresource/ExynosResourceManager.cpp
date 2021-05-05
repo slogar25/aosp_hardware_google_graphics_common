@@ -143,7 +143,7 @@ ExynosResourceManager::ExynosResourceManager(ExynosDevice *device)
     hasHdrLayer(false),
     hasDrmLayer(false),
     mFormatRestrictionCnt(0),
-    mDstBufMgrThread(this),
+    mDstBufMgrThread(sp<DstBufMgrThread>::make(this)),
     mResourceReserved(0x0)
 {
 
@@ -195,8 +195,8 @@ ExynosResourceManager::ExynosResourceManager(ExynosDevice *device)
         }
     }
 
-    mDstBufMgrThread.mRunning = true;
-    mDstBufMgrThread.run("DstBufMgrThread");
+    mDstBufMgrThread->mRunning = true;
+    mDstBufMgrThread->run("DstBufMgrThread");
 }
 
 ExynosResourceManager::~ExynosResourceManager()
@@ -212,8 +212,8 @@ ExynosResourceManager::~ExynosResourceManager()
     }
     mM2mMPPs.clear();
 
-    mDstBufMgrThread.mRunning = false;
-    mDstBufMgrThread.requestExitAndWait();
+    mDstBufMgrThread->mRunning = false;
+    mDstBufMgrThread->requestExitAndWait();
 }
 
 void ExynosResourceManager::reloadResourceForHWFC()
@@ -266,7 +266,7 @@ int32_t ExynosResourceManager::doPreProcessing()
 void ExynosResourceManager::doReallocDstBufs(uint32_t Xres, uint32_t Yres)
 {
     HDEBUGLOGD(eDebugBuf, "M2M dst alloc call ");
-    mDstBufMgrThread.reallocDstBufs(Xres, Yres);
+    mDstBufMgrThread->reallocDstBufs(Xres, Yres);
 }
 
 bool ExynosResourceManager::DstBufMgrThread::needDstRealloc(uint32_t Xres, uint32_t Yres, ExynosMPP *m2mMPP)
@@ -583,7 +583,7 @@ int32_t ExynosResourceManager::assignResourceInternal(ExynosDisplay *display)
     int ret = NO_ERROR;
     int retry_count = 0;
 
-    Mutex::Autolock lock(mDstBufMgrThread.mStateMutex);
+    Mutex::Autolock lock(mDstBufMgrThread->mStateMutex);
 
     /*
      * First add layers that SF requested HWC2_COMPOSITION_CLIENT type
