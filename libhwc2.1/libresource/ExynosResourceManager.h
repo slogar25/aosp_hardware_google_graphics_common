@@ -183,7 +183,7 @@ class ExynosResourceManager {
                 uint32_t layer_index, exynos_image m2m_out_img, ExynosMPP *m2mMPP, ExynosMPP *otfMPP);
         void dump(const restriction_classification_t, String8 &result) const;
 
-        DstBufMgrThread mDstBufMgrThread;
+        sp<DstBufMgrThread> mDstBufMgrThread;
 
     protected:
         virtual void setFrameRateForPerformance(ExynosMPP &mpp, AcrylicPerformanceRequestFrame *frame);
