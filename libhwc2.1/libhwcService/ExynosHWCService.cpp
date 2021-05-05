@@ -415,4 +415,17 @@ int32_t ExynosHWCService::setDisplayBrightness(int32_t display_id, float brightn
     return -EINVAL;
 }
 
+int32_t ExynosHWCService::setDisplayLhbm(int32_t display_id, uint32_t on) {
+    if (on > 1) return -EINVAL;
+
+    auto display = mHWCCtx->device->getDisplay(display_id);
+
+    if (display != nullptr) {
+        display->requestLhbm(!!on);
+        return NO_ERROR;
+    }
+
+    return -EINVAL;
+}
+
 } //namespace android

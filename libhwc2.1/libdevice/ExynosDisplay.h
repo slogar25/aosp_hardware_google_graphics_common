@@ -332,7 +332,7 @@ typedef struct brightnessState {
         MIPI_SYNC_GHBM_ON,
         MIPI_SYNC_GHBM_OFF,
     };
-    static constexpr size_t kNumofBrightnessState = 3;
+    static constexpr size_t kNumofBrightnessState = 4;
     static constexpr float kSdrDimRatioNone = 1.0;
     union {
         std::array<bool, kNumofBrightnessState> mData;
@@ -340,6 +340,7 @@ typedef struct brightnessState {
             bool instant_hbm;
             bool peak_hbm;
             bool boost_brightness;
+            bool local_hbm;
         };
     };
     /** dim ratio calculated from current layer stack but will be delayed to apply **/
@@ -352,7 +353,7 @@ typedef struct brightnessState {
     float brightness_value;
 
     void reset() {
-        mData = {false, false, false};
+        mData = {false, false, false, false};
         dim_sdr_target_ratio = kSdrDimRatioNone;
     }
     bool dimSdrTransition() {
@@ -1140,6 +1141,10 @@ class ExynosDisplay {
             }
         }
         float getBrightnessValue() const { return mBrightnessState.brightness_value; }
+        void requestLhbm(bool on) {
+            mReqLhbm = on;
+            mDevice->invalidate();
+        }
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
@@ -1164,6 +1169,9 @@ class ExynosDisplay {
 
         // Brightness state
         brightnessState_t mBrightnessState;
+
+        // request lhbm state
+        bool mReqLhbm = false;
 
         // for power HAL extension hints
         std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>
