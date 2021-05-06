@@ -63,6 +63,8 @@ static void set_dpp_ch_restriction(struct hwc_dpp_ch_restriction &hwc_dpp_restri
         hwc_dpp_restriction.restriction.scale_up = 1;
 }
 
+using namespace SOC_VERSION;
+
 ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice)
 {
     mType = INTERFACE_TYPE_DRM;

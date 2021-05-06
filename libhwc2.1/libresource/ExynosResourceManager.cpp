@@ -82,6 +82,7 @@ feature_support_t feature_table[] =
 
 using namespace android;
 using namespace vendor::graphics;
+using namespace SOC_VERSION;
 
 ExynosMPPVector ExynosResourceManager::mOtfMPPs;
 ExynosMPPVector ExynosResourceManager::mM2mMPPs;

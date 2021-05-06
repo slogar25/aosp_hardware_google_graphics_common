@@ -20,8 +20,6 @@
 
 #include "../libdevice/ExynosDisplay.h"
 
-class ExynosMPPModule;
-
 class ExynosPrimaryDisplay : public ExynosDisplay {
     public:
         /* Methods */
