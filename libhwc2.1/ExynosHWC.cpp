@@ -32,6 +32,7 @@
 class ExynosHWCService;
 
 using namespace android;
+using namespace SOC_VERSION;
 
 uint32_t hwcApiVersion(const hwc_composer_device_1_t* hwc) {
     uint32_t hwcVersion = hwc->common.version;
