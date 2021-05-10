@@ -3384,9 +3384,6 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
         updateBtsVsyncPeriod(mVsyncPeriod, true);
     }
 
-    /* Update mYuvHdrHbmThresholdArea */
-    mYuvHdrHbmThresholdArea = mXres * mYres * kHbmThresholdPct;
-
     return NO_ERROR;
 }
 
@@ -5086,8 +5083,6 @@ void ExynosDisplay::updateBrightnessState() {
                     mBrightnessState.peak_hbm = true;
                     mBrightnessState.instant_hbm = true;
                 }
-            } else if (mLayers[i]->getDisplayFrameArea() > mYuvHdrHbmThresholdArea) {
-                mBrightnessState.boost_brightness = true;
             }
         }
     }
