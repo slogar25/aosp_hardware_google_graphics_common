@@ -68,6 +68,8 @@ LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V1-ndk_platform \
                           libbase
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
+LOCAL_HEADER_LIBRARIES += libgralloc_headers
+
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 LOCAL_STATIC_LIBRARIES += libjsoncpp
 LOCAL_PROPRIETARY_MODULE := true
@@ -135,6 +137,7 @@ ifeq ($(BOARD_USES_HWC_SERVICES),true)
 include $(CLEAR_VARS)
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
+LOCAL_HEADER_LIBRARIES += libgralloc_headers
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay libacryl \
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
@@ -205,6 +208,7 @@ LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V1-ndk_platform \
 
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
+LOCAL_HEADER_LIBRARIES += libgralloc_headers
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwcomposer\"
