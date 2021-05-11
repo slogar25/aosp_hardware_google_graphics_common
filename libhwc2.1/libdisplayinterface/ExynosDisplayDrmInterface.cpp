@@ -1415,15 +1415,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
         mBrightnessDimmingOn.clear_dirty();
     }
-    if (mBrightnessLevel.is_dirty()) {
-        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->brightness_level(),
-                                            mBrightnessLevel.get())) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
-        }
-        mBrightnessLevel.clear_dirty();
-    }
 
-    bool mipi_sync = false;
+    bool mipi_sync = false; // support one sync type a time for now
     int wait_vsync = 0;
     auto mipi_sync_action = brightnessState_t::MIPI_SYNC_NONE;
 
@@ -1432,6 +1425,32 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                                             mBrightnessLhbmOn.get())) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set lhbm_on property", __func__);
         }
+        mBrightnessLhbmOn.clear_dirty();
+
+        // sync mipi command and frame when lhbm on/off
+        mipi_sync = true;
+        mipi_sync_action = mBrightnessLhbmOn.get()
+                            ? brightnessState_t::MIPI_SYNC_LHBM_ON
+                            : brightnessState_t::MIPI_SYNC_LHBM_OFF;
+    }
+
+    if (mBrightnessLhbmOn.is_dirty() || mBrightnessLevel.is_dirty()) {
+        auto dbv = mBrightnessLevel.get();
+        if (mBrightnessLhbmOn.get()) {
+            uint32_t dbv_adj = 0;
+            if (mExynosDisplay->getColorAdjustedDbv(dbv_adj)) {
+                ALOGW("failed to get adjusted dbv");
+            } else if (dbv_adj != dbv && dbv_adj != 0) {
+                ALOGI("lhbm: adjust dbv from %d to %d", dbv, dbv_adj);
+                dbv = dbv_adj;
+            }
+        }
+
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+                                            mDrmConnector->brightness_level(), dbv)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
+        }
+        mBrightnessLevel.clear_dirty();
         mBrightnessLhbmOn.clear_dirty();
     }
 
@@ -1443,7 +1462,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         mBrightnessHbmOn.clear_dirty();
 
         // sync mipi command and frame when sdr dimming on/off
-        if (mBrightnessState.dimSdrTransition()) {
+        if (!mipi_sync && mBrightnessState.dimSdrTransition()) {
             mipi_sync = true;
             wait_vsync = 1; // GHBM mipi command has 1 frame delay
             mipi_sync_action = mBrightnessHbmOn.get()
@@ -1473,7 +1492,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         // At this time, the previous commit (block call) starts transferring
         // the frame, triggered by TE0 rising edge, and all mipi commands are
         // supposed to be sent out after TE0 falling edge and before TE1 rising
-        // edge. GHBM compensated frame should be transferred at TE2 rising edge.
+        // edge. GHBM (un)compensated frame should be transferred at TE2 rising edge.
+        // LHBM (un)compensated frame should be transferred at TE1 rising edge.
         ATRACE_NAME("MIPI_SYNC");
         while (wait_vsync-- > 0) {
             if ((ret = waitVBlank()) != NO_ERROR) {

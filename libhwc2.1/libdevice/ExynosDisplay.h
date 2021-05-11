@@ -331,6 +331,8 @@ typedef struct brightnessState {
         MIPI_SYNC_NONE,
         MIPI_SYNC_GHBM_ON,
         MIPI_SYNC_GHBM_OFF,
+        MIPI_SYNC_LHBM_ON,
+        MIPI_SYNC_LHBM_OFF,
     };
     static constexpr size_t kNumofBrightnessState = 4;
     static constexpr float kSdrDimRatioNone = 1.0;
@@ -1097,6 +1099,7 @@ class ExynosDisplay {
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
+        virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
             return HWC2_ERROR_UNSUPPORTED;
