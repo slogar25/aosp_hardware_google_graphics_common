@@ -254,6 +254,7 @@ class ExynosDisplayDrmInterface :
         virtual float getSdrDimRatio();
 
         bool isHbmOn() { return mBrightnessHbmOn.get(); }
+        uint32_t getDbv() { return mBrightnessLevel.get(); }
     protected:
         struct ModeState {
             bool needs_modeset = false;
