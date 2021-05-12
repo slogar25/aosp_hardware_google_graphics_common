@@ -21,8 +21,8 @@
 
 namespace android {
 
-Worker::Worker(const char *name, int priority)
-    : name_(name), priority_(priority), exit_(false), initialized_(false) {
+Worker::Worker(const char *name, int priority, bool is_rt)
+    : name_(name), priority_(priority), is_rt_(is_rt), exit_(false), initialized_(false) {
 }
 
 Worker::~Worker() {
@@ -77,7 +77,14 @@ int Worker::WaitForSignalOrExitLocked(int64_t max_nanoseconds) {
 }
 
 void Worker::InternalRoutine() {
-  setpriority(PRIO_PROCESS, 0, priority_);
+  if (is_rt_) {
+    struct sched_param param = { 0 };
+    param.sched_priority = priority_;
+    sched_setscheduler(0, SCHED_FIFO, &param);
+  } else {
+    setpriority(PRIO_PROCESS, 0, priority_);
+  }
+
   prctl(PR_SET_NAME, name_.c_str());
 
   std::unique_lock<std::mutex> lk(mutex_, std::defer_lock);
