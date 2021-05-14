@@ -36,7 +36,7 @@
 namespace android {
 
 VSyncWorker::VSyncWorker()
-    : Worker("vsync", HAL_PRIORITY_URGENT_DISPLAY),
+    : Worker("vsync", 2, true),
       drm_(NULL),
       display_(-1),
       enabled_(false),
