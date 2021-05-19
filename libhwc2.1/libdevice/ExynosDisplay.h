@@ -334,14 +334,13 @@ typedef struct brightnessState {
         MIPI_SYNC_LHBM_ON,
         MIPI_SYNC_LHBM_OFF,
     };
-    static constexpr size_t kNumofBrightnessState = 4;
+    static constexpr size_t kNumofBrightnessState = 3;
     static constexpr float kSdrDimRatioNone = 1.0;
     union {
         std::array<bool, kNumofBrightnessState> mData;
         struct {
             bool instant_hbm;
             bool peak_hbm;
-            bool boost_brightness;
             bool local_hbm;
         };
     };
@@ -355,7 +354,7 @@ typedef struct brightnessState {
     float brightness_value;
 
     void reset() {
-        mData = {false, false, false, false};
+        mData = {false, false, false};
         dim_sdr_target_ratio = kSdrDimRatioNone;
     }
     bool dimSdrTransition() {
@@ -1164,13 +1163,7 @@ class ExynosDisplay {
         // display brightness is 2 nits
         static constexpr float kGhbmMinDimRatio = 0.002;
 
-        // hbm threshold percentage
-        static constexpr float kHbmThresholdPct = 0.5f;
-
-        // threshold to request HBM when HDR video
-        uint32_t mYuvHdrHbmThresholdArea;
-
-        // Brightness state
+       // Brightness state
         brightnessState_t mBrightnessState;
 
         // request lhbm state
