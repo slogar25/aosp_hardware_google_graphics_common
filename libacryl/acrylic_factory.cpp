@@ -15,14 +15,14 @@
  * limitations under the License.
  */
 
-#include <cstring>
-
 #include <log/log.h>
-
+#include <mali_gralloc_formats.h>
 #include <exynos_format.h> // hardware/smasung_slsi/exynos/include
 
-#include "acrylic_internal.h"
+#include <cstring>
+
 #include "acrylic_g2d.h"
+#include "acrylic_internal.h"
 
 static uint32_t all_fimg2d_gs101_formats[] = {
     HAL_PIXEL_FORMAT_RGBA_8888,
@@ -37,12 +37,14 @@ static uint32_t all_fimg2d_gs101_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,    // NV21 on multi-buffer
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           // NV12 (YUV420 semi-planar)
     HAL_PIXEL_FORMAT_GOOGLE_NV12_SP,                // NV12 (YUV420 semi-planar)
+    MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I,     // NV12 AFBC
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,          // NV12 with MFC alignment constraints
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,         // NV12M with MFC alignment constraints on multi-buffer
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,    // NV12M with MFC alignment constraints on multi-buffer
     HAL_PIXEL_FORMAT_YCbCr_422_SP,                  // YUV422 2P (YUV422 semi-planar)
     HAL_PIXEL_FORMAT_YCBCR_P010,
     HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B,
+    MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
@@ -65,12 +67,14 @@ static uint32_t all_fimg2d_gs201_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_FULL,    // NV21 on multi-buffer
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           // NV12 (YUV420 semi-planar)
     HAL_PIXEL_FORMAT_GOOGLE_NV12_SP,                // NV12 (YUV420 semi-planar)
+    MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I,     // NV12 AFBC
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,          // NV12 with MFC alignment constraints
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,         // NV12M with MFC alignment constraints on multi-buffer
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,    // NV12M with MFC alignment constraints on multi-buffer
     HAL_PIXEL_FORMAT_YCbCr_422_SP,                  // YUV422 2P (YUV422 semi-planar)
     HAL_PIXEL_FORMAT_YCBCR_P010,
     HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B,
+    MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
