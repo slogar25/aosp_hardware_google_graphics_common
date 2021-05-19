@@ -2058,10 +2058,6 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     const struct brightness_capability *cap =
             reinterpret_cast<struct brightness_capability *>(blob->data);
 
-    mBrightnessHdrRatio =
-            static_cast<float>(cap->hbm.nits.max) / static_cast<float>(cap->normal.nits.max);
-    ALOGI("mBrightnessHdrRatio = %f", mBrightnessHdrRatio);
-
     if (cap->hbm.level.min == cap->hbm.level.max)
         mPanelHbmType = PanelHbmType::ONE_STEP;
     else
@@ -2163,8 +2159,6 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
 
     if (brightness_state.peak_hbm) {
         mScaledBrightness = mBrightnessHbmMax;
-    } else if (brightness_state.boost_brightness) {
-        mScaledBrightness = min(mBrightnessHdrRatio * brightness, mBrightnessHbmMax);
     } else {
         mScaledBrightness = brightness;
     }
