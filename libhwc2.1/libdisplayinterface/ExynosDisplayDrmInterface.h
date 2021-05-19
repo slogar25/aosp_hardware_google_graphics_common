@@ -379,8 +379,6 @@ class ExynosDisplayDrmInterface :
         FILE *mDimmingOnFd;
         bool mBrightntessIntfSupported = false;
         float mBrightnessHbmMax = 1.0f;
-        /* boost brightness ratio for HDR */
-        float mBrightnessHdrRatio = 1.0;
         enum class PanelHbmType {
             ONE_STEP,
             CONTINUOUS,
