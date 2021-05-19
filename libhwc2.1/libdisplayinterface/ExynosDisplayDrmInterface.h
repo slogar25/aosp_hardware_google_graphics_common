@@ -253,8 +253,9 @@ class ExynosDisplayDrmInterface :
         virtual int32_t updateBrightness(bool syncFrame);
         virtual float getSdrDimRatio();
 
-        bool isHbmOn() { return mBrightnessHbmOn.get(); }
+        bool isHbmOn() { return mBrightnessCtrl.HbmOn.get(); }
         uint32_t getDbv() { return mBrightnessLevel.get(); }
+
     protected:
         struct ModeState {
             bool needs_modeset = false;
@@ -394,9 +395,24 @@ class ExynosDisplayDrmInterface :
         brightnessState_t mBrightnessState;
         CtrlValue<uint32_t> mBrightnessLevel;
         float mScaledBrightness;
-        CtrlValue<bool> mBrightnessDimmingOn;
-        CtrlValue<bool> mBrightnessHbmOn;
-        CtrlValue<bool> mBrightnessLhbmOn;
+        typedef struct brightnessCtrl {
+            static constexpr size_t kNumOfBrightnessCtrl = 3;
+            union {
+                std::array<CtrlValue<bool>, kNumOfBrightnessCtrl> mData;
+                struct {
+                    CtrlValue<bool> DimmingOn;
+                    CtrlValue<bool> HbmOn;
+                    CtrlValue<bool> LhbmOn;
+                };
+            };
+            void reset() {
+                for (uint32_t i = 0; i < kNumOfBrightnessCtrl; i++) {
+                    mData[i].store(false);
+                    mData[i].clear_dirty();
+                };
+            }
+        } brightnessCtrl_t;
+        brightnessCtrl_t mBrightnessCtrl;
 
         struct BrightnessTable {
             float mBriStart;
