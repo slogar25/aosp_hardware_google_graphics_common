@@ -508,6 +508,8 @@ int32_t ExynosDisplay::destroyLayer(hwc2_layer_t outLayer) {
         setGeometryChanged(GEOMETRY_DISPLAY_LAYER_REMOVED);
     }
 
+    mDisplayInterface->destroyLayer(layer);
+
     delete layer;
 
     if (mPlugState == false) {
@@ -1244,6 +1246,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
         h -= crop;
     }
 
+    cfg.layer = &layer;
     if ((layer.mExynosCompositionType == HWC2_COMPOSITION_DEVICE) &&
         (layer.mCompositionType == HWC2_COMPOSITION_CURSOR))
         cfg.state = cfg.WIN_STATE_CURSOR;
@@ -1276,6 +1279,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     else
         cfg.format = layer.mPreprocessedInfo.mPrivateFormat;
 
+    cfg.buffer_id = gmeta.unique_id;
     cfg.fd_idma[0] = gmeta.fd;
     cfg.fd_idma[1] = gmeta.fd1;
     cfg.fd_idma[2] = gmeta.fd2;
@@ -1509,6 +1513,7 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
         }
     }
 
+    config.buffer_id = gmeta.unique_id;
     config.fd_idma[0] = gmeta.fd;
     config.fd_idma[1] = gmeta.fd1;
     config.fd_idma[2] = gmeta.fd2;
