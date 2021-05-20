@@ -119,7 +119,7 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm libui libvendorgraphicbuf
 
 LOCAL_VINTF_FRAGMENTS         += pixel-display-default.xml
 
-include $(TOP)/hardware/google/graphics/$(hwc_modules_path)/libhwc2.1/Android.mk
+include $(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/Android.mk
 
 LOCAL_CFLAGS += -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"display\"
