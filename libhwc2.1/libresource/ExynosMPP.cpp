@@ -1047,12 +1047,6 @@ uint64_t ExynosMPP::getBufferUsage(uint64_t usage)
         allocUsage |= VendorGraphicBufferUsage::PRIVATE_NONSECURE;
     }
 
-    /* HACK: for distinguishing FIMD_VIDEO_region */
-    if (!((allocUsage & BufferUsage::PROTECTED) &&
-          !(allocUsage & VendorGraphicBufferUsage::PRIVATE_NONSECURE))) {
-        allocUsage |= (BufferUsage::GPU_TEXTURE | BufferUsage::GPU_RENDER_TARGET);
-    }
-
     return allocUsage;
 }
 
