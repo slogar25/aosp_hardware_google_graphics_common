@@ -1111,6 +1111,7 @@ class ExynosDisplay {
         virtual void setLbeAmbientLight(int __unused value){};
         virtual LbeState getLbeState() { return LbeState::OFF; };
 
+        int32_t checkPowerHalExtHintSupport(const std::string& mode);
         int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
         /* getDisplayPreAssignBit support mIndex up to 1.
@@ -1124,8 +1125,7 @@ class ExynosDisplay {
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
         virtual int32_t setActiveConfigInternal(hwc2_config_t config, bool force);
 
-        void removeRefreshRateHint();
-        void restoreRefreshRateHint();
+        void updateRefreshRateHint();
 
     public:
         /**
@@ -1151,7 +1151,9 @@ class ExynosDisplay {
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
         void connectPowerHalExt();
-        void updateRefreshRateHint();
+        int32_t checkIdleHintSupport();
+        int32_t checkRefreshRateHintSupport(int refreshRate);
+
         inline uint32_t getDisplayVsyncPeriodFromConfig(hwc2_config_t config) {
             int32_t vsync_period;
             getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &vsync_period);
@@ -1173,9 +1175,11 @@ class ExynosDisplay {
         std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>
                 mPowerHalExtAidl;
 
-        // previous refresh rate hint
-        std::string mPrevFpsHintStr;
-        bool mRestorePrevFpsHint;
+        // previous refresh rate
+        int mPrevRefreshRate;
+
+        // support list of refresh rate hints
+        std::map<int, bool> mRefreshRateHintSupportMap;
 
         /* Idle hint to notify power hal */
         class IdleHintWorker : public Worker {
@@ -1193,6 +1197,9 @@ class ExynosDisplay {
             bool mNeedResetTimer;
         };
 
+        // whether idle hint support is checked
+        bool mIdleHintSupportIsChecked;
+
         /*
          * This must be the last field in the struct. When this object is
          * destroyed, the thread on which the Routine() function runs must be
@@ -1201,7 +1208,7 @@ class ExynosDisplay {
          * The destructor destroys fields in reverse order of their
          * declarations, so having this field be last ensures this property.
          */
-        IdleHintWorker mIdleHint;
+        std::unique_ptr<IdleHintWorker> mIdleHint;
 };
 
 #endif //_EXYNOSDISPLAY_H
