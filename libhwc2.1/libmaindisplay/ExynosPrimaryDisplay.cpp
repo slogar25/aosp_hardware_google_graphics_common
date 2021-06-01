@@ -293,11 +293,6 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     else
         mDREnable = mDRDefault;
 
-    if (mode == HWC2_POWER_MODE_ON)
-        ExynosDisplay::restoreRefreshRateHint();
-    else
-        ExynosDisplay::removeRefreshRateHint();
-
     switch (mode) {
         case HWC2_POWER_MODE_DOZE_SUSPEND:
         case HWC2_POWER_MODE_DOZE:
@@ -311,6 +306,8 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
         default:
             return HWC2_ERROR_BAD_PARAMETER;
     }
+
+    ExynosDisplay::updateRefreshRateHint();
 
     return HWC2_ERROR_NONE;
 }
