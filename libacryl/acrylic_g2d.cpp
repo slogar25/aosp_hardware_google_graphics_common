@@ -517,6 +517,16 @@ static g2d_fmt __halfmt_to_g2dfmt[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50, G2D_FMT_NV12_SBWC, 2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40, G2D_FMT_NV12_SBWC_10B, 2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80, G2D_FMT_NV12_SBWC_10B, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50, G2D_FMT_NV12_SBWC, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L50, G2D_FMT_NV12_SBWC, 1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L75, G2D_FMT_NV12_SBWC, 2,0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L75, G2D_FMT_NV12_SBWC, 1,0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40, G2D_FMT_NV12_SBWC_10B, 2, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L40, G2D_FMT_NV12_SBWC_10B, 1, 0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L60, G2D_FMT_NV12_SBWC_10B, 2,0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L60, G2D_FMT_NV12_SBWC_10B, 1,0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80, G2D_FMT_NV12_SBWC_10B, 2,0},
+    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L80, G2D_FMT_NV12_SBWC_10B, 1,0},
 };
 
 static g2d_fmt *halfmt_to_g2dfmt(struct g2d_fmt *tbl, size_t tbl_len, uint32_t halfmt)
@@ -603,11 +613,24 @@ static uint32_t mfc_stride_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC,
 };
 
-static unsigned int sbwc_lossy_formats[] = {
-    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50,
-    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40,
-    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80,
+struct lossy_formats {
+        unsigned int halfmt;
+        unsigned int blocksize;
 };
+
+static lossy_formats sbwc_lossy_formats[] {
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L50,            64},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L40,        64},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L50,             64},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L40,          64},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC_L75,             96},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L60,         96},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC_L75,              96},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L60,          96},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC_L80,         128},
+   {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC_L80,          128},
+};
+
 
 bool AcrylicCompositorG2D::prepareImage(AcrylicCanvas &layer, struct g2d_layer &image, uint32_t cmd[], int index)
 {
@@ -688,9 +711,9 @@ bool AcrylicCompositorG2D::prepareImage(AcrylicCanvas &layer, struct g2d_layer &
         unsigned int format = layer.getFormat();
 
         for (unsigned int i = 0; i < ARRSIZE(sbwc_lossy_formats); i++) {
-            if (format == sbwc_lossy_formats[i]) {
+            if (format == sbwc_lossy_formats[i].halfmt) {
                 isLossy = 1;
-                blocksize = (i < 2) ? 64 : 128;
+                blocksize = sbwc_lossy_formats[i].blocksize;
                 break;
             }
         }
