@@ -44,7 +44,6 @@ using namespace android;
 using DrmPropertyMap = std::unordered_map<uint32_t, uint64_t>;
 
 class ExynosDevice;
-constexpr uint32_t MAX_CACHED_BUFFERS = 32; // TODO: find a good value for this
 
 using BufHandles = std::array<uint32_t, HWC_DRM_BO_MAX_PLANES>;
 class FramebufferManager {
@@ -54,16 +53,18 @@ class FramebufferManager {
         void init(int drmFd);
 
         // get buffer for provided config, if a buffer with same config is already cached it will be
-        // reused otherwise one will be allocated. returns fbId that can be used to attach to plane, any
-        // buffers allocated/reused with this call will be staged, flip() call is expected after this
-        // when frame is committed
-        int32_t getBuffer(const exynos_win_config_data &config, uint32_t &fbId, bool caching = true);
+        // reused otherwise one will be allocated. returns fbId that can be used to attach to the
+        // plane, any buffers allocated/reused with this call will be bound to the corresponding
+        // layer. Those fbIds will be cleaned up once the layer was destroyed.
+        int32_t getBuffer(const exynos_win_config_data &config, uint32_t &fbId);
 
-        // this should be called after frame update
-        // this will move all staged buffers to front of the cached buffers queue
-        // This will also schedule a cleanup of cached buffers if cached buffer list goes
-        // beyond MAX_CACHED_BUFFERS
-        void flip(bool isActiveCommit);
+        void cleanup(const ExynosLayer *layer);
+
+        // The flip function is to help clean up the cached fbIds of destroyed
+        // layers after the previous fdIds were update successfully on the
+        // screen.
+        // This should be called after the frame update.
+        void flip();
 
         // release all currently tracked buffers, this can be called for example when display is turned
         // off
@@ -73,20 +74,13 @@ class FramebufferManager {
         uint32_t getBufHandleFromFd(int fd);
         // this struct should contain elements that can be used to identify framebuffer more easily
         struct Framebuffer {
-            Framebuffer(int fd, BufHandles handles, uint32_t bufNum, uint32_t fb)
-                  : bufHandles(handles), bufferNum(bufNum), fbId(fb), drmFd(fd){};
-            ~Framebuffer() {
-                for (uint32_t i = 0; i < bufferNum; i++) {
-                    if (bufHandles[i]) freeBufHandle(bufHandles[i]);
-                }
-                drmModeRmFB(drmFd, fbId);
-            };
-            void freeBufHandle(uint32_t handle);
-            BufHandles bufHandles;
-            uint32_t bufferNum;
-            uint32_t fbId;
+            explicit Framebuffer(int fd, uint64_t bufId, int bufFd, uint32_t fb)
+                  : drmFd(fd), buffer_id(bufId), fd(bufFd), fbId(fb){};
+            ~Framebuffer() { drmModeRmFB(drmFd, fbId); };
             int drmFd;
-            nsecs_t lastLookupTime = 0;
+            uint64_t buffer_id;
+            int fd;
+            uint32_t fbId;
         };
         using FBList = std::list<std::unique_ptr<Framebuffer>>;
 
@@ -95,25 +89,25 @@ class FramebufferManager {
                         const uint32_t offsets[4], const uint64_t modifier[4], uint32_t *buf_id,
                         uint32_t flags);
 
+        void freeBufHandle(uint32_t handle);
         void removeFBsThreadRoutine();
 
-        // releases framebuffers at the back of the cached buffer queue that go beyond
-        // MAX_CACHED_BUFFERS
-        void cleanup(FBList &cleanupBuffers);
+        // mCachedLayerBuffers map keep the relationship between Layer and
+        // FBList. The map entry will be deleted once the layer is destroyed.
+        std::map<const ExynosLayer *, FBList> mCachedLayerBuffers;
 
-        // buffers that are going to be committed in the next atomic frame update
-        FBList mStagingBuffers;
-        // unused buffers that have been used recently, front of the queue has the most recently used
-        // ones
-        FBList mCachedBuffers;
+        // mCleanBuffers list keeps fbIds of destroyed layers. Those fbIds will
+        // be destroyed in mRmFBThread thread.
+        FBList mCleanBuffers;
 
         int mDrmFd = -1;
-        nsecs_t mLastActiveCommitTime = 0;
 
         std::thread mRmFBThread;
         bool mRmFBThreadRunning = false;
-        Condition mCondition;
+        Condition mFlipDone;
         Mutex mMutex;
+
+        static constexpr uint32_t MAX_CACHED_BUFFERS = 32; // TODO: find a good value for this
 };
 
 class ExynosDisplayDrmInterface :
@@ -252,6 +246,7 @@ class ExynosDisplayDrmInterface :
         { return NO_ERROR;};
         virtual int32_t updateBrightness(bool syncFrame);
         virtual float getSdrDimRatio();
+        virtual void destroyLayer(ExynosLayer *layer) override;
 
         bool isHbmOn() { return mBrightnessCtrl.HbmOn.get(); }
         uint32_t getDbv() { return mBrightnessLevel.get(); }

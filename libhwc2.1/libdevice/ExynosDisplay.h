@@ -158,6 +158,8 @@ struct exynos_win_config_data
     } state = WIN_STATE_DISABLED;
 
     uint32_t color = 0;
+    const ExynosLayer* layer = nullptr;
+    uint64_t buffer_id = 0;
     int fd_idma[3] = {-1, -1, -1};
     int acq_fence = -1;
     int rel_fence = -1;
