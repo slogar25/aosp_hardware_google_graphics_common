@@ -81,7 +81,7 @@ uint32_t FramebufferManager::getBufHandleFromFd(int fd)
 
     int ret = drmPrimeFDToHandle(mDrmFd, fd, &gem_handle);
     if (ret) {
-        ALOGE("drmPrimeFDToHandle failed with fd %d error %d", fd, ret);
+        ALOGE("drmPrimeFDToHandle failed with fd %d error %d (%s)", fd, ret, strerror(errno));
     }
     return gem_handle;
 }
@@ -280,8 +280,14 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         Mutex::Autolock lock(mMutex);
         auto &cachedBuffers = mCachedLayerBuffers[config.layer];
         if (cachedBuffers.size() > MAX_CACHED_BUFFERS) {
+            // TODO(188733347): SF cache is allocating a new buffer everytime to
+            // cache layers
+            /*
             ALOGW("Framebuffer: cached buffers size %zu exceeds limitation while adding fbId %d",
                   cachedBuffers.size(), fbId);
+            printExynosLayer(config.layer);
+            */
+            mCleanBuffers.splice(mCleanBuffers.end(), cachedBuffers);
         }
 
         if (config.state == config.WIN_STATE_COLOR) {
