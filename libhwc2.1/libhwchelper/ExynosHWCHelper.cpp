@@ -478,6 +478,10 @@ void dumpExynosImage(String8& result, exynos_image &img)
     }
 }
 
+void printExynosLayer(const ExynosLayer* layer) {
+    const_cast<ExynosLayer*>(layer)->printLayer();
+}
+
 bool isSrcCropFloat(hwc_frect &frect)
 {
     return (frect.left != (int)frect.left) ||

@@ -63,7 +63,7 @@ FramebufferManager::~FramebufferManager()
         Mutex::Autolock lock(mMutex);
         mRmFBThreadRunning = false;
     }
-    mCondition.signal();
+    mFlipDone.signal();
     mRmFBThread.join();
 }
 
@@ -81,7 +81,7 @@ uint32_t FramebufferManager::getBufHandleFromFd(int fd)
 
     int ret = drmPrimeFDToHandle(mDrmFd, fd, &gem_handle);
     if (ret) {
-        ALOGE("drmPrimeFDToHandle failed with error %d", ret);
+        ALOGE("drmPrimeFDToHandle failed with fd %d error %d (%s)", fd, ret, strerror(errno));
     }
     return gem_handle;
 }
@@ -98,13 +98,33 @@ int FramebufferManager::addFB2WithModifiers(uint32_t width, uint32_t height, uin
     return ret;
 }
 
-void FramebufferManager::cleanup(FBList &cleanupBuffers) {
-    for (auto it = mCachedBuffers.begin();
-         mCachedBuffers.size() > MAX_CACHED_BUFFERS && it != mCachedBuffers.end();) {
-        auto const cit = it++;
-        /* Can't remove framebuffer in active commit */
-        if ((*cit)->lastLookupTime != mLastActiveCommitTime) {
-            cleanupBuffers.splice(cleanupBuffers.end(), mCachedBuffers, cit);
+uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer,
+                                            Framebuffer::BufferDesc desc) {
+    Mutex::Autolock lock(mMutex);
+    auto &cachedBuffers = mCachedLayerBuffers[layer];
+    auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(),
+                           [desc](auto &buffer) { return (buffer->bufferDesc == desc); });
+
+    return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
+}
+
+uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer,
+                                            Framebuffer::SolidColorDesc desc) {
+    Mutex::Autolock lock(mMutex);
+    auto &cachedBuffers = mCachedLayerBuffers[layer];
+    auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(),
+                           [desc](auto &buffer) { return (buffer->colorDesc == desc); });
+
+    return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
+}
+
+void FramebufferManager::cleanup(const ExynosLayer *layer) {
+    ATRACE_CALL();
+    {
+        Mutex::Autolock lock(mMutex);
+        if (auto it = mCachedLayerBuffers.find(layer); it != mCachedLayerBuffers.end()) {
+            mCleanBuffers.splice(mCleanBuffers.end(), std::move(it->second));
+            mCachedLayerBuffers.erase(it);
         }
     }
 }
@@ -118,17 +138,16 @@ void FramebufferManager::removeFBsThreadRoutine()
             if (!mRmFBThreadRunning) {
                 break;
             }
-            mCondition.wait(mMutex);
-            cleanup(cleanupBuffers);
+            mFlipDone.wait(mMutex);
+            cleanupBuffers.splice(cleanupBuffers.end(), mCleanBuffers);
         }
         ATRACE_NAME("cleanup framebuffers");
         cleanupBuffers.clear();
     }
 }
 
-int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint32_t &fbId,
-                                      bool caching)
-{
+int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint32_t &fbId) {
+    ATRACE_CALL();
     int ret = NO_ERROR;
     int drmFormat = DRM_FORMAT_UNDEFINED;
     uint32_t bpp = 0;
@@ -171,6 +190,11 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
             ALOGE("%s:: getPlaneNumOfFormat(%d) error, planeNum(%d)", __func__, config.format,
                   planeNum);
             return -EINVAL;
+        }
+
+        fbId = findCachedFbId(config.layer, Framebuffer::BufferDesc{config.buffer_id});
+        if (fbId != 0) {
+            return NO_ERROR;
         }
 
         if (config.compression) {
@@ -220,29 +244,25 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         bufHeight = config.dst.h;
         modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_COLORMAP;
         drmFormat = DRM_FORMAT_BGRA8888;
+        bufferNum = 0;
         handles[0] = 0xff000000;
         bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
         pitches[0] = config.dst.w * bpp;
-        caching = false;
+        fbId = findCachedFbId(config.layer, Framebuffer::SolidColorDesc{bufWidth, bufHeight});
+        if (fbId != 0) {
+            return NO_ERROR;
+        }
     } else {
         ALOGE("%s:: known config state(%d)", __func__, config.state);
         return -EINVAL;
     }
 
-    if (caching) {
-        Mutex::Autolock lock(mMutex);
-        auto it =
-                std::find_if(mCachedBuffers.begin(), mCachedBuffers.end(),
-                             [&handles](auto &buffer) { return (buffer->bufHandles == handles); });
-        if (it != mCachedBuffers.end()) {
-            fbId = (*it)->fbId;
-            mStagingBuffers.splice(mStagingBuffers.end(), mCachedBuffers, it);
-            return NO_ERROR;
-        }
-    }
-
     ret = addFB2WithModifiers(bufWidth, bufHeight, drmFormat, handles, pitches, offsets, modifiers,
                               &fbId, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
+
+    for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
+        freeBufHandle(handles[bufferIndex]);
+    }
 
     if (ret) {
         ALOGE("%s:: Failed to add FB, fb_id(%d), ret(%d), f_w: %d, f_h: %d, dst.w: %d, dst.h: %d, "
@@ -256,46 +276,61 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         return ret;
     }
 
-    if (caching) {
+    if (config.layer || config.buffer_id) {
         Mutex::Autolock lock(mMutex);
-        mStagingBuffers.emplace_back(new Framebuffer(mDrmFd, handles, bufferNum, fbId));
+        auto &cachedBuffers = mCachedLayerBuffers[config.layer];
+        if (cachedBuffers.size() > MAX_CACHED_BUFFERS) {
+            // TODO(188733347): SF cache is allocating a new buffer everytime to
+            // cache layers
+            /*
+            ALOGW("Framebuffer: cached buffers size %zu exceeds limitation while adding fbId %d",
+                  cachedBuffers.size(), fbId);
+            printExynosLayer(config.layer);
+            */
+            mCleanBuffers.splice(mCleanBuffers.end(), cachedBuffers);
+        }
+
+        if (config.state == config.WIN_STATE_COLOR) {
+            cachedBuffers.emplace_front(
+                    new Framebuffer(mDrmFd, fbId,
+                                    Framebuffer::SolidColorDesc{bufWidth, bufHeight}));
+        } else {
+            cachedBuffers.emplace_front(
+                    new Framebuffer(mDrmFd, fbId, Framebuffer::BufferDesc{config.buffer_id}));
+        }
+    } else {
+        ALOGW("Framebuffer: possible leakage fbId %d was created", fbId);
     }
 
     return 0;
 }
 
-void FramebufferManager::flip(bool isActiveCommit)
-{
-    {
-        Mutex::Autolock lock(mMutex);
-        nsecs_t lastCommitTime = systemTime(SYSTEM_TIME_MONOTONIC);
-        if (isActiveCommit) {
-            mLastActiveCommitTime = lastCommitTime;
-            for (auto &it : mStagingBuffers) {
-                it->lastLookupTime = lastCommitTime;
-            }
-        }
-        mCachedBuffers.splice(mCachedBuffers.end(), mStagingBuffers);
-    }
-    mCondition.signal();
+void FramebufferManager::flip() {
+    mFlipDone.signal();
 }
 
 void FramebufferManager::releaseAll()
 {
     Mutex::Autolock lock(mMutex);
-    mStagingBuffers.clear();
-    mCachedBuffers.clear();
+    mCachedLayerBuffers.clear();
 }
 
-void FramebufferManager::Framebuffer::freeBufHandle(uint32_t handle)
-{
+void FramebufferManager::freeBufHandle(uint32_t handle) {
+    if (handle == 0) {
+        return;
+    }
+
     struct drm_gem_close gem_close {
         .handle = handle
     };
-    int ret = drmIoctl(drmFd, DRM_IOCTL_GEM_CLOSE, &gem_close);
+    int ret = drmIoctl(mDrmFd, DRM_IOCTL_GEM_CLOSE, &gem_close);
     if (ret) {
-        ALOGE("Failed to close gem handle with error %d\n", ret);
+        ALOGE("Failed to close gem handle 0x%x with error %d\n", handle, ret);
     }
+}
+
+void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
+    mFBManager.cleanup(layer);
 }
 
 ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
@@ -1323,8 +1358,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
     android::String8 result;
 
-    funcReturnCallback retCallback(
-            [&]() { mFBManager.flip((ret == NO_ERROR) && !drmReq.getError()); });
+    funcReturnCallback retCallback([&]() {
+        if ((ret == NO_ERROR) && !drmReq.getError()) {
+            mFBManager.flip();
+        }
+    });
 
     if (mExynosDisplay->mDpuData.enable_readback) {
         if ((ret = setupWritebackCommit(drmReq)) < 0) {
@@ -1848,7 +1886,7 @@ int32_t ExynosDisplayDrmInterface::setupWritebackCommit(DrmModeAtomicReq &drmReq
     writeback_config.fd_idma[0] = gmeta.fd;
     writeback_config.fd_idma[1] = gmeta.fd1;
     writeback_config.fd_idma[2] = gmeta.fd2;
-    if ((ret = mFBManager.getBuffer(writeback_config, writeback_fb_id, false)) < 0) {
+    if ((ret = mFBManager.getBuffer(writeback_config, writeback_fb_id)) < 0) {
         ALOGE("%s: getBuffer() fail ret(%d)", __func__, ret);
         return ret;
     }
