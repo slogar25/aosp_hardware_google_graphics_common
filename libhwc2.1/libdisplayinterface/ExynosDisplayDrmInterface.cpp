@@ -98,6 +98,26 @@ int FramebufferManager::addFB2WithModifiers(uint32_t width, uint32_t height, uin
     return ret;
 }
 
+uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer,
+                                            Framebuffer::BufferDesc desc) {
+    Mutex::Autolock lock(mMutex);
+    auto &cachedBuffers = mCachedLayerBuffers[layer];
+    auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(),
+                           [desc](auto &buffer) { return (buffer->bufferDesc == desc); });
+
+    return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
+}
+
+uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer,
+                                            Framebuffer::SolidColorDesc desc) {
+    Mutex::Autolock lock(mMutex);
+    auto &cachedBuffers = mCachedLayerBuffers[layer];
+    auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(),
+                           [desc](auto &buffer) { return (buffer->colorDesc == desc); });
+
+    return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
+}
+
 void FramebufferManager::cleanup(const ExynosLayer *layer) {
     ATRACE_CALL();
     {
@@ -127,6 +147,7 @@ void FramebufferManager::removeFBsThreadRoutine()
 }
 
 int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint32_t &fbId) {
+    ATRACE_CALL();
     int ret = NO_ERROR;
     int drmFormat = DRM_FORMAT_UNDEFINED;
     uint32_t bpp = 0;
@@ -171,6 +192,11 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
             return -EINVAL;
         }
 
+        fbId = findCachedFbId(config.layer, Framebuffer::BufferDesc{config.buffer_id});
+        if (fbId != 0) {
+            return NO_ERROR;
+        }
+
         if (config.compression) {
             uint64_t compressed_modifier = AFBC_FORMAT_MOD_BLOCK_SIZE_16x16;
             switch (config.comp_src) {
@@ -190,25 +216,6 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
                     modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLOCK_SIZE_32x5);
                 } else {
                     modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLOCK_SIZE_32x4);
-                }
-            }
-        }
-
-        {
-            Mutex::Autolock lock(mMutex);
-            auto &cachedBuffers = mCachedLayerBuffers[config.layer];
-            auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(),
-                                   [&config](auto &buffer) {
-                                       return (buffer->buffer_id == config.buffer_id);
-                                   });
-            if (it != cachedBuffers.end()) {
-                if (CC_LIKELY(config.fd_idma[0] == (*it)->fd)) {
-                    fbId = (*it)->fbId;
-                    return NO_ERROR;
-                } else {
-                    ALOGE("Framebuffer: found mismatch record fd %d vs %d with buffer id %" PRIu64,
-                          config.fd_idma[0], (*it)->fd, (*it)->buffer_id);
-                    cachedBuffers.erase(it);
                 }
             }
         }
@@ -241,6 +248,10 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         handles[0] = 0xff000000;
         bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
         pitches[0] = config.dst.w * bpp;
+        fbId = findCachedFbId(config.layer, Framebuffer::SolidColorDesc{bufWidth, bufHeight});
+        if (fbId != 0) {
+            return NO_ERROR;
+        }
     } else {
         ALOGE("%s:: known config state(%d)", __func__, config.state);
         return -EINVAL;
@@ -267,12 +278,20 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
 
     if (config.layer || config.buffer_id) {
         Mutex::Autolock lock(mMutex);
-        if (mCachedLayerBuffers[config.layer].size() > MAX_CACHED_BUFFERS) {
+        auto &cachedBuffers = mCachedLayerBuffers[config.layer];
+        if (cachedBuffers.size() > MAX_CACHED_BUFFERS) {
             ALOGW("Framebuffer: cached buffers size %zu exceeds limitation while adding fbId %d",
-                  mCachedLayerBuffers[config.layer].size(), fbId);
+                  cachedBuffers.size(), fbId);
         }
-        mCachedLayerBuffers[config.layer].emplace_back(
-                new Framebuffer(mDrmFd, config.buffer_id, config.fd_idma[0], fbId));
+
+        if (config.state == config.WIN_STATE_COLOR) {
+            cachedBuffers.emplace_front(
+                    new Framebuffer(mDrmFd, fbId,
+                                    Framebuffer::SolidColorDesc{bufWidth, bufHeight}));
+        } else {
+            cachedBuffers.emplace_front(
+                    new Framebuffer(mDrmFd, fbId, Framebuffer::BufferDesc{config.buffer_id}));
+        }
     } else {
         ALOGW("Framebuffer: possible leakage fbId %d was created", fbId);
     }
