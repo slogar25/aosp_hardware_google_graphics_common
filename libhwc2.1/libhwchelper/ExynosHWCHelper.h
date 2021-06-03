@@ -433,6 +433,7 @@ bool hasHdr10Plus(exynos_image &img);
 void dumpExynosImage(uint32_t type, exynos_image &img);
 void dumpExynosImage(String8& result, exynos_image &img);
 void dumpHandle(uint32_t type, buffer_handle_t h);
+void printExynosLayer(const ExynosLayer *layer);
 String8 getFormatStr(int format, uint32_t compressType);
 String8 getMPPStr(int typeId);
 void adjustRect(hwc_rect_t &rect, int32_t width, int32_t height);
