@@ -71,24 +71,38 @@ class FramebufferManager {
         void releaseAll();
 
     private:
-        uint32_t getBufHandleFromFd(int fd);
         // this struct should contain elements that can be used to identify framebuffer more easily
         struct Framebuffer {
-            explicit Framebuffer(int fd, uint64_t bufId, int bufFd, uint32_t fb)
-                  : drmFd(fd), buffer_id(bufId), fd(bufFd), fbId(fb){};
+            using BufferDesc = uint64_t;
+            struct SolidColorDesc {
+                uint32_t width;
+                uint32_t height;
+                bool operator==(const Framebuffer::SolidColorDesc &rhs) const {
+                    return (width == rhs.width && height == rhs.height);
+                }
+            };
+
+            explicit Framebuffer(int fd, uint32_t fb, BufferDesc desc)
+                  : drmFd(fd), fbId(fb), bufferDesc(desc){};
+            explicit Framebuffer(int fd, uint32_t fb, SolidColorDesc desc)
+                  : drmFd(fd), fbId(fb), colorDesc(desc){};
             ~Framebuffer() { drmModeRmFB(drmFd, fbId); };
             int drmFd;
-            uint64_t buffer_id;
-            int fd;
             uint32_t fbId;
+            union {
+                BufferDesc bufferDesc;
+                SolidColorDesc colorDesc;
+            };
         };
         using FBList = std::list<std::unique_ptr<Framebuffer>>;
 
+        uint32_t findCachedFbId(const ExynosLayer *layer, Framebuffer::BufferDesc desc);
+        uint32_t findCachedFbId(const ExynosLayer *layer, Framebuffer::SolidColorDesc desc);
         int addFB2WithModifiers(uint32_t width, uint32_t height, uint32_t pixel_format,
                         const BufHandles handles, const uint32_t pitches[4],
                         const uint32_t offsets[4], const uint64_t modifier[4], uint32_t *buf_id,
                         uint32_t flags);
-
+        uint32_t getBufHandleFromFd(int fd);
         void freeBufHandle(uint32_t handle);
         void removeFBsThreadRoutine();
 
