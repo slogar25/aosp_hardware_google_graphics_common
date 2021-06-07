@@ -180,7 +180,7 @@ class ExynosDisplayDrmInterface :
                         const DrmProperty &property,
                         uint64_t value, bool optional = false);
                 String8& dumpAtomicCommitInfo(String8 &result, bool debugPrint = false);
-                int commit(uint32_t flags, bool loggingForDebug = false, bool keepBlob = false);
+                int commit(uint32_t flags, bool loggingForDebug = false);
                 void addOldBlob(uint32_t blob_id) {
                     mOldBlobs.push_back(blob_id);
                 };
