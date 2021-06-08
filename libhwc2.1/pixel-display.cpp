@@ -91,6 +91,33 @@ ndk::ScopedAStatus Display::getLbeState(LbeState *_aidl_return) {
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
+
+ndk::ScopedAStatus Display::isLhbmSupported(bool *_aidl_return) {
+    if (mDevice) {
+        *_aidl_return = mDevice->isLhbmSupported();
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::setLhbmState(bool enabled) {
+    if (mDevice && mDevice->isLhbmSupported()) {
+        int32_t ret = mDevice->setLhbmState(enabled);
+        if (!ret)
+            return ndk::ScopedAStatus::ok();
+        else if (ret == TIMED_OUT)
+            return ndk::ScopedAStatus::fromExceptionCode(STATUS_TIMED_OUT);
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::getLhbmState(bool *_aidl_return) {
+    if (mDevice && mDevice->isLhbmSupported()) {
+        *_aidl_return = mDevice->getLhbmState();
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
 } // namespace display
 } // namespace pixel
 } // namespace hardware
