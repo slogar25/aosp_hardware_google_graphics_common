@@ -77,6 +77,7 @@ class ExynosDisplayInterface {
         virtual int32_t getVsyncAppliedTime(hwc2_config_t __unused config, int64_t* __unused actualChangeTime) {return NO_ERROR;}
         virtual void destroyLayer(ExynosLayer* __unused layer){};
 
+        virtual int32_t waitVBlank() { return 0; };
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };
