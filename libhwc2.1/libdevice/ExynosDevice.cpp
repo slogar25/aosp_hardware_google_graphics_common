@@ -1027,3 +1027,24 @@ LbeState ExynosDevice::getLbeState() {
     }
     return LbeState::OFF;
 }
+
+bool ExynosDevice::isLhbmSupported() {
+    ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    return display->isLhbmSupported();
+}
+
+int32_t ExynosDevice::setLhbmState(bool enabled) {
+    if (isLhbmSupported()) {
+        ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+        return display->setLhbmState(enabled);
+    }
+    return -1;
+}
+
+bool ExynosDevice::getLhbmState() {
+    if (isLhbmSupported()) {
+        ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+        return display->getLhbmState();
+    }
+    return false;
+}

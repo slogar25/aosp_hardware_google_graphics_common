@@ -329,6 +329,10 @@ class ExynosDevice {
         void setLbeAmbientLight(int value);
         LbeState getLbeState();
 
+        bool isLhbmSupported();
+        int32_t setLhbmState(bool enabled);
+        bool getLhbmState();
+
     private:
         bool mLbeSupported;
 };

@@ -124,6 +124,9 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
         ALOGE("Brightness node is not opened");
     }
 #endif
+
+    mLhbmFd = fopen(kLocalHbmModeFileNode, "w+");
+    if (mLhbmFd == NULL) ALOGE("local hbm mode node open failed! %s", strerror(errno));
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
@@ -416,4 +419,32 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
 
     currentPanelGammaSource = source;
     return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
+    requestLhbm(enabled);
+    ALOGI("setLhbmState =%d", enabled);
+
+    std::unique_lock<std::mutex> lk(lhbm_mutex_);
+    mLhbmChanged = false;
+    if (!lhbm_cond_.wait_for(lk, std::chrono::milliseconds(1000),
+                             [this] { return mLhbmChanged; })) {
+        ALOGI("setLhbmState =%d timeout !", enabled);
+        return TIMED_OUT;
+    } else {
+        if (enabled)
+            mDisplayInterface->waitVBlank();
+        return NO_ERROR;
+    }
+}
+
+bool ExynosPrimaryDisplay::getLhbmState() {
+    return mLhbmOn;
+}
+
+void ExynosPrimaryDisplay::notifyLhbmState(bool enabled) {
+    std::lock_guard<std::mutex> lk(lhbm_mutex_);
+    mLhbmChanged = true;
+    lhbm_cond_.notify_one();
+    mLhbmOn = enabled;
 }

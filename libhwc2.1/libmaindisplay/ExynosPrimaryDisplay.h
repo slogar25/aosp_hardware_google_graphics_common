@@ -33,6 +33,11 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
             return currentPanelGammaSource;
         }
 
+        virtual bool isLhbmSupported() { return mLhbmFd ? true : false; };
+        virtual int32_t setLhbmState(bool enabled);
+        virtual bool getLhbmState();
+        virtual void notifyLhbmState(bool enabled);
+
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t doDisplayConfigInternal(hwc2_config_t config) override;
 
@@ -68,6 +73,15 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         void firstPowerOn();
 
         std::string getPanelSysfsPath(const displaycolor::DisplayType& type);
+
+        // LHBM
+        FILE* mLhbmFd;
+        bool mLhbmOn;
+        bool mLhbmChanged;
+        static constexpr const char *kLocalHbmModeFileNode =
+                "/sys/class/backlight/panel0-backlight/local_hbm_mode";
+        std::mutex lhbm_mutex_;
+        std::condition_variable lhbm_cond_;
 };
 
 #endif
