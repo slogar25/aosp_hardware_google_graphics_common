@@ -665,6 +665,7 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
         mBrightnessState.reset();
         mBrightnessCtrl.reset();
         mExynosDisplay->requestLhbm(false);
+        mExynosDisplay->notifyLhbmState(mBrightnessCtrl.LhbmOn.get());
     }
     return ret;
 }
@@ -1462,7 +1463,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                                             mBrightnessCtrl.LhbmOn.get())) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set lhbm_on property", __func__);
         }
-        mBrightnessCtrl.LhbmOn.clear_dirty();
 
         // sync mipi command and frame when lhbm on/off
         mipi_sync = true;
@@ -1556,6 +1556,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             HWC_LOGE(mExynosDisplay, "%s:: Failed to commit gbhm pset ret=%d"
                      " in deliverWinConfigData()\n", __func__, ret);
             return ret;
+        }
+        if (mipi_sync_action == brightnessState_t::MIPI_SYNC_LHBM_ON ||
+            mipi_sync_action == brightnessState_t::MIPI_SYNC_LHBM_OFF) {
+            mExynosDisplay->notifyLhbmState(mBrightnessCtrl.LhbmOn.get());
         }
     }
 

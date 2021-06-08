@@ -1114,6 +1114,12 @@ class ExynosDisplay {
         virtual LbeState getLbeState() { return LbeState::OFF; };
 
         int32_t checkPowerHalExtHintSupport(const std::string& mode);
+
+        virtual bool isLhbmSupported() { return false; };
+        virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; };
+        virtual bool getLhbmState() { return false; };
+        virtual void notifyLhbmState(bool __unused enabled){};
+
         int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
         /* getDisplayPreAssignBit support mIndex up to 1.

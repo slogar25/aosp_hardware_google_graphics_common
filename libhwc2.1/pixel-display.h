@@ -39,6 +39,9 @@ public:
     ndk::ScopedAStatus setLbeState(LbeState state) override;
     ndk::ScopedAStatus setLbeAmbientLight(int ambientLux) override;
     ndk::ScopedAStatus getLbeState(LbeState *_aidl_return) override;
+    ndk::ScopedAStatus isLhbmSupported(bool *_aidl_return) override;
+    ndk::ScopedAStatus setLhbmState(bool enabled) override;
+    ndk::ScopedAStatus getLhbmState(bool *_aidl_return) override;
 
 private:
     ExynosDevice *mDevice = nullptr;

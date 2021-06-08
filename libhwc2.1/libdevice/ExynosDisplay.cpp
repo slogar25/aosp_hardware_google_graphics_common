@@ -5163,6 +5163,7 @@ void ExynosDisplay::updateBrightnessState() {
     }
 
     mBrightnessState.local_hbm = mReqLhbm;
+    mBrightnessState.instant_hbm |= mBrightnessState.local_hbm;
 
     if (mDisplayInterface->updateBrightness(true /* syncFrame */) != HWC2_ERROR_NONE) {
         ALOGW("Failed to update brighntess");
