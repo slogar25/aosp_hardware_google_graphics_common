@@ -287,7 +287,7 @@ class ExynosDisplayDrmInterface :
         virtual int32_t waitVBlank();
         bool isHbmOn() { return mBrightnessCtrl.HbmOn.get(); }
         uint32_t getDbv() { return mBrightnessLevel.get(); }
-
+        float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
     protected:
         struct ModeState {
             bool needs_modeset = false;

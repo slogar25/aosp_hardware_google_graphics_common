@@ -537,6 +537,7 @@ class ExynosDisplay {
         bool mSkipFrame;
 
         FILE *mBrightnessFd;
+        FILE *mEarlyWakeupFd;
         uint32_t mMaxBrightness;
 
         hwc_vsync_period_change_constraints_t mVsyncPeriodChangeConstraints;
@@ -1101,7 +1102,9 @@ class ExynosDisplay {
         virtual int getDDIScalerMode(int width, int height);
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
-        virtual int32_t updateColorConversionInfo() { return NO_ERROR; }
+        virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
+        virtual int32_t updatePresentColorConversionInfo() { return NO_ERROR; };
+        virtual bool checkEarlyWakeupNeeded(float) { return false; };
         virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
