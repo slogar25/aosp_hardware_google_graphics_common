@@ -98,34 +98,20 @@ int FramebufferManager::addFB2WithModifiers(uint32_t width, uint32_t height, uin
     return ret;
 }
 
-uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer,
-                                            Framebuffer::BufferDesc desc) {
+bool FramebufferManager::checkShrink() {
     Mutex::Autolock lock(mMutex);
-    auto &cachedBuffers = mCachedLayerBuffers[layer];
-    auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(),
-                           [desc](auto &buffer) { return (buffer->bufferDesc == desc); });
 
-    return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
-}
-
-uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer,
-                                            Framebuffer::SolidColorDesc desc) {
-    Mutex::Autolock lock(mMutex);
-    auto &cachedBuffers = mCachedLayerBuffers[layer];
-    auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(),
-                           [desc](auto &buffer) { return (buffer->colorDesc == desc); });
-
-    return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
+    mCacheShrinkPending = mCachedLayerBuffers.size() > MAX_CACHED_LAYERS;
+    return mCacheShrinkPending;
 }
 
 void FramebufferManager::cleanup(const ExynosLayer *layer) {
     ATRACE_CALL();
-    {
-        Mutex::Autolock lock(mMutex);
-        if (auto it = mCachedLayerBuffers.find(layer); it != mCachedLayerBuffers.end()) {
-            mCleanBuffers.splice(mCleanBuffers.end(), std::move(it->second));
-            mCachedLayerBuffers.erase(it);
-        }
+
+    Mutex::Autolock lock(mMutex);
+    if (auto it = mCachedLayerBuffers.find(layer); it != mCachedLayerBuffers.end()) {
+        mCleanBuffers.splice(mCleanBuffers.end(), std::move(it->second));
+        mCachedLayerBuffers.erase(it);
     }
 }
 
@@ -192,7 +178,9 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
             return -EINVAL;
         }
 
-        fbId = findCachedFbId(config.layer, Framebuffer::BufferDesc{config.buffer_id});
+        fbId = findCachedFbId(config.layer,
+                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id}](
+                                      auto &buffer) { return buffer->bufferDesc == bufferDesc; });
         if (fbId != 0) {
             return NO_ERROR;
         }
@@ -225,7 +213,7 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
             modifiers[bufferIndex] = modifiers[0];
             handles[bufferIndex] = getBufHandleFromFd(config.fd_idma[bufferIndex]);
             if (handles[bufferIndex] == 0) {
-                return -EINVAL;
+                return -ENOMEM;
             }
         }
 
@@ -248,7 +236,9 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         handles[0] = 0xff000000;
         bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
         pitches[0] = config.dst.w * bpp;
-        fbId = findCachedFbId(config.layer, Framebuffer::SolidColorDesc{bufWidth, bufHeight});
+        fbId = findCachedFbId(config.layer,
+                              [colorDesc = Framebuffer::SolidColorDesc{bufWidth, bufHeight}](
+                                      auto &buffer) { return buffer->colorDesc == colorDesc; });
         if (fbId != 0) {
             return NO_ERROR;
         }
@@ -279,14 +269,10 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     if (config.layer || config.buffer_id) {
         Mutex::Autolock lock(mMutex);
         auto &cachedBuffers = mCachedLayerBuffers[config.layer];
-        if (cachedBuffers.size() > MAX_CACHED_BUFFERS) {
-            // TODO(188733347): SF cache is allocating a new buffer everytime to
-            // cache layers
-            /*
-            ALOGW("Framebuffer: cached buffers size %zu exceeds limitation while adding fbId %d",
+        if (cachedBuffers.size() > MAX_CACHED_BUFFERS_PER_LAYER) {
+            ALOGW("FBManager: cached buffers size %zu exceeds limitation while adding fbId %d",
                   cachedBuffers.size(), fbId);
             printExynosLayer(config.layer);
-            */
             mCleanBuffers.splice(mCleanBuffers.end(), cachedBuffers);
         }
 
@@ -299,20 +285,30 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
                     new Framebuffer(mDrmFd, fbId, Framebuffer::BufferDesc{config.buffer_id}));
         }
     } else {
-        ALOGW("Framebuffer: possible leakage fbId %d was created", fbId);
+        ALOGW("FBManager: possible leakage fbId %d was created", fbId);
     }
 
     return 0;
 }
 
 void FramebufferManager::flip() {
-    mFlipDone.signal();
+    bool needCleanup = false;
+    {
+        Mutex::Autolock lock(mMutex);
+        destroyUnusedLayersLocked();
+        needCleanup = mCleanBuffers.size() > 0;
+    }
+
+    if (needCleanup) {
+        mFlipDone.signal();
+    }
 }
 
 void FramebufferManager::releaseAll()
 {
     Mutex::Autolock lock(mMutex);
     mCachedLayerBuffers.clear();
+    mCleanBuffers.clear();
 }
 
 void FramebufferManager::freeBufHandle(uint32_t handle) {
@@ -327,6 +323,33 @@ void FramebufferManager::freeBufHandle(uint32_t handle) {
     if (ret) {
         ALOGE("Failed to close gem handle 0x%x with error %d\n", handle, ret);
     }
+}
+
+void FramebufferManager::markInuseLayerLocked(const ExynosLayer *layer) {
+    if (mCacheShrinkPending) {
+        mCachedLayersInuse.insert(layer);
+    }
+}
+
+void FramebufferManager::destroyUnusedLayersLocked() {
+    if (!mCacheShrinkPending || mCachedLayersInuse.size() == mCachedLayerBuffers.size()) {
+        mCachedLayersInuse.clear();
+        return;
+    }
+
+    ALOGW("FBManager: shrink cached layers from %zu to %zu", mCachedLayerBuffers.size(),
+          mCachedLayersInuse.size());
+
+    for (auto layer = mCachedLayerBuffers.begin(); layer != mCachedLayerBuffers.end();) {
+        if (mCachedLayersInuse.find(layer->first) == mCachedLayersInuse.end()) {
+            mCleanBuffers.splice(mCleanBuffers.end(), std::move(layer->second));
+            layer = mCachedLayerBuffers.erase(layer);
+        } else {
+            ++layer;
+        }
+    }
+
+    mCachedLayersInuse.clear();
 }
 
 void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
@@ -1362,8 +1385,12 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     funcReturnCallback retCallback([&]() {
         if ((ret == NO_ERROR) && !drmReq.getError()) {
             mFBManager.flip();
+        } else if (ret == -ENOMEM) {
+            mFBManager.releaseAll();
         }
     });
+
+    mFBManager.checkShrink();
 
     if (mExynosDisplay->mDpuData.enable_readback) {
         if ((ret = setupWritebackCommit(drmReq)) < 0) {
