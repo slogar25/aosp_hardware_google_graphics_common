@@ -584,6 +584,7 @@ public:
     const T &get() { return value_; };
     bool is_dirty() { return dirty_; };
     void clear_dirty() { dirty_ = false; };
+    void set_dirty() { dirty_ = true; };
 
 private:
     T value_;
