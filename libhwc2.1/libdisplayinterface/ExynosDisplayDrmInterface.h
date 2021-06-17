@@ -58,6 +58,8 @@ class FramebufferManager {
         // layer. Those fbIds will be cleaned up once the layer was destroyed.
         int32_t getBuffer(const exynos_win_config_data &config, uint32_t &fbId);
 
+        bool checkShrink();
+
         void cleanup(const ExynosLayer *layer);
 
         // The flip function is to help clean up the cached fbIds of destroyed
@@ -96,8 +98,8 @@ class FramebufferManager {
         };
         using FBList = std::list<std::unique_ptr<Framebuffer>>;
 
-        uint32_t findCachedFbId(const ExynosLayer *layer, Framebuffer::BufferDesc desc);
-        uint32_t findCachedFbId(const ExynosLayer *layer, Framebuffer::SolidColorDesc desc);
+        template <class UnaryPredicate>
+        uint32_t findCachedFbId(const ExynosLayer *layer, UnaryPredicate predicate);
         int addFB2WithModifiers(uint32_t width, uint32_t height, uint32_t pixel_format,
                         const BufHandles handles, const uint32_t pitches[4],
                         const uint32_t offsets[4], const uint64_t modifier[4], uint32_t *buf_id,
@@ -105,6 +107,11 @@ class FramebufferManager {
         uint32_t getBufHandleFromFd(int fd);
         void freeBufHandle(uint32_t handle);
         void removeFBsThreadRoutine();
+
+        void markInuseLayerLocked(const ExynosLayer *layer) REQUIRES(mMutex);
+        void destroyUnusedLayersLocked() REQUIRES(mMutex);
+
+        int mDrmFd = -1;
 
         // mCachedLayerBuffers map keep the relationship between Layer and
         // FBList. The map entry will be deleted once the layer is destroyed.
@@ -114,15 +121,30 @@ class FramebufferManager {
         // be destroyed in mRmFBThread thread.
         FBList mCleanBuffers;
 
-        int mDrmFd = -1;
+        // mCacheShrinkPending is set when we want to clean up unused layers
+        // in mCachedLayerBuffers. When the flag is set, mCachedLayersInuse will
+        // keep in-use layers in this frame update. Those unused layers will be
+        // freed at the end of the update.
+        bool mCacheShrinkPending = false;
+        std::set<const ExynosLayer *> mCachedLayersInuse;
 
         std::thread mRmFBThread;
         bool mRmFBThreadRunning = false;
         Condition mFlipDone;
         Mutex mMutex;
 
-        static constexpr uint32_t MAX_CACHED_BUFFERS = 32; // TODO: find a good value for this
+        static constexpr size_t MAX_CACHED_LAYERS = 16;
+        static constexpr size_t MAX_CACHED_BUFFERS_PER_LAYER = 32;
 };
+
+template <class UnaryPredicate>
+uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer, UnaryPredicate predicate) {
+    Mutex::Autolock lock(mMutex);
+    markInuseLayerLocked(layer);
+    const auto &cachedBuffers = mCachedLayerBuffers[layer];
+    const auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(), predicate);
+    return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
+}
 
 class ExynosDisplayDrmInterface :
     public ExynosDisplayInterface,
