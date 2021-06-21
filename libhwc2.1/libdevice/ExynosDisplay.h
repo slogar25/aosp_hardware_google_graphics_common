@@ -1036,7 +1036,7 @@ class ExynosDisplay {
         bool needNotChangeConfig(hwc2_config_t config);
         int32_t updateInternalDisplayConfigVariables(
                 hwc2_config_t config, bool updateVsync = true);
-        int32_t resetConfigRequestState();
+        int32_t resetConfigRequestStateLocked();
         int32_t updateConfigRequestAppliedTime();
         int32_t updateVsyncAppliedTimeLine(int64_t actualChangeTime);
         int32_t getDisplayVsyncPeriodInternal(
