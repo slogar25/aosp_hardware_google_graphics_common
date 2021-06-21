@@ -1945,9 +1945,9 @@ int32_t ExynosDisplayDrmInterface::setupWritebackCommit(DrmModeAtomicReq &drmReq
     writeback_config.state = exynos_win_config_data::WIN_STATE_BUFFER;
     writeback_config.format = mReadbackInfo.mReadbackFormat;
     writeback_config.src = {0, 0, mExynosDisplay->mXres, mExynosDisplay->mYres,
-        mExynosDisplay->mXres, mExynosDisplay->mYres};
+                            gmeta.stride, gmeta.vstride};
     writeback_config.dst = {0, 0, mExynosDisplay->mXres, mExynosDisplay->mYres,
-        mExynosDisplay->mXres, mExynosDisplay->mYres};
+                            gmeta.stride, gmeta.vstride};
     writeback_config.fd_idma[0] = gmeta.fd;
     writeback_config.fd_idma[1] = gmeta.fd1;
     writeback_config.fd_idma[2] = gmeta.fd2;
