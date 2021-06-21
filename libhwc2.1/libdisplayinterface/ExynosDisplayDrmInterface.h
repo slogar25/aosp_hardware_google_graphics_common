@@ -337,6 +337,8 @@ class ExynosDisplayDrmInterface :
         void parseRangeEnums(const DrmProperty& property);
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
+        int32_t clearWritebackCommit(DrmModeAtomicReq &drmReq);
+
     private:
         int32_t updateColorSettings(DrmModeAtomicReq &drmReq, uint64_t dqeEnabled);
         int32_t getLowPowerDrmModeModeInfo();
@@ -376,6 +378,7 @@ class ExynosDisplayDrmInterface :
                 static constexpr uint32_t PREFERRED_READBACK_FORMAT =
                     HAL_PIXEL_FORMAT_RGBA_8888;
                 uint32_t mReadbackFormat = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+                bool mNeedClearReadbackCommit = false;
             private:
                 DrmDevice *mDrmDevice = NULL;
                 DrmConnector *mWritebackConnector = NULL;
