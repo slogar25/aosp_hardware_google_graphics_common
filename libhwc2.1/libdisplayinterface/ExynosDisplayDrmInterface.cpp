@@ -1561,7 +1561,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
         return ret;
     }
-    if ((ret = drmReq.commit(flags, true, mipi_sync)) < 0) {
+    if ((ret = drmReq.commit(flags, true)) < 0) {
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in deliverWinConfigData()\n",
                 __func__, ret);
         return ret;
@@ -1731,19 +1731,19 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::DrmModeAtomicReq(ExynosDisplayDrmIn
 
 ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
 {
-    if (mDrmDisplayInterface != NULL) {
-        if (mError != 0) {
-            android::String8 result;
-            result.appendFormat("atomic commit error\n");
-            if (hwcCheckDebugMessages(eDebugDisplayInterfaceConfig) == false)
-                dumpAtomicCommitInfo(result);
-            HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.string());
-        }
+    if (mError != 0) {
+        android::String8 result;
+        result.appendFormat("atomic commit error\n");
+        if (hwcCheckDebugMessages(eDebugDisplayInterfaceConfig) == false)
+            dumpAtomicCommitInfo(result);
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.string());
     }
+
     if(mPset)
         drmModeAtomicFree(mPset);
 
-    destroyOldBlobs();
+    if (destroyOldBlobs() != NO_ERROR)
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "destroy blob error");
 }
 
 int32_t ExynosDisplayDrmInterface::DrmModeAtomicReq::atomicAddProperty(
@@ -1850,8 +1850,7 @@ String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
 }
 
 
-int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool loggingForDebug,
-                                                        bool keepBlob)
+int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool loggingForDebug)
 {
     ATRACE_NAME("drmModeAtomicCommit");
     android::String8 result;
@@ -1861,11 +1860,6 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
         dumpAtomicCommitInfo(result, true);
     if (ret < 0) {
         HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "commit error: %d", ret);
-        setError(ret);
-    }
-
-    if (!keepBlob && (ret = destroyOldBlobs()) != NO_ERROR) {
-        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "destroy blob error");
         setError(ret);
     }
 
