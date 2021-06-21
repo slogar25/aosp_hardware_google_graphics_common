@@ -170,8 +170,6 @@ static struct {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,            2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_PRIV,       2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_TILED,      2, 0x22, { 8, 4, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,           2},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,        1, 0x22, {15, 0, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,     4},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,       2, 0x22, {10, 5, 0, 0}, HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,     4},
     {HAL_PIXEL_FORMAT_YCBCR_P010,                       1, 0x22, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010,                    2},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,              2, 0x22, {16, 8, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010,                    2},
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B,               1, 0x22, {24, 0, 0, 0}, HAL_PIXEL_FORMAT_YCBCR_P010,                    2},
@@ -188,27 +186,17 @@ static struct {
 #define NV12_MFC_Y_PAYLOAD(w, h)    (MFC_ALIGN(w) * MFC_ALIGN(h))
 #define NV12_MFC_C_PAYLOAD(w, h)    (MFC_ALIGN(w) * MFC_ALIGN(h) / 2)
 #define NV12_MFC_PAYLOAD(w, h)      (NV12_MFC_Y_PAYLOAD(w, h) + MFC_PAD_SIZE + (MFC_ALIGN(w) * (h) / 2))
-#define NV12_82_MFC_Y_PAYLOAD(w, h) (NV12_MFC_Y_PAYLOAD(w, h) + MFC_PAD_SIZE + MFC_ALIGN((w) / 4) * (h))
-#define NV12_82_MFC_C_PAYLOAD(w, h) (NV12_MFC_C_PAYLOAD(w, h) + MFC_PAD_SIZE + MFC_ALIGN((w) / 4) * (h) / 2)
-#define NV12_82_MFC_PAYLOAD(w, h)   (NV12_MFC_Y_PAYLOAD(w, h) + MFC_PAD_SIZE + MFC_ALIGN((w) / 4) * MFC_ALIGN(h) + MFC_2B_PAD_SIZE + NV12_82_MFC_C_PAYLOAD(w, h))
 
 size_t halfmt_plane_length(uint32_t fmt, unsigned int plane, uint32_t width, uint32_t height)
 {
-    switch (fmt) {
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B:
-            return NV12_82_MFC_PAYLOAD(width, height);
-        case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B:
-            return (plane == 0) ? NV12_82_MFC_Y_PAYLOAD(width, height) : NV12_82_MFC_C_PAYLOAD(width, height);
-        default:
-            for (size_t i = 0 ; i < ARRSIZE(__halfmt_plane_bpp); i++) {
-                if (__halfmt_plane_bpp[i].fmt == fmt) {
-                    LOGASSERT(plane < __halfmt_plane_bpp[i].bufcnt,
-                              "Plane count of HAL format %#x is %u but %d plane is requested",
-                              fmt, __halfmt_plane_bpp[i].bufcnt, plane);
-                    if (plane < __halfmt_plane_bpp[i].bufcnt)
-                        return (__halfmt_plane_bpp[i].bpp[plane] * width * height) / 8;
-                }
-            }
+    for (size_t i = 0; i < ARRSIZE(__halfmt_plane_bpp); i++) {
+        if (__halfmt_plane_bpp[i].fmt == fmt) {
+            LOGASSERT(plane < __halfmt_plane_bpp[i].bufcnt,
+                      "Plane count of HAL format %#x is %u but %d plane is requested", fmt,
+                      __halfmt_plane_bpp[i].bufcnt, plane);
+            if (plane < __halfmt_plane_bpp[i].bufcnt)
+                return (__halfmt_plane_bpp[i].bpp[plane] * width * height) / 8;
+        }
     }
 
     LOGASSERT(1, "Unable to find HAL format %#x with plane %d", fmt, plane);
