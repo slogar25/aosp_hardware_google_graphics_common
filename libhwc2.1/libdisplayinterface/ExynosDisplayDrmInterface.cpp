@@ -1395,11 +1395,22 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     mFBManager.checkShrink();
 
+    bool needModesetForReadback = false;
     if (mExynosDisplay->mDpuData.enable_readback) {
         if ((ret = setupWritebackCommit(drmReq)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s:: Failed to setup writeback commit ret(%d)",
                     __func__, ret);
             return ret;
+        }
+        needModesetForReadback = true;
+    } else {
+        if (mReadbackInfo.mNeedClearReadbackCommit) {
+            if ((ret = clearWritebackCommit(drmReq)) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Failed to clear writeback commit ret(%d)",
+                         __func__, ret);
+                return ret;
+            }
+            needModesetForReadback = true;
         }
     }
 
@@ -1551,7 +1562,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     uint32_t flags = mipi_sync ? 0 : DRM_MODE_ATOMIC_NONBLOCK;
-    if (mExynosDisplay->mDpuData.enable_readback)
+    if (needModesetForReadback)
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
     if (mipi_sync)
@@ -1672,6 +1683,15 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                 plane->fb_property(), 0)) < 0)
             return ret;
+    }
+
+    /* Disable readback connector if required */
+    if (mReadbackInfo.mNeedClearReadbackCommit &&
+        !mExynosDisplay->mDpuData.enable_readback) {
+        if ((ret = clearWritebackCommit(drmReq)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Failed to apply writeback", __func__);
+            return ret;
+        }
     }
 
     /* Disable ModeSet */
@@ -1948,6 +1968,33 @@ int32_t ExynosDisplayDrmInterface::setupWritebackCommit(DrmModeAtomicReq &drmReq
         return ret;
 
     mReadbackInfo.setFbId(writeback_fb_id);
+    mReadbackInfo.mNeedClearReadbackCommit = true;
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplayDrmInterface::clearWritebackCommit(DrmModeAtomicReq &drmReq)
+{
+    int ret;
+
+    DrmConnector *writeback_conn = mReadbackInfo.getWritebackConnector();
+    if (writeback_conn == NULL) {
+        ALOGE("%s: There is no writeback connection", __func__);
+        return -EINVAL;
+    }
+
+    if ((ret = drmReq.atomicAddProperty(writeback_conn->id(),
+            writeback_conn->writeback_fb_id(), 0)) < 0)
+        return ret;
+
+    if ((ret = drmReq.atomicAddProperty(writeback_conn->id(),
+            writeback_conn->writeback_out_fence(), 0)) < 0)
+        return ret;
+
+    if ((ret = drmReq.atomicAddProperty(writeback_conn->id(),
+            writeback_conn->crtc_id_property(), 0)) < 0)
+        return ret;
+
+    mReadbackInfo.mNeedClearReadbackCommit = false;
     return NO_ERROR;
 }
 
