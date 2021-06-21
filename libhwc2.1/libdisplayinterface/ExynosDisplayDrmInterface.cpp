@@ -929,7 +929,8 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     /* Don't skip when power was off */
     if (!(mExynosDisplay->mSkipFrame) &&
         (mActiveModeState.blob_id != 0) &&
-        (mActiveModeState.mode.id() == mode.id())) {
+        (mActiveModeState.mode.id() == mode.id()) &&
+        (mActiveModeState.needs_modeset == false)) {
         ALOGD("%s:: same mode %d", __func__, mode.id());
         return HWC2_ERROR_NONE;
     }
@@ -1708,6 +1709,9 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
                 __func__, ret);
         return ret;
     }
+
+    if (needModeClear)
+        mActiveModeState.needs_modeset = true;
 
     return NO_ERROR;
 }
