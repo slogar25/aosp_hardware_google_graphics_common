@@ -3296,6 +3296,9 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     DISPLAY_LOGD(eDebugDisplayConfig, "%s : %dx%d, %dms, %d Xdpi, %d Ydpi", __func__,
             mXres, mYres, mVsyncPeriod, mXdpi, mYdpi);
 
+    if (mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
+        DISPLAY_LOGI("%s, previous request config is processing", __func__);
+    }
     /* Config would be requested on present time */
     mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_PENDING;
     mVsyncPeriodChangeConstraints = *vsyncPeriodChangeConstraints;
@@ -3557,8 +3560,8 @@ void ExynosDisplay::updateRefreshRateHint() {
     mPrevRefreshRate = refreshRate;
 }
 
-int32_t ExynosDisplay::resetConfigRequestState()
-{
+/* This function must be called within a mDisplayMutex protection */
+int32_t ExynosDisplay::resetConfigRequestStateLocked() {
     mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
     updateBtsVsyncPeriod(mVsyncPeriod, true);
     DISPLAY_LOGD(eDebugDisplayConfig,"Update mVsyncPeriod %d",
@@ -3566,7 +3569,14 @@ int32_t ExynosDisplay::resetConfigRequestState()
 
     updateRefreshRateHint();
 
-    mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
+    if (mConfigRequestState != hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
+        DISPLAY_LOGI("%s: mConfigRequestState (%d) is not REQUESTED", __func__,
+                     mConfigRequestState);
+    } else {
+        DISPLAY_LOGD(eDebugDisplayInterfaceConfig, "%s: Change mConfigRequestState (%d) to NONE",
+                     __func__, mConfigRequestState);
+        mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
+    }
     return NO_ERROR;
 }
 

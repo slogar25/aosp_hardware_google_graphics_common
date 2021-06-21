@@ -560,7 +560,7 @@ void ExynosDisplayDrmInterface::Callback(
 
     if (configApplied) {
         if (mVsyncCallback.getDesiredVsyncPeriod()) {
-            mExynosDisplay->resetConfigRequestState();
+            mExynosDisplay->resetConfigRequestStateLocked();
             mDrmConnector->set_active_mode(mActiveModeState.mode);
             mVsyncCallback.resetDesiredVsyncPeriod();
         }
