@@ -1345,11 +1345,14 @@ int32_t ExynosDisplayDrmInterface::waitVBlank() {
     return ret;
 }
 
-int32_t ExynosDisplayDrmInterface::updateColorSettings(DrmModeAtomicReq &drmReq) {
+int32_t ExynosDisplayDrmInterface::updateColorSettings(DrmModeAtomicReq &drmReq, uint64_t dqeEnabled) {
     int ret = NO_ERROR;
-    if ((ret = setDisplayColorSetting(drmReq)) != 0) {
-        HWC_LOGE(mExynosDisplay, "Failed to set display color setting");
-        return ret;
+
+    if (dqeEnabled) {
+        if ((ret = setDisplayColorSetting(drmReq)) != 0) {
+            HWC_LOGE(mExynosDisplay, "Failed to set display color setting");
+            return ret;
+        }
     }
 
     for (size_t i = 0; i < mExynosDisplay->mDpuData.configs.size(); i++) {
@@ -1420,6 +1423,19 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     for (auto &plane : mDrmDevice->planes()) {
         planeEnableInfo[plane->id()] = 0;
+    }
+
+    uint64_t dqeEnable = 1;
+    if (mExynosDisplay->mDpuData.enable_readback &&
+        !mExynosDisplay->mDpuData.readback_info.requested_from_service) {
+        dqeEnable = 0;
+    }
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                    mDrmCrtc->dqe_enabled_property(), dqeEnable)) < 0) {
+        HWC_LOGE(mExynosDisplay, "%s: Fail to dqe_enable setting",
+                __func__);
+        return ret;
     }
 
     for (size_t i = 0; i < mExynosDisplay->mDpuData.configs.size(); i++) {
@@ -1541,7 +1557,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     if (mipi_sync)
         drmReq.savePset();
 
-    if ((ret = updateColorSettings(drmReq)) != 0) {
+    if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
         HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
         return ret;
     }
@@ -1574,7 +1590,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             return ret;
         }
         drmReq.restorePset();
-        if ((ret = updateColorSettings(drmReq)) != 0) {
+        if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
             HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
             return ret;
         }
