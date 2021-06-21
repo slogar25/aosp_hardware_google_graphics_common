@@ -136,9 +136,6 @@ public:
         mMatrixIndex[mMatrixCount] = spcidx;
 
         *command |= mMatrixCount++;
-        // 8-bit part data are always dithered by MFC
-        if ((g2dfmt & G2D_DATAFMT_YUV420SP82_LGCY) != 0)
-            *command |= G2D_YCBCRMODE_DITHER;
 
         return true;
     }
@@ -477,8 +474,6 @@ static g2d_fmt __halfmt_to_g2dfmt_legacy[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP,        G2D_FMT_NV12,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,      G2D_FMT_NV12,      2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,       G2D_FMT_NV12,      1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,  G2D_FMT_NV12_82_LGCY,   1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, G2D_FMT_NV12_82_LGCY,   2, 0},
     {HAL_PIXEL_FORMAT_YCBCR_P010,                 G2D_FMT_NV12_P010_LGCY, 1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,        G2D_FMT_NV12_P010_LGCY, 2, 0},
     {HAL_PIXEL_FORMAT_YCbCr_422_I,                G2D_FMT_YUYV,      1, 0},
@@ -507,8 +502,6 @@ static g2d_fmt __halfmt_to_g2dfmt[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,      G2D_FMT_NV12,      2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,       G2D_FMT_NV12,      1, 0},
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP,             G2D_FMT_NV12,      1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,  G2D_FMT_NV12_82,   1, 0},
-    {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B, G2D_FMT_NV12_82,   2, 0},
     {HAL_PIXEL_FORMAT_YCBCR_P010,                 G2D_FMT_NV12_P010, 1, 0},
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B,         G2D_FMT_NV12_P010, 1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,        G2D_FMT_NV12_P010, 2, 0},
@@ -602,8 +595,6 @@ unsigned int AcrylicCompositorG2D::updateFilterCoefficients(unsigned int layerco
 
 static uint32_t mfc_stride_formats[] = {
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,
-    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_S10B,
-    HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_S10B,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_SBWC,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC,
     HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M_10B_SBWC,
@@ -1240,7 +1231,8 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
         src_yuv420_8b = false;
 
         unsigned int bpp;
-        uint8_t planecnt;
+        uint8_t planecount;
+        uint32_t equiv_fmt;
         for (int idx = 0; idx < frame->getLayerCount(); idx++) {
             AcrylicPerformanceRequestLayer *layer = &(frame->mLayers[idx]);
             uint64_t layer_bw, pixelcount;
@@ -1261,18 +1253,23 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
                          (ALIGN(layer->mSourceRect.pos.vert + src_vert, 16) -
                           ALIGN_DOWN(layer->mSourceRect.pos.vert, 16));
 
-            planecnt = halfmt_plane_count(layer->mPixFormat);
-            if (layer->mAttribute & AcrylicCanvas::ATTR_COMPRESSED)
-                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_COMPRESSED;
-            else if (planecnt == 2)
-                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_YUV2P;
-            else if (planecnt == 4)
-                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_YUV2P_82;
-
-            // src_yuv420_8b is used when calculating write bandwidth.
             bpp = halfmt_bpp(layer->mPixFormat);
-            if (bpp == 12)
-                src_yuv420_8b = true;
+            planecount = halfmt_plane_count(layer->mPixFormat);
+            equiv_fmt = find_format_equivalent(layer->mPixFormat);
+
+            if (equiv_fmt == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_SBWC ||
+                equiv_fmt == HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN_10B_SBWC)
+                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_SBWC;
+            else if (layer->mAttribute & AcrylicCanvas::ATTR_COMPRESSED) {
+                if (planecount == 1)
+                    data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_RGB_AFBC;
+                else
+                    data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_YUV_AFBC;
+            } else if (planecount == 2)
+                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_YUV2P;
+
+            // src_yuv420_8b is used when calculating write bandwidth
+            if (bpp == 12) src_yuv420_8b = true;
 
             layer_bw = pixelcount * bpp;
             // Below is checking if scaling is involved.
@@ -1294,8 +1291,6 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
                 layer_bw <<= 4; // layer_bw * 16
             } else {
                 layer_bw = (layer_bw << 4) + (layer_bw << 1); // layer_bw * 18
-
-                data.frame[i].layer[idx].layer_attr |= G2D_PERF_LAYER_SCALING;
             }
 
             bandwidth += layer_bw;
@@ -1314,12 +1309,11 @@ bool AcrylicCompositorG2D::requestPerformanceQoS(AcrylicPerformanceRequest *requ
         data.frame[i].bandwidth_read = static_cast<uint32_t>(bandwidth);
 
         bpp = halfmt_bpp(frame->mTargetPixFormat);
-        if (bpp == 12)
-            data.frame[i].frame_attr |= G2D_PERF_FRAME_YUV2P;
-
         bandwidth = frame->mTargetDimension.hori * frame->mTargetDimension.vert;
         bandwidth *= frame->mFrameRate * bpp;
 
+        // When src rotation is involved, src format includes yuv420(8bit-depth)
+        // and dst format is yuv420(8bit-depth), weight to the write bandwidth is 2.
         // RSH 12 : bw * 2 / (bits_per_byte * kilobyte)
         // RHS 13 : bw * 1 / (bits_per_byte * kilobyte)
         bandwidth >>= ((bpp == 12) && src_yuv420_8b && src_rotate) ? 12 : 13;
