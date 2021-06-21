@@ -145,6 +145,8 @@ struct exynos_readback_info
      * safe for the client to read.
      */
     int acq_fence = -1;
+    /* Requested from HWCService */
+    bool requested_from_service = false;
 };
 
 struct exynos_win_config_data
@@ -1054,8 +1056,8 @@ class ExynosDisplay {
 
         int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
                 int32_t* /*android_dataspace_t*/ outDataspace);
-        int32_t setReadbackBuffer(buffer_handle_t buffer, int32_t releaseFence);
-        void setReadbackBufferInternal(buffer_handle_t buffer, int32_t releaseFence);
+        int32_t setReadbackBuffer(buffer_handle_t buffer, int32_t releaseFence, bool requestedService = false);
+        void setReadbackBufferInternal(buffer_handle_t buffer, int32_t releaseFence, bool requestedService = false);
         int32_t getReadbackBufferFence(int32_t* outFence);
         /* This function is called by ExynosDisplayInterface class to set acquire fence*/
         int32_t setReadbackBufferAcqFence(int32_t acqFence);

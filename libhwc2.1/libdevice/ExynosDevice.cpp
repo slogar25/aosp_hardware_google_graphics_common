@@ -902,7 +902,7 @@ void ExynosDevice::captureScreenWithReadback(uint32_t displayType)
 
     mIsWaitingReadbackReqDone = true;
 
-    if (display->setReadbackBuffer(captureClass.getBuffer(), -1) != HWC2_ERROR_NONE) {
+    if (display->setReadbackBuffer(captureClass.getBuffer(), -1, true) != HWC2_ERROR_NONE) {
         ALOGE("setReadbackBuffer fail");
         return;
     }
