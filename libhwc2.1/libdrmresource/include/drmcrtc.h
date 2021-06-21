@@ -61,6 +61,7 @@ class DrmCrtc {
   DrmProperty &adjusted_vblank_property();
   const DrmProperty &ppc_property() const;
   const DrmProperty &max_disp_freq_property() const;
+  const DrmProperty &dqe_enabled_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -92,6 +93,7 @@ class DrmCrtc {
   DrmProperty adjusted_vblank_property_;
   DrmProperty ppc_property_;
   DrmProperty max_disp_freq_property_;
+  DrmProperty dqe_enabled_property_;
   std::vector<DrmProperty *> properties_;
 };
 }  // namespace android
