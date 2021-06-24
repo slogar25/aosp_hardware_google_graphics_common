@@ -481,6 +481,7 @@ class ExynosDisplayDrmInterface :
                 "/sys/class/backlight/panel0-backlight/dimming_on";
 
         FramebufferManager mFBManager;
+        bool mLhbmForceUpdated = false;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);

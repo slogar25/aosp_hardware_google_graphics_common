@@ -1163,6 +1163,9 @@ class ExynosDisplay {
             mReqLhbm = on;
             mDevice->invalidate();
         }
+        void clearReqLhbm() { mReqLhbm = false; }
+        void setMinDisplayVsyncPeriod(uint32_t period) { mMinDisplayVsyncPeriod = period; }
+        uint32_t getMinDisplayVsyncPeriod(void) const { return mMinDisplayVsyncPeriod; }
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
@@ -1188,6 +1191,9 @@ class ExynosDisplay {
 
         // request lhbm state
         bool mReqLhbm = false;
+
+        // vsync period of max refresh rate
+        uint32_t mMinDisplayVsyncPeriod;
 
         /* Display hint to notify power hal */
         class PowerHalHintWorker : public Worker {
