@@ -479,6 +479,10 @@ void dumpExynosImage(String8& result, exynos_image &img)
 }
 
 void printExynosLayer(const ExynosLayer* layer) {
+    if (layer == nullptr) {
+        return;
+    }
+
     const_cast<ExynosLayer*>(layer)->printLayer();
 }
 
