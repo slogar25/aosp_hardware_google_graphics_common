@@ -3339,9 +3339,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     uint32_t vsync_period = getDisplayVsyncPeriodFromConfig(config);
     updateBtsVsyncPeriod(vsync_period);
 
-    float refreshRate = static_cast<float>(nsecsPerSec) /
-                                  mDisplayConfigs[config].vsyncPeriod;
-    bool earlyWakeupNeeded = checkEarlyWakeupNeeded(refreshRate);
+    bool earlyWakeupNeeded = checkRrCompensationEnabled();
     if (earlyWakeupNeeded && mEarlyWakeupFd != NULL) {
         char val = '1';
         fwrite(&val, sizeof(val), 1, mEarlyWakeupFd);
