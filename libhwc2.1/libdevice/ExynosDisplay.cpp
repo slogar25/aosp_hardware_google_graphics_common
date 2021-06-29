@@ -3417,6 +3417,7 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_HEIGHT, (int32_t*)&mYres);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_X, (int32_t*)&mXdpi);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_Y, (int32_t*)&mYdpi);
+    mHdrFullScrenAreaThreshold = mXres * mYres * kHdrFullScreen;
     if (updateVsync) {
         mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
         updateBtsVsyncPeriod(mVsyncPeriod, true);
@@ -5182,6 +5183,9 @@ void ExynosDisplay::updateBrightnessState() {
                     mBrightnessState.peak_hbm = true;
                     mBrightnessState.instant_hbm = true;
                 }
+            }
+            if (mLayers[i]->getDisplayFrameArea() >= mHdrFullScrenAreaThreshold) {
+                mBrightnessState.hdr_full_screen = true;
             }
         }
     }
