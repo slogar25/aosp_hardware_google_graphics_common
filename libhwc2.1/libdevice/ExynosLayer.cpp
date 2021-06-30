@@ -31,37 +31,37 @@
  */
 
 ExynosLayer::ExynosLayer(ExynosDisplay* display)
-: ExynosMPPSource(MPP_SOURCE_LAYER, this),
-    mDisplay(display),
-    mCompositionType(HWC2_COMPOSITION_INVALID),
-    mExynosCompositionType(HWC2_COMPOSITION_INVALID),
-    mValidateCompositionType(HWC2_COMPOSITION_INVALID),
-    mValidateExynosCompositionType(HWC2_COMPOSITION_INVALID),
-    mOverlayInfo(0x0),
-    mSupportedMPPFlag(0x0),
-    mFps(0),
-    mOverlayPriority(ePriorityLow),
-    mGeometryChanged(0x0),
-    mWindowIndex(0),
-    mCompressed(false),
-    mAcquireFence(-1),
-    mReleaseFence(-1),
-    mFrameCount(0),
-    mLastFrameCount(0),
-    mLastFpsTime(0),
-    mLastLayerBuffer(NULL),
-    mLayerBuffer(NULL),
-    mDamageNum(0),
-    mBlending(HWC2_BLEND_MODE_NONE),
-    mPlaneAlpha(1.0),
-    mTransform(0),
-    mZOrder(0),
-    mDataSpace(HAL_DATASPACE_UNKNOWN),
-    mLayerFlag(0x0),
-    mIsHdrLayer(false),
-    mBufferHasMetaParcel(false),
-    mMetaParcelFd(-1)
-{
+      : ExynosMPPSource(MPP_SOURCE_LAYER, this),
+        mDisplay(display),
+        mCompositionType(HWC2_COMPOSITION_INVALID),
+        mExynosCompositionType(HWC2_COMPOSITION_INVALID),
+        mValidateCompositionType(HWC2_COMPOSITION_INVALID),
+        mValidateExynosCompositionType(HWC2_COMPOSITION_INVALID),
+        mOverlayInfo(0x0),
+        mSupportedMPPFlag(0x0),
+        mFps(0),
+        mOverlayPriority(ePriorityLow),
+        mGeometryChanged(0x0),
+        mWindowIndex(0),
+        mCompressed(false),
+        mAcquireFence(-1),
+        mPrevAcquireFence(-1),
+        mReleaseFence(-1),
+        mFrameCount(0),
+        mLastFrameCount(0),
+        mLastFpsTime(0),
+        mLastLayerBuffer(NULL),
+        mLayerBuffer(NULL),
+        mDamageNum(0),
+        mBlending(HWC2_BLEND_MODE_NONE),
+        mPlaneAlpha(1.0),
+        mTransform(0),
+        mZOrder(0),
+        mDataSpace(HAL_DATASPACE_UNKNOWN),
+        mLayerFlag(0x0),
+        mIsHdrLayer(false),
+        mBufferHasMetaParcel(false),
+        mMetaParcelFd(-1) {
     memset(&mDisplayFrame, 0, sizeof(mDisplayFrame));
     memset(&mSourceCrop, 0, sizeof(mSourceCrop));
     mVisibleRegionScreen.numRects = 0;
@@ -84,6 +84,10 @@ ExynosLayer::~ExynosLayer() {
         close(mMetaParcelFd);
         mMetaParcelFd = -1;
     }
+
+    if (mPrevAcquireFence != -1)
+        mPrevAcquireFence = fence_close(mPrevAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE,
+                                        FENCE_IP_UNDEFINED);
 }
 
 /**
@@ -134,6 +138,14 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.sourceCrop = mSourceCrop;
     mPreprocessedInfo.displayFrame = mDisplayFrame;
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
+
+    if (mAcquireFence == -1 && mPrevAcquireFence != -1) {
+        mAcquireFence = hwcCheckFenceDebug(mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER,
+                                           hwc_dup(mPrevAcquireFence, mDisplay,
+                                                   FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER));
+    } else if (mAcquireFence != -1) {
+        setFenceInfo(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, FENCE_FROM);
+    }
 
     if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
         mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
@@ -374,8 +386,14 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
     }
 
     mLayerBuffer = buffer;
+    mPrevAcquireFence =
+            fence_close(mPrevAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_UNDEFINED);
     mAcquireFence = fence_close(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_UNDEFINED);
+
     mAcquireFence = hwcCheckFenceDebug(mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, acquireFence);
+    mPrevAcquireFence = hwcCheckFenceDebug(mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER,
+                                           hwc_dup(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE,
+                                                   FENCE_IP_LAYER, true));
     if (mReleaseFence >= 0)
         HWC_LOGE(NULL, "Layer's release fence is not initialized");
     mReleaseFence = -1;

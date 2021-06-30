@@ -783,9 +783,8 @@ int hwcFdClose(int fd) {
     return -1;
 }
 
-int hwc_dup(int fd, ExynosDisplay* display,
-        hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip) {
-
+int hwc_dup(int fd, ExynosDisplay* display, hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip,
+            bool pendingAllowed) {
     int dup_fd = -1;
 
     if (fd>= 3)
@@ -802,7 +801,7 @@ int hwc_dup(int fd, ExynosDisplay* display,
         hwc_print_stack();
     }
 
-    setFenceInfo(dup_fd, display, type, ip, FENCE_FROM);
+    setFenceInfo(dup_fd, display, type, ip, FENCE_FROM, pendingAllowed);
     FT_LOGD("duplicated %d from %d", dup_fd, fd);
 
     return dup_fd;

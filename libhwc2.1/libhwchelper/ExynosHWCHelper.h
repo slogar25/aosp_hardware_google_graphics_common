@@ -446,8 +446,8 @@ int fence_close(int fence, ExynosDisplay* display,
 bool fence_valid(int fence);
 
 int hwcFdClose(int fd);
-int hwc_dup(int fd, ExynosDisplay* display,
-        hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip);
+int hwc_dup(int fd, ExynosDisplay *display, hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip,
+            bool pendingAllowed = false);
 int hwc_print_stack();
 
 inline hwc_rect expand(const hwc_rect &r1, const hwc_rect &r2)
