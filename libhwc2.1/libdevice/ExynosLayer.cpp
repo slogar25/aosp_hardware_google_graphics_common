@@ -139,14 +139,6 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.displayFrame = mDisplayFrame;
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
 
-    if (mAcquireFence == -1 && mPrevAcquireFence != -1) {
-        mAcquireFence = hwcCheckFenceDebug(mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER,
-                                           hwc_dup(mPrevAcquireFence, mDisplay,
-                                                   FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER));
-    } else if (mAcquireFence != -1) {
-        setFenceInfo(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, FENCE_FROM);
-    }
-
     if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
         mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
     } else {
@@ -897,6 +889,16 @@ int32_t ExynosLayer::resetAssignedResource()
         mOtfMPP = NULL;
     }
     return ret;
+}
+
+void ExynosLayer::setSrcAcquireFence() {
+    if (mAcquireFence == -1 && mPrevAcquireFence != -1) {
+        mAcquireFence = hwcCheckFenceDebug(mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER,
+                                           hwc_dup(mPrevAcquireFence, mDisplay,
+                                                   FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER));
+    } else if (mAcquireFence != -1) {
+        setFenceInfo(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, FENCE_FROM);
+    }
 }
 
 void ExynosLayer::dump(String8& result)
