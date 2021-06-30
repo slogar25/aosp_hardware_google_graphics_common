@@ -3832,12 +3832,6 @@ int32_t ExynosDisplay::validateDisplay(
         mDevice->dynamicRecompositionThreadCreate();
     }
 
-    for (size_t i=0; i < mLayers.size(); i++) {
-        // Layer's acquire fence from SF
-        setFenceInfo(mLayers[i]->mAcquireFence, this,
-                FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, FENCE_FROM);
-    }
-
     if ((ret = mResourceManager->assignResource(this)) != NO_ERROR) {
         validateError = true;
         HWC_LOGE(this, "%s:: assignResource() fail, display(%d), ret(%d)", __func__, mDisplayId, ret);
