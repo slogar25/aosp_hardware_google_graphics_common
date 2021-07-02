@@ -1238,6 +1238,12 @@ std::string TableBuilder::buildPaddedString(const std::string& str, int size) {
 void writeFileNode(FILE* fd, int value) {
     constexpr uint32_t kMaxWriteFileLen = 16;
     char val[kMaxWriteFileLen] = {0};
+
+    if (fd == nullptr) {
+        ALOGE("invalid fd pass to %s!", __func__);
+        return;
+    }
+
     if (int32_t ret = snprintf(val, kMaxWriteFileLen, "%d", value) <= 0) {
         ALOGE("failed to write file node, ret =%d", ret);
     } else {
@@ -1252,7 +1258,7 @@ void writeFileNode(FILE* fd, int value) {
 
 int32_t writeIntToFile(const char* file, uint32_t value) {
     FILE* fd = fopen(file, "w+");
-    if (fd == NULL) {
+    if (fd == nullptr) {
         ALOGE("%s open failed! %s", file, strerror(errno));
         return -EINVAL;
     }
