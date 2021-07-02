@@ -3781,6 +3781,10 @@ int32_t ExynosDisplay::setVsyncEnabledInternal(
     if (enabled == HWC2_VSYNC_ENABLE) {
         gettimeofday(&updateTimeInfo.lastEnableVsyncTime, NULL);
         val = 1;
+        if (mVsyncState != HWC2_VSYNC_ENABLE) {
+            /* TODO: remove it once driver can handle on its own */
+            setWakeupDisplay();
+        }
     } else {
         gettimeofday(&updateTimeInfo.lastDisableVsyncTime, NULL);
     }
