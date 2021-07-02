@@ -126,14 +126,27 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
 #endif
 
     mLhbmFd = fopen(kLocalHbmModeFileNode, "w+");
-    if (mLhbmFd == NULL) ALOGE("local hbm mode node open failed! %s", strerror(errno));
+    if (mLhbmFd == nullptr) ALOGE("local hbm mode node open failed! %s", strerror(errno));
+
+    mWakeupDispFd = fopen(kWakeupDispFilePath, "w");
+    if (mWakeupDispFd == nullptr) ALOGE("wake up display node open failed! %s", strerror(errno));
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
 {
-    if (mBrightnessFd != NULL) {
+    if (mWakeupDispFd) {
+        fclose(mWakeupDispFd);
+        mWakeupDispFd = nullptr;
+    }
+
+    if (mLhbmFd) {
+        fclose(mLhbmFd);
+        mLhbmFd = nullptr;
+    }
+
+    if (mBrightnessFd) {
         fclose(mBrightnessFd);
-        mBrightnessFd = NULL;
+        mBrightnessFd = nullptr;
     }
 }
 
@@ -447,4 +460,10 @@ void ExynosPrimaryDisplay::notifyLhbmState(bool enabled) {
     mLhbmChanged = true;
     lhbm_cond_.notify_one();
     mLhbmOn = enabled;
+}
+
+void ExynosPrimaryDisplay::setWakeupDisplay() {
+    if (mWakeupDispFd) {
+        writeFileNode(mWakeupDispFd, 1);
+    }
 }

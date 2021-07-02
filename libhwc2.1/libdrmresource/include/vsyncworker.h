@@ -30,38 +30,37 @@ namespace android {
 
 class VsyncCallback {
  public:
-  virtual ~VsyncCallback() {
-  }
-  virtual void Callback(int display, int64_t timestamp) = 0;
+     virtual ~VsyncCallback() {}
+     virtual void Callback(int display, int64_t timestamp) = 0;
 };
 
 class VSyncWorker : public Worker {
  public:
-  VSyncWorker();
-  ~VSyncWorker() override;
+     VSyncWorker();
+     ~VSyncWorker() override;
 
-  int Init(DrmDevice *drm, int display);
-  void RegisterCallback(std::shared_ptr<VsyncCallback> callback);
+     int Init(DrmDevice *drm, int display);
+     void RegisterCallback(std::shared_ptr<VsyncCallback> callback);
 
-  void VSyncControl(bool enabled);
+     void VSyncControl(bool enabled);
 
  protected:
-  void Routine() override;
+     void Routine() override;
 
  private:
-  int64_t GetPhasedVSync(int64_t frame_ns, int64_t current);
-  int SyntheticWaitVBlank(int64_t *timestamp);
+     int GetPhasedVSync(int64_t frame_ns, int64_t &expect);
+     int SyntheticWaitVBlank(int64_t &timestamp);
 
-  DrmDevice *drm_;
+     DrmDevice *drm_;
 
-  // shared_ptr since we need to use this outside of the thread lock (to
-  // actually call the hook) and we don't want the memory freed until we're
-  // done
-  std::shared_ptr<VsyncCallback> callback_ = NULL;
+     // shared_ptr since we need to use this outside of the thread lock (to
+     // actually call the hook) and we don't want the memory freed until we're
+     // done
+     std::shared_ptr<VsyncCallback> callback_ = NULL;
 
-  int display_;
-  std::atomic_bool enabled_;
-  int64_t last_timestamp_;
+     int display_;
+     std::atomic_bool enabled_;
+     int64_t last_timestamp_;
 };
 }  // namespace android
 
