@@ -1101,7 +1101,7 @@ class ExynosDisplay {
         virtual int getDDIScalerMode(int width, int height);
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
-        virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
+        virtual int32_t updateColorConversionInfo() { return NO_ERROR; }
         virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
@@ -1111,16 +1111,17 @@ class ExynosDisplay {
             return PanelGammaSource::GAMMA_DEFAULT;
         }
         virtual void initLbe(){};
-        virtual void setLbeState(LbeState __unused state){};
-        virtual void setLbeAmbientLight(int __unused value){};
-        virtual LbeState getLbeState() { return LbeState::OFF; };
+        virtual void setLbeState(LbeState __unused state) {}
+        virtual void setLbeAmbientLight(int __unused value) {}
+        virtual LbeState getLbeState() { return LbeState::OFF; }
 
         int32_t checkPowerHalExtHintSupport(const std::string& mode);
 
-        virtual bool isLhbmSupported() { return false; };
-        virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; };
+        virtual bool isLhbmSupported() { return false; }
+        virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; }
         virtual bool getLhbmState() { return false; };
-        virtual void notifyLhbmState(bool __unused enabled){};
+        virtual void notifyLhbmState(bool __unused enabled) {}
+        virtual void setWakeupDisplay() {}
 
         int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
