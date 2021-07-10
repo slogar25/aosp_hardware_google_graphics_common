@@ -64,7 +64,8 @@ ExynosDevice::ExynosDevice()
     mVsyncDisplayId(getDisplayId(HWC_DISPLAY_PRIMARY, 0)),
     mTimestamp(0),
     mDisplayMode(0),
-    mInterfaceType(INTERFACE_TYPE_FB)
+    mInterfaceType(INTERFACE_TYPE_FB),
+    mIsInTUI(false)
 {
     exynosHWCControl.forceGpu = false;
     exynosHWCControl.windowUpdate = true;
