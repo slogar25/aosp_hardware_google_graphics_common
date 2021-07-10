@@ -333,8 +333,14 @@ class ExynosDevice {
         int32_t setLhbmState(bool enabled);
         bool getLhbmState();
 
+    public:
+        void enterToTUI() { mIsInTUI = true; };
+        void exitFromTUI() { mIsInTUI = false; };
+        bool isInTUI() { return mIsInTUI; };
+
     private:
         bool mLbeSupported;
+        bool mIsInTUI;
 };
 
 #endif //_EXYNOSDEVICE_H
