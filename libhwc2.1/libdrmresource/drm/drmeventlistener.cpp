@@ -110,9 +110,9 @@ void DrmEventListener::UEventHandler() {
     bool drm_event = false, hotplug_event = false;
     for (int i = 0; i < ret;) {
       char *event = buffer + i;
-      if (strcmp(event, "DEVTYPE=drm_minor"))
+      if (!strcmp(event, "DEVTYPE=drm_minor"))
         drm_event = true;
-      else if (strcmp(event, "HOTPLUG=1"))
+      else if (!strcmp(event, "HOTPLUG=1"))
         hotplug_event = true;
 
       i += strlen(event) + 1;
