@@ -1873,16 +1873,23 @@ String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
     return result;
 }
 
-
 int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool loggingForDebug)
 {
     ATRACE_NAME("drmModeAtomicCommit");
     android::String8 result;
+
+    /*
+     * During kernel is in TUI, all atomic commits should be returned with error EPERM(-1).
+     * To avoid handling atomic commit as fail, it needs to check TUI status.
+     */
     int ret = drmModeAtomicCommit(mDrmDisplayInterface->mDrmDevice->fd(),
             mPset, flags, mDrmDisplayInterface->mDrmDevice);
     if (loggingForDebug)
         dumpAtomicCommitInfo(result, true);
-    if (ret < 0) {
+    if ((ret == -EPERM) && mDrmDisplayInterface->mDrmDevice->event_listener()->IsDrmInTUI()) {
+        ALOGV("skip atomic commit error handling as kernel is in TUI");
+        ret = NO_ERROR;
+    } else if (ret < 0) {
         HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "commit error: %d", ret);
         setError(ret);
     }

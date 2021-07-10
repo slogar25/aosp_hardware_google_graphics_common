@@ -2676,16 +2676,16 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
 
-    int ret = 0;
+    int ret = HWC2_ERROR_NONE;
     String8 errString;
 
     Mutex::Autolock lock(mDisplayMutex);
 
-    if (mPauseDisplay) {
+    if (mPauseDisplay || mDevice->isInTUI()) {
         closeFencesForSkipFrame(RENDERING_STATE_PRESENTED);
         *outRetireFence = -1;
         mRenderingState = RENDERING_STATE_PRESENTED;
-        return HWC2_ERROR_NONE;
+        return ret;
     }
 
     /*
