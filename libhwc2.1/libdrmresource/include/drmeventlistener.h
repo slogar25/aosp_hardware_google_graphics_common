@@ -20,6 +20,8 @@
 #include "autofd.h"
 #include "worker.h"
 
+#include <sys/epoll.h>
+
 namespace android {
 
 class DrmDevice;
@@ -34,7 +36,19 @@ class DrmEventHandler {
   virtual void HandleEvent(uint64_t timestamp_us) = 0;
 };
 
+class DrmTUIEventHandler {
+ public:
+  DrmTUIEventHandler() {
+  }
+  virtual ~DrmTUIEventHandler() {
+  }
+
+  virtual void HandleTUIEvent() = 0;
+};
+
 class DrmEventListener : public Worker {
+ static constexpr const char kTUIStatusPath[] = "/sys/devices/platform/exynos-drm/tui_status";
+ static const uint32_t maxFds = 3;
  public:
   DrmEventListener(DrmDevice *drm);
   virtual ~DrmEventListener() {
@@ -44,6 +58,10 @@ class DrmEventListener : public Worker {
 
   void RegisterHotplugHandler(DrmEventHandler *handler);
   void UnRegisterHotplugHandler(DrmEventHandler *handler);
+  void RegisterTUIHandler(DrmTUIEventHandler *handler);
+  void UnRegisterTUIHandler(DrmTUIEventHandler *handler);
+
+  bool IsDrmInTUI();
 
   static void FlipHandler(int fd, unsigned int sequence, unsigned int tv_sec,
                           unsigned int tv_usec, void *user_data);
@@ -53,13 +71,15 @@ class DrmEventListener : public Worker {
 
  private:
   void UEventHandler();
+  void TUIEventHandler();
 
-  fd_set fds_;
+  UniqueFd epoll_fd_;
   UniqueFd uevent_fd_;
-  int max_fd_ = -1;
+  UniqueFd tuievent_fd_;
 
   DrmDevice *drm_;
   std::unique_ptr<DrmEventHandler> hotplug_handler_;
+  std::unique_ptr<DrmTUIEventHandler> tui_handler_;
 };
 }  // namespace android
 
