@@ -277,10 +277,9 @@ class IDisplayColorGeneric {
     /**
      * @brief Check if refresh rate regamma compensation is enabled.
      *
-     * @param refresh_rate The new refresh rate will apply.
      * @return true for yes.
      */
-    virtual bool IsRrCompensationEnabled(DisplayType display, float refresh_rate) = 0;
+    virtual bool IsRrCompensationEnabled(DisplayType display) = 0;
 
     /**
      * @brief Get a map of supported ColorModes, and supported RenderIntents for

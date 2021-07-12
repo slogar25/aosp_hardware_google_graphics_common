@@ -1436,6 +1436,12 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     if (mDesiredModeState.needs_modeset) {
+        bool mipi_sync = mExynosDisplay->checkRrCompensationEnabled();
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+                                            mDrmConnector->sync_rr_switch(),
+                                            mipi_sync)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set sync_rr_switch property", __func__);
+        }
         if ((ret = setDisplayMode(drmReq, mDesiredModeState.blob_id)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
                     __func__);

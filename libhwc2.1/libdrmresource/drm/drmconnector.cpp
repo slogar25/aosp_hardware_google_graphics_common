@@ -137,6 +137,11 @@ int DrmConnector::Init() {
       ALOGE("Could not get local_hbm_mode property\n");
   }
 
+  ret = drm_->GetConnectorProperty(*this, "sync_rr_switch", &sync_rr_switch_);
+  if (ret) {
+      ALOGE("Could not get sync_rr_switch property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   properties_.push_back(&edid_property_);
@@ -155,6 +160,7 @@ int DrmConnector::Init() {
   properties_.push_back(&hbm_on_);
   properties_.push_back(&dimming_on_);
   properties_.push_back(&lhbm_on_);
+  properties_.push_back(&sync_rr_switch_);
 
   return 0;
 }
@@ -315,6 +321,10 @@ const DrmProperty &DrmConnector::dimming_on() const {
 
 const DrmProperty &DrmConnector::lhbm_on() const {
     return lhbm_on_;
+}
+
+const DrmProperty &DrmConnector::sync_rr_switch() const {
+    return sync_rr_switch_;
 }
 
 const DrmProperty &DrmConnector::hdr_formats() const {
