@@ -112,6 +112,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
 
             if (mBrightnessFd == NULL)
                 ALOGE("%s open failed! %s", BRIGHTNESS_NODE_BASE, strerror(errno));
+
         } else {
             ALOGE("Max brightness read failed (size: %zu)", size);
             if (ferror(maxBrightnessFd)) {
@@ -123,6 +124,12 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     } else {
         ALOGE("Brightness node is not opened");
     }
+#endif
+
+#if defined EARLY_WAKUP_NODE_BASE
+    mEarlyWakeupFd = fopen(EARLY_WAKUP_NODE_BASE, "w");
+    if (mEarlyWakeupFd == NULL)
+        ALOGE("%s open failed! %s", EARLY_WAKUP_NODE_BASE, strerror(errno));
 #endif
 
     mLhbmFd = fopen(kLocalHbmModeFileNode, "w+");
