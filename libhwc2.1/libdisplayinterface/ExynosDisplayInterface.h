@@ -40,9 +40,7 @@ class ExynosDisplayInterface {
                 hwc2_config_t* outConfigs);
         virtual void dumpDisplayConfigs() {};
         virtual bool supportDataspace(int32_t __unused dataspace) { return true; };
-        virtual int32_t getColorModes(
-                uint32_t* outNumModes,
-                int32_t* outModes);
+        virtual int32_t getColorModes(uint32_t* outNumModes, int32_t* outModes);
         virtual int32_t setColorMode(int32_t __unused mode) {return NO_ERROR;};
         virtual int32_t setActiveConfig(hwc2_config_t __unused config) {return NO_ERROR;};
         virtual int32_t setActiveConfigWithConstraints(
