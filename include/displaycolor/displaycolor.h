@@ -178,7 +178,8 @@ struct DisplayScene {
                bm == rhs.bm &&
                lhbm_on == rhs.lhbm_on &&
                (lhbm_on && dbv == rhs.dbv) &&
-               refresh_rate == rhs.refresh_rate;
+               refresh_rate == rhs.refresh_rate &&
+               hdr_full_screen == rhs.hdr_full_screen;
     }
 
     /// A vector of layer color data.
@@ -213,6 +214,9 @@ struct DisplayScene {
 
     /// refresh rate
     float refresh_rate;
+
+    /// hdr full screen mode
+    bool hdr_full_screen;
 };
 
 /// An interface specifying functions that are HW-agnostic.

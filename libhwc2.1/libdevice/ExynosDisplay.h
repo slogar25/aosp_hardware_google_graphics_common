@@ -357,9 +357,13 @@ typedef struct brightnessState {
     // current Brightness value
     float brightness_value;
 
+    // HDR layer is covering most of the screen
+    bool hdr_full_screen;
+
     void reset() {
         mData = {false, false, false};
         dim_sdr_target_ratio = kSdrDimRatioNone;
+        hdr_full_screen = false;
     }
     bool dimSdrTransition() {
         return dim_sdr_target_ratio != dim_sdr_ratio &&
@@ -1178,6 +1182,11 @@ class ExynosDisplay {
         /// minimum possible dim rate in the case hbm peak is 1000 nits and norml
         // display brightness is 2 nits
         static constexpr float kGhbmMinDimRatio = 0.002;
+
+        /// consider HDR as full screen playback when its frame coverage
+        //exceeds this threshold.
+        static constexpr float kHdrFullScreen = 0.5;
+        uint32_t mHdrFullScrenAreaThreshold;
 
        // Brightness state
         brightnessState_t mBrightnessState;
