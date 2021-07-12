@@ -63,11 +63,15 @@ int DrmEventListener::Init() {
   tuievent_fd_.Set(open(kTUIStatusPath, O_RDONLY));
   if (tuievent_fd_.get() < 0) {
     ALOGE("Failed to open sysfs(%s) for TUI event: %s", kTUIStatusPath, strerror(errno));
-    return tuievent_fd_.get();
-  }
+  } else {
+    /* Read garbage data once */
+    pread(tuievent_fd_.get(), &buffer, sizeof(buffer), 0);
 
-  /* Read garbage data once */
-  pread(tuievent_fd_.get(), &buffer, sizeof(buffer), 0);
+    ev.events = EPOLLPRI;
+    ev.data.fd = tuievent_fd_.get();
+    if (epoll_ctl(epoll_fd_.get(), EPOLL_CTL_ADD, tuievent_fd_.get(), &ev) < 0)
+      ALOGE("Failed to add tui fd into epoll: %s", strerror(errno));
+  }
 
   /* Set EPoll*/
   epoll_fd_.Set(epoll_create(maxFds));
@@ -87,13 +91,6 @@ int DrmEventListener::Init() {
   ev.data.fd = drm_->fd();
   if (epoll_ctl(epoll_fd_.get(), EPOLL_CTL_ADD, drm_->fd(), &ev) < 0) {
     ALOGE("Failed to add drm fd into epoll: %s", strerror(errno));
-    return -errno;
-  }
-
-  ev.events = EPOLLPRI;
-  ev.data.fd = tuievent_fd_.get();
-  if (epoll_ctl(epoll_fd_.get(), EPOLL_CTL_ADD, tuievent_fd_.get(), &ev) < 0) {
-    ALOGE("Failed to add tui fd into epoll: %s", strerror(errno));
     return -errno;
   }
 
@@ -127,15 +124,19 @@ bool DrmEventListener::IsDrmInTUI() {
   char buffer[1024];
   int ret;
 
-  ret = pread(tuievent_fd_.get(), &buffer, sizeof(buffer), 0);
-  if (ret == 0) {
-    return false;
-  } else if (ret < 0) {
-    ALOGE("Got error reading TUI event %s", strerror(errno));
-    return false;
+  if (tuievent_fd_.get() >= 0) {
+    ret = pread(tuievent_fd_.get(), &buffer, sizeof(buffer), 0);
+    if (ret == 0) {
+      return false;
+    } else if (ret < 0) {
+      ALOGE("Got error reading TUI event %s", strerror(errno));
+      return false;
+    }
+
+    return atoi(buffer) == 1 ? true : false;
   }
 
-  return atoi(buffer) == 1 ? true : false;
+  return false;
 }
 
 void DrmEventListener::FlipHandler(int /* fd */, unsigned int /* sequence */,
@@ -218,7 +219,7 @@ void DrmEventListener::Routine() {
         drmHandleEvent(drm_->fd(), &event_context);
       }
     } else if (events[n].events & EPOLLPRI) {
-      if (events[n].data.fd == tuievent_fd_.get()) {
+      if (tuievent_fd_.get() >= 0 && events[n].data.fd == tuievent_fd_.get()) {
         TUIEventHandler();
       }
     }
