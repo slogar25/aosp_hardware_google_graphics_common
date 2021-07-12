@@ -66,7 +66,7 @@ class FramebufferManager {
         // layers after the previous fdIds were update successfully on the
         // screen.
         // This should be called after the frame update.
-        void flip();
+        void flip(bool hasSecureFrameBuffer);
 
         // release all currently tracked buffers, this can be called for example when display is turned
         // off
@@ -110,6 +110,7 @@ class FramebufferManager {
 
         void markInuseLayerLocked(const ExynosLayer *layer) REQUIRES(mMutex);
         void destroyUnusedLayersLocked() REQUIRES(mMutex);
+        void destroyFramebufferLocked() REQUIRES(mMutex);
 
         int mDrmFd = -1;
 
@@ -126,6 +127,7 @@ class FramebufferManager {
         // keep in-use layers in this frame update. Those unused layers will be
         // freed at the end of the update.
         bool mCacheShrinkPending = false;
+        bool mHasSecureFramebuffer = false;
         std::set<const ExynosLayer *> mCachedLayersInuse;
 
         std::thread mRmFBThread;
@@ -136,6 +138,10 @@ class FramebufferManager {
         static constexpr size_t MAX_CACHED_LAYERS = 16;
         static constexpr size_t MAX_CACHED_BUFFERS_PER_LAYER = 32;
 };
+
+inline bool isFramebuffer(const ExynosLayer *layer) {
+    return layer == nullptr;
+}
 
 template <class UnaryPredicate>
 uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer, UnaryPredicate predicate) {
