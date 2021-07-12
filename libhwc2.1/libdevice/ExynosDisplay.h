@@ -1108,7 +1108,7 @@ class ExynosDisplay {
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
         virtual int32_t updatePresentColorConversionInfo() { return NO_ERROR; };
-        virtual bool checkEarlyWakeupNeeded(float) { return false; };
+        virtual bool checkRrCompensationEnabled() { return false; };
         virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
