@@ -283,6 +283,7 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         } else {
             cachedBuffers.emplace_front(
                     new Framebuffer(mDrmFd, fbId, Framebuffer::BufferDesc{config.buffer_id}));
+            mHasSecureFramebuffer |= (isFramebuffer(config.layer) && config.protection);
         }
     } else {
         ALOGW("FBManager: possible leakage fbId %d was created", fbId);
@@ -291,11 +292,14 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     return 0;
 }
 
-void FramebufferManager::flip() {
+void FramebufferManager::flip(bool hasSecureFrameBuffer) {
     bool needCleanup = false;
     {
         Mutex::Autolock lock(mMutex);
         destroyUnusedLayersLocked();
+        if (!hasSecureFrameBuffer) {
+            destroyFramebufferLocked();
+        }
         needCleanup = mCleanBuffers.size() > 0;
     }
 
@@ -350,6 +354,21 @@ void FramebufferManager::destroyUnusedLayersLocked() {
     }
 
     mCachedLayersInuse.clear();
+}
+
+void FramebufferManager::destroyFramebufferLocked() {
+    if (!mHasSecureFramebuffer) {
+        return;
+    }
+
+    mHasSecureFramebuffer = false;
+
+    for (auto &layer : mCachedLayerBuffers) {
+        if (isFramebuffer(layer.first)) {
+            mCleanBuffers.splice(mCleanBuffers.end(), std::move(layer.second));
+            return;
+        }
+    }
 }
 
 void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
@@ -1385,10 +1404,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     DrmModeAtomicReq drmReq(this);
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
     android::String8 result;
+    bool hasSecureFrameBuffer = false;
 
     funcReturnCallback retCallback([&]() {
         if ((ret == NO_ERROR) && !drmReq.getError()) {
-            mFBManager.flip();
+            mFBManager.flip(hasSecureFrameBuffer);
         } else if (ret == -ENOMEM) {
             mFBManager.releaseAll();
         }
@@ -1472,6 +1492,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
                 return ret;
             }
+            hasSecureFrameBuffer |= (isFramebuffer(config.layer) && config.protection);
             /* Set this plane is enabled */
             planeEnableInfo[plane->id()] = 1;
         }
