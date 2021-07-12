@@ -177,7 +177,9 @@ struct DisplayScene {
                force_hdr == rhs.force_hdr &&
                bm == rhs.bm &&
                lhbm_on == rhs.lhbm_on &&
-               (lhbm_on && dbv == rhs.dbv);
+               (lhbm_on && dbv == rhs.dbv) &&
+               refresh_rate == rhs.refresh_rate &&
+               hdr_full_screen == rhs.hdr_full_screen;
     }
 
     /// A vector of layer color data.
@@ -209,6 +211,12 @@ struct DisplayScene {
 
     /// lhbm status
     bool lhbm_on;
+
+    /// refresh rate
+    float refresh_rate;
+
+    /// hdr full screen mode
+    bool hdr_full_screen;
 };
 
 /// An interface specifying functions that are HW-agnostic.
@@ -247,13 +255,31 @@ class IDisplayColorGeneric {
 
     /**
      * @brief Update display color data. This function is expected to be called
-     * before querying display color data, if the display scene has changed.
+     * in the context of HWC::validateDisplay, if the display scene has changed.
      *
      * @param display The display relating to the scene.
      * @param scene Display scene data to use during the update.
      * @return OK if successful, error otherwise.
      */
     virtual int Update(DisplayType display, const DisplayScene &scene) = 0;
+
+    /**
+     * @brief Update display color data. This function is expected to be called
+     * in the context of HWC::presentDisplay, if the display scene has changed
+     * since the Update call for HWC::validateDisplay.
+     *
+     * @param display The display relating to the scene.
+     * @param scene Display scene data to use during the update.
+     * @return OK if successful, error otherwise.
+     */
+    virtual int UpdatePresent(DisplayType display, const DisplayScene &scene) = 0;
+
+    /**
+     * @brief Check if refresh rate regamma compensation is enabled.
+     *
+     * @return true for yes.
+     */
+    virtual bool IsRrCompensationEnabled(DisplayType display) = 0;
 
     /**
      * @brief Get a map of supported ColorModes, and supported RenderIntents for

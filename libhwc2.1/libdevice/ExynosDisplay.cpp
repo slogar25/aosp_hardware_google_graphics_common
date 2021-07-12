@@ -357,6 +357,7 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mColorMode(HAL_COLOR_MODE_NATIVE),
         mSkipFrame(false),
         mBrightnessFd(NULL),
+        mEarlyWakeupFd(NULL),
         mMaxBrightness(0),
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
@@ -2753,9 +2754,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         updateBrightnessState();
 
         if (updateColorConversionInfo() != NO_ERROR) {
-            DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
+            ALOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
                     __func__, ret);
-            goto err;
         }
         if (mDisplayControl.earlyStartMPP == true) {
             /*
@@ -2777,6 +2777,11 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         if ((ret = doDisplayConfigPostProcess(mDevice)) != NO_ERROR) {
             DISPLAY_LOGE("doDisplayConfigPostProcess error (%d)", ret);
         }
+    }
+
+    if (updatePresentColorConversionInfo() != NO_ERROR) {
+        ALOGE("%s:: updatePresentColorConversionInfo() fail, ret(%d)",
+                __func__, ret);
     }
 
     if ((mLayers.size() == 0) &&
@@ -3334,6 +3339,17 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     uint32_t vsync_period = getDisplayVsyncPeriodFromConfig(config);
     updateBtsVsyncPeriod(vsync_period);
 
+    bool earlyWakeupNeeded = checkRrCompensationEnabled();
+    if (earlyWakeupNeeded && mEarlyWakeupFd != NULL) {
+        char val = '1';
+        fwrite(&val, sizeof(val), 1, mEarlyWakeupFd);
+        if (ferror(mEarlyWakeupFd)){
+            ALOGE("early wakup fd write failed");
+            clearerr(mEarlyWakeupFd);
+        }
+        rewind(mEarlyWakeupFd);
+    }
+
     return HWC2_ERROR_NONE;
 }
 
@@ -3399,6 +3415,7 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_HEIGHT, (int32_t*)&mYres);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_X, (int32_t*)&mXdpi);
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_Y, (int32_t*)&mYdpi);
+    mHdrFullScrenAreaThreshold = mXres * mYres * kHdrFullScreen;
     if (updateVsync) {
         mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
         updateBtsVsyncPeriod(mVsyncPeriod, true);
@@ -5164,6 +5181,9 @@ void ExynosDisplay::updateBrightnessState() {
                     mBrightnessState.peak_hbm = true;
                     mBrightnessState.instant_hbm = true;
                 }
+            }
+            if (mLayers[i]->getDisplayFrameArea() >= mHdrFullScrenAreaThreshold) {
+                mBrightnessState.hdr_full_screen = true;
             }
         }
     }

@@ -357,9 +357,13 @@ typedef struct brightnessState {
     // current Brightness value
     float brightness_value;
 
+    // HDR layer is covering most of the screen
+    bool hdr_full_screen;
+
     void reset() {
         mData = {false, false, false};
         dim_sdr_target_ratio = kSdrDimRatioNone;
+        hdr_full_screen = false;
     }
     bool dimSdrTransition() {
         return dim_sdr_target_ratio != dim_sdr_ratio &&
@@ -537,6 +541,7 @@ class ExynosDisplay {
         bool mSkipFrame;
 
         FILE *mBrightnessFd;
+        FILE *mEarlyWakeupFd;
         uint32_t mMaxBrightness;
 
         hwc_vsync_period_change_constraints_t mVsyncPeriodChangeConstraints;
@@ -1101,7 +1106,9 @@ class ExynosDisplay {
         virtual int getDDIScalerMode(int width, int height);
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
-        virtual int32_t updateColorConversionInfo() { return NO_ERROR; }
+        virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
+        virtual int32_t updatePresentColorConversionInfo() { return NO_ERROR; };
+        virtual bool checkRrCompensationEnabled() { return false; };
         virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
@@ -1175,6 +1182,11 @@ class ExynosDisplay {
         /// minimum possible dim rate in the case hbm peak is 1000 nits and norml
         // display brightness is 2 nits
         static constexpr float kGhbmMinDimRatio = 0.002;
+
+        /// consider HDR as full screen playback when its frame coverage
+        //exceeds this threshold.
+        static constexpr float kHdrFullScreen = 0.5;
+        uint32_t mHdrFullScrenAreaThreshold;
 
        // Brightness state
         brightnessState_t mBrightnessState;
