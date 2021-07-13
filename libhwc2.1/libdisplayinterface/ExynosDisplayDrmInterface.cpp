@@ -874,6 +874,33 @@ int32_t ExynosDisplayDrmInterface::getVsyncAppliedTime(
     return HWC2_ERROR_NONE;
 }
 
+bool ExynosDisplayDrmInterface::supportDataspace(int32_t dataspace)
+{
+    bool supportStandard = false;
+    bool supportTransfer = false;
+    bool supportRange = false;
+
+    /* Check supported standard */
+    for (auto &e : mStandardEnums) {
+        if (e.first & dataspace)
+            supportStandard = true;
+    }
+
+    /* Check supported transfer */
+    for (auto &e : mTransferEnums) {
+        if (e.first & dataspace)
+            supportTransfer = true;
+    }
+
+    /* Check supported range */
+    for (auto &e : mRangeEnums) {
+        if (e.first & dataspace)
+            supportRange = true;
+    }
+
+    return supportStandard && supportTransfer && supportRange;
+}
+
 int32_t ExynosDisplayDrmInterface::getColorModes(
         uint32_t* outNumModes,
         int32_t* outModes)

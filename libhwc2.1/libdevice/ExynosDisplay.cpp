@@ -2425,17 +2425,18 @@ int32_t ExynosDisplay::getChangedCompositionTypes(
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::getClientTargetSupport(
-        uint32_t width, uint32_t height,
-        int32_t /*android_pixel_format_t*/ format,
-        int32_t /*android_dataspace_t*/ dataspace) {
+int32_t ExynosDisplay::getClientTargetSupport(uint32_t width, uint32_t height,
+                                              int32_t /*android_pixel_format_t*/ format,
+                                              int32_t /*android_dataspace_t*/ dataspace)
+{
     if (width != mXres)
         return HWC2_ERROR_UNSUPPORTED;
     if (height != mYres)
         return HWC2_ERROR_UNSUPPORTED;
     if (format != HAL_PIXEL_FORMAT_RGBA_8888)
         return HWC2_ERROR_UNSUPPORTED;
-    if (dataspace != HAL_DATASPACE_UNKNOWN)
+    if ((dataspace != HAL_DATASPACE_UNKNOWN) &&
+        (!mDisplayInterface->supportDataspace(dataspace)))
         return HWC2_ERROR_UNSUPPORTED;
 
     return HWC2_ERROR_NONE;
