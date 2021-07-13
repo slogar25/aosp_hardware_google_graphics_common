@@ -96,9 +96,28 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mResolutionInfo.nDSCXSliceSize[2] = 720;
     mResolutionInfo.nPanelType[2] = PANEL_LEGACY;
 
-#if defined(MAX_BRIGHTNESS_NODE_BASE) && defined(BRIGHTNESS_NODE_BASE)
-    FILE *maxBrightnessFd = fopen(MAX_BRIGHTNESS_NODE_BASE, "r");
-    ALOGI("Trying %s open for get max brightness", MAX_BRIGHTNESS_NODE_BASE);
+    static_assert(sizeof(BRIGHTNESS_NODE_0_BASE) != 0 && sizeof(MAX_BRIGHTNESS_NODE_0_BASE) != 0,
+                  "Invalid brightness 0 node");
+    static_assert(sizeof(BRIGHTNESS_NODE_1_BASE) != 0 && sizeof(MAX_BRIGHTNESS_NODE_1_BASE) != 0,
+                  "Invalid brightness 1 node");
+    std::string brightness_node;
+    std::string max_brightness_node;
+    switch (mIndex) {
+        case 0:
+            max_brightness_node = MAX_BRIGHTNESS_NODE_0_BASE;
+            brightness_node = BRIGHTNESS_NODE_0_BASE;
+            break;
+        case 1:
+            max_brightness_node = MAX_BRIGHTNESS_NODE_1_BASE;
+            brightness_node = BRIGHTNESS_NODE_1_BASE;
+            break;
+        default:
+            ALOGE("assgin brightness node failed (mIndex: %d)", mIndex);
+            break;
+    }
+
+    FILE *maxBrightnessFd = fopen(max_brightness_node.c_str(), "r");
+    ALOGI("Trying %s open for get max brightness", max_brightness_node.c_str());
 
     if (maxBrightnessFd != NULL) {
         char val[MAX_BRIGHTNESS_LEN] = {0};
@@ -107,11 +126,11 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
             mMaxBrightness = atoi(val);
             ALOGI("Max brightness : %d", mMaxBrightness);
 
-            mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "w+");
-            ALOGI("Trying %s open for brightness control", BRIGHTNESS_NODE_BASE);
+            mBrightnessFd = fopen(brightness_node.c_str(), "w+");
+            ALOGI("Trying %s open for brightness control", brightness_node.c_str());
 
             if (mBrightnessFd == NULL)
-                ALOGE("%s open failed! %s", BRIGHTNESS_NODE_BASE, strerror(errno));
+                ALOGE("%s open failed! %s", brightness_node.c_str(), strerror(errno));
 
         } else {
             ALOGE("Max brightness read failed (size: %zu)", size);
@@ -124,7 +143,6 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     } else {
         ALOGE("Brightness node is not opened");
     }
-#endif
 
 #if defined EARLY_WAKUP_NODE_BASE
     mEarlyWakeupFd = fopen(EARLY_WAKUP_NODE_BASE, "w");
