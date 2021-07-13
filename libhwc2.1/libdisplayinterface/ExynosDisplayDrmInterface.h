@@ -480,7 +480,26 @@ class ExynosDisplayDrmInterface :
         static constexpr const char *kDimmingOnFileNode =
                 "/sys/class/backlight/panel0-backlight/dimming_on";
 
+        static constexpr int32_t kHbmDimmingTimeUs = 5000000;
+
         FramebufferManager mFBManager;
+
+        /*
+         * BrightnessDimmingUsage:
+         * NORMAL- enable dimming
+         * HBM-    enable dimming only for hbm transition
+         * NONE-   disable dimming
+         */
+        enum class BrightnessDimmingUsage {
+            NORMAL = 0,
+            HBM,
+            NONE,
+        };
+
+        BrightnessDimmingUsage mBrightnessDimmingUsage;
+        bool mHbmDimming;
+        int32_t mHbmDimmingTimeUs;
+        struct timeval mHbmDimmingStart;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
