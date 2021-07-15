@@ -1201,20 +1201,25 @@ class ExynosDisplay {
             void Routine() override;
 
         private:
-            void connectPowerHalExt();
+            int32_t connectPowerHalExt();
             int32_t checkPowerHalExtHintSupport(const std::string& mode);
             int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
             int32_t checkRefreshRateHintSupport(int refreshRate);
-            void updateRefreshRateHintInternal(hwc2_power_mode_t powerMode, uint32_t vsyncPeriod);
+            int32_t updateRefreshRateHintInternal(hwc2_power_mode_t powerMode,
+                                                  uint32_t vsyncPeriod);
+            int32_t sendRefreshRateHint(int refreshRate, bool enabled);
 
-            void checkIdleHintSupport();
-            void updateIdleHint(uint64_t deadlineTime);
+            int32_t checkIdleHintSupport();
+            int32_t updateIdleHint(uint64_t deadlineTime);
 
             bool mNeedUpdateRefreshRateHint;
 
             // previous refresh rate
             int mPrevRefreshRate;
+
+            // the refresh rate whose hint failed to be disabled
+            int mPendingPrevRefreshRate;
 
             // support list of refresh rate hints
             std::map<int, bool> mRefreshRateHintSupportMap;
