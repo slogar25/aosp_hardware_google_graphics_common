@@ -307,6 +307,8 @@ int32_t ExynosPrimaryDisplay::setPowerDoze(hwc2_power_mode_t mode) {
 
     mPowerModeState = mode;
 
+    ExynosDisplay::updateRefreshRateHint();
+
     return HWC2_ERROR_NONE;
 }
 
