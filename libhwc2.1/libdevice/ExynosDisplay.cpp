@@ -58,6 +58,7 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
       : Worker("DisplayHints", HAL_PRIORITY_URGENT_DISPLAY),
         mNeedUpdateRefreshRateHint(false),
         mPrevRefreshRate(0),
+        mPendingPrevRefreshRate(0),
         mIdleHintIsEnabled(false),
         mIdleHintDeadlineTime(0),
         mIdleHintSupportIsChecked(false),
@@ -65,13 +66,12 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
         mPowerHalExtAidl(nullptr) {
-    connectPowerHalExt();
     InitWorker();
 }
 
-void ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
+int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
     if (mPowerHalExtAidl) {
-        return;
+        return NO_ERROR;
     }
 
     const std::string kInstance = std::string(IPower::descriptor) + "/default";
@@ -81,20 +81,31 @@ void ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
     mPowerHalExtAidl = IPowerExt::fromBinder(pwExtBinder);
     if (!mPowerHalExtAidl) {
         ALOGE("failed to connect power HAL extension");
-        return;
+        return -EINVAL;
     }
 
     ALOGI("connect power HAL extension successfully");
+    return NO_ERROR;
 }
 
 int32_t ExynosDisplay::PowerHalHintWorker::checkPowerHalExtHintSupport(const std::string &mode) {
-    if (mode.empty() || !mPowerHalExtAidl) {
+    if (mode.empty() || connectPowerHalExt() != NO_ERROR) {
         return -EINVAL;
     }
 
     bool isSupported = false;
-    if (!mPowerHalExtAidl->isModeSupported(mode.c_str(), &isSupported).isOk()) {
+    auto ret = mPowerHalExtAidl->isModeSupported(mode.c_str(), &isSupported);
+    if (!ret.isOk()) {
         ALOGE("failed to check power HAL extension hint: mode=%s", mode.c_str());
+        if (ret.getExceptionCode() == EX_TRANSACTION_FAILED) {
+            /*
+             * PowerHAL service may crash due to some reasons, this could end up
+             * binder transaction failure. Set nullptr here to trigger re-connection.
+             */
+            ALOGE("binder transaction failed for power HAL extension hint");
+            mPowerHalExtAidl = nullptr;
+            return -ENOTCONN;
+        }
         return -EINVAL;
     }
 
@@ -109,16 +120,25 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkPowerHalExtHintSupport(const std
 
 int32_t ExynosDisplay::PowerHalHintWorker::sendPowerHalExtHint(const std::string &mode,
                                                                bool enabled) {
-    if (mode.empty() || !mPowerHalExtAidl) {
+    if (mode.empty() || connectPowerHalExt() != NO_ERROR) {
         return -EINVAL;
     }
 
-    if (!mPowerHalExtAidl->setMode(mode.c_str(), enabled).isOk()) {
+    auto ret = mPowerHalExtAidl->setMode(mode.c_str(), enabled);
+    if (!ret.isOk()) {
         ALOGE("failed to send power HAL extension hint: mode=%s, enabled=%d", mode.c_str(),
               enabled);
+        if (ret.getExceptionCode() == EX_TRANSACTION_FAILED) {
+            /*
+             * PowerHAL service may crash due to some reasons, this could end up
+             * binder transaction failure. Set nullptr here to trigger re-connection.
+             */
+            ALOGE("binder transaction failed for power HAL extension hint");
+            mPowerHalExtAidl = nullptr;
+            return -ENOTCONN;
+        }
         return -EINVAL;
     }
-
     return NO_ERROR;
 }
 
@@ -141,62 +161,95 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refre
             ret = -EOPNOTSUPP;
         }
     }
-
     return ret;
 }
 
-void ExynosDisplay::PowerHalHintWorker::updateRefreshRateHintInternal(hwc2_power_mode_t powerMode,
-                                                                      uint32_t vsyncPeriod) {
+int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(int refreshRate, bool enabled) {
+    std::string hintStr = "REFRESH_" + std::to_string(refreshRate) + "FPS";
+    int32_t ret = sendPowerHalExtHint(hintStr, enabled);
+    if (ret == -ENOTCONN) {
+        /* Reset the hints when binder failure occurs */
+        mPrevRefreshRate = 0;
+        mPendingPrevRefreshRate = 0;
+    }
+    return ret;
+}
+
+int32_t ExynosDisplay::PowerHalHintWorker::updateRefreshRateHintInternal(
+        hwc2_power_mode_t powerMode, uint32_t vsyncPeriod) {
+    int32_t ret = NO_ERROR;
+    /* We should disable pending hint before other operations */
+    if (mPendingPrevRefreshRate) {
+        ret = sendRefreshRateHint(mPendingPrevRefreshRate, false);
+        if (ret == NO_ERROR) {
+            mPendingPrevRefreshRate = 0;
+        } else {
+            return ret;
+        }
+    }
+
     if (powerMode != HWC2_POWER_MODE_ON) {
         if (mPrevRefreshRate) {
-            std::string prevRefreshRateHintStr =
-                    "REFRESH_" + std::to_string(mPrevRefreshRate) + "FPS";
-            if (sendPowerHalExtHint(prevRefreshRateHintStr, false) != NO_ERROR) {
-                ALOGE("failed to disable the refresh rate hint: %s",
-                      prevRefreshRateHintStr.c_str());
-            } else {
+            ret = sendRefreshRateHint(mPrevRefreshRate, false);
+            if (ret == NO_ERROR) {
                 mPrevRefreshRate = 0;
             }
         }
-        return;
+        return ret;
     }
 
     /* TODO: add refresh rate buckets, tracked in b/181100731 */
     int refreshRate = round(nsecsPerSec / vsyncPeriod * 0.1f) * 10;
     if (mPrevRefreshRate == refreshRate) {
-        return;
+        return NO_ERROR;
     }
 
-    if (checkRefreshRateHintSupport(refreshRate) != NO_ERROR) {
-        return;
+    ret = checkRefreshRateHintSupport(refreshRate);
+    if (ret != NO_ERROR) {
+        return ret;
     }
 
-    std::string refreshRateHintStr = "REFRESH_" + std::to_string(refreshRate) + "FPS";
-    if (sendPowerHalExtHint(refreshRateHintStr, true) != NO_ERROR) {
-        ALOGE("failed to enable refresh rate hint: %s", refreshRateHintStr.c_str());
-        return;
+    /*
+     * According to PowerHAL design, while switching to next refresh rate, we
+     * have to enable the next hint first, then disable the previous one so
+     * that the next hint can take effect.
+     */
+    ret = sendRefreshRateHint(refreshRate, true);
+    if (ret != NO_ERROR) {
+        return ret;
     }
 
     if (mPrevRefreshRate) {
-        std::string prevRefreshRateHintStr = "REFRESH_" + std::to_string(mPrevRefreshRate) + "FPS";
-        if (sendPowerHalExtHint(prevRefreshRateHintStr, false) != NO_ERROR) {
-            ALOGE("failed to disable refresh rate hint: REFRESH_%dFPS", mPrevRefreshRate);
-            return;
+        ret = sendRefreshRateHint(mPrevRefreshRate, false);
+        if (ret != NO_ERROR) {
+            if (ret != -ENOTCONN) {
+                /*
+                 * We may fail to disable the previous hint and end up multiple
+                 * hints enabled. Save the failed hint as pending hint here, we
+                 * will try to disable it first while entering this function.
+                 */
+                mPendingPrevRefreshRate = mPrevRefreshRate;
+                mPrevRefreshRate = refreshRate;
+            }
+            return ret;
         }
     }
 
     mPrevRefreshRate = refreshRate;
+    return ret;
 }
 
-void ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
+int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
+    int32_t ret = NO_ERROR;
     Lock();
     if (mIdleHintSupportIsChecked) {
+        ret = mIdleHintIsSupported ? NO_ERROR : -EOPNOTSUPP;
         Unlock();
-        return;
+        return ret;
     }
     Unlock();
 
-    int32_t ret = checkPowerHalExtHintSupport("DISPLAY_IDLE");
+    ret = checkPowerHalExtHintSupport("DISPLAY_IDLE");
     Lock();
     if (ret == NO_ERROR) {
         mIdleHintIsSupported = true;
@@ -209,19 +262,25 @@ void ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
         ALOGW("failed to check the support of display idle hint, ret %d", ret);
     }
     Unlock();
+    return ret;
 }
 
-void ExynosDisplay::PowerHalHintWorker::updateIdleHint(uint64_t deadlineTime) {
+int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(uint64_t deadlineTime) {
+    int32_t ret = checkIdleHintSupport();
+    if (ret != NO_ERROR) {
+        return ret;
+    }
+
     bool enableIdleHint = (deadlineTime < systemTime(SYSTEM_TIME_MONOTONIC));
     ATRACE_INT("HWCIdleHintTimer:", enableIdleHint);
 
     if (mIdleHintIsEnabled != enableIdleHint) {
-        if (sendPowerHalExtHint("DISPLAY_IDLE", enableIdleHint) != NO_ERROR) {
-            ALOGE("failed to send DISPLAY_IDLE hint: %d", enableIdleHint);
-            return;
+        ret = sendPowerHalExtHint("DISPLAY_IDLE", enableIdleHint);
+        if (ret == NO_ERROR) {
+            mIdleHintIsEnabled = enableIdleHint;
         }
-        mIdleHintIsEnabled = enableIdleHint;
     }
+    return ret;
 }
 
 void ExynosDisplay::PowerHalHintWorker::signalRefreshRate(hwc2_power_mode_t powerMode,
@@ -251,7 +310,6 @@ void ExynosDisplay::PowerHalHintWorker::signalIdle() {
 }
 
 void ExynosDisplay::PowerHalHintWorker::Routine() {
-    checkIdleHintSupport();
     Lock();
     int ret = 0;
     if (!mNeedUpdateRefreshRateHint) {
@@ -276,15 +334,28 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
     hwc2_power_mode_t powerMode = mPowerModeState;
     uint32_t vsyncPeriod = mVsyncPeriod;
 
+    /*
+     * Clear the flags here instead of clearing them after calling the hint
+     * update functions. The flags may be set by signals after Unlock() and
+     * before the hint update functions are done. Thus we may miss the newest
+     * hints if we clear the flags after the hint update functions work without
+     * errors.
+     */
     mNeedUpdateRefreshRateHint = false;
     Unlock();
 
-    if (mIdleHintIsSupported) {
-        updateIdleHint(deadlineTime);
-    }
+    updateIdleHint(deadlineTime);
 
     if (needUpdateRefreshRateHint) {
-        updateRefreshRateHintInternal(powerMode, vsyncPeriod);
+        int32_t rc = updateRefreshRateHintInternal(powerMode, vsyncPeriod);
+        if (rc != NO_ERROR && rc != -EOPNOTSUPP) {
+            Lock();
+            if (mPowerModeState == HWC2_POWER_MODE_ON) {
+                /* Set the flag to trigger update again for next loop */
+                mNeedUpdateRefreshRateHint = true;
+            }
+            Unlock();
+        }
     }
 }
 
