@@ -1130,8 +1130,6 @@ class ExynosDisplay {
         virtual void notifyLhbmState(bool __unused enabled) {}
         virtual void setWakeupDisplay() {}
 
-        int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
-
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
         inline uint32_t getDisplayPreAssignBit() {
@@ -1168,9 +1166,6 @@ class ExynosDisplay {
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
-        void connectPowerHalExt();
-        int32_t checkIdleHintSupport();
-        int32_t checkRefreshRateHintSupport(int refreshRate);
 
         inline uint32_t getDisplayVsyncPeriodFromConfig(hwc2_config_t config) {
             int32_t vsync_period;
@@ -1194,44 +1189,54 @@ class ExynosDisplay {
         // request lhbm state
         bool mReqLhbm = false;
 
-        // for power HAL extension hints
-        std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>
-                mPowerHalExtAidl;
-
-        // previous refresh rate
-        int mPrevRefreshRate;
-
-        // support list of refresh rate hints
-        std::map<int, bool> mRefreshRateHintSupportMap;
-
-        /* Idle hint to notify power hal */
-        class IdleHintWorker : public Worker {
+        /* Display hint to notify power hal */
+        class PowerHalHintWorker : public Worker {
         public:
-            IdleHintWorker(ExynosDisplay* display);
+            PowerHalHintWorker();
 
-            void resetIdleTimer();
+            void signalRefreshRate(hwc2_power_mode_t powerMode, uint32_t vsyncPeriod);
+            void signalIdle();
 
         protected:
             void Routine() override;
 
         private:
-            ExynosDisplay* mExynosDisplay;
-            bool mIdleFlag;
-            bool mNeedResetTimer;
+            void connectPowerHalExt();
+            int32_t checkPowerHalExtHintSupport(const std::string& mode);
+            int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
+
+            int32_t checkRefreshRateHintSupport(int refreshRate);
+            void updateRefreshRateHintInternal(hwc2_power_mode_t powerMode, uint32_t vsyncPeriod);
+
+            void checkIdleHintSupport();
+            void updateIdleHint(uint64_t deadlineTime);
+
+            bool mNeedUpdateRefreshRateHint;
+
+            // previous refresh rate
+            int mPrevRefreshRate;
+
+            // support list of refresh rate hints
+            std::map<int, bool> mRefreshRateHintSupportMap;
+
+            bool mIdleHintIsEnabled;
+            uint64_t mIdleHintDeadlineTime;
+
+            // whether idle hint support is checked
+            bool mIdleHintSupportIsChecked;
+
+            // whether idle hint is supported
+            bool mIdleHintIsSupported;
+
+            hwc2_power_mode_t mPowerModeState;
+            uint32_t mVsyncPeriod;
+
+            // for power HAL extension hints
+            std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>
+                    mPowerHalExtAidl;
         };
 
-        // whether idle hint support is checked
-        bool mIdleHintSupportIsChecked;
-
-        /*
-         * This must be the last field in the struct. When this object is
-         * destroyed, the thread on which the Routine() function runs must be
-         * destroyed before any of the other fields because it may otherwise
-         * observe the ExynosDisplay object in a partially destructed state.
-         * The destructor destroys fields in reverse order of their
-         * declarations, so having this field be last ensures this property.
-         */
-        std::unique_ptr<IdleHintWorker> mIdleHint;
+        PowerHalHintWorker mPowerHalHint;
 };
 
 #endif //_EXYNOSDISPLAY_H
