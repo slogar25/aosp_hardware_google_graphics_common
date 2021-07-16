@@ -35,6 +35,9 @@
 #include "ExynosVirtualDisplay.h"
 #include "hardware/exynos/acryl.h"
 
+using namespace std::chrono_literals;
+constexpr float msecsPerSec = std::chrono::milliseconds(1s).count();
+
 #ifndef USE_MODULE_ATTR
 /* Basic supported features */
 feature_support_t feature_table[] =
@@ -2062,9 +2065,13 @@ int32_t ExynosResourceManager::updateResourceState()
  * Module that supports setting frame rate should implement this function
  * in the module source code (hardware/samsung_slsi/graphics/exynos...).
  */
-void ExynosResourceManager::setFrameRateForPerformance(ExynosMPP __unused &mpp,
-        AcrylicPerformanceRequestFrame __unused *frame)
+void ExynosResourceManager::setFrameRateForPerformance(ExynosMPP &mpp,
+        AcrylicPerformanceRequestFrame *frame)
 {
+    int fps = ceil(msecsPerSec / mpp.mCapacity);
+    HDEBUGLOGD(eDebugResourceAssigning, "%s setFrameRate %d",
+            mpp.mName.string(), fps);
+    frame->setFrameRate(fps);
 }
 
 int32_t ExynosResourceManager::deliverPerformanceInfo()
@@ -2568,5 +2575,13 @@ void ExynosResourceManager::dump(const restriction_classification_t classificati
             ::dump(restrictions[i].sizeRestriction, result);
         }
         result.appendFormat("\n");
+    }
+}
+
+void ExynosResourceManager::setM2MCapa(uint32_t physicalType, uint32_t capa)
+{
+    for (size_t i = 0; i < mM2mMPPs.size(); i++) {
+        if (mM2mMPPs[i]->mPhysicalType == physicalType)
+            mM2mMPPs[i]->mCapacity = capa;
     }
 }
