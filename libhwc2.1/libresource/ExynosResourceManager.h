@@ -177,6 +177,7 @@ class ExynosResourceManager {
         float getAssignedCapacity(uint32_t physicalType);
 
         void dump(String8 &result) const;
+        void setM2MCapa(uint32_t physicalType, uint32_t capa);
 
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,
