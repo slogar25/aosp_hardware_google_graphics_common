@@ -600,24 +600,21 @@ void ExynosDisplayDrmInterface::Callback(
     }
 
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
-    exynosDevice->compareVsyncPeriod();
-    if (exynosDevice->mVsyncDisplayId == mExynosDisplay->mDisplayId) {
-        auto vsync_2_4CallbackInfo =
-            exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
-        if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
-            ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
-                    vsync_2_4CallbackInfo.callbackData,
-                    mExynosDisplay->mDisplayId,
-                    timestamp, mExynosDisplay->mVsyncPeriod);
-            ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
-            return;
-        }
-
-        auto vsyncCallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
-        if (vsyncCallbackInfo.funcPointer && vsyncCallbackInfo.callbackData)
-            ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(vsyncCallbackInfo.callbackData,
-                                                            mExynosDisplay->mDisplayId, timestamp);
+    auto vsync_2_4CallbackInfo =
+        exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
+    if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
+        ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
+                vsync_2_4CallbackInfo.callbackData,
+                mExynosDisplay->mDisplayId,
+                timestamp, mExynosDisplay->mVsyncPeriod);
+        ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
+        return;
     }
+
+    auto vsyncCallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
+    if (vsyncCallbackInfo.funcPointer && vsyncCallbackInfo.callbackData)
+        ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(vsyncCallbackInfo.callbackData,
+                                                        mExynosDisplay->mDisplayId, timestamp);
 }
 
 bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
