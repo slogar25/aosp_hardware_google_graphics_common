@@ -2677,25 +2677,25 @@ int32_t ExynosDisplay::getChangedCompositionTypes(
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::getClientTargetSupport(
-        uint32_t width, uint32_t height,
-        int32_t /*android_pixel_format_t*/ format,
-        int32_t /*android_dataspace_t*/ dataspace) {
+int32_t ExynosDisplay::getClientTargetSupport(uint32_t width, uint32_t height,
+                                              int32_t /*android_pixel_format_t*/ format,
+                                              int32_t /*android_dataspace_t*/ dataspace)
+{
     if (width != mXres)
         return HWC2_ERROR_UNSUPPORTED;
     if (height != mYres)
         return HWC2_ERROR_UNSUPPORTED;
     if (format != HAL_PIXEL_FORMAT_RGBA_8888)
         return HWC2_ERROR_UNSUPPORTED;
-    if (dataspace != HAL_DATASPACE_UNKNOWN)
+    if ((dataspace != HAL_DATASPACE_UNKNOWN) &&
+        (!mDisplayInterface->supportDataspace(dataspace)))
         return HWC2_ERROR_UNSUPPORTED;
 
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::getColorModes(
-        uint32_t* outNumModes,
-        int32_t* /*android_color_mode_t*/ outModes) {
+int32_t ExynosDisplay::getColorModes(uint32_t *outNumModes, int32_t * /*android_color_mode_t*/ outModes)
+{
     return mDisplayInterface->getColorModes(outNumModes, outModes);
 }
 
@@ -3363,8 +3363,8 @@ int32_t ExynosDisplay::setColorTransform(
 #endif
 }
 
-int32_t ExynosDisplay::setColorMode(
-        int32_t /*android_color_mode_t*/ mode) {
+int32_t ExynosDisplay::setColorMode(int32_t /*android_color_mode_t*/ mode)
+{
     if (mDisplayInterface->setColorMode(mode) < 0) {
         if (mode == HAL_COLOR_MODE_NATIVE)
             return HWC2_ERROR_NONE;

@@ -249,9 +249,8 @@ class ExynosDisplayDrmInterface :
                 uint32_t* outNumConfigs,
                 hwc2_config_t* outConfigs);
         virtual void dumpDisplayConfigs();
-        virtual int32_t getColorModes(
-                uint32_t* outNumModes,
-                int32_t* outModes);
+        virtual bool supportDataspace(int32_t dataspace);
+        virtual int32_t getColorModes(uint32_t* outNumModes, int32_t* outModes);
         virtual int32_t setColorMode(int32_t mode);
         virtual int32_t setActiveConfig(hwc2_config_t config);
         virtual int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
@@ -334,13 +333,14 @@ class ExynosDisplayDrmInterface :
                 uint32_t &fbId);
 
         int32_t setupPartialRegion(DrmModeAtomicReq &drmReq);
-        static void parseEnums(const DrmProperty& property,
+        static void parseEnums(const DrmProperty &property,
                 const std::vector<std::pair<uint32_t, const char *>> &enums,
                 DrmPropertyMap &out_enums);
-        void parseBlendEnums(const DrmProperty& property);
-        void parseStandardEnums(const DrmProperty& property);
-        void parseTransferEnums(const DrmProperty& property);
-        void parseRangeEnums(const DrmProperty& property);
+        void parseBlendEnums(const DrmProperty &property);
+        void parseStandardEnums(const DrmProperty &property);
+        void parseTransferEnums(const DrmProperty &property);
+        void parseRangeEnums(const DrmProperty &property);
+        void parseColorModeEnums(const DrmProperty &property);
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
         int32_t clearWritebackCommit(DrmModeAtomicReq &drmReq);
@@ -407,6 +407,7 @@ class ExynosDisplayDrmInterface :
         DrmPropertyMap mStandardEnums;
         DrmPropertyMap mTransferEnums;
         DrmPropertyMap mRangeEnums;
+        DrmPropertyMap mColorModeEnums;
 
         DrmReadbackInfo mReadbackInfo;
 
