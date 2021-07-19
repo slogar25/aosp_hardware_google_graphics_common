@@ -81,6 +81,8 @@ int DrmCrtc::Init() {
     ALOGI("Failed to get &max_disp_freq property");
   if (drm_->GetCrtcProperty(*this, "dqe_enabled", &dqe_enabled_property_))
     ALOGI("Failed to get &dqe_enabled_property property");
+  if (drm_->GetCrtcProperty(*this, "color mode", &color_mode_property_))
+    ALOGI("Failed to get color mode property");
 
   properties_.push_back(&active_property_);
   properties_.push_back(&mode_property_);
@@ -100,6 +102,7 @@ int DrmCrtc::Init() {
   properties_.push_back(&ppc_property_);
   properties_.push_back(&max_disp_freq_property_);
   properties_.push_back(&dqe_enabled_property_);
+  properties_.push_back(&color_mode_property_);
 
   return 0;
 }
@@ -206,6 +209,10 @@ const DrmProperty &DrmCrtc::max_disp_freq_property() const {
 
 const DrmProperty &DrmCrtc::dqe_enabled_property() const {
     return dqe_enabled_property_;
+}
+
+const DrmProperty &DrmCrtc::color_mode_property() const {
+    return color_mode_property_;
 }
 
 }  // namespace android

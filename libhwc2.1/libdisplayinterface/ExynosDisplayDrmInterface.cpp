@@ -403,7 +403,7 @@ void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
     mDrmConnector = NULL;
 }
 
-void ExynosDisplayDrmInterface::parseEnums(const DrmProperty& property,
+void ExynosDisplayDrmInterface::parseEnums(const DrmProperty &property,
         const std::vector<std::pair<uint32_t, const char *>> &enums,
         std::unordered_map<uint32_t, uint64_t> &out_enums)
 {
@@ -418,7 +418,7 @@ void ExynosDisplayDrmInterface::parseEnums(const DrmProperty& property,
     }
 }
 
-void ExynosDisplayDrmInterface::parseBlendEnums(const DrmProperty& property)
+void ExynosDisplayDrmInterface::parseBlendEnums(const DrmProperty &property)
 {
     const std::vector<std::pair<uint32_t, const char *>> blendEnums = {
         {HWC2_BLEND_MODE_NONE, "None"},
@@ -433,7 +433,7 @@ void ExynosDisplayDrmInterface::parseBlendEnums(const DrmProperty& property)
     }
 }
 
-void ExynosDisplayDrmInterface::parseStandardEnums(const DrmProperty& property)
+void ExynosDisplayDrmInterface::parseStandardEnums(const DrmProperty &property)
 {
     const std::vector<std::pair<uint32_t, const char *>> standardEnums = {
         {HAL_DATASPACE_STANDARD_UNSPECIFIED, "Unspecified"},
@@ -458,7 +458,7 @@ void ExynosDisplayDrmInterface::parseStandardEnums(const DrmProperty& property)
     }
 }
 
-void ExynosDisplayDrmInterface::parseTransferEnums(const DrmProperty& property)
+void ExynosDisplayDrmInterface::parseTransferEnums(const DrmProperty &property)
 {
     const std::vector<std::pair<uint32_t, const char *>> transferEnums = {
         {HAL_DATASPACE_TRANSFER_UNSPECIFIED, "Unspecified"},
@@ -480,7 +480,7 @@ void ExynosDisplayDrmInterface::parseTransferEnums(const DrmProperty& property)
     }
 }
 
-void ExynosDisplayDrmInterface::parseRangeEnums(const DrmProperty& property)
+void ExynosDisplayDrmInterface::parseRangeEnums(const DrmProperty &property)
 {
     const std::vector<std::pair<uint32_t, const char *>> rangeEnums = {
         {HAL_DATASPACE_RANGE_UNSPECIFIED, "Unspecified"},
@@ -494,6 +494,21 @@ void ExynosDisplayDrmInterface::parseRangeEnums(const DrmProperty& property)
     for (auto &e : mRangeEnums) {
         ALOGD("range [hal: %d, drm: %" PRId64 "]",
                 e.first >> HAL_DATASPACE_RANGE_SHIFT, e.second);
+    }
+}
+
+void ExynosDisplayDrmInterface::parseColorModeEnums(const DrmProperty &property)
+{
+    const std::vector<std::pair<uint32_t, const char *>> colorModeEnums = {
+        {HAL_COLOR_MODE_NATIVE, "Native"},
+        {HAL_COLOR_MODE_DCI_P3, "DCI-P3"},
+        {HAL_COLOR_MODE_SRGB, "sRGB"},
+    };
+
+    ALOGD("Init color mode enums");
+    parseEnums(property, colorModeEnums, mColorModeEnums);
+    for (auto &e : mColorModeEnums) {
+        ALOGD("Colormode [hal: %d, drm: %" PRId64 "]", e.first, e.second);
     }
 }
 
@@ -564,6 +579,8 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     }
 
     chosePreferredConfig();
+
+    parseColorModeEnums(mDrmCrtc->color_mode_property());
 
     getBrightnessInterfaceSupport();
 
@@ -871,21 +888,75 @@ int32_t ExynosDisplayDrmInterface::getVsyncAppliedTime(
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplayDrmInterface::getColorModes(
-        uint32_t* outNumModes,
-        int32_t* outModes)
+bool ExynosDisplayDrmInterface::supportDataspace(int32_t dataspace)
 {
-    *outNumModes = 1;
+    bool supportStandard = false;
+    bool supportTransfer = false;
+    bool supportRange = false;
 
-    if (outModes != NULL) {
-        outModes[0] = HAL_COLOR_MODE_NATIVE;
+    /* Check supported standard */
+    for (auto &e : mStandardEnums) {
+        if (e.first & dataspace)
+            supportStandard = true;
     }
+
+    /* Check supported transfer */
+    for (auto &e : mTransferEnums) {
+        if (e.first & dataspace)
+            supportTransfer = true;
+    }
+
+    /* Check supported range */
+    for (auto &e : mRangeEnums) {
+        if (e.first & dataspace)
+            supportRange = true;
+    }
+
+    return supportStandard && supportTransfer && supportRange;
+}
+
+int32_t ExynosDisplayDrmInterface::getColorModes(uint32_t *outNumModes, int32_t *outModes)
+{
+    if (mDrmCrtc->color_mode_property().id() == 0) {
+        *outNumModes = 1;
+
+        if (outModes != NULL) {
+            outModes[0] = HAL_COLOR_MODE_NATIVE;
+        }
+        return HWC2_ERROR_NONE;
+    }
+
+    uint32_t colorNum = 0;
+    for (auto &e : mColorModeEnums) {
+        if (outModes != NULL) {
+            outModes[colorNum] = e.first;
+        }
+        colorNum++;
+        ALOGD("Colormode [hal: %d, drm: %" PRId64 "]", e.first, e.second);
+    }
+    *outNumModes = colorNum;
+
     return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplayDrmInterface::setColorMode(int32_t mode)
 {
-    return 0;
+    int ret = 0;
+
+    if (mDrmCrtc->color_mode_property().id() == 0) {
+        return HWC2_ERROR_NONE;
+    }
+
+    DrmModeAtomicReq drmReq(this);
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                                        mDrmCrtc->color_mode_property(), mode)) < 0)
+        return ret;
+
+    if ((ret = drmReq.commit(0, true)) < 0)
+        return ret;
+
+    return HWC2_ERROR_NONE;
 }
 
 int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
