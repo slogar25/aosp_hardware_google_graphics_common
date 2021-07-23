@@ -16,11 +16,14 @@
 
 #include "pixel-display.h"
 
+#include <aidlcommonsupport/NativeHandle.h>
 #include <android-base/logging.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 #include <sys/types.h>
 #include <utils/Errors.h>
+
+extern int32_t load_png_image(const char *filepath, buffer_handle_t buffer);
 
 using ::aidl::com::google::hardware::pixel::display::Display;
 
@@ -35,6 +38,18 @@ void PixelDisplayInit(ExynosDevice *device) {
     CHECK(status == STATUS_OK);
 
     ABinderProcess_startThreadPool();
+}
+
+int32_t readCompensationImage(const aidl::android::hardware::common::NativeHandle &handle,
+                              const std::string &imageName) {
+    ALOGI("setCompensationImageHandle, imageName = %s", imageName.c_str());
+
+    std::string shadowCompensationImage("/mnt/vendor/persist/display/");
+    shadowCompensationImage.append(imageName);
+
+    native_handle_t *clone = makeFromAidl(handle);
+
+    return load_png_image(shadowCompensationImage.c_str(), static_cast<buffer_handle_t>(clone));
 }
 
 namespace aidl {
@@ -117,6 +132,13 @@ ndk::ScopedAStatus Display::getLhbmState(bool *_aidl_return) {
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &native_handle,
+                                                       const std::string &imageName,
+                                                       int *_aidl_return) {
+    *_aidl_return = readCompensationImage(native_handle, imageName);
+    return ndk::ScopedAStatus::ok();
 }
 } // namespace display
 } // namespace pixel
