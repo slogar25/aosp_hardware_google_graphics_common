@@ -702,6 +702,13 @@ int32_t ExynosDisplayDrmInterface::setLowPowerMode() {
     // Dots per 1000 inches
     mExynosDisplay->mYdpi = mm_height ? (mDozeDrmMode.v_display() * kUmPerInch) / mm_height : -1;
 
+    // force to turn off lhbm
+    if (mBrightnessCtrl.LhbmOn.get() == true) {
+        mExynosDisplay->clearReqLhbm();
+        mExynosDisplay->updateBrightnessState();
+        mLhbmForceUpdated = true;
+    }
+
     return setActiveDrmMode(mDozeDrmMode);
 }
 
@@ -794,6 +801,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         /* key: (width<<32 | height) */
         std::map<uint64_t, uint32_t> groupIds;
         uint32_t groupId = 0;
+        uint32_t min_vsync_period = UINT_MAX;
 
         for (const DrmMode &mode : mDrmConnector->modes()) {
             displayConfigs_t configs;
@@ -813,11 +821,14 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             configs.Xdpi = mm_width ? (mode.h_display() * kUmPerInch) / mm_width : -1;
             // Dots per 1000 inches
             configs.Ydpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
+            // find min vsync period
+            if (configs.vsyncPeriod <= min_vsync_period) min_vsync_period = configs.vsyncPeriod;
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
             ALOGD("config group(%d), w(%d), h(%d), vsync(%d), xdpi(%d), ydpi(%d)",
                     configs.groupId, configs.width, configs.height,
                     configs.vsyncPeriod, configs.Xdpi, configs.Ydpi);
         }
+        mExynosDisplay->setMinDisplayVsyncPeriod(min_vsync_period);
     }
 
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
@@ -1035,6 +1046,18 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     }
 
     DrmModeAtomicReq drmReq(this);
+
+    if (mLhbmForceUpdated) {
+        if (mBrightnessCtrl.LhbmOn.is_dirty()) {
+            if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->lhbm_on(),
+                                                mBrightnessCtrl.LhbmOn.get())) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Fail to set lhbm_on property", __func__);
+            }
+            mBrightnessCtrl.LhbmOn.clear_dirty();
+            mExynosDisplay->notifyLhbmState(mBrightnessCtrl.LhbmOn.get());
+        }
+        mLhbmForceUpdated = false;
+    }
 
     if ((ret = setDisplayMode(drmReq, modeBlob)) != NO_ERROR) {
         drmReq.addOldBlob(modeBlob);

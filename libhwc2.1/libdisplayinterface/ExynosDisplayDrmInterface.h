@@ -483,6 +483,7 @@ class ExynosDisplayDrmInterface :
         static constexpr int32_t kHbmDimmingTimeUs = 5000000;
 
         FramebufferManager mFBManager;
+        bool mLhbmForceUpdated = false;
 
         /*
          * BrightnessDimmingUsage:
