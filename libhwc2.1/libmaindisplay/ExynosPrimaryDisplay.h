@@ -83,6 +83,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
                 "/sys/class/backlight/panel0-backlight/local_hbm_mode";
         std::mutex lhbm_mutex_;
         std::condition_variable lhbm_cond_;
+        bool isLhbmSwitchAvailable(bool enabled);
 
         FILE* mWakeupDispFd;
         static constexpr const char* kWakeupDispFilePath =

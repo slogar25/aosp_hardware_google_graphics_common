@@ -461,7 +461,28 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
     return HWC2_ERROR_NONE;
 }
 
+bool ExynosPrimaryDisplay::isLhbmSwitchAvailable(bool enabled) {
+    Mutex::Autolock lock(mDisplayMutex);
+    if ((mPowerModeState != HWC2_POWER_MODE_ON) && enabled) {
+        ALOGW("skip LHBM, not ON state ");
+        return false;
+    }
+
+    if (mVsyncPeriod != getMinDisplayVsyncPeriod()) {
+        if (enabled) {
+            ALOGW("skip LHBM on, not max refresh rate");
+            return false;
+        }
+        ALOGW("calling setLhbmState in refresh rate=%d", mVsyncPeriod);
+    }
+    return true;
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
+    if (mLhbmOn == enabled) return NO_ERROR;
+
+    if (!isLhbmSwitchAvailable(enabled)) return INVALID_OPERATION;
+
     requestLhbm(enabled);
     ALOGI("setLhbmState =%d", enabled);
 
