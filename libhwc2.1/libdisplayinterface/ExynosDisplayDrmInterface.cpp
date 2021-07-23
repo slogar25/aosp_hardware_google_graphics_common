@@ -18,6 +18,7 @@
 
 #include "ExynosDisplayDrmInterface.h"
 
+#include <cutils/properties.h>
 #include <drm.h>
 #include <drm/drm_fourcc.h>
 #include <sys/types.h>
@@ -2315,6 +2316,13 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     mDimmingOnFd = fopen(kDimmingOnFileNode, "w+");
     if (mDimmingOnFd == NULL) ALOGE("%s open failed! %s", kDimmingOnFileNode, strerror(errno));
 
+    if (mDimmingOnFd) {
+        mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(
+                property_get_int32("vendor.display.brightness.dimming.usage", 0));
+        mHbmDimmingTimeUs =
+                property_get_int32("vendor.display.brightness.dimming.hbm_time", kHbmDimmingTimeUs);
+    }
+
     return;
 }
 
@@ -2381,8 +2389,7 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     brightnessState_t brightness_state = mExynosDisplay->getBrightnessState();
     if (brightness_state == mBrightnessState) return;
 
-    mBrightnessCtrl.DimmingOn.store(
-            (!mBrightnessState.instant_hbm && !brightness_state.instant_hbm));
+    bool dimming_on = (!mBrightnessState.instant_hbm && !brightness_state.instant_hbm);
 
     float brightness = mExynosDisplay->getBrightnessValue();
 
@@ -2414,6 +2421,33 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
     } else {
         mBrightnessCtrl.HbmOn.store(false);
     }
+
+    switch (mBrightnessDimmingUsage) {
+        case BrightnessDimmingUsage::HBM:
+            if (mBrightnessCtrl.HbmOn.is_dirty()) {
+                gettimeofday(&mHbmDimmingStart, NULL);
+                mHbmDimming = true;
+            }
+
+            if (mHbmDimming) {
+                struct timeval curr_time;
+                gettimeofday(&curr_time, NULL);
+                curr_time.tv_usec += (curr_time.tv_sec - mHbmDimmingStart.tv_sec) * 1000000;
+                long duration = curr_time.tv_usec - mHbmDimmingStart.tv_usec;
+                if (duration > mHbmDimmingTimeUs) mHbmDimming = false;
+            }
+
+            dimming_on = dimming_on && (mHbmDimming);
+            break;
+        case BrightnessDimmingUsage::NONE:
+            dimming_on = false;
+            break;
+        default:
+            break;
+    }
+
+    mBrightnessCtrl.DimmingOn.store(dimming_on);
+
     ALOGI("level=%d, DimmingOn=%d, HbmOn=%d, LhbmOn=%d", mBrightnessLevel.get(),
           mBrightnessCtrl.DimmingOn.get(), mBrightnessCtrl.HbmOn.get(),
           mBrightnessCtrl.LhbmOn.get());
