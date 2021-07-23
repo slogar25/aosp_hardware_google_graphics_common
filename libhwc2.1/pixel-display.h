@@ -27,6 +27,8 @@ namespace hardware {
 namespace pixel {
 namespace display {
 
+using aidl::android::hardware::common::NativeHandle;
+
 // Default implementation
 class Display : public BnDisplay {
 public:
@@ -42,6 +44,9 @@ public:
     ndk::ScopedAStatus isLhbmSupported(bool *_aidl_return) override;
     ndk::ScopedAStatus setLhbmState(bool enabled) override;
     ndk::ScopedAStatus getLhbmState(bool *_aidl_return) override;
+    ndk::ScopedAStatus setCompensationImageHandle(const NativeHandle &native_handle,
+                                                  const std::string &imageName,
+                                                  int *_aidl_return) override;
 
 private:
     ExynosDevice *mDevice = nullptr;

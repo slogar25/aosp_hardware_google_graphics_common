@@ -13,20 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <utils/Errors.h>
+#include "ExynosHWCHelper.h"
+
 #include <linux/videodev2.h>
+#include <linux/videodev2_exynos_media.h>
+#include <png.h>
+#include <sync/sync.h>
 #include <sys/mman.h>
 #include <utils/CallStack.h>
-#include <sync/sync.h>
-#include "ExynosHWCHelper.h"
-#include "ExynosHWCDebug.h"
-#include "ExynosHWC.h"
-#include "ExynosLayer.h"
-#include "exynos_sync.h"
-#include <linux/videodev2_exynos_media.h>
-#include "VendorVideoAPI.h"
-#include "ExynosResourceRestriction.h"
+#include <utils/Errors.h>
+
 #include <iomanip>
+
+#include "ExynosHWC.h"
+#include "ExynosHWCDebug.h"
+#include "ExynosLayer.h"
+#include "ExynosResourceRestriction.h"
+#include "VendorVideoAPI.h"
+#include "exynos_sync.h"
 
 using vendor::graphics::BufferUsage;
 using vendor::graphics::VendorGraphicBufferUsage;
@@ -1269,4 +1273,82 @@ int32_t writeIntToFile(const char* file, uint32_t value) {
 
 uint32_t getDisplayId(int32_t displayType, int32_t displayIndex) {
     return (displayType << DISPLAYID_MASK_LEN) | displayIndex;
+}
+
+int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
+    png_structp png_ptr;
+    png_infop info_ptr;
+    int width, height, bpp, color_type;
+
+    VendorGraphicBufferMeta gmeta(buffer);
+
+    FILE* fp = fopen(filepath, "rb");
+    if (fp == NULL) {
+        ALOGE("%s open failed ", filepath);
+        return -ENOENT;
+    }
+
+    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
+    if (png_ptr == NULL) {
+        fclose(fp);
+        return -ENOMEM;
+    }
+
+    info_ptr = png_create_info_struct(png_ptr);
+    if (info_ptr == NULL) {
+        fclose(fp);
+        png_destroy_read_struct(&png_ptr, NULL, NULL);
+        return -ENOMEM;
+    }
+
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        fclose(fp);
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        return -EIO;
+    }
+
+    png_init_io(png_ptr, fp);
+
+    png_set_sig_bytes(png_ptr, 0);
+    png_read_info(png_ptr, info_ptr);
+
+    width = png_get_image_width(png_ptr, info_ptr);
+    height = png_get_image_height(png_ptr, info_ptr);
+    if (width != gmeta.width || height != gmeta.height) {
+        fclose(fp);
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        return -EINVAL;
+    }
+
+    bpp = png_get_bit_depth(png_ptr, info_ptr) * png_get_channels(png_ptr, info_ptr);
+    color_type = png_get_color_type(png_ptr, info_ptr);
+    if (color_type != PNG_COLOR_TYPE_RGB_ALPHA || bpp != formatToBpp(gmeta.format)) {
+        fclose(fp);
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        return -EINVAL;
+    }
+
+    uint32_t bufferHandleSize = gmeta.stride * gmeta.vstride * formatToBpp(gmeta.format) / 8;
+    if (bufferHandleSize > gmeta.size) {
+        fclose(fp);
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+        return -EINVAL;
+    }
+    void* bufferHandleData =
+            mmap(0, bufferHandleSize, PROT_READ | PROT_WRITE, MAP_SHARED, gmeta.fd, 0);
+
+    if (bufferHandleData != MAP_FAILED && bufferHandleData != NULL) {
+        int strideBytes = gmeta.stride * (formatToBpp(gmeta.format) / 8);
+        png_bytep row_ptr = (png_bytep)bufferHandleData;
+        for (int y = 0; y < height; ++y) {
+            png_read_row(png_ptr, row_ptr, NULL);
+            row_ptr += strideBytes;
+        }
+        munmap(bufferHandleData, bufferHandleSize);
+    }
+
+    fclose(fp);
+    png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
+
+    return 0;
 }
