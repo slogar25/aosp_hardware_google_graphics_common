@@ -122,8 +122,6 @@ ndk::ScopedAStatus Display::setLhbmState(bool enabled) {
             return ndk::ScopedAStatus::ok();
         else if (ret == TIMED_OUT)
             return ndk::ScopedAStatus::fromExceptionCode(STATUS_TIMED_OUT);
-        else if (ret == INVALID_OPERATION)
-            return ndk::ScopedAStatus::fromExceptionCode(STATUS_INVALID_OPERATION);
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
