@@ -1643,15 +1643,15 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         mBrightnessCtrl.LhbmOn.clear_dirty();
     }
 
-    if (mBrightnessCtrl.HbmOn.is_dirty()) {
+    // only allow to set hbm on for mipi sync when dim SDR transition
+    if (mBrightnessCtrl.HbmOn.is_dirty() && mBrightnessState.dimSdrTransition()) {
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
                                             mBrightnessCtrl.HbmOn.get())) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
         }
         mBrightnessCtrl.HbmOn.clear_dirty();
-
         // sync mipi command and frame when sdr dimming on/off
-        if (!mipi_sync && mBrightnessState.dimSdrTransition()) {
+        if (!mipi_sync) {
             mipi_sync = true;
             wait_vsync = 1; // GHBM mipi command has 1 frame delay
             mipi_sync_action = mBrightnessCtrl.HbmOn.get() ? brightnessState_t::MIPI_SYNC_GHBM_ON
@@ -2369,9 +2369,13 @@ int32_t ExynosDisplayDrmInterface::updateBrightness(bool syncFrame) {
         mBrightnessCtrl.DimmingOn.clear_dirty();
     }
 
-    if (mHbmOnFd && mBrightnessCtrl.HbmOn.is_dirty()) {
-        writeFileNode(mHbmOnFd, mBrightnessCtrl.HbmOn.get());
-        mBrightnessCtrl.HbmOn.clear_dirty();
+    if (mBrightnessCtrl.HbmOn.is_dirty() && !mBrightnessState.dimSdrTransition()) {
+        if (mHbmOnFd) {
+            writeFileNode(mHbmOnFd, mBrightnessCtrl.HbmOn.get());
+            mBrightnessCtrl.HbmOn.clear_dirty();
+        } else {
+            ALOGW("Fail to set hbm_on by sysfs");
+        }
     }
 
     if (mExynosDisplay->mBrightnessFd)
