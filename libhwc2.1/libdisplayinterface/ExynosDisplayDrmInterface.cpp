@@ -180,7 +180,7 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         }
 
         fbId = findCachedFbId(config.layer,
-                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id}](
+                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat}](
                                       auto &buffer) { return buffer->bufferDesc == bufferDesc; });
         if (fbId != 0) {
             return NO_ERROR;
@@ -283,7 +283,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
                                     Framebuffer::SolidColorDesc{bufWidth, bufHeight}));
         } else {
             cachedBuffers.emplace_front(
-                    new Framebuffer(mDrmFd, fbId, Framebuffer::BufferDesc{config.buffer_id}));
+                    new Framebuffer(mDrmFd, fbId,
+                                    Framebuffer::BufferDesc{config.buffer_id, drmFormat}));
             mHasSecureFramebuffer |= (isFramebuffer(config.layer) && config.protection);
         }
     } else {
