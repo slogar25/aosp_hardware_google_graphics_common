@@ -503,7 +503,7 @@ class ExynosDisplayDrmInterface :
         };
 
         BrightnessDimmingUsage mBrightnessDimmingUsage;
-        bool mHbmDimming;
+        bool mHbmSvDimming;
         int32_t mHbmDimmingTimeUs;
         struct timeval mHbmDimmingStart;
 
