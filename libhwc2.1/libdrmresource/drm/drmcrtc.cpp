@@ -55,6 +55,8 @@ int DrmCrtc::Init() {
 
   if (drm_->GetCrtcProperty(*this, "cgc_lut", &cgc_lut_property_))
     ALOGI("Failed to get cgc_lut property");
+  if (drm_->GetCrtcProperty(*this, "cgc_lut_fd", &cgc_lut_fd_property_))
+    ALOGI("Failed to get cgc_lut_fd property");
   if (drm_->GetCrtcProperty(*this, "DEGAMMA_LUT", &degamma_lut_property_))
     ALOGI("Failed to get &degamma_lut property");
   if (drm_->GetCrtcProperty(*this, "DEGAMMA_LUT_SIZE", &degamma_lut_size_property_))
@@ -88,6 +90,7 @@ int DrmCrtc::Init() {
   properties_.push_back(&mode_property_);
   properties_.push_back(&out_fence_ptr_property_);
   properties_.push_back(&cgc_lut_property_);
+  properties_.push_back(&cgc_lut_fd_property_);
   properties_.push_back(&degamma_lut_property_);
   properties_.push_back(&degamma_lut_size_property_);
   properties_.push_back(&gamma_lut_property_);
@@ -153,6 +156,10 @@ const DrmProperty &DrmCrtc::out_fence_ptr_property() const {
 
 const DrmProperty &DrmCrtc::cgc_lut_property() const {
     return cgc_lut_property_;
+}
+
+const DrmProperty &DrmCrtc::cgc_lut_fd_property() const {
+    return cgc_lut_fd_property_;
 }
 
 const DrmProperty &DrmCrtc::degamma_lut_property() const {

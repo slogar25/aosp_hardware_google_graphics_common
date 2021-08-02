@@ -48,6 +48,7 @@ class DrmCrtc {
   const DrmProperty &mode_property() const;
   const DrmProperty &out_fence_ptr_property() const;
   const DrmProperty &cgc_lut_property() const;
+  const DrmProperty &cgc_lut_fd_property() const;
   const DrmProperty &degamma_lut_property() const;
   const DrmProperty &degamma_lut_size_property() const;
   const DrmProperty &gamma_lut_property() const;
@@ -81,6 +82,7 @@ class DrmCrtc {
   DrmProperty mode_property_;
   DrmProperty out_fence_ptr_property_;
   DrmProperty cgc_lut_property_;
+  DrmProperty cgc_lut_fd_property_;
   DrmProperty degamma_lut_property_;
   DrmProperty degamma_lut_size_property_;
   DrmProperty gamma_lut_property_;
