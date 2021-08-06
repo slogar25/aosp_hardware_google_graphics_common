@@ -2428,18 +2428,21 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
         case BrightnessDimmingUsage::HBM:
             if (mBrightnessCtrl.HbmOn.is_dirty()) {
                 gettimeofday(&mHbmDimmingStart, NULL);
-                mHbmDimming = true;
+                if (brightness_state.hdr_full_screen != mBrightnessState.hdr_full_screen) {
+                    mBrightnessState.hdr_full_screen = brightness_state.hdr_full_screen;
+                } else {
+                    mHbmSvDimming = true;
+                }
             }
 
-            if (mHbmDimming) {
+            if (mHbmSvDimming) {
                 struct timeval curr_time;
                 gettimeofday(&curr_time, NULL);
                 curr_time.tv_usec += (curr_time.tv_sec - mHbmDimmingStart.tv_sec) * 1000000;
                 long duration = curr_time.tv_usec - mHbmDimmingStart.tv_usec;
-                if (duration > mHbmDimmingTimeUs) mHbmDimming = false;
+                if (duration > mHbmDimmingTimeUs) mHbmSvDimming = false;
             }
-
-            dimming_on = dimming_on && (mHbmDimming);
+            dimming_on = dimming_on && (mHbmSvDimming);
             break;
         case BrightnessDimmingUsage::NONE:
             dimming_on = false;
