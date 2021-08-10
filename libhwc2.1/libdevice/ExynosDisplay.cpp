@@ -22,6 +22,7 @@
 #include <cutils/properties.h>
 #include <hardware/hwcomposer_defs.h>
 #include <linux/fb.h>
+#include <processgroup/processgroup.h>
 #include <sync/sync.h>
 #include <sys/ioctl.h>
 #include <utils/CallStack.h>
@@ -2931,6 +2932,14 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     int ret = HWC2_ERROR_NONE;
     String8 errString;
+    thread_local bool setTaskProfileDone = false;
+
+    if (setTaskProfileDone == false) {
+        if (!SetTaskProfiles(gettid(), {"SFMainPolicy"})) {
+            ALOGW("Failed to add `%d` into SFMainPolicy", gettid());
+        }
+        setTaskProfileDone = true;
+    }
 
     Mutex::Autolock lock(mDisplayMutex);
 
