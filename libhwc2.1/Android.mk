@@ -70,7 +70,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V3-ndk_platform \
                           libbinder_ndk \
                           libbase \
-                          libpng
+                          libpng \
+                          libprocessgroup
 
 LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
 LOCAL_HEADER_LIBRARIES += libgralloc_headers
