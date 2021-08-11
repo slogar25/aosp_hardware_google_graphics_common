@@ -514,6 +514,19 @@ void ExynosDisplayDrmInterface::parseColorModeEnums(const DrmProperty &property)
     }
 }
 
+void ExynosDisplayDrmInterface::parseHbmModeEnums(const DrmProperty &property) {
+    const std::vector<std::pair<uint32_t, const char *>> modeEnums = {
+            {static_cast<uint32_t>(HbmMode::OFF), "Off"},
+            {static_cast<uint32_t>(HbmMode::ON_IRC_ON), "On IRC On"},
+            {static_cast<uint32_t>(HbmMode::ON_IRC_OFF), "On IRC Off"},
+    };
+
+    parseEnums(property, modeEnums, mHbmModeEnums);
+    for (auto &e : mHbmModeEnums) {
+        ALOGD("hbm mode [hal: %d, drm: %" PRId64 "]", e.first, e.second);
+    }
+}
+
 uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
 {
     return type+index;
@@ -722,6 +735,7 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
     if (mode == HWC_POWER_MODE_OFF) {
         mBrightnessState.reset();
         mBrightnessCtrl.reset();
+        mExynosDisplay->requestEnhancedHbm(false);
         mExynosDisplay->requestLhbm(false);
         mExynosDisplay->notifyLhbmState(mBrightnessCtrl.LhbmOn.get());
     }
@@ -1644,18 +1658,26 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     // only allow to set hbm on for mipi sync when dim SDR transition
-    if (mBrightnessCtrl.HbmOn.is_dirty() && mBrightnessState.dimSdrTransition()) {
-        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_on(),
-                                            mBrightnessCtrl.HbmOn.get())) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_on property", __func__);
+    if (mBrightnessCtrl.HbmMode.is_dirty() && mBrightnessState.dimSdrTransition()) {
+        uint64_t hbmEnum = 0;
+        std::tie(hbmEnum, ret) = halToDrmEnum(mBrightnessCtrl.HbmMode.get(), mHbmModeEnums);
+        if (ret < 0) {
+            HWC_LOGE(mExynosDisplay, "Fail to convert hbm mode(%d)", mBrightnessCtrl.HbmMode.get());
+            return ret;
         }
-        mBrightnessCtrl.HbmOn.clear_dirty();
+
+        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(), mDrmConnector->hbm_mode(),
+                                            hbmEnum)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_mode property", __func__);
+        }
+        mBrightnessCtrl.HbmMode.clear_dirty();
+
         // sync mipi command and frame when sdr dimming on/off
         if (!mipi_sync) {
             mipi_sync = true;
             wait_vsync = 1; // GHBM mipi command has 1 frame delay
-            mipi_sync_action = mBrightnessCtrl.HbmOn.get() ? brightnessState_t::MIPI_SYNC_GHBM_ON
-                                                           : brightnessState_t::MIPI_SYNC_GHBM_OFF;
+            mipi_sync_action = isHbmOn() ? brightnessState_t::MIPI_SYNC_GHBM_ON
+                                         : brightnessState_t::MIPI_SYNC_GHBM_OFF;
         }
     }
 
@@ -2304,12 +2326,14 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
 
     drmModeFreePropertyBlob(blob);
 
+    parseHbmModeEnums(mDrmConnector->hbm_mode());
+
     mBrightntessIntfSupported = true;
     mBrightnessState.reset();
     mBrightnessCtrl.reset();
 
-    mHbmOnFd = fopen(kHbmOnFileNode, "w+");
-    if (mHbmOnFd == NULL) ALOGE("%s open failed! %s", kHbmOnFileNode, strerror(errno));
+    mHbmModeFd = fopen(kHbmModeFileNode, "w+");
+    if (mHbmModeFd == NULL) ALOGE("%s open failed! %s", kHbmModeFileNode, strerror(errno));
 
     mDimmingOnFd = fopen(kDimmingOnFileNode, "w+");
     if (mDimmingOnFd == NULL) ALOGE("%s open failed! %s", kDimmingOnFileNode, strerror(errno));
@@ -2369,12 +2393,12 @@ int32_t ExynosDisplayDrmInterface::updateBrightness(bool syncFrame) {
         mBrightnessCtrl.DimmingOn.clear_dirty();
     }
 
-    if (mBrightnessCtrl.HbmOn.is_dirty() && !mBrightnessState.dimSdrTransition()) {
-        if (mHbmOnFd) {
-            writeFileNode(mHbmOnFd, mBrightnessCtrl.HbmOn.get());
-            mBrightnessCtrl.HbmOn.clear_dirty();
+    if (mBrightnessCtrl.HbmMode.is_dirty() && !mBrightnessState.dimSdrTransition()) {
+        if (mHbmModeFd) {
+            writeFileNode(mHbmModeFd, mBrightnessCtrl.HbmMode.get());
+            mBrightnessCtrl.HbmMode.clear_dirty();
         } else {
-            ALOGW("Fail to set hbm_on by sysfs");
+            ALOGW("Fail to set hbm_mode by sysfs");
         }
     }
 
@@ -2416,17 +2440,20 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
         }
     }
 
-    if (mPanelHbmType == PanelHbmType::ONE_STEP && mScaledBrightness == mBrightnessHbmMax) {
-        mBrightnessCtrl.HbmOn.store(true);
-    } else if (mPanelHbmType == PanelHbmType::CONTINUOUS && range == BrightnessRange::HBM) {
-        mBrightnessCtrl.HbmOn.store(true);
-    } else {
-        mBrightnessCtrl.HbmOn.store(false);
+    HbmMode hbm_mode = HbmMode::OFF;
+    if ((mPanelHbmType == PanelHbmType::ONE_STEP && mScaledBrightness == mBrightnessHbmMax) ||
+        (mPanelHbmType == PanelHbmType::CONTINUOUS && range == BrightnessRange::HBM)) {
+        hbm_mode = HbmMode::ON_IRC_ON;
+    }
+
+    if (hbm_mode == HbmMode::ON_IRC_ON && brightness_state.enhanced_hbm) {
+        hbm_mode = HbmMode::ON_IRC_OFF;
     }
 
     switch (mBrightnessDimmingUsage) {
         case BrightnessDimmingUsage::HBM:
-            if (mBrightnessCtrl.HbmOn.is_dirty()) {
+            if ((static_cast<uint32_t>(hbm_mode) > static_cast<uint32_t>(HbmMode::OFF)) !=
+                mBrightnessCtrl.HbmMode.get() > static_cast<uint32_t>(HbmMode::OFF)) {
                 gettimeofday(&mHbmDimmingStart, NULL);
                 if (brightness_state.hdr_full_screen != mBrightnessState.hdr_full_screen) {
                     mBrightnessState.hdr_full_screen = brightness_state.hdr_full_screen;
@@ -2451,10 +2478,12 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
             break;
     }
 
+    mBrightnessCtrl.HbmMode.store(static_cast<uint32_t>(hbm_mode));
+
     mBrightnessCtrl.DimmingOn.store(dimming_on);
 
-    ALOGI("level=%d, DimmingOn=%d, HbmOn=%d, LhbmOn=%d", mBrightnessLevel.get(),
-          mBrightnessCtrl.DimmingOn.get(), mBrightnessCtrl.HbmOn.get(),
+    ALOGI("level=%d, DimmingOn=%d, HbmMode=%d, LhbmOn=%d", mBrightnessLevel.get(),
+          mBrightnessCtrl.DimmingOn.get(), mBrightnessCtrl.HbmMode.get(),
           mBrightnessCtrl.LhbmOn.get());
 
     mBrightnessState = brightness_state;
