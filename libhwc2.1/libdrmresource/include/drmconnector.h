@@ -73,7 +73,7 @@ class DrmConnector {
   const DrmProperty &lp_mode() const;
   const DrmProperty &brightness_cap() const;
   const DrmProperty &brightness_level() const;
-  const DrmProperty &hbm_on() const;
+  const DrmProperty &hbm_mode() const;
   const DrmProperty &dimming_on() const;
   const DrmProperty &lhbm_on() const;
   const DrmProperty &sync_rr_switch() const;
@@ -127,7 +127,7 @@ class DrmConnector {
   DrmProperty lp_mode_;
   DrmProperty brightness_cap_;
   DrmProperty brightness_level_;
-  DrmProperty hbm_on_;
+  DrmProperty hbm_mode_;
   DrmProperty dimming_on_;
   DrmProperty lhbm_on_;
   DrmProperty sync_rr_switch_;
