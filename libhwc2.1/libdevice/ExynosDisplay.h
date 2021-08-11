@@ -360,6 +360,8 @@ typedef struct brightnessState {
     // HDR layer is covering most of the screen
     bool hdr_full_screen;
 
+    bool enhanced_hbm;
+
     void reset() {
         mData = {false, false, false};
         dim_sdr_target_ratio = kSdrDimRatioNone;
@@ -374,13 +376,14 @@ typedef struct brightnessState {
         dim_sdr_target_ratio = a.dim_sdr_target_ratio;
         dim_sdr_ratio = a.dim_sdr_ratio;
         brightness_value = a.brightness_value;
+        enhanced_hbm = a.enhanced_hbm;
         return *this;
     }
+    // TODO: add hdr_full_screen comparison
     bool operator==(const brightnessState& a) const {
-        return a.mData == mData &&
-            a.dim_sdr_ratio == dim_sdr_ratio &&
-            a.dim_sdr_target_ratio == dim_sdr_target_ratio &&
-            a.brightness_value == brightness_value;
+        return a.mData == mData && a.dim_sdr_ratio == dim_sdr_ratio &&
+                a.dim_sdr_target_ratio == dim_sdr_target_ratio &&
+                a.brightness_value == brightness_value && a.enhanced_hbm == enhanced_hbm;
     }
 } brightnessState_t;
 
@@ -1136,6 +1139,8 @@ class ExynosDisplay {
             uint32_t type = SECOND_DISPLAY_START_BIT * mIndex + mType;
             return 1 << type;
         }
+        void requestEnhancedHbm(bool on) { mBrightnessState.enhanced_hbm = on; };
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
