@@ -122,9 +122,9 @@ int DrmConnector::Init() {
       ALOGE("Could not get brightness_level property\n");
   }
 
-  ret = drm_->GetConnectorProperty(*this, "hbm_on", &hbm_on_);
+  ret = drm_->GetConnectorProperty(*this, "hbm_mode", &hbm_mode_);
   if (ret) {
-      ALOGE("Could not get hbm_on property\n");
+      ALOGE("Could not get hbm_mode property\n");
   }
 
   ret = drm_->GetConnectorProperty(*this, "dimming_on", &dimming_on_);
@@ -157,7 +157,7 @@ int DrmConnector::Init() {
   properties_.push_back(&lp_mode_);
   properties_.push_back(&brightness_cap_);
   properties_.push_back(&brightness_level_);
-  properties_.push_back(&hbm_on_);
+  properties_.push_back(&hbm_mode_);
   properties_.push_back(&dimming_on_);
   properties_.push_back(&lhbm_on_);
   properties_.push_back(&sync_rr_switch_);
@@ -311,8 +311,8 @@ const DrmProperty &DrmConnector::brightness_level() const {
     return brightness_level_;
 }
 
-const DrmProperty &DrmConnector::hbm_on() const {
-    return hbm_on_;
+const DrmProperty &DrmConnector::hbm_mode() const {
+    return hbm_mode_;
 }
 
 const DrmProperty &DrmConnector::dimming_on() const {

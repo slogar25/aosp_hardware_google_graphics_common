@@ -296,7 +296,9 @@ class ExynosDisplayDrmInterface :
         virtual void destroyLayer(ExynosLayer *layer) override;
 
         virtual int32_t waitVBlank();
-        bool isHbmOn() { return mBrightnessCtrl.HbmOn.get(); }
+        bool isHbmOn() {
+            return mBrightnessCtrl.HbmMode.get() != static_cast<uint32_t>(HbmMode::OFF);
+        }
         uint32_t getDbv() { return mBrightnessLevel.get(); }
         float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
     protected:
@@ -423,7 +425,8 @@ class ExynosDisplayDrmInterface :
     protected:
         void getBrightnessInterfaceSupport();
         void setupBrightnessConfig();
-        FILE *mHbmOnFd;
+        void parseHbmModeEnums(const DrmProperty &property);
+        FILE *mHbmModeFd;
         FILE *mDimmingOnFd;
         bool mBrightntessIntfSupported = false;
         float mBrightnessHbmMax = 1.0f;
@@ -436,6 +439,13 @@ class ExynosDisplayDrmInterface :
             HBM,
             MAX,
         };
+        enum class HbmMode {
+            OFF = 0,
+            ON_IRC_ON,
+            ON_IRC_OFF,
+        };
+
+        DrmPropertyMap mHbmModeEnums;
         PanelHbmType mPanelHbmType;
 
         Mutex mBrightnessUpdateMutex;
@@ -443,20 +453,16 @@ class ExynosDisplayDrmInterface :
         CtrlValue<uint32_t> mBrightnessLevel;
         float mScaledBrightness;
         typedef struct brightnessCtrl {
-            static constexpr size_t kNumOfBrightnessCtrl = 3;
-            union {
-                std::array<CtrlValue<bool>, kNumOfBrightnessCtrl> mData;
-                struct {
-                    CtrlValue<bool> DimmingOn;
-                    CtrlValue<bool> HbmOn;
-                    CtrlValue<bool> LhbmOn;
-                };
-            };
+            CtrlValue<bool> DimmingOn;
+            CtrlValue<uint32_t> HbmMode;
+            CtrlValue<bool> LhbmOn;
             void reset() {
-                for (uint32_t i = 0; i < kNumOfBrightnessCtrl; i++) {
-                    mData[i].store(false);
-                    mData[i].clear_dirty();
-                };
+                DimmingOn.store(false);
+                DimmingOn.clear_dirty();
+                HbmMode.store(0);
+                HbmMode.clear_dirty();
+                LhbmOn.store(false);
+                LhbmOn.clear_dirty();
             }
         } brightnessCtrl_t;
         brightnessCtrl_t mBrightnessCtrl;
@@ -481,7 +487,7 @@ class ExynosDisplayDrmInterface :
 
         // TODO: hbm in dual display is not supported. It should support it in
         //      the furture.
-        static constexpr const char *kHbmOnFileNode =
+        static constexpr const char *kHbmModeFileNode =
                 "/sys/class/backlight/panel0-backlight/hbm_mode";
         static constexpr const char *kDimmingOnFileNode =
                 "/sys/class/backlight/panel0-backlight/dimming_on";
