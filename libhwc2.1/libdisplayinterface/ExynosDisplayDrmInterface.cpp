@@ -1644,6 +1644,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             if (mExynosDisplay->getColorAdjustedDbv(dbv_adj)) {
                 ALOGW("failed to get adjusted dbv");
             } else if (dbv_adj != dbv && dbv_adj != 0) {
+                if (dbv_adj > mBrightnessTable[BrightnessRange::NORMAL].mBklEnd)
+                    dbv_adj = mBrightnessTable[BrightnessRange::NORMAL].mBklEnd;
+                else if (dbv_adj < mBrightnessTable[BrightnessRange::NORMAL].mBklStart)
+                    dbv_adj = mBrightnessTable[BrightnessRange::NORMAL].mBklStart;
                 ALOGI("lhbm: adjust dbv from %d to %d", dbv, dbv_adj);
                 dbv = dbv_adj;
             }
