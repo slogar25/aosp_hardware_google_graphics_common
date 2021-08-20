@@ -817,6 +817,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             if (it != groupIds.end()) {
                 configs.groupId = it->second;
             } else {
+                configs.groupId = groupId;
                 groupIds.insert(std::make_pair(key, groupId));
                 groupId++;
             }
