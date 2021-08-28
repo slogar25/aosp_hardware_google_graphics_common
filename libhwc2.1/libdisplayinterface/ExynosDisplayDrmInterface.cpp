@@ -1200,6 +1200,9 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HDR10");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10);
+        if (mExynosDisplay->mDevice->mResourceManager->hasHDR10PlusMPP()) {
+            mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10_PLUS);
+        }
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.string(), HAL_HDR_HDR10);
     }
