@@ -520,7 +520,7 @@ class ExynosDisplay {
         ExynosLowFpsLayerInfo mLowFpsLayerInfo;
 
         // HDR capabilities
-        std::vector<android_hdr_t> mHdrTypes;
+        std::vector<int32_t> mHdrTypes;
         float mMaxLuminance;
         float mMaxAverageLuminance;
         float mMinLuminance;
