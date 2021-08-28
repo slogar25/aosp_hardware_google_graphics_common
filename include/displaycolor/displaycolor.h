@@ -33,6 +33,7 @@ using android::hardware::graphics::common::V1_2::Dataspace;
 /**
  * hwc/displaycolor interface history
  *
+ * 2.0.0.2021-08-27 pass brightness table for hdr10+
  * 1.0.0.2021-08-25 Initial release
  */
 
@@ -53,7 +54,7 @@ constexpr struct DisplayColorIntfVer {
     }
 
 } kInterfaceVersion {
-    1,
+    2,
     0,
     0,
 };
@@ -78,6 +79,25 @@ enum BrightnessMode {
     BM_NOMINAL = 0,
     BM_HBM = 1,
     BM_MAX = 2,
+};
+
+struct DisplayBrightnessTable {
+    float nbm_nits_min;
+    float nbm_nits_max;
+    float hbm_nits_min;
+    float hbm_nits_max;
+
+    uint32_t nbm_dbv_min;
+    uint32_t nbm_dbv_max;
+    uint32_t hbm_dbv_min;
+    uint32_t hbm_dbv_max;
+};
+
+struct DisplayInfo {
+    std::string panel_name;
+    std::string panel_serial;
+
+    DisplayBrightnessTable brightness_table;
 };
 
 struct LayerColorData {
