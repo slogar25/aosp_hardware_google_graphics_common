@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(b/186905324): Switch soc_ver with TARGET_BOARD_PLATFORM
+soc_ver := $(TARGET_BOARD_PLATFORM)
+
 LOCAL_PATH:= $(call my-dir)
 # HAL module implemenation, not prelinked and stored in
 # hw/<COPYPIX_HARDWARE_MODULE_ID>.<ro.product.board>.so
@@ -40,6 +43,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -Wno-unused-parameter
+LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
 
 LOCAL_MODULE := libdrmresource
@@ -85,14 +89,14 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libvirtualdisplay \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwchelper \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1 \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libmaindisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libexternaldisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libvirtualdisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libdevice \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libdisplayinterface \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1 \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libmaindisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libexternaldisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libvirtualdisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdevice \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include
@@ -118,11 +122,12 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm libui libvendorgraphicbuf
 
 LOCAL_VINTF_FRAGMENTS         += pixel-display-default.xml
 
-include $(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/Android.mk
+include $(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/Android.mk
 
 LOCAL_CFLAGS += -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
+LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
 LOCAL_MODULE := libexynosdisplay
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
@@ -161,13 +166,13 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libvirtualdisplay \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwchelper \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1 \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libmaindisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libexternaldisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libvirtualdisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libdevice \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1 \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libmaindisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libexternaldisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libvirtualdisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdevice \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include
@@ -177,6 +182,7 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_C_INCLUDES)
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwcservice\"
+LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
 LOCAL_SRC_FILES := \
 	libhwcService/IExynosHWC.cpp \
@@ -215,6 +221,7 @@ LOCAL_HEADER_LIBRARIES += libgralloc_headers
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwcomposer\"
+LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
 LOCAL_CFLAGS += -DUSES_HWC_SERVICES
@@ -230,13 +237,13 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libvirtualdisplay \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwchelper \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1 \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libmaindisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libexternaldisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libvirtualdisplay \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libresource \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libdevice \
-	$(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1 \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libmaindisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libexternaldisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libvirtualdisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdevice \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface
 

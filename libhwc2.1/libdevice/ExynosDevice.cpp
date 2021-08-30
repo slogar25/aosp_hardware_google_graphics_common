@@ -30,6 +30,7 @@
 #include "VendorGraphicBuffer.h"
 
 using namespace vendor::graphics;
+using namespace SOC_VERSION;
 
 /**
  * ExynosDevice implementation

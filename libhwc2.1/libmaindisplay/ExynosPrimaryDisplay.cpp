@@ -32,6 +32,8 @@
 
 extern struct exynos_hwc_control exynosHWCControl;
 
+using namespace SOC_VERSION;
+
 static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
          {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}};
