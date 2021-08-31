@@ -61,6 +61,7 @@ enum {
     SET_PANEL_GAMMA_TABLE_SOURCE = 1001,
     SET_DISPLAY_BRIGHTNESS = 1002,
     SET_DISPLAY_LHBM = 1003,
+    SET_LBE_CTRL = 1004,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -293,6 +294,16 @@ public:
         int result = remote()->transact(SET_SCALE_DOWN_RATIO, data, &reply);
         if (result != NO_ERROR)
             ALOGE("SET_SCALE_DOWN_RATIO transact error(%d)", result);
+    }
+
+    virtual void setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(display_id);
+        data.writeInt32(state);
+        data.writeInt32(lux);
+        int result = remote()->transact(SET_LBE_CTRL, data, &reply);
+        if (result != NO_ERROR) ALOGE("SET_LBE_CTRL transact error(%d)", result);
     }
 
     virtual void setHWCDebug(int debug)
@@ -644,6 +655,15 @@ status_t BnExynosHWCService::onTransact(
             uint32_t on = data.readInt32();
             int32_t error = setDisplayLhbm(display_id, on);
             reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+
+        case SET_LBE_CTRL: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t display_id = data.readInt32();
+            uint32_t state = data.readInt32();
+            uint32_t lux = data.readInt32();
+            setLbeCtrl(display_id, state, lux);
             return NO_ERROR;
         } break;
 

@@ -66,6 +66,7 @@ public:
 
     virtual int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode) = 0;
     virtual int32_t setPanelGammaTableSource(int32_t display_id, int32_t type, int32_t source) = 0;
+    virtual void setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) = 0;
     /*
     virtual void notifyPSRExit() = 0;
     */
