@@ -66,6 +66,7 @@ public:
     virtual int  setHWCCtl(uint32_t display, uint32_t ctrl, int32_t val);
 
     virtual int setDDIScaler(uint32_t width, uint32_t height);
+    virtual void setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) override;
 #if 0
     void setPSRExitCallback(void (*callback)(exynos_hwc_composer_device_1_t *));
     virtual void notifyPSRExit();
