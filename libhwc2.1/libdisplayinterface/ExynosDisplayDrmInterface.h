@@ -488,9 +488,9 @@ class ExynosDisplayDrmInterface :
         // TODO: hbm in dual display is not supported. It should support it in
         //      the furture.
         static constexpr const char *kHbmModeFileNode =
-                "/sys/class/backlight/panel0-backlight/hbm_mode";
+                "/sys/class/backlight/panel%d-backlight/hbm_mode";
         static constexpr const char *kDimmingOnFileNode =
-                "/sys/class/backlight/panel0-backlight/dimming_on";
+                "/sys/class/backlight/panel%d-backlight/dimming_on";
 
         static constexpr int32_t kHbmDimmingTimeUs = 5000000;
 
