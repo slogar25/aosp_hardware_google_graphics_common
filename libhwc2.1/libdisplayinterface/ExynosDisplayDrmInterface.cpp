@@ -2340,11 +2340,15 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     mBrightnessState.reset();
     mBrightnessCtrl.reset();
 
-    mHbmModeFd = fopen(kHbmModeFileNode, "w+");
-    if (mHbmModeFd == NULL) ALOGE("%s open failed! %s", kHbmModeFileNode, strerror(errno));
+    String8 node_name;
+    node_name.appendFormat(kHbmModeFileNode, mExynosDisplay->mIndex);
+    mHbmModeFd = fopen(node_name.string(), "w+");
+    if (mHbmModeFd == NULL) ALOGE("%s open failed! %s", node_name.string(), strerror(errno));
 
-    mDimmingOnFd = fopen(kDimmingOnFileNode, "w+");
-    if (mDimmingOnFd == NULL) ALOGE("%s open failed! %s", kDimmingOnFileNode, strerror(errno));
+    node_name.clear();
+    node_name.appendFormat(kDimmingOnFileNode, mExynosDisplay->mIndex);
+    mDimmingOnFd = fopen(node_name.string(), "w+");
+    if (mDimmingOnFd == NULL) ALOGE("%s open failed! %s", node_name.string(), strerror(errno));
 
     if (mDimmingOnFd) {
         mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(
