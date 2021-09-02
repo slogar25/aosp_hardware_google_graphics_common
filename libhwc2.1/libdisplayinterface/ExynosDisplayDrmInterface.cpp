@@ -180,7 +180,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         }
 
         fbId = findCachedFbId(config.layer,
-                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat}](
+                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat,
+                                                                    config.protection}](
                                       auto &buffer) { return buffer->bufferDesc == bufferDesc; });
         if (fbId != 0) {
             return NO_ERROR;
@@ -284,7 +285,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         } else {
             cachedBuffers.emplace_front(
                     new Framebuffer(mDrmFd, fbId,
-                                    Framebuffer::BufferDesc{config.buffer_id, drmFormat}));
+                                    Framebuffer::BufferDesc{config.buffer_id, drmFormat,
+                                                            config.protection}));
             mHasSecureFramebuffer |= (isFramebuffer(config.layer) && config.protection);
         }
     } else {
@@ -300,7 +302,7 @@ void FramebufferManager::flip(bool hasSecureFrameBuffer) {
         Mutex::Autolock lock(mMutex);
         destroyUnusedLayersLocked();
         if (!hasSecureFrameBuffer) {
-            destroyFramebufferLocked();
+            destroySecureFramebufferLocked();
         }
         needCleanup = mCleanBuffers.size() > 0;
     }
@@ -358,7 +360,7 @@ void FramebufferManager::destroyUnusedLayersLocked() {
     mCachedLayersInuse.clear();
 }
 
-void FramebufferManager::destroyFramebufferLocked() {
+void FramebufferManager::destroySecureFramebufferLocked() {
     if (!mHasSecureFramebuffer) {
         return;
     }
@@ -367,8 +369,16 @@ void FramebufferManager::destroyFramebufferLocked() {
 
     for (auto &layer : mCachedLayerBuffers) {
         if (isFramebuffer(layer.first)) {
-            mCleanBuffers.splice(mCleanBuffers.end(), std::move(layer.second));
-            return;
+            auto &bufferList = layer.second;
+            for (auto it = bufferList.begin(); it != bufferList.end(); ++it) {
+                auto &buffer = *it;
+                if (buffer->bufferDesc.isSecure) {
+                    // Assume the latest non-secure buffer in the front
+                    // TODO: have a better way to keep in-used buffers
+                    mCleanBuffers.splice(mCleanBuffers.end(), bufferList, it, bufferList.end());
+                    return;
+                }
+            }
         }
     }
 }
