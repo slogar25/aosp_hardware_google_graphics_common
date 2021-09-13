@@ -70,6 +70,7 @@ class DrmEventListener : public Worker {
 
  private:
   void UEventHandler();
+  void DRMEventHandler();
   void TUIEventHandler();
 
   UniqueFd epoll_fd_;
