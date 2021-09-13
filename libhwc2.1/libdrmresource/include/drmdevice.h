@@ -81,6 +81,9 @@ class DrmDevice {
   void RegisterHotplugHandler(DrmEventHandler *handler) {
     event_listener_.RegisterHotplugHandler(handler);
   }
+  void RegisterHistogramHandler(DrmHistogramEventHandler *handler) {
+      event_listener_.RegisterHistogramHandler(handler);
+  }
 
  private:
   int UpdateObjectProperty(int id, int type, DrmProperty *property);
