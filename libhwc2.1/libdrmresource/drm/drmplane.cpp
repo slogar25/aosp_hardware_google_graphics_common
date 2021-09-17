@@ -215,6 +215,14 @@ bool DrmPlane::GetCrtcSupported(const DrmCrtc &crtc) const {
   return !!((1 << crtc.pipe()) & possible_crtc_mask_);
 }
 
+bool DrmPlane::isFormatSupported(const uint32_t format) const {
+  return std::find(formats_.begin(), formats_.end(), format) != formats_.end();
+}
+
+uint32_t DrmPlane::getNumFormatSupported() const {
+  return formats_.size();
+}
+
 uint32_t DrmPlane::type() const {
   return type_;
 }

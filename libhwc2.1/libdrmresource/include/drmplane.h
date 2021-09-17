@@ -39,6 +39,8 @@ class DrmPlane {
   uint32_t id() const;
 
   bool GetCrtcSupported(const DrmCrtc &crtc) const;
+  bool isFormatSupported(const uint32_t format) const;
+  uint32_t getNumFormatSupported() const;
 
   uint32_t type() const;
 
