@@ -1172,6 +1172,8 @@ class ExynosDisplay {
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
 
+        bool skipSignalIdleForVideoLayer();
+
         inline uint32_t getDisplayVsyncPeriodFromConfig(hwc2_config_t config) {
             int32_t vsync_period;
             getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &vsync_period);
