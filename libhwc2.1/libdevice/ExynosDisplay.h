@@ -726,7 +726,8 @@ class ExynosDisplay {
             SKIP_ERR_HAS_REQUEST,
             SKIP_ERR_DISP_NOT_CONNECTED,
             SKIP_ERR_DISP_NOT_POWER_ON,
-            SKIP_ERR_FORCE_VALIDATE
+            SKIP_ERR_FORCE_VALIDATE,
+            SKIP_ERR_INVALID_CLIENT_TARGET_BUFFER
         };
         virtual int32_t canSkipValidate();
 
@@ -1140,6 +1141,8 @@ class ExynosDisplay {
             return 1 << type;
         }
         void requestEnhancedHbm(bool on) { mBrightnessState.enhanced_hbm = on; };
+
+        void cleanupAfterClientDeath();
 
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
