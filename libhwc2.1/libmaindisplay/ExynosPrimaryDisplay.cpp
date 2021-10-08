@@ -462,6 +462,7 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
 }
 
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
+    ATRACE_CALL();
     requestLhbm(enabled);
     ALOGI("setLhbmState =%d", enabled);
 
