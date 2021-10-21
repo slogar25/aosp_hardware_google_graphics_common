@@ -20,6 +20,7 @@
 #include "ExynosPrimaryDisplay.h"
 
 #include <fstream>
+#include <poll.h>
 
 #include "ExynosDevice.h"
 #include "ExynosDisplayDrmInterface.h"
@@ -461,6 +462,25 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
     return HWC2_ERROR_NONE;
 }
 
+// Both setDisplayBrightness and setLhbmState will change display brightness and
+// each goes different path (sysfs and drm/kms)
+//
+// case 1: setDisplayBrightness happens before setLhbmState
+//         Don't care. brightness change by setLhbmState will happen after brightness
+//         change by setDisplayBrightness.
+//
+// case 2: setLhbmState happends before setDisplayBrightness
+//         block current call until brightness change by setLhbmState completes.
+int32_t ExynosPrimaryDisplay::setDisplayBrightness(float brightness) {
+    if (mLhbmStatusPending) {
+        // This could be done in setLhbmState and block this call on
+        // mLhbmStatusPending. But it may increase the time for UDFPS path
+        checkLhbmMode(mLastRequestedLhbm, ms2ns(200));
+        mLhbmStatusPending = false;
+    }
+    return ExynosDisplay::setDisplayBrightness(brightness);
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     ATRACE_CALL();
     requestLhbm(enabled);
@@ -468,6 +488,10 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
 
     std::unique_lock<std::mutex> lk(lhbm_mutex_);
     mLhbmChanged = false;
+
+    mLhbmStatusPending = true;
+    mLastRequestedLhbm = enabled;
+
     if (!lhbm_cond_.wait_for(lk, std::chrono::milliseconds(1000),
                              [this] { return mLhbmChanged; })) {
         ALOGI("setLhbmState =%d timeout !", enabled);
@@ -477,6 +501,75 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
             mDisplayInterface->waitVBlank();
         return NO_ERROR;
     }
+}
+
+// return immediately if it's already in the status. Otherwise poll the status
+bool ExynosPrimaryDisplay::checkLhbmMode(bool status, nsecs_t timeoutNs) {
+    ATRACE_CALL();
+    char buf[1];
+    auto startTime = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    UniqueFd fd = open(kLocalHbmModeFileNode, O_RDONLY);
+
+    int size = read(fd.get(), buf, 1);
+    if (size != 1) {
+        ALOGE("%s failed to read from %s", __func__, kLocalHbmModeFileNode);
+        return false;
+    }
+
+    if (buf[0] == (status ? '1' : '0')) {
+        return true;
+    }
+
+    struct pollfd pfds[1];
+    int ret = EINVAL;
+
+    pfds[0].fd = fd.get();
+    pfds[0].events = POLLPRI;
+    while (true) {
+        auto currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
+        // int64_t for nsecs_t
+        auto remainTimeNs = timeoutNs - (currentTime - startTime);
+        if (remainTimeNs <= 0) {
+            remainTimeNs = ms2ns(1);
+        }
+        int pollRet = poll(&pfds[0], 1, ns2ms(remainTimeNs));
+        if (pollRet == 0) {
+            ALOGW("%s poll timeout", __func__);
+            // time out
+            ret = ETIMEDOUT;
+            break;
+        } else if (pollRet > 0) {
+            if (!(pfds[0].revents & POLLPRI)) {
+                continue;
+            }
+
+            lseek(fd.get(), 0, SEEK_SET);
+            size = read(fd.get(), buf, 1);
+            if (size == 1) {
+                if (buf[0] == (status ? '1' : '0')) {
+                    ret = 0;
+                } else {
+                    ALOGE("%s status %d expected %d after notified", __func__, buf[0], status);
+                    ret = EINVAL;
+                }
+            } else {
+                ret = EIO;
+                ALOGE("%s failed to read after notified %d", __func__, errno);
+            }
+            break;
+        } else {
+            if (errno == EAGAIN || errno == EINTR) {
+                continue;
+            }
+
+            ALOGE("%s poll failed %d", __func__, errno);
+            ret = errno;
+            break;
+        }
+    };
+
+    return ret == NO_ERROR;
 }
 
 bool ExynosPrimaryDisplay::getLhbmState() {
