@@ -875,7 +875,7 @@ class ExynosDisplay {
          *   HWC2_ERROR_BAD_PARAMETER when the brightness is invalid, or
          *   HWC2_ERROR_NO_RESOURCES  when the brightness cannot be applied.
          */
-        int32_t setDisplayBrightness(float brightness);
+        virtual int32_t setDisplayBrightness(float brightness);
 
         /* getDisplayConnectionType(..., outType)
          * Descriptor: HWC2_FUNCTION_GET_DISPLAY_CONNECTION_TYPE

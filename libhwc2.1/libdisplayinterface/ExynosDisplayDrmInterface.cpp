@@ -1654,6 +1654,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     if (mBrightnessCtrl.LhbmOn.is_dirty()) {
         auto dbv = mBrightnessLevel.get();
+        auto old_dbv = dbv;
         if (mBrightnessCtrl.LhbmOn.get()) {
             uint32_t dbv_adj = 0;
             if (mExynosDisplay->getColorAdjustedDbv(dbv_adj)) {
@@ -1668,7 +1669,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             }
         }
 
-        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+        if ((dbv != old_dbv) && (ret = drmReq.atomicAddProperty(mDrmConnector->id(),
                                             mDrmConnector->brightness_level(), dbv)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
         }
@@ -1754,6 +1755,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             return ret;
         }
         drmReq.restorePset();
+        if (out_fences[mDrmCrtc->pipe()] >= 0) {
+            fence_close((int)out_fences[mDrmCrtc->pipe()], mExynosDisplay, FENCE_TYPE_RETIRE,
+                        FENCE_IP_DPP);
+        }
         if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
             HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
             return ret;
