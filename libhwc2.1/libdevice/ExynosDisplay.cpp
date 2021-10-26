@@ -3701,9 +3701,23 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     return NO_ERROR;
 }
 
-void ExynosDisplay::updateBtsVsyncPeriod(uint32_t vsync_period, bool forceUpdate) {
-    if (forceUpdate || vsync_period < mBtsVsyncPeriod) {
-        mBtsVsyncPeriod = vsync_period;
+void ExynosDisplay::updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool forceUpdate) {
+    if (vsyncPeriod < mBtsVsyncPeriod) {
+        mBtsVsyncPeriod = vsyncPeriod;
+
+        if (mType == HWC_DISPLAY_PRIMARY) {
+            uint32_t btsRefreshRate = getBtsRefreshRate();
+
+            for (size_t i = 0; i < mLayers.size(); i++) {
+                if (!mLayers[i]->checkDownscaleCap(btsRefreshRate)) {
+                    setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+                    break;
+                }
+            }
+        }
+    } else if (forceUpdate) {
+        /* TODO: add check for resource can re-assign to Device */
+        mBtsVsyncPeriod = vsyncPeriod;
     }
 }
 
