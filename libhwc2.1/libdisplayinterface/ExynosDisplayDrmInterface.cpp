@@ -1094,6 +1094,20 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
 
     DrmModeAtomicReq drmReq(this);
 
+    uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+
+    if ((mode.h_display() != mActiveModeState.mode.h_display()) ||
+        (mode.v_display() != mActiveModeState.mode.v_display())) {
+        ret = clearDisplayPlanes(drmReq);
+        if (ret != HWC2_ERROR_NONE) {
+            HWC_LOGE(mExynosDisplay, "%s: Failed to clear planes due to resolution change",
+                     __func__);
+        } else {
+            ALOGD("%s: switching display resolution, clearing planes", __func__);
+        }
+        flags |= DRM_MODE_ATOMIC_NONBLOCK;
+    }
+
     if ((ret = setDisplayMode(drmReq, modeBlob)) != NO_ERROR) {
         drmReq.addOldBlob(modeBlob);
         HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
@@ -1101,7 +1115,7 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
         return ret;
     }
 
-    if ((ret = drmReq.commit(DRM_MODE_ATOMIC_ALLOW_MODESET, true))) {
+    if ((ret = drmReq.commit(flags, true))) {
         drmReq.addOldBlob(modeBlob);
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
                 __func__, ret);
@@ -1770,14 +1784,12 @@ int32_t ExynosDisplayDrmInterface::clearDisplayMode(DrmModeAtomicReq &drmReq)
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
+int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
 {
     int ret = NO_ERROR;
-    DrmModeAtomicReq drmReq(this);
 
     /* Disable all planes */
     for (auto &plane : mDrmDevice->planes()) {
-
         /* Do not disable planes that are reserved to other dispaly */
         ExynosMPP* exynosMPP = mExynosMPPsForPlane[plane->id()];
         if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
@@ -1786,12 +1798,29 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
             continue;
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
-                plane->crtc_property(), 0)) < 0)
-            return ret;
+                                            plane->crtc_property(), 0)) < 0) {
+            break;
+        }
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
-                plane->fb_property(), 0)) < 0)
-            return ret;
+                                            plane->fb_property(), 0)) < 0) {
+            break;
+        }
+    }
+
+    return ret;
+}
+
+int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
+{
+    int ret = NO_ERROR;
+    DrmModeAtomicReq drmReq(this);
+
+    ret = clearDisplayPlanes(drmReq);
+    if (ret != NO_ERROR) {
+        HWC_LOGE(mExynosDisplay, "%s: Failed to clear planes", __func__);
+
+        return ret;
     }
 
     /* Disable readback connector if required */

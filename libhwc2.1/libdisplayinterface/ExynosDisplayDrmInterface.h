@@ -330,6 +330,7 @@ class ExynosDisplayDrmInterface :
         int32_t createModeBlob(const DrmMode &mode, uint32_t &modeBlob);
         int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
         int32_t clearDisplayMode(DrmModeAtomicReq &drmReq);
+        int32_t clearDisplayPlanes(DrmModeAtomicReq &drmReq);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         /*
