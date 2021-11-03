@@ -1057,7 +1057,7 @@ class ExynosDisplay {
         int32_t getConfigAppliedTime(const uint64_t desiredTime,
                 const uint64_t actualChangeTime,
                 int64_t &appliedTime, int64_t &refreshTime);
-        void updateBtsVsyncPeriod(uint32_t vsync_period, bool forceUpdate = false);
+        void updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool forceUpdate = false);
         uint32_t getBtsRefreshRate() const;
 
         /* TODO : TBD */
