@@ -60,6 +60,9 @@ class DrmConnector {
   const DrmMode &active_mode() const;
   void set_active_mode(const DrmMode &mode);
 
+  int ResetLpMode();
+  const DrmMode &lp_mode() const;
+
   const DrmProperty &dpms_property() const;
   const DrmProperty &crtc_id_property() const;
   const DrmProperty &edid_property() const;
@@ -71,7 +74,6 @@ class DrmConnector {
   const DrmProperty &min_luminance() const;
   const DrmProperty &hdr_formats() const;
   const DrmProperty &orientation() const;
-  const DrmProperty &lp_mode() const;
   const DrmProperty &brightness_cap() const;
   const DrmProperty &brightness_level() const;
   const DrmProperty &hbm_mode() const;
@@ -114,6 +116,7 @@ class DrmConnector {
 
   DrmMode active_mode_;
   std::vector<DrmMode> modes_;
+  DrmMode lp_mode_;
 
   DrmProperty dpms_property_;
   DrmProperty crtc_id_property_;
@@ -126,7 +129,7 @@ class DrmConnector {
   DrmProperty min_luminance_;
   DrmProperty hdr_formats_;
   DrmProperty orientation_;
-  DrmProperty lp_mode_;
+  DrmProperty lp_mode_property_;
   DrmProperty brightness_cap_;
   DrmProperty brightness_level_;
   DrmProperty hbm_mode_;
@@ -138,6 +141,8 @@ class DrmConnector {
   std::vector<DrmEncoder *> possible_encoders_;
 
   uint32_t preferred_mode_id_;
+
+  int UpdateLpMode();
 };
 }  // namespace android
 

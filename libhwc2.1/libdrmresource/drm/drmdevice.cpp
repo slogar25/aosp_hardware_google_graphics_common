@@ -515,9 +515,9 @@ int DrmDevice::GetConnectorProperty(const DrmConnector &connector,
                      property);
 }
 
-int DrmDevice::UpdateCrtcProperty(const DrmCrtc &crtc, DrmProperty *property) {
+int DrmDevice::UpdateObjectProperty(int id, int type, DrmProperty *property) {
     drmModeObjectPropertiesPtr props;
-    props = drmModeObjectGetProperties(fd(), crtc.id(), DRM_MODE_OBJECT_CRTC);
+    props = drmModeObjectGetProperties(fd(), id, type);
     if (!props) {
         ALOGE("Failed to get properties for crtc %s", property->name().c_str());
         return -ENODEV;
@@ -533,5 +533,13 @@ int DrmDevice::UpdateCrtcProperty(const DrmCrtc &crtc, DrmProperty *property) {
     }
     drmModeFreeObjectProperties(props);
     return found ? 0 : -ENOENT;
+}
+
+int DrmDevice::UpdateCrtcProperty(const DrmCrtc &crtc, DrmProperty *property) {
+    return UpdateObjectProperty(crtc.id(), DRM_MODE_OBJECT_CRTC, property);
+}
+
+int DrmDevice::UpdateConnectorProperty(const DrmConnector &conn, DrmProperty *property) {
+    return UpdateObjectProperty(conn.id(), DRM_MODE_OBJECT_CONNECTOR, property);
 }
 }  // namespace android

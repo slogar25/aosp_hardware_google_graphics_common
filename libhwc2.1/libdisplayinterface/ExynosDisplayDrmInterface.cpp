@@ -739,22 +739,13 @@ bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
 }
 
 int32_t ExynosDisplayDrmInterface::getLowPowerDrmModeModeInfo() {
-    int ret;
-    uint64_t blobId;
+    auto mode = mDrmConnector->lp_mode();
 
-    std::tie(ret, blobId) = mDrmConnector->lp_mode().value();
-    if (ret) {
-        ALOGE("Fail to get blob id for lp mode");
+    if (!mode.clock()) {
         return HWC2_ERROR_UNSUPPORTED;
     }
-    drmModePropertyBlobPtr blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
-    if (!blob) {
-        ALOGE("Fail to get blob for lp mode(%" PRId64 ")", blobId);
-        return HWC2_ERROR_UNSUPPORTED;
-    }
-    drmModeModeInfo dozeModeInfo = *static_cast<drmModeModeInfoPtr>(blob->data);
-    mDozeDrmMode = DrmMode(&dozeModeInfo);
-    drmModeFreePropertyBlob(blob);
+
+    mDozeDrmMode = mode;
 
     return NO_ERROR;
 }
@@ -1110,6 +1101,7 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     DrmModeAtomicReq drmReq(this);
 
     uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+    bool reconfig = false;
 
     if ((mode.h_display() != mActiveModeState.mode.h_display()) ||
         (mode.v_display() != mActiveModeState.mode.v_display())) {
@@ -1121,6 +1113,7 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
             ALOGD("%s: switching display resolution, clearing planes", __func__);
         }
         flags |= DRM_MODE_ATOMIC_NONBLOCK;
+        reconfig = true;
     }
 
     if ((ret = setDisplayMode(drmReq, modeBlob)) != NO_ERROR) {
@@ -1140,6 +1133,11 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     mDrmConnector->set_active_mode(mode);
     mActiveModeState.setMode(mode, modeBlob, drmReq);
     mActiveModeState.needs_modeset = false;
+
+    if (reconfig) {
+        mDrmConnector->ResetLpMode();
+        getLowPowerDrmModeModeInfo();
+    }
 
     return HWC2_ERROR_NONE;
 }
