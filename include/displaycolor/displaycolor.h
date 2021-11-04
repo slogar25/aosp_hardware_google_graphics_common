@@ -33,6 +33,7 @@ using android::hardware::graphics::common::V1_2::Dataspace;
 /**
  * hwc/displaycolor interface history
  *
+ * 3.0.0.2021-11-18 calibration info intf
  * 2.0.0.2021-08-27 pass brightness table for hdr10+
  * 1.0.0.2021-08-25 Initial release
  */
@@ -54,7 +55,7 @@ constexpr struct DisplayColorIntfVer {
     }
 
 } kInterfaceVersion {
-    2,
+    3,
     0,
     0,
 };
@@ -267,6 +268,13 @@ struct DisplayScene {
     bool hdr_full_screen;
 };
 
+struct CalibrationInfo {
+    bool factory_cal_loaded;
+    bool golden_cal_loaded;
+    bool common_cal_loaded;
+    bool dev_cal_loaded;
+};
+
 /// An interface specifying functions that are HW-agnostic.
 class IDisplayColorGeneric {
    public:
@@ -328,6 +336,13 @@ class IDisplayColorGeneric {
      * @return true for yes.
      */
     virtual bool IsRrCompensationEnabled(DisplayType display) = 0;
+
+    /**
+     * @brief Get calibration information for each profiles.
+     * @param display The display to get the calibration information.
+     */
+    virtual const CalibrationInfo &GetCalibrationInfo(
+        DisplayType display) const = 0;
 
     /**
      * @brief Get a map of supported ColorModes, and supported RenderIntents for
