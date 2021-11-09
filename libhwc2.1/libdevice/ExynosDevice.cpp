@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "BrightnessController.h"
 #include "ExynosDevice.h"
 #include "ExynosDisplay.h"
 #include "ExynosLayer.h"
@@ -1062,7 +1063,7 @@ LbeState ExynosDevice::getLbeState() {
 
 bool ExynosDevice::isLhbmSupported() {
     ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
-    return display->isLhbmSupported();
+    return display->mBrightnessController->isLhbmSupported();
 }
 
 int32_t ExynosDevice::setLhbmState(bool enabled) {

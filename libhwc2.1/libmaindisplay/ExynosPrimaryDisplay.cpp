@@ -22,6 +22,7 @@
 #include <fstream>
 #include <poll.h>
 
+#include "BrightnessController.h"
 #include "ExynosDevice.h"
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosDisplayDrmInterfaceModule.h"
@@ -97,65 +98,15 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mResolutionInfo.nDSCXSliceSize[2] = 720;
     mResolutionInfo.nPanelType[2] = PANEL_LEGACY;
 
-    static_assert(sizeof(BRIGHTNESS_NODE_0_BASE) != 0 && sizeof(MAX_BRIGHTNESS_NODE_0_BASE) != 0,
-                  "Invalid brightness 0 node");
-    static_assert(sizeof(BRIGHTNESS_NODE_1_BASE) != 0 && sizeof(MAX_BRIGHTNESS_NODE_1_BASE) != 0,
-                  "Invalid brightness 1 node");
-    std::string brightness_node;
-    std::string max_brightness_node;
-    switch (mIndex) {
-        case 0:
-            max_brightness_node = MAX_BRIGHTNESS_NODE_0_BASE;
-            brightness_node = BRIGHTNESS_NODE_0_BASE;
-            break;
-        case 1:
-            max_brightness_node = MAX_BRIGHTNESS_NODE_1_BASE;
-            brightness_node = BRIGHTNESS_NODE_1_BASE;
-            break;
-        default:
-            ALOGE("assgin brightness node failed (mIndex: %d)", mIndex);
-            break;
-    }
-
-    FILE *maxBrightnessFd = fopen(max_brightness_node.c_str(), "r");
-    ALOGI("Trying %s open for get max brightness", max_brightness_node.c_str());
-
-    if (maxBrightnessFd != NULL) {
-        char val[MAX_BRIGHTNESS_LEN] = {0};
-        size_t size = fread(val, 1, MAX_BRIGHTNESS_LEN, maxBrightnessFd);
-        if (size) {
-            mMaxBrightness = atoi(val);
-            ALOGI("Max brightness : %d", mMaxBrightness);
-
-            mBrightnessFd = fopen(brightness_node.c_str(), "w+");
-            ALOGI("Trying %s open for brightness control", brightness_node.c_str());
-
-            if (mBrightnessFd == NULL)
-                ALOGE("%s open failed! %s", brightness_node.c_str(), strerror(errno));
-
-        } else {
-            ALOGE("Max brightness read failed (size: %zu)", size);
-            if (ferror(maxBrightnessFd)) {
-                ALOGE("An error occurred");
-                clearerr(maxBrightnessFd);
-            }
-        }
-        fclose(maxBrightnessFd);
-    } else {
-        ALOGE("Brightness node is not opened");
-    }
-
 #if defined EARLY_WAKUP_NODE_BASE
     mEarlyWakeupFd = fopen(EARLY_WAKUP_NODE_BASE, "w");
     if (mEarlyWakeupFd == NULL)
         ALOGE("%s open failed! %s", EARLY_WAKUP_NODE_BASE, strerror(errno));
 #endif
 
-    mLhbmFd = fopen(kLocalHbmModeFileNode, "w+");
-    if (mLhbmFd == nullptr) ALOGE("local hbm mode node open failed! %s", strerror(errno));
-
     mWakeupDispFd = fopen(kWakeupDispFilePath, "w");
     if (mWakeupDispFd == nullptr) ALOGE("wake up display node open failed! %s", strerror(errno));
+    mBrightnessController = std::make_unique<BrightnessController>(mIndex);
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
@@ -163,16 +114,6 @@ ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
     if (mWakeupDispFd) {
         fclose(mWakeupDispFd);
         mWakeupDispFd = nullptr;
-    }
-
-    if (mLhbmFd) {
-        fclose(mLhbmFd);
-        mLhbmFd = nullptr;
-    }
-
-    if (mBrightnessFd) {
-        fclose(mBrightnessFd);
-        mBrightnessFd = nullptr;
     }
 }
 
@@ -462,25 +403,6 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
     return HWC2_ERROR_NONE;
 }
 
-// Both setDisplayBrightness and setLhbmState will change display brightness and
-// each goes different path (sysfs and drm/kms)
-//
-// case 1: setDisplayBrightness happens before setLhbmState
-//         Don't care. brightness change by setLhbmState will happen after brightness
-//         change by setDisplayBrightness.
-//
-// case 2: setLhbmState happends before setDisplayBrightness
-//         block current call until brightness change by setLhbmState completes.
-int32_t ExynosPrimaryDisplay::setDisplayBrightness(float brightness) {
-    if (mLhbmStatusPending) {
-        // This could be done in setLhbmState and block this call on
-        // mLhbmStatusPending. But it may increase the time for UDFPS path
-        checkLhbmMode(mLastRequestedLhbm, ms2ns(200));
-        mLhbmStatusPending = false;
-    }
-    return ExynosDisplay::setDisplayBrightness(brightness);
-}
-
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     ATRACE_CALL();
     requestLhbm(enabled);
@@ -488,9 +410,6 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
 
     std::unique_lock<std::mutex> lk(lhbm_mutex_);
     mLhbmChanged = false;
-
-    mLhbmStatusPending = true;
-    mLastRequestedLhbm = enabled;
 
     if (!lhbm_cond_.wait_for(lk, std::chrono::milliseconds(1000),
                              [this] { return mLhbmChanged; })) {
@@ -501,75 +420,6 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
             mDisplayInterface->waitVBlank();
         return NO_ERROR;
     }
-}
-
-// return immediately if it's already in the status. Otherwise poll the status
-bool ExynosPrimaryDisplay::checkLhbmMode(bool status, nsecs_t timeoutNs) {
-    ATRACE_CALL();
-    char buf[1];
-    auto startTime = systemTime(SYSTEM_TIME_MONOTONIC);
-
-    UniqueFd fd = open(kLocalHbmModeFileNode, O_RDONLY);
-
-    int size = read(fd.get(), buf, 1);
-    if (size != 1) {
-        ALOGE("%s failed to read from %s", __func__, kLocalHbmModeFileNode);
-        return false;
-    }
-
-    if (buf[0] == (status ? '1' : '0')) {
-        return true;
-    }
-
-    struct pollfd pfds[1];
-    int ret = EINVAL;
-
-    pfds[0].fd = fd.get();
-    pfds[0].events = POLLPRI;
-    while (true) {
-        auto currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
-        // int64_t for nsecs_t
-        auto remainTimeNs = timeoutNs - (currentTime - startTime);
-        if (remainTimeNs <= 0) {
-            remainTimeNs = ms2ns(1);
-        }
-        int pollRet = poll(&pfds[0], 1, ns2ms(remainTimeNs));
-        if (pollRet == 0) {
-            ALOGW("%s poll timeout", __func__);
-            // time out
-            ret = ETIMEDOUT;
-            break;
-        } else if (pollRet > 0) {
-            if (!(pfds[0].revents & POLLPRI)) {
-                continue;
-            }
-
-            lseek(fd.get(), 0, SEEK_SET);
-            size = read(fd.get(), buf, 1);
-            if (size == 1) {
-                if (buf[0] == (status ? '1' : '0')) {
-                    ret = 0;
-                } else {
-                    ALOGE("%s status %d expected %d after notified", __func__, buf[0], status);
-                    ret = EINVAL;
-                }
-            } else {
-                ret = EIO;
-                ALOGE("%s failed to read after notified %d", __func__, errno);
-            }
-            break;
-        } else {
-            if (errno == EAGAIN || errno == EINTR) {
-                continue;
-            }
-
-            ALOGE("%s poll failed %d", __func__, errno);
-            ret = errno;
-            break;
-        }
-    };
-
-    return ret == NO_ERROR;
 }
 
 bool ExynosPrimaryDisplay::getLhbmState() {

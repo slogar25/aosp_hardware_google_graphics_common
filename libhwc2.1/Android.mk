@@ -104,6 +104,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
 	ExynosHWCDebug.cpp \
+	libdevice/BrightnessController.cpp \
 	libdevice/ExynosDisplay.cpp \
 	libdevice/ExynosDevice.cpp \
 	libdevice/ExynosLayer.cpp \

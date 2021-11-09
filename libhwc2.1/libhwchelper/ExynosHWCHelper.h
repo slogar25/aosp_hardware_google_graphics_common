@@ -577,6 +577,9 @@ int32_t load_png_image(const char *filepath, buffer_handle_t buffer);
 template <typename T>
 struct CtrlValue {
 public:
+    CtrlValue() : value_(), dirty_(false) {}
+    CtrlValue(const T& value) : value_(value), dirty_(false) {}
+
     void store(T value) {
         if (value == value_) return;
         dirty_ = true;
@@ -586,10 +589,15 @@ public:
     bool is_dirty() { return dirty_; };
     void clear_dirty() { dirty_ = false; };
     void set_dirty() { dirty_ = true; };
-
+    void reset(T value) { value_ = value; dirty_ = false; }
 private:
     T value_;
     bool dirty_;
 };
+
+template <typename T>
+constexpr typename std::underlying_type<T>::type toUnderlying(T v) {
+    return static_cast<typename std::underlying_type<T>::type>(v);
+}
 
 #endif

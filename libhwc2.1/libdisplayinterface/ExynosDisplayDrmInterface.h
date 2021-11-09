@@ -41,7 +41,6 @@
 #endif
 
 using namespace android;
-using DrmPropertyMap = std::unordered_map<uint32_t, uint64_t>;
 
 class ExynosDevice;
 
@@ -294,18 +293,19 @@ class ExynosDisplayDrmInterface :
                 const std::unique_ptr<DrmPlane> &plane,
                 const exynos_win_config_data& config)
         { return NO_ERROR;};
-        virtual int32_t updateBrightness(bool syncFrame);
-        virtual float getSdrDimRatio();
         virtual void destroyLayer(ExynosLayer *layer) override;
 
         virtual int32_t waitVBlank();
-        bool isHbmOn() {
-            return mBrightnessCtrl.HbmMode.get() != static_cast<uint32_t>(HbmMode::OFF);
-        }
-        uint32_t getDbv() { return mBrightnessLevel.get(); }
         float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
 
     protected:
+        enum class HalMipiSyncType : uint32_t {
+            HAL_MIPI_CMD_SYNC_REFRESH_RATE = 0,
+            HAL_MIPI_CMD_SYNC_LHBM,
+            HAL_MIPI_CMD_SYNC_GHBM,
+            HAL_MIPI_CMD_SYNC_BL,
+        };
+
         struct ModeState {
             bool needs_modeset = false;
             DrmMode mode;
@@ -332,8 +332,6 @@ class ExynosDisplayDrmInterface :
         int32_t clearDisplayMode(DrmModeAtomicReq &drmReq);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
-        static std::tuple<uint64_t, int> halToDrmEnum(
-                const int32_t halData, const DrmPropertyMap &drmEnums);
         /*
          * This function adds FB and gets new fb id if fbId is 0,
          * if fbId is not 0, this reuses fbId.
@@ -345,14 +343,12 @@ class ExynosDisplayDrmInterface :
                 uint32_t &fbId);
 
         int32_t setupPartialRegion(DrmModeAtomicReq &drmReq);
-        static void parseEnums(const DrmProperty &property,
-                const std::vector<std::pair<uint32_t, const char *>> &enums,
-                DrmPropertyMap &out_enums);
         void parseBlendEnums(const DrmProperty &property);
         void parseStandardEnums(const DrmProperty &property);
         void parseTransferEnums(const DrmProperty &property);
         void parseRangeEnums(const DrmProperty &property);
         void parseColorModeEnums(const DrmProperty &property);
+        void parseMipiSyncEnums(const DrmProperty &property);
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
         int32_t clearWritebackCommit(DrmModeAtomicReq &drmReq);
@@ -416,111 +412,21 @@ class ExynosDisplayDrmInterface :
         /* Mapping plane id to ExynosMPP, key is plane id */
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;
 
-        DrmPropertyMap mBlendEnums;
-        DrmPropertyMap mStandardEnums;
-        DrmPropertyMap mTransferEnums;
-        DrmPropertyMap mRangeEnums;
-        DrmPropertyMap mColorModeEnums;
+        DrmEnumParser::MapHal2DrmEnum mBlendEnums;
+        DrmEnumParser::MapHal2DrmEnum mStandardEnums;
+        DrmEnumParser::MapHal2DrmEnum mTransferEnums;
+        DrmEnumParser::MapHal2DrmEnum mRangeEnums;
+        DrmEnumParser::MapHal2DrmEnum mColorModeEnums;
+        DrmEnumParser::MapHal2DrmEnum mMipiSyncEnums;
 
         DrmReadbackInfo mReadbackInfo;
-
-    private:
-        DrmMode mDozeDrmMode;
-        uint32_t mMaxWindowNum = 0;
-
-    protected:
-        void getBrightnessInterfaceSupport();
-        void setupBrightnessConfig();
-        void parseHbmModeEnums(const DrmProperty &property);
-        FILE *mHbmModeFd;
-        FILE *mDimmingOnFd;
-        bool mBrightntessIntfSupported = false;
-        float mBrightnessHbmMax = 1.0f;
-        enum class PanelHbmType {
-            ONE_STEP,
-            CONTINUOUS,
-        };
-        enum BrightnessRange {
-            NORMAL = 0,
-            HBM,
-            MAX,
-        };
-        enum class HbmMode {
-            OFF = 0,
-            ON_IRC_ON,
-            ON_IRC_OFF,
-        };
-
-        DrmPropertyMap mHbmModeEnums;
-        PanelHbmType mPanelHbmType;
-
-        Mutex mBrightnessUpdateMutex;
-        brightnessState_t mBrightnessState;
-        CtrlValue<uint32_t> mBrightnessLevel;
-        float mScaledBrightness;
-        typedef struct brightnessCtrl {
-            CtrlValue<bool> DimmingOn;
-            CtrlValue<uint32_t> HbmMode;
-            CtrlValue<bool> LhbmOn;
-            void reset() {
-                DimmingOn.store(false);
-                DimmingOn.clear_dirty();
-                HbmMode.store(0);
-                HbmMode.clear_dirty();
-                LhbmOn.store(false);
-                LhbmOn.clear_dirty();
-            }
-        } brightnessCtrl_t;
-        brightnessCtrl_t mBrightnessCtrl;
-
-        struct BrightnessTable {
-            float mBriStart;
-            float mBriEnd;
-            uint32_t mBklStart;
-            uint32_t mBklEnd;
-            uint32_t mNitsStart;
-            uint32_t mNitsEnd;
-            BrightnessTable() {}
-            BrightnessTable(const brightness_attribute &attr)
-                  : mBriStart(static_cast<float>(attr.percentage.min) / 100.0f),
-                    mBriEnd(static_cast<float>(attr.percentage.max) / 100.0f),
-                    mBklStart(attr.level.min),
-                    mBklEnd(attr.level.max),
-                    mNitsStart(attr.nits.min),
-                    mNitsEnd(attr.nits.max) {}
-        };
-        struct BrightnessTable mBrightnessTable[BrightnessRange::MAX];
-
-        // TODO: hbm in dual display is not supported. It should support it in
-        //      the furture.
-        static constexpr const char *kHbmModeFileNode =
-                "/sys/class/backlight/panel%d-backlight/hbm_mode";
-        static constexpr const char *kDimmingOnFileNode =
-                "/sys/class/backlight/panel%d-backlight/dimming_on";
-
-        static constexpr int32_t kHbmDimmingTimeUs = 5000000;
-
         FramebufferManager mFBManager;
-
-        /*
-         * BrightnessDimmingUsage:
-         * NORMAL- enable dimming
-         * HBM-    enable dimming only for hbm transition
-         * NONE-   disable dimming
-         */
-        enum class BrightnessDimmingUsage {
-            NORMAL = 0,
-            HBM,
-            NONE,
-        };
-
-        BrightnessDimmingUsage mBrightnessDimmingUsage;
-        bool mHbmSvDimming;
-        int32_t mHbmDimmingTimeUs;
-        struct timeval mHbmDimmingStart;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
+
+        DrmMode mDozeDrmMode;
+        uint32_t mMaxWindowNum = 0;
 };
 
 #endif

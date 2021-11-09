@@ -33,9 +33,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
             return currentPanelGammaSource;
         }
 
-        virtual bool isLhbmSupported() { return mLhbmFd ? true : false; }
         virtual int32_t setLhbmState(bool enabled);
-        virtual int32_t setDisplayBrightness(float brightness) override;
 
         virtual bool getLhbmState();
         virtual void notifyLhbmState(bool enabled);
@@ -84,11 +82,6 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         bool mLhbmOn;
         bool mLhbmChanged;
 
-        std::atomic<bool> mLastRequestedLhbm;
-        std::atomic<bool> mLhbmStatusPending;
-
-        static constexpr const char *kLocalHbmModeFileNode =
-                "/sys/class/backlight/panel0-backlight/local_hbm_mode";
         std::mutex lhbm_mutex_;
         std::condition_variable lhbm_cond_;
 

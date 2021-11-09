@@ -76,7 +76,7 @@ class DrmConnector {
   const DrmProperty &hbm_mode() const;
   const DrmProperty &dimming_on() const;
   const DrmProperty &lhbm_on() const;
-  const DrmProperty &sync_rr_switch() const;
+  const DrmProperty &mipi_sync() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -130,7 +130,7 @@ class DrmConnector {
   DrmProperty hbm_mode_;
   DrmProperty dimming_on_;
   DrmProperty lhbm_on_;
-  DrmProperty sync_rr_switch_;
+  DrmProperty mipi_sync_;
   std::vector<DrmProperty *> properties_;
 
   std::vector<DrmEncoder *> possible_encoders_;

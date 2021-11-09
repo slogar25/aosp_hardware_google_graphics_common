@@ -35,7 +35,6 @@
 #define HWC_PRINT_FRAME_NUM     10
 
 #define LOW_FPS_THRESHOLD     5
-#define MAX_BRIGHTNESS_LEN 5
 
 using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
 
@@ -45,6 +44,7 @@ using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
 
 typedef hwc2_composition_t exynos_composition;
 
+class BrightnessController;
 class ExynosLayer;
 class ExynosDevice;
 class ExynosMPP;
@@ -330,63 +330,6 @@ struct DisplayControl {
     bool skipM2mProcessing = true;
 };
 
-typedef struct brightnessState {
-    enum MipiSyncType {
-        MIPI_SYNC_NONE,
-        MIPI_SYNC_GHBM_ON,
-        MIPI_SYNC_GHBM_OFF,
-        MIPI_SYNC_LHBM_ON,
-        MIPI_SYNC_LHBM_OFF,
-    };
-    static constexpr size_t kNumofBrightnessState = 3;
-    static constexpr float kSdrDimRatioNone = 1.0;
-    union {
-        std::array<bool, kNumofBrightnessState> mData;
-        struct {
-            bool instant_hbm;
-            bool peak_hbm;
-            bool local_hbm;
-        };
-    };
-    /** dim ratio calculated from current layer stack but will be delayed to apply **/
-    float dim_sdr_target_ratio = kSdrDimRatioNone;
-    /** dim ratio to apply to current frame and is 'dim_delay' frames behind
-     * dim_sdr_target_ratio **/
-    float dim_sdr_ratio = kSdrDimRatioNone;
-
-    // current Brightness value
-    float brightness_value;
-
-    // HDR layer is covering most of the screen
-    bool hdr_full_screen;
-
-    bool enhanced_hbm;
-
-    void reset() {
-        mData = {false, false, false};
-        dim_sdr_target_ratio = kSdrDimRatioNone;
-        hdr_full_screen = false;
-    }
-    bool dimSdrTransition() {
-        return dim_sdr_target_ratio != dim_sdr_ratio &&
-            (dim_sdr_target_ratio == kSdrDimRatioNone || dim_sdr_ratio == kSdrDimRatioNone);
-    }
-    brightnessState& operator=(const brightnessState& a) {
-        mData = a.mData;
-        dim_sdr_target_ratio = a.dim_sdr_target_ratio;
-        dim_sdr_ratio = a.dim_sdr_ratio;
-        brightness_value = a.brightness_value;
-        enhanced_hbm = a.enhanced_hbm;
-        return *this;
-    }
-    // TODO: add hdr_full_screen comparison
-    bool operator==(const brightnessState& a) const {
-        return a.mData == mData && a.dim_sdr_ratio == dim_sdr_ratio &&
-                a.dim_sdr_target_ratio == dim_sdr_target_ratio &&
-                a.brightness_value == brightness_value && a.enhanced_hbm == enhanced_hbm;
-    }
-} brightnessState_t;
-
 class ExynosDisplay {
     public:
         uint32_t mDisplayId;
@@ -525,6 +468,8 @@ class ExynosDisplay {
         float mMaxAverageLuminance;
         float mMinLuminance;
 
+        std::unique_ptr<BrightnessController> mBrightnessController;
+
         /* For debugging */
         hwc_display_contents_1_t *mHWC1LayerList;
 
@@ -543,9 +488,7 @@ class ExynosDisplay {
         // Skip present frame if there was no validate after power on
         bool mSkipFrame;
 
-        FILE *mBrightnessFd;
         FILE *mEarlyWakeupFd;
-        uint32_t mMaxBrightness;
 
         hwc_vsync_period_change_constraints_t mVsyncPeriodChangeConstraints;
         hwc_vsync_period_change_timeline_t mVsyncAppliedTimeLine;
@@ -1114,6 +1057,7 @@ class ExynosDisplay {
         virtual int32_t updatePresentColorConversionInfo() { return NO_ERROR; };
         virtual bool checkRrCompensationEnabled() { return false; };
         virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
+
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
             return HWC2_ERROR_UNSUPPORTED;
@@ -1128,7 +1072,6 @@ class ExynosDisplay {
 
         int32_t checkPowerHalExtHintSupport(const std::string& mode);
 
-        virtual bool isLhbmSupported() { return false; }
         virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; }
         virtual bool getLhbmState() { return false; };
         virtual void notifyLhbmState(bool __unused enabled) {}
@@ -1140,7 +1083,6 @@ class ExynosDisplay {
             uint32_t type = SECOND_DISPLAY_START_BIT * mIndex + mType;
             return 1 << type;
         }
-        void requestEnhancedHbm(bool on) { mBrightnessState.enhanced_hbm = on; };
 
         void cleanupAfterClientDeath();
 
@@ -1158,19 +1100,7 @@ class ExynosDisplay {
          * interface type.
          */
         std::unique_ptr<ExynosDisplayInterface> mDisplayInterface;
-
-        const brightnessState_t& getBrightnessState() const { return mBrightnessState; }
-        void updateForMipiSync(brightnessState_t::MipiSyncType type) {
-            if (type == brightnessState_t::MIPI_SYNC_GHBM_ON ||
-                type == brightnessState_t::MIPI_SYNC_GHBM_OFF) {
-                mBrightnessState.dim_sdr_ratio = mBrightnessState.dim_sdr_target_ratio;
-            }
-        }
-        float getBrightnessValue() const { return mBrightnessState.brightness_value; }
-        void requestLhbm(bool on) {
-            mReqLhbm = on;
-            mDevice->invalidate();
-        }
+        void requestLhbm(bool on);
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
@@ -1192,12 +1122,6 @@ class ExynosDisplay {
         //exceeds this threshold.
         static constexpr float kHdrFullScreen = 0.5;
         uint32_t mHdrFullScrenAreaThreshold;
-
-       // Brightness state
-        brightnessState_t mBrightnessState;
-
-        // request lhbm state
-        bool mReqLhbm = false;
 
         /* Display hint to notify power hal */
         class PowerHalHintWorker : public Worker {
