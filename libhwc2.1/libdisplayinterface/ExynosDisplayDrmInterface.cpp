@@ -180,7 +180,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         }
 
         fbId = findCachedFbId(config.layer,
-                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat}](
+                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat,
+                                                                    config.protection}](
                                       auto &buffer) { return buffer->bufferDesc == bufferDesc; });
         if (fbId != 0) {
             return NO_ERROR;
@@ -284,7 +285,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         } else {
             cachedBuffers.emplace_front(
                     new Framebuffer(mDrmFd, fbId,
-                                    Framebuffer::BufferDesc{config.buffer_id, drmFormat}));
+                                    Framebuffer::BufferDesc{config.buffer_id, drmFormat,
+                                                            config.protection}));
             mHasSecureFramebuffer |= (isFramebuffer(config.layer) && config.protection);
         }
     } else {
@@ -300,7 +302,7 @@ void FramebufferManager::flip(bool hasSecureFrameBuffer) {
         Mutex::Autolock lock(mMutex);
         destroyUnusedLayersLocked();
         if (!hasSecureFrameBuffer) {
-            destroyFramebufferLocked();
+            destroySecureFramebufferLocked();
         }
         needCleanup = mCleanBuffers.size() > 0;
     }
@@ -358,7 +360,7 @@ void FramebufferManager::destroyUnusedLayersLocked() {
     mCachedLayersInuse.clear();
 }
 
-void FramebufferManager::destroyFramebufferLocked() {
+void FramebufferManager::destroySecureFramebufferLocked() {
     if (!mHasSecureFramebuffer) {
         return;
     }
@@ -367,8 +369,16 @@ void FramebufferManager::destroyFramebufferLocked() {
 
     for (auto &layer : mCachedLayerBuffers) {
         if (isFramebuffer(layer.first)) {
-            mCleanBuffers.splice(mCleanBuffers.end(), std::move(layer.second));
-            return;
+            auto &bufferList = layer.second;
+            for (auto it = bufferList.begin(); it != bufferList.end(); ++it) {
+                auto &buffer = *it;
+                if (buffer->bufferDesc.isSecure) {
+                    // Assume the latest non-secure buffer in the front
+                    // TODO: have a better way to keep in-used buffers
+                    mCleanBuffers.splice(mCleanBuffers.end(), bufferList, it, bufferList.end());
+                    return;
+                }
+            }
         }
     }
 }
@@ -738,6 +748,8 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
     if (mode == HWC_POWER_MODE_OFF) {
         mBrightnessState.reset();
         mBrightnessCtrl.reset();
+        mBrightnessLevel.store(0);
+        mBrightnessLevel.clear_dirty();
         mExynosDisplay->requestEnhancedHbm(false);
         mExynosDisplay->requestLhbm(false);
         mExynosDisplay->notifyLhbmState(mBrightnessCtrl.LhbmOn.get());
@@ -1640,7 +1652,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                             : brightnessState_t::MIPI_SYNC_LHBM_OFF;
     }
 
-    if (mBrightnessCtrl.LhbmOn.is_dirty() || mBrightnessLevel.is_dirty()) {
+    if (mBrightnessCtrl.LhbmOn.is_dirty()) {
         auto dbv = mBrightnessLevel.get();
         if (mBrightnessCtrl.LhbmOn.get()) {
             uint32_t dbv_adj = 0;
@@ -1660,12 +1672,17 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                                             mDrmConnector->brightness_level(), dbv)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
         }
-        mBrightnessLevel.clear_dirty();
         mBrightnessCtrl.LhbmOn.clear_dirty();
     }
 
-    // only allow to set hbm on for mipi sync when dim SDR transition
-    if (mBrightnessCtrl.HbmMode.is_dirty() && mBrightnessState.dimSdrTransition()) {
+    /**
+     * TODO(b/200332096):
+     *
+     * Need to consider hbm sync between sysfs and drm commit later.
+     *
+     */
+    if (mBrightnessCtrl.HbmMode.is_dirty() && mBrightnessState.dimSdrTransition() &&
+        mBrightnessState.instant_hbm) {
         uint64_t hbmEnum = 0;
         std::tie(hbmEnum, ret) = halToDrmEnum(mBrightnessCtrl.HbmMode.get(), mHbmModeEnums);
         if (ret < 0) {
@@ -1678,6 +1695,15 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             HWC_LOGE(mExynosDisplay, "%s: Fail to set hbm_mode property", __func__);
         }
         mBrightnessCtrl.HbmMode.clear_dirty();
+
+        if (mBrightnessLevel.is_dirty()) {
+            if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+                                                mDrmConnector->brightness_level(),
+                                                mBrightnessLevel.get())) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
+            }
+            mBrightnessLevel.clear_dirty();
+        }
 
         // sync mipi command and frame when sdr dimming on/off
         if (!mipi_sync) {
@@ -2409,8 +2435,10 @@ int32_t ExynosDisplayDrmInterface::updateBrightness(bool syncFrame) {
         }
     }
 
-    if (mExynosDisplay->mBrightnessFd)
+    if (mExynosDisplay->mBrightnessFd && mBrightnessLevel.is_dirty()) {
         writeFileNode(mExynosDisplay->mBrightnessFd, mBrightnessLevel.get());
+        mBrightnessLevel.clear_dirty();
+    }
 
     return HWC2_ERROR_NONE;
 }

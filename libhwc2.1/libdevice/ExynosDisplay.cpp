@@ -1291,6 +1291,17 @@ int ExynosDisplay::skipStaticLayers(ExynosCompositionInfo& compositionInfo)
     return NO_ERROR;
 }
 
+bool ExynosDisplay::skipSignalIdleForVideoLayer(void) {
+    /* ignore the frame update in case we have video layer but ui layer is not updated */
+    for (size_t i = 0; i < mLayers.size(); i++) {
+        if (!mLayers[i]->isLayerFormatYuv() &&
+            mLayers[i]->mLastLayerBuffer != mLayers[i]->mLayerBuffer) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /**
  * @return int
  */
@@ -3123,7 +3134,9 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         goto err;
     }
 
-    mPowerHalHint.signalIdle();
+    if (mGeometryChanged != 0 || !skipSignalIdleForVideoLayer()) {
+        mPowerHalHint.signalIdle();
+    }
 
     handleWindowUpdate();
 
