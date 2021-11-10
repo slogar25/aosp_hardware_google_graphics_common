@@ -338,6 +338,9 @@ class ExynosDevice {
         int32_t setLhbmState(bool enabled);
         bool getLhbmState();
 
+        template <class Operator>
+        void findActiveDisplay(Operator optor);
+
     public:
         void enterToTUI() { mIsInTUI = true; };
         void exitFromTUI() { mIsInTUI = false; };
