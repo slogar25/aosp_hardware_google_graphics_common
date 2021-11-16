@@ -314,14 +314,19 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
     Lock();
     int ret = 0;
     if (!mNeedUpdateRefreshRateHint) {
-        if (!mIdleHintIsSupported || mIdleHintIsEnabled) {
-            ret = WaitForSignalOrExitLocked();
-        } else {
+        if (mIdleHintIsSupported) {
             uint64_t currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
-            if (mIdleHintDeadlineTime > currentTime) {
-                uint64_t timeout = mIdleHintDeadlineTime - currentTime;
-                ret = WaitForSignalOrExitLocked(timeout);
+            bool shouldEnableIdleHint = (mIdleHintDeadlineTime < currentTime);
+            if (mIdleHintIsEnabled == shouldEnableIdleHint) {
+                if (mIdleHintIsEnabled) {
+                    ret = WaitForSignalOrExitLocked();
+                } else {
+                    uint64_t timeout = mIdleHintDeadlineTime - currentTime;
+                    ret = WaitForSignalOrExitLocked(timeout);
+                }
             }
+        } else if (mIdleHintSupportIsChecked) {
+            ret = WaitForSignalOrExitLocked();
         }
     }
 
