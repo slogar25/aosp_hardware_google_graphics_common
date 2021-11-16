@@ -1114,3 +1114,27 @@ uint64_t ExynosDevice::getSpecialPlaneAttr(uint32_t index)
 {
     return mDeviceInterface->getSPPChAttr(index);
 }
+
+int ExynosDevice::setMinIdleRefreshRate(const int fps) {
+    ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    if (display) {
+        return display->setMinIdleRefreshRate(fps);
+    }
+    return BAD_VALUE;
+}
+
+int ExynosDevice::setRefreshRateThrottle(const int delayMs) {
+    if (delayMs < 0) {
+        ALOGE("%s fail: delayMs(%d) is less than 0", __func__, delayMs);
+        return BAD_VALUE;
+    }
+
+    ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    if (display) {
+        return display->setRefreshRateThrottleNanos(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::milliseconds(delayMs))
+                        .count());
+    }
+    return BAD_VALUE;
+}

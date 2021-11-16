@@ -19,8 +19,11 @@
 
 #include "ExynosPrimaryDisplay.h"
 
-#include <fstream>
+#include <linux/fb.h>
 #include <poll.h>
+
+#include <chrono>
+#include <fstream>
 
 #include "BrightnessController.h"
 #include "ExynosDevice.h"
@@ -29,8 +32,6 @@
 #include "ExynosExternalDisplay.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
-
-#include <linux/fb.h>
 
 extern struct exynos_hwc_control exynosHWCControl;
 
@@ -69,8 +70,7 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
 }
 
 ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
-    :   ExynosDisplay(index, device)
-{
+      : ExynosDisplay(index, device), mMinIdleRefreshRate(0), mRefreshRateDelayNanos(0) {
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
 
@@ -437,4 +437,48 @@ void ExynosPrimaryDisplay::setWakeupDisplay() {
     if (mWakeupDispFd) {
         writeFileNode(mWakeupDispFd, 1);
     }
+}
+
+int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int fps) {
+    mMinIdleRefreshRate = fps;
+
+    const std::string path = getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "min_vrefresh";
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        ALOGW("Unable to open node '%s', error = %s", path.c_str(), strerror(errno));
+        return errno;
+    } else {
+        ofs << mMinIdleRefreshRate;
+        ofs.close();
+        ALOGI("ExynosPrimaryDisplay::%s() writes min_vrefresh(%d) to the sysfs node", __func__,
+              fps);
+    }
+    return NO_ERROR;
+}
+
+int ExynosPrimaryDisplay::setRefreshRateThrottleNanos(const int64_t delayNanos) {
+    mRefreshRateDelayNanos = delayNanos;
+
+    const int32_t refreshRateDelayMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                               std::chrono::nanoseconds(mRefreshRateDelayNanos))
+                                               .count();
+    const std::string path = getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "idle_delay_ms";
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        ALOGW("Unable to open node '%s', error = %s", path.c_str(), strerror(errno));
+        return errno;
+    } else {
+        ofs << refreshRateDelayMs;
+        ofs.close();
+        ALOGI("ExynosPrimaryDisplay::%s() writes idle_delay_ms(%d) to the sysfs node", __func__,
+              refreshRateDelayMs);
+    }
+
+    return NO_ERROR;
+}
+
+void ExynosPrimaryDisplay::dump(String8 &result) {
+    ExynosDisplay::dump(result);
+    result.appendFormat("Min idle refresh rate: %d\n", mMinIdleRefreshRate);
+    result.appendFormat("Refresh rate delay: %" PRId64 "ns\n\n", mRefreshRateDelayNanos);
 }

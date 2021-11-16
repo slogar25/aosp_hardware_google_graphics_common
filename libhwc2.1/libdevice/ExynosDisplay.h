@@ -1014,7 +1014,7 @@ class ExynosDisplay {
         /* This function is called by ExynosDisplayInterface class to set acquire fence*/
         int32_t setReadbackBufferAcqFence(int32_t acqFence);
 
-        void dump(String8& result);
+        virtual void dump(String8& result);
 
         virtual int32_t startPostProcessing();
 
@@ -1102,6 +1102,11 @@ class ExynosDisplay {
          */
         std::unique_ptr<ExynosDisplayInterface> mDisplayInterface;
         void requestLhbm(bool on);
+
+        virtual int setMinIdleRefreshRate(const int __unused fps) { return NO_ERROR; }
+        virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos) {
+            return NO_ERROR;
+        }
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
