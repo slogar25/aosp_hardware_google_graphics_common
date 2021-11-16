@@ -3553,14 +3553,42 @@ int32_t ExynosDisplay::getConfigAppliedTime(const uint64_t desiredTime,
 {
     uint32_t transientDuration = mDisplayInterface->getConfigChangeDuration();
     appliedTime = actualChangeTime;
-    while (desiredTime > appliedTime) {
-        DISPLAY_LOGD(eDebugDisplayConfig, "desired time(%" PRId64 ") > applied time(%" PRId64 ")", desiredTime, appliedTime);;
-        appliedTime += mVsyncPeriod;
+
+    if (desiredTime > appliedTime) {
+        const int64_t originalAppliedTime = appliedTime;
+        const int64_t diff = desiredTime - appliedTime;
+        appliedTime += (diff + mVsyncPeriod - 1) / mVsyncPeriod * mVsyncPeriod;
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "desired time(%" PRId64 "), applied time(%" PRId64 "->%" PRId64 ")",
+                     desiredTime, originalAppliedTime, appliedTime);
+    } else {
+        DISPLAY_LOGD(eDebugDisplayConfig, "desired time(%" PRId64 "), applied time(%" PRId64 ")",
+                     desiredTime, appliedTime);
     }
 
     refreshTime = appliedTime - (transientDuration * mVsyncPeriod);
 
     return NO_ERROR;
+}
+
+void ExynosDisplay::calculateTimeline(
+        hwc2_config_t config, hwc_vsync_period_change_constraints_t *vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t *outTimeline) {
+    int64_t actualChangeTime = 0;
+    /* actualChangeTime includes transient duration */
+    mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
+
+    outTimeline->refreshRequired = true;
+    getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos, actualChangeTime,
+                         outTimeline->newVsyncAppliedTimeNanos, outTimeline->refreshTimeNanos);
+
+    DISPLAY_LOGD(eDebugDisplayConfig,
+                 "requested config : %d(%d)->%d(%d), "
+                 "desired %" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64 "",
+                 mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod, config,
+                 mDisplayConfigs[config].vsyncPeriod,
+                 mVsyncPeriodChangeConstraints.desiredTimeNanos,
+                 outTimeline->newVsyncAppliedTimeNanos);
 }
 
 int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
@@ -3570,11 +3598,11 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     ATRACE_CALL();
     Mutex::Autolock lock(mDisplayMutex);
 
-    DISPLAY_LOGD(eDebugDisplayConfig, "%s:: config(%d), seamless(%d), "
-            "desiredTime(%" PRId64, ")",
-            config,
-            vsyncPeriodChangeConstraints->seamlessRequired,
-            vsyncPeriodChangeConstraints->desiredTimeNanos);
+    DISPLAY_LOGD(eDebugDisplayConfig,
+                 "config(%d), seamless(%d), "
+                 "desiredTime(%" PRId64 ")",
+                 config, vsyncPeriodChangeConstraints->seamlessRequired,
+                 vsyncPeriodChangeConstraints->desiredTimeNanos);
 
     if (isBadConfig(config)) return HWC2_ERROR_BAD_CONFIG;
 
@@ -3606,22 +3634,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     mVsyncPeriodChangeConstraints = *vsyncPeriodChangeConstraints;
     mDesiredConfig = config;
 
-    int64_t actualChangeTime = 0;
-    /* actualChangeTime includes transient duration */
-    mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
-
-    outTimeline->refreshRequired = true;
-    getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos,
-            actualChangeTime,
-            outTimeline->newVsyncAppliedTimeNanos,
-            outTimeline->refreshTimeNanos);
-
-    DISPLAY_LOGD(eDebugDisplayConfig, "requested config : %d(%d)->%d(%d), "
-            "desired %" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64 "",
-            mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod,
-            config, mDisplayConfigs[config].vsyncPeriod,
-            mVsyncPeriodChangeConstraints.desiredTimeNanos,
-            outTimeline->newVsyncAppliedTimeNanos);
+    calculateTimeline(config, vsyncPeriodChangeConstraints, outTimeline);
 
     /* mActiveConfig should be changed immediately for internal status */
     mActiveConfig = config;
@@ -3748,8 +3761,8 @@ void ExynosDisplay::updateRefreshRateHint() {
 int32_t ExynosDisplay::resetConfigRequestStateLocked() {
     mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
     updateBtsVsyncPeriod(mVsyncPeriod, true);
-    DISPLAY_LOGD(eDebugDisplayConfig,"Update mVsyncPeriod %d",
-            mVsyncPeriod);
+    DISPLAY_LOGD(eDebugDisplayConfig, "Update mVsyncPeriod %d by mActiveConfig(%d)", mVsyncPeriod,
+                 mActiveConfig);
 
     updateRefreshRateHint();
 
@@ -3760,6 +3773,7 @@ int32_t ExynosDisplay::resetConfigRequestStateLocked() {
         DISPLAY_LOGD(eDebugDisplayInterfaceConfig, "%s: Change mConfigRequestState (%d) to NONE",
                      __func__, mConfigRequestState);
         mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
+        updateAppliedActiveConfig(mActiveConfig, systemTime(SYSTEM_TIME_MONOTONIC));
     }
     return NO_ERROR;
 }
@@ -3853,8 +3867,10 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
     if (actualChangeTime >= mVsyncPeriodChangeConstraints.desiredTimeNanos) {
         DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig");
         needSetActiveConfig = true;
+        ATRACE_INT("Pending ActiveConfig", 0);
     } else {
         DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending");
+        ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
     }
 
     if (needSetActiveConfig) {

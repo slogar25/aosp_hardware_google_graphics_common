@@ -45,6 +45,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual int setMinIdleRefreshRate(const int fps) override;
         virtual int setRefreshRateThrottleNanos(const int64_t delayNs) override;
         virtual void dump(String8& result) override;
+        virtual void updateAppliedActiveConfig(const hwc2_config_t newConfig,
+                                               const int64_t ts) override;
 
     protected:
         /* setPowerMode(int32_t mode)
@@ -93,8 +95,13 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         static constexpr const char* kWakeupDispFilePath =
                 "/sys/devices/platform/1c300000.drmdecon/early_wakeup";
 
+        void calculateTimeline(hwc2_config_t config,
+                               hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+                               hwc_vsync_period_change_timeline_t* outTimeline) override;
         int mMinIdleRefreshRate;
         int64_t mRefreshRateDelayNanos;
+        int64_t mLastRefreshRateAppliedNanos;
+        hwc2_config_t mAppliedActiveConfig;
 };
 
 #endif

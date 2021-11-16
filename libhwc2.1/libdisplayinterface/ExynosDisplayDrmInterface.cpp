@@ -990,7 +990,8 @@ int32_t ExynosDisplayDrmInterface::setColorMode(int32_t mode)
 int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
         hwc2_config_t config, bool test)
 {
-    ALOGD("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
+    ALOGD("%s:: %s config(%d) test(%d)", __func__, mExynosDisplay->mDisplayName.string(), config,
+          test);
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
             [config](DrmMode const &m) { return m.id() == config;});
     if (mode == mDrmConnector->modes().end()) {
@@ -1089,6 +1090,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
         return HWC2_ERROR_BAD_CONFIG;
     }
 
+    mExynosDisplay->updateAppliedActiveConfig(config, systemTime(SYSTEM_TIME_MONOTONIC));
     if (!setActiveDrmMode(*mode)) {
         ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
     } else {
