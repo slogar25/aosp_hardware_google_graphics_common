@@ -1211,6 +1211,7 @@ class ExynosDisplay {
             void Routine() override;
 
         private:
+            static void BinderDiedCallback(void*);
             int32_t connectPowerHalExt();
             int32_t checkPowerHalExtHintSupport(const std::string& mode);
             int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
@@ -1219,9 +1220,10 @@ class ExynosDisplay {
             int32_t updateRefreshRateHintInternal(hwc2_power_mode_t powerMode,
                                                   uint32_t vsyncPeriod);
             int32_t sendRefreshRateHint(int refreshRate, bool enabled);
+            void forceUpdateHints();
 
             int32_t checkIdleHintSupport();
-            int32_t updateIdleHint(uint64_t deadlineTime);
+            int32_t updateIdleHint(uint64_t deadlineTime, bool forceUpdate);
 
             bool mNeedUpdateRefreshRateHint;
 
@@ -1235,6 +1237,7 @@ class ExynosDisplay {
             std::map<int, bool> mRefreshRateHintSupportMap;
 
             bool mIdleHintIsEnabled;
+            bool mForceUpdateIdleHint;
             uint64_t mIdleHintDeadlineTime;
 
             // whether idle hint support is checked
@@ -1249,6 +1252,7 @@ class ExynosDisplay {
             // for power HAL extension hints
             std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>
                     mPowerHalExtAidl;
+            ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
         };
 
         PowerHalHintWorker mPowerHalHint;
