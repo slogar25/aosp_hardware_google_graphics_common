@@ -61,13 +61,21 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mPrevRefreshRate(0),
         mPendingPrevRefreshRate(0),
         mIdleHintIsEnabled(false),
+        mForceUpdateIdleHint(false),
         mIdleHintDeadlineTime(0),
         mIdleHintSupportIsChecked(false),
         mIdleHintIsSupported(false),
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
-        mPowerHalExtAidl(nullptr) {
+        mPowerHalExtAidl(nullptr),
+        mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {
     InitWorker();
+}
+
+void ExynosDisplay::PowerHalHintWorker::BinderDiedCallback(void *cookie) {
+    ALOGE("PowerHal is died");
+    auto powerHint = reinterpret_cast<PowerHalHintWorker *>(cookie);
+    powerHint->forceUpdateHints();
 }
 
 int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
@@ -78,6 +86,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
     const std::string kInstance = std::string(IPower::descriptor) + "/default";
     ndk::SpAIBinder pwBinder = ndk::SpAIBinder(AServiceManager_getService(kInstance.c_str()));
     ndk::SpAIBinder pwExtBinder;
+
     AIBinder_getExtension(pwBinder.get(), pwExtBinder.getR());
     mPowerHalExtAidl = IPowerExt::fromBinder(pwExtBinder);
     if (!mPowerHalExtAidl) {
@@ -85,6 +94,9 @@ int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
         return -EINVAL;
     }
 
+    AIBinder_linkToDeath(pwExtBinder.get(), mDeathRecipient.get(), reinterpret_cast<void *>(this));
+
+    forceUpdateHints();
     ALOGI("connect power HAL extension successfully");
     return NO_ERROR;
 }
@@ -140,6 +152,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::sendPowerHalExtHint(const std::string
         }
         return -EINVAL;
     }
+
     return NO_ERROR;
 }
 
@@ -266,22 +279,36 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
     return ret;
 }
 
-int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(uint64_t deadlineTime) {
+int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(uint64_t deadlineTime, bool forceUpdate) {
     int32_t ret = checkIdleHintSupport();
     if (ret != NO_ERROR) {
         return ret;
     }
 
-    bool enableIdleHint = (deadlineTime < systemTime(SYSTEM_TIME_MONOTONIC));
+    bool enableIdleHint =
+            (deadlineTime < systemTime(SYSTEM_TIME_MONOTONIC) && CC_LIKELY(deadlineTime > 0));
     ATRACE_INT("HWCIdleHintTimer:", enableIdleHint);
 
-    if (mIdleHintIsEnabled != enableIdleHint) {
+    if (mIdleHintIsEnabled != enableIdleHint || forceUpdate) {
         ret = sendPowerHalExtHint("DISPLAY_IDLE", enableIdleHint);
         if (ret == NO_ERROR) {
             mIdleHintIsEnabled = enableIdleHint;
         }
     }
     return ret;
+}
+
+void ExynosDisplay::PowerHalHintWorker::forceUpdateHints(void) {
+    Lock();
+    mPrevRefreshRate = 0;
+    mNeedUpdateRefreshRateHint = true;
+    if (mIdleHintSupportIsChecked && mIdleHintIsSupported) {
+        mForceUpdateIdleHint = true;
+    }
+
+    Unlock();
+
+    Signal();
 }
 
 void ExynosDisplay::PowerHalHintWorker::signalRefreshRate(hwc2_power_mode_t powerMode,
@@ -348,9 +375,12 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
      * errors.
      */
     mNeedUpdateRefreshRateHint = false;
+
+    bool forceUpdateIdleHint = mForceUpdateIdleHint;
+    mForceUpdateIdleHint = false;
     Unlock();
 
-    updateIdleHint(deadlineTime);
+    updateIdleHint(deadlineTime, forceUpdateIdleHint);
 
     if (needUpdateRefreshRateHint) {
         int32_t rc = updateRefreshRateHintInternal(powerMode, vsyncPeriod);
