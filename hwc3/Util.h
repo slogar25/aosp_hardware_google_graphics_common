@@ -44,6 +44,11 @@
         if (err) [[unlikely]] return err; \
     } while (0)
 
+
+#define TO_BINDER_STATUS(x) x == 0                                                \
+                            ? ndk::ScopedAStatus::ok()                            \
+                            : ndk::ScopedAStatus::fromServiceSpecificError(x)
+
 namespace aidl::android::hardware::graphics::composer3::impl {
 
 class DebugFunction {

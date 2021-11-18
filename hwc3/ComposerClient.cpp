@@ -73,7 +73,7 @@ ndk::ScopedAStatus ComposerClient::createLayer(int64_t display, int32_t bufferSl
             layer = 0;
         }
     }
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::createVirtualDisplay(int32_t width, int32_t height,
@@ -85,7 +85,7 @@ ndk::ScopedAStatus ComposerClient::createVirtualDisplay(int32_t width, int32_t h
     if (!err) {
         err = mResources->addVirtualDisplay(display->display, outputBufferSlotCount);
     }
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::destroyLayer(int64_t display, int64_t layer) {
@@ -94,7 +94,7 @@ ndk::ScopedAStatus ComposerClient::destroyLayer(int64_t display, int64_t layer) 
     if (!err) {
         err = mResources->removeLayer(display, layer);
     }
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::destroyVirtualDisplay(int64_t display) {
@@ -103,7 +103,7 @@ ndk::ScopedAStatus ComposerClient::destroyVirtualDisplay(int64_t display) {
     if (!err) {
         err = mResources->removeDisplay(display);
     }
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::executeCommands(int32_t inLength,
@@ -113,27 +113,27 @@ ndk::ScopedAStatus ComposerClient::executeCommands(int32_t inLength,
     std::lock_guard<std::mutex> lock(mCommandEngineMutex);
     auto err = mCommandEngine->execute(inLength, inHandles, status);
     mCommandEngine->reset();
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getActiveConfig(int64_t display, int32_t* config) {
     DEBUG_FUNC();
     auto err = mHal->getActiveConfig(display, config);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getColorModes(int64_t display,
                                                  std::vector<ColorMode>* colorModes) {
     DEBUG_FUNC();
     auto err = mHal->getColorModes(display, colorModes);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDataspaceSaturationMatrix(common::Dataspace dataspace,
                                                                 std::vector<float>* matrix) {
     DEBUG_FUNC();
     if (dataspace != common::Dataspace::SRGB_LINEAR) {
-        return ndk::ScopedAStatus::fromStatus(EX_BAD_PARAMETER);
+        return TO_BINDER_STATUS(EX_BAD_PARAMETER);
     }
 
     auto err = mHal->getDataspaceSaturationMatrix(dataspace, matrix);
@@ -145,60 +145,60 @@ ndk::ScopedAStatus ComposerClient::getDataspaceSaturationMatrix(common::Dataspac
         matrix->clear();
         matrix->insert(matrix->begin(), unit.begin(), unit.end());
     }
-    return ndk::ScopedAStatus::ok();
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayAttribute(int64_t display, int32_t config,
                                                        DisplayAttribute attribute, int32_t* value) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayAttribute(display, config, attribute, value);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayBrightnessSupport(int64_t display, bool* support) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayBrightnessSupport(display, support);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayCapabilities(int64_t display,
                                                           std::vector<DisplayCapability>* caps) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayCapabilities(display, caps);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayConfigs(int64_t display,
                                                      std::vector<int32_t>* configs) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayConfigs(display, configs);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayConnectionType(int64_t display,
                                                             DisplayConnectionType* type) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayConnectionType(display, type);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayIdentificationData(int64_t display,
                                                                 DisplayIdentification* id) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayIdentificationData(display, id);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayName(int64_t display, std::string* name) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayName(display, name);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayVsyncPeriod(int64_t display, int32_t* vsyncPeriod) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayVsyncPeriod(display, vsyncPeriod);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayedContentSample(int64_t display, int64_t maxFrames,
@@ -206,39 +206,39 @@ ndk::ScopedAStatus ComposerClient::getDisplayedContentSample(int64_t display, in
                                                              DisplayContentSample* samples) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayedContentSample(display, maxFrames, timestamp, samples);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDisplayedContentSamplingAttributes(
         int64_t display, DisplayContentSamplingAttributes* attrs) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayedContentSamplingAttributes(display, attrs);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getDozeSupport(int64_t display, bool* support) {
     DEBUG_FUNC();
     auto err = mHal->getDozeSupport(display, support);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getHdrCapabilities(int64_t display, HdrCapabilities* caps) {
     DEBUG_FUNC();
     auto err = mHal->getHdrCapabilities(display, caps);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getLayerGenericMetadataKeys(
         std::vector<LayerGenericMetadataKey>* keys) {
     DEBUG_FUNC();
     auto err = mHal->getLayerGenericMetadataKeys(keys);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getMaxVirtualDisplayCount(int32_t* count) {
     DEBUG_FUNC();
     auto err = mHal->getMaxVirtualDisplayCount(count);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getOutputCommandQueue(
@@ -253,35 +253,35 @@ ndk::ScopedAStatus ComposerClient::getPerFrameMetadataKeys(int64_t display,
                                                            std::vector<PerFrameMetadataKey>* keys) {
     DEBUG_FUNC();
     auto err = mHal->getPerFrameMetadataKeys(display, keys);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getReadbackBufferAttributes(int64_t display,
                                                                ReadbackBufferAttributes* attrs) {
     DEBUG_FUNC();
     auto err = mHal->getReadbackBufferAttributes(display, attrs);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getReadbackBufferFence(int64_t display,
                                                           ndk::ScopedFileDescriptor* acquireFence) {
     DEBUG_FUNC();
     auto err = mHal->getReadbackBufferFence(display, acquireFence);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getRenderIntents(int64_t display, ColorMode mode,
                                                     std::vector<RenderIntent>* intents) {
     DEBUG_FUNC();
     auto err = mHal->getRenderIntents(display, mode, intents);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::getSupportedContentTypes(int64_t display,
                                                             std::vector<ContentType>* types) {
     DEBUG_FUNC();
     auto err = mHal->getSupportedContentTypes(display, types);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::registerCallback(
@@ -296,7 +296,7 @@ ndk::ScopedAStatus ComposerClient::registerCallback(
 ndk::ScopedAStatus ComposerClient::setActiveConfig(int64_t display, int32_t config) {
     DEBUG_FUNC();
     auto err = mHal->setActiveConfig(display, config);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setActiveConfigWithConstraints(
@@ -304,45 +304,45 @@ ndk::ScopedAStatus ComposerClient::setActiveConfigWithConstraints(
         VsyncPeriodChangeTimeline* timeline) {
     DEBUG_FUNC();
     auto err = mHal->setActiveConfigWithConstraints(display, config, constraints, timeline);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setAutoLowLatencyMode(int64_t display, bool on) {
     DEBUG_FUNC();
     auto err = mHal->setAutoLowLatencyMode(display, on);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setClientTargetSlotCount(int64_t display, int32_t count) {
     DEBUG_FUNC();
     auto err = mResources->setDisplayClientTargetCacheSize(display, count);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setColorMode(int64_t display, ColorMode mode,
                                                 RenderIntent intent) {
     DEBUG_FUNC();
     auto err = mHal->setColorMode(display, mode, intent);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setContentType(int64_t display, ContentType type) {
     DEBUG_FUNC();
     auto err = mHal->setContentType(display, type);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setDisplayBrightness(int64_t display, float brightness) {
     DEBUG_FUNC();
     auto err = mHal->setDisplayBrightness(display, brightness);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setDisplayedContentSamplingEnabled(
         int64_t display, bool enable, FormatColorComponent componentMask, int64_t maxFrames) {
     DEBUG_FUNC();
     auto err = mHal->setDisplayedContentSamplingEnabled(display, enable, componentMask, maxFrames);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setInputCommandQueue(
@@ -350,13 +350,13 @@ ndk::ScopedAStatus ComposerClient::setInputCommandQueue(
     DEBUG_FUNC();
     std::lock_guard<std::mutex> lock(mCommandEngineMutex);
     auto err = mCommandEngine->setInputMQDescriptor(descriptor) ? 0 : EX_NO_RESOURCES;
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setPowerMode(int64_t display, PowerMode mode) {
     DEBUG_FUNC();
     auto err = mHal->setPowerMode(display, mode);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setReadbackBuffer(
@@ -372,13 +372,13 @@ ndk::ScopedAStatus ComposerClient::setReadbackBuffer(
     if (!err) {
         err = mHal->setReadbackBuffer(display, readbackBuffer, releaseFence);
     }
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::setVsyncEnabled(int64_t display, bool enabled) {
     DEBUG_FUNC();
     auto err = mHal->setVsyncEnabled(display, enabled);
-    return ndk::ScopedAStatus::fromStatus(err);
+    return TO_BINDER_STATUS(err);
 }
 
 void ComposerClient::HalEventCallback::onHotplug(int64_t display, bool connected) {
