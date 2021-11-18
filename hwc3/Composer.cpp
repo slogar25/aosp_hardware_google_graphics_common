@@ -28,13 +28,13 @@ ndk::ScopedAStatus Composer::createClient(std::shared_ptr<IComposerClient>* outC
     std::unique_lock<std::mutex> lock(mClientMutex);
     if (!waitForClientDestroyedLocked(lock)) {
         *outClient = nullptr;
-        return ndk::ScopedAStatus::fromStatus(EX_NO_RESOURCES);
+        return TO_BINDER_STATUS(EX_NO_RESOURCES);
     }
 
     auto client = ndk::SharedRefBase::make<ComposerClient>(mHal.get());
     if (!client || !client->init()) {
         *outClient = nullptr;
-        return ndk::ScopedAStatus::fromStatus(EX_NO_RESOURCES);
+        return TO_BINDER_STATUS(EX_NO_RESOURCES);
     }
 
     auto clientDestroyed = [this]() { onClientDestroyed(); };
