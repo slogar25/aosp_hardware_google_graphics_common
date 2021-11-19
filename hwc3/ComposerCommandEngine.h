@@ -24,94 +24,75 @@
 
 namespace aidl::android::hardware::graphics::composer3::impl {
 
-class ComposerCommandEngine : public CommandReaderBase {
+class ComposerCommandEngine {
   public:
       ComposerCommandEngine(IComposerHal* hal, IResourceManager* resources)
             : mHal(hal), mResources(resources) {}
       bool init();
 
-      void getOutputMQDescriptor(DescriptorType* outQueue) {
-          *outQueue = mWriter->getMQDescriptor();
-      }
-      bool setInputMQDescriptor(const DescriptorType& descriptor) {
-          return setMQDescriptor(descriptor);
-      }
-      int32_t execute(int32_t inLength, const std::vector<AidlNativeHandle>& inHandles,
-                      ExecuteCommandsStatus* status);
+      int32_t execute(const std::vector<command::CommandPayload>& commands,
+                      std::vector<command::CommandResultPayload> *result);
+
       void reset() {
-          CommandReaderBase::reset();
           mWriter->reset();
       }
 
   private:
-    bool executeCommand(Command command, uint16_t length);
-    // 2.1
-    bool executeSelectDisplay(uint16_t length);
-    bool executeSelectLayer(uint16_t length);
-    bool executeSetColorTransform(uint16_t length);
-    bool executeSetClientTarget(uint16_t length);
-    bool executeSetOutputBuffer(uint16_t length);
-    bool executeValidateDisplay(uint16_t length);
-    bool executePresentOrValidateDisplay(uint16_t length);
-    bool executeAcceptDisplayChanges(uint16_t length);
-    bool executePresentDisplay(uint16_t length);
-    bool executeSetLayerCursorPosition(uint16_t length);
-    bool executeSetLayerBuffer(uint16_t length);
-    bool executeSetLayerSurfaceDamage(uint16_t length);
-    bool executeSetLayerBlendMode(uint16_t length);
-    bool executeSetLayerColor(uint16_t length);
-    bool executeSetLayerCompositionType(uint16_t length);
-    bool executeSetLayerDataspace(uint16_t length);
-    bool executeSetLayerDisplayFrame(uint16_t length);
-    bool executeSetLayerPlaneAlpha(uint16_t length);
-    bool executeSetLayerSidebandStream(uint16_t length);
-    bool executeSetLayerSourceCrop(uint16_t length);
-    bool executeSetLayerTransform(uint16_t length);
-    bool executeSetLayerVisibleRegion(uint16_t length);
-    bool executeSetLayerZOrder(uint16_t length);
-    // 2.2
-    bool executeSetLayerPerFrameMetadata(uint16_t length);
-    bool executeSetLayerFloatColor(uint16_t length);
-    // 2.3
-    bool executeSetLayerColorTransform(uint16_t length);
-    bool executeSetLayerPerFrameMetadataBlobs(uint16_t length);
-    // 2.4
-    bool executeSetLayerGenericMetadata(uint16_t length);
+    void dispatchDisplayCommand(const command::DisplayCommand& displayCommand);
+    void dispatchLayerCommand(const command::LayerCommand& displayCommand);
 
-    int32_t executeValidateDisplayInternal();
-    ndk::ScopedFileDescriptor readAidlFence() {
-        // readFence returns a dup'd fd, take the ownership here
-        auto fd = readFence();
-        return ndk::ScopedFileDescriptor(fd);
-    }
-    int32_t takeFence(ndk::ScopedFileDescriptor& fence) {
-        // take the ownership
-        int fd = fence.get();
-        *fence.getR() = -1;
-        return fd;
-    }
-    std::vector<int32_t> takeFence(std::vector<ndk::ScopedFileDescriptor>& fences) {
-        std::vector<int32_t> rawFences;
-        for (auto& sfd : fences) {
-            rawFences.push_back(takeFence(sfd));
-        }
-        return rawFences;
-    }
+    void executeSetColorTransform(int64_t display, const command::ColorTransformPayload& command);
+    void executeSetClientTarget(int64_t display, const command::ClientTarget& command);
+    void executeSetOutputBuffer(uint64_t display, const command::Buffer& buffer);
+    void executeValidateDisplay(int64_t display);
+    void executePresentOrValidateDisplay(int64_t display);
+    void executeAcceptDisplayChanges(int64_t display);
+    int executePresentDisplay(int64_t display);
 
-    common::Rect readRect();
-    std::vector<common::Rect> readRegion(size_t count);
-    common::FRect readFRect();
-    FloatColor readFloatColor();
-    void readBlob(uint32_t size, void* blob);
+    void executeSetLayerCursorPosition(int64_t display, int64_t layer,
+                                       const common::Point& cursorPosition);
+    void executeSetLayerBuffer(int64_t display, int64_t layer,
+                               const command::Buffer& buffer);
+    void executeSetLayerSurfaceDamage(int64_t display, int64_t layer,
+                const std::vector<std::optional<common::Rect>>& damage);
+    void executeSetLayerBlendMode(int64_t display, int64_t layer,
+                                  const command::ParcelableBlendMode& blendMode);
+    void executeSetLayerColor(int64_t display, int64_t layer, const Color& color);
+    void executeSetLayerComposition(int64_t display, int64_t layer,
+                                        const command::ParcelableComposition& composition);
+    void executeSetLayerDataspace(int64_t display, int64_t layer,
+                                  const command::ParcelableDataspace& dataspace);
+    void executeSetLayerDisplayFrame(int64_t display, int64_t layer,
+                                     const common::Rect& rect);
+    void executeSetLayerPlaneAlpha(int64_t display, int64_t layer,
+                                   const command::PlaneAlpha& planeAlpha);
+    void executeSetLayerSidebandStream(int64_t display, int64_t layer,
+                                       const AidlNativeHandle& sidebandStream);
+    void executeSetLayerSourceCrop(int64_t display, int64_t layer,
+                                   const common::FRect& sourceCrop);
+    void executeSetLayerTransform(int64_t display, int64_t layer,
+                                  const command::ParcelableTransform& transform);
+    void executeSetLayerVisibleRegion(int64_t display, int64_t layer,
+                const std::vector<std::optional<common::Rect>>& visibleRegion);
+    void executeSetLayerZOrder(int64_t display, int64_t layer,
+                               const command::ZOrder& zOrder);
+    void executeSetLayerPerFrameMetadata(int64_t display, int64_t layer,
+                const std::vector<std::optional<PerFrameMetadata>>& perFrameMetadata);
+    void executeSetLayerFloatColor(int64_t display, int64_t layer,
+                                   const FloatColor& floatColor);
+    void executeSetLayerColorTransform(int64_t display, int64_t layer,
+                                       const std::vector<float>& colorTransform);
+    void executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
+                const std::vector<std::optional<PerFrameMetadataBlob>>& perFrameMetadataBlob);
+    void executeSetLayerGenericMetadata(int64_t display, int64_t layer,
+                                        const command::GenericMetadata& genericMetadata);
 
-    // 64KiB minus a small space for metadata such as read/write pointers
-    static constexpr size_t kWriterInitialSize = 64 * 1024 / sizeof(uint32_t) - 16;
+    int32_t executeValidateDisplayInternal(int64_t display);
+
     IComposerHal* mHal;
     IResourceManager* mResources;
     std::unique_ptr<CommandWriterBase> mWriter;
-
-    int64_t mCurrentDisplay = 0;
-    int64_t mCurrentLayer = 0;
+    int32_t mCommandIndex;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::impl

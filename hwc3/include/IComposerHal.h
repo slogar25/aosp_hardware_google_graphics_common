@@ -23,18 +23,41 @@
 #include <cutils/native_handle.h>
 
 #include <aidl/android/hardware/common/NativeHandle.h>
+#include <aidl/android/hardware/graphics/common/BlendMode.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/graphics/common/FRect.h>
 #include <aidl/android/hardware/graphics/common/PixelFormat.h>
+#include <aidl/android/hardware/graphics/common/Point.h>
 #include <aidl/android/hardware/graphics/common/Rect.h>
 #include <aidl/android/hardware/graphics/common/Transform.h>
-#include <aidl/android/hardware/graphics/composer3/BlendMode.h>
 #include <aidl/android/hardware/graphics/composer3/Capability.h>
 #include <aidl/android/hardware/graphics/composer3/ClientTargetProperty.h>
 #include <aidl/android/hardware/graphics/composer3/Color.h>
 #include <aidl/android/hardware/graphics/composer3/ColorMode.h>
 #include <aidl/android/hardware/graphics/composer3/Composition.h>
 #include <aidl/android/hardware/graphics/composer3/ContentType.h>
+#include <aidl/android/hardware/graphics/composer3/command/Buffer.h>
+#include <aidl/android/hardware/graphics/composer3/command/ChangedCompositionTypes.h>
+#include <aidl/android/hardware/graphics/composer3/command/ClientTarget.h>
+#include <aidl/android/hardware/graphics/composer3/command/ClientTargetPropertyWithNits.h>
+#include <aidl/android/hardware/graphics/composer3/command/ColorTransformPayload.h>
+#include <aidl/android/hardware/graphics/composer3/command/CommandPayload.h>
+#include <aidl/android/hardware/graphics/composer3/command/CommandResultPayload.h>
+#include <aidl/android/hardware/graphics/composer3/command/DisplayCommand.h>
+#include <aidl/android/hardware/graphics/composer3/command/DisplayRequest.h>
+#include <aidl/android/hardware/graphics/composer3/command/Error.h>
+#include <aidl/android/hardware/graphics/composer3/command/GenericMetadata.h>
+#include <aidl/android/hardware/graphics/composer3/command/LayerCommand.h>
+#include <aidl/android/hardware/graphics/composer3/command/ParcelableBlendMode.h>
+#include <aidl/android/hardware/graphics/composer3/command/ParcelableComposition.h>
+#include <aidl/android/hardware/graphics/composer3/command/ParcelableDataspace.h>
+#include <aidl/android/hardware/graphics/composer3/command/ParcelableTransform.h>
+#include <aidl/android/hardware/graphics/composer3/command/PlaneAlpha.h>
+#include <aidl/android/hardware/graphics/composer3/command/PresentFence.h>
+#include <aidl/android/hardware/graphics/composer3/command/PresentOrValidate.h>
+#include <aidl/android/hardware/graphics/composer3/command/ReleaseFences.h>
+#include <aidl/android/hardware/graphics/composer3/command/WhitePointNits.h>
+#include <aidl/android/hardware/graphics/composer3/command/ZOrder.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayAttribute.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayConnectionType.h>
@@ -137,13 +160,13 @@ class IComposerHal {
                                     const std::vector<common::Rect>& damage) = 0; // cmd
     virtual int32_t setColorMode(int64_t display, ColorMode mode, RenderIntent intent) = 0;
     virtual int32_t setColorTransform(int64_t display, const std::vector<float>& matrix,
-                                      int32_t hint) = 0; // cmd
+                                      common::ColorTransform hint) = 0; // cmd
     virtual int32_t setContentType(int64_t display, ContentType contentType) = 0;
     virtual int32_t setDisplayBrightness(int64_t display, float brightness) = 0;
     virtual int32_t setDisplayedContentSamplingEnabled(int64_t display, bool enable,
                                                        FormatColorComponent componentMask,
                                                        int64_t maxFrames) = 0;
-    virtual int32_t setLayerBlendMode(int64_t display, int64_t layer, BlendMode mode) = 0;
+    virtual int32_t setLayerBlendMode(int64_t display, int64_t layer, common::BlendMode mode) = 0;
     virtual int32_t setLayerBuffer(int64_t display, int64_t layer, buffer_handle_t buffer,
                                    const ndk::ScopedFileDescriptor& acquireFence) = 0;
     virtual int32_t setLayerColor(int64_t display, int64_t layer, Color color) = 0;
@@ -157,23 +180,23 @@ class IComposerHal {
     virtual int32_t setLayerDisplayFrame(int64_t display, int64_t layer,
                                          const common::Rect& frame) = 0;
     virtual int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) = 0;
-    virtual int32_t setLayerGenericMetadata(int64_t display, int64_t layer, const std::string& key,
-                                            bool mandatory, const std::vector<uint8_t>& value) = 0;
+    virtual int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
+                                            const command::GenericMetadata& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
-                                             const std::vector<PerFrameMetadata>& metadata) = 0;
-    virtual int32_t setLayerPerFrameMetadataBlobs(
-            int64_t display, int64_t layer, const std::vector<PerFrameMetadataBlob>& blobs) = 0;
+                            const std::vector<std::optional<PerFrameMetadata>>& metadata) = 0;
+    virtual int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
+                            const std::vector<std::optional<PerFrameMetadataBlob>>& blobs) = 0;
     virtual int32_t setLayerPlaneAlpha(int64_t display, int64_t layer, float alpha) = 0;
     virtual int32_t setLayerSidebandStream(int64_t display, int64_t layer,
                                            buffer_handle_t stream) = 0;
     virtual int32_t setLayerSourceCrop(int64_t display, int64_t layer,
                                        const common::FRect& crop) = 0;
     virtual int32_t setLayerSurfaceDamage(int64_t display, int64_t layer,
-                                          const std::vector<common::Rect>& damage) = 0;
+                        const std::vector<std::optional<common::Rect>>& damage) = 0;
     virtual int32_t setLayerTransform(int64_t display, int64_t layer,
                                       common::Transform transform) = 0;
     virtual int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
-                                          const std::vector<common::Rect>& visible) = 0;
+                                 const std::vector<std::optional<common::Rect>>& visible) = 0;
     virtual int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) = 0;
     virtual int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                                     const ndk::ScopedFileDescriptor& releaseFence) = 0;
@@ -185,7 +208,7 @@ class IComposerHal {
                                     std::vector<Composition>* outCompositionTypes,
                                     uint32_t* outDisplayRequestMask,
                                     std::vector<int64_t>* outRequestedLayers,
-                                    std::vector<uint32_t>* outRequestMasks,
+                                    std::vector<int32_t>* outRequestMasks,
                                     ClientTargetProperty* outClientTargetProperty) = 0; //cmd
 };
 

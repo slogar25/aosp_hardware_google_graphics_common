@@ -24,9 +24,6 @@
 #include "include/IComposerHal.h"
 #include "include/IResourceManager.h"
 
-using aidl::android::hardware::common::fmq::MQDescriptor;
-using aidl::android::hardware::common::fmq::SynchronizedReadWrite;
-
 namespace aidl::android::hardware::graphics::composer3::impl {
 
 class ComposerClient : public BnComposerClient {
@@ -67,9 +64,8 @@ class ComposerClient : public BnComposerClient {
                                             VirtualDisplay* display) override;
     ndk::ScopedAStatus destroyLayer(int64_t display, int64_t layer) override;
     ndk::ScopedAStatus destroyVirtualDisplay(int64_t display) override;
-    ndk::ScopedAStatus executeCommands(int32_t inLength,
-                                       const std::vector<AidlNativeHandle>& inHandles,
-                                       ExecuteCommandsStatus* status) override;
+    ndk::ScopedAStatus executeCommands(const std::vector<command::CommandPayload>& commands,
+                                       std::vector<command::CommandResultPayload>* results) override;
     ndk::ScopedAStatus getActiveConfig(int64_t display, int32_t* config) override;
     ndk::ScopedAStatus getColorModes(int64_t display, std::vector<ColorMode>* colorModes) override;
     ndk::ScopedAStatus getDataspaceSaturationMatrix(common::Dataspace dataspace,
@@ -96,8 +92,6 @@ class ComposerClient : public BnComposerClient {
     ndk::ScopedAStatus getLayerGenericMetadataKeys(
             std::vector<LayerGenericMetadataKey>* keys) override;
     ndk::ScopedAStatus getMaxVirtualDisplayCount(int32_t* count) override;
-    ndk::ScopedAStatus getOutputCommandQueue(
-            MQDescriptor<int32_t, SynchronizedReadWrite>* descriptor) override;
     ndk::ScopedAStatus getPerFrameMetadataKeys(int64_t display,
                                                std::vector<PerFrameMetadataKey>* keys) override;
     ndk::ScopedAStatus getReadbackBufferAttributes(int64_t display,
@@ -122,8 +116,6 @@ class ComposerClient : public BnComposerClient {
     ndk::ScopedAStatus setDisplayedContentSamplingEnabled(int64_t display, bool enable,
                                                           FormatColorComponent componentMask,
                                                           int64_t maxFrames) override;
-    ndk::ScopedAStatus setInputCommandQueue(
-            const MQDescriptor<int32_t, SynchronizedReadWrite>& descriptor) override;
     ndk::ScopedAStatus setPowerMode(int64_t display, PowerMode mode) override;
     ndk::ScopedAStatus setReadbackBuffer(int64_t display, const AidlNativeHandle& buffer,
                                          const ndk::ScopedFileDescriptor& releaseFence) override;
@@ -134,8 +126,7 @@ class ComposerClient : public BnComposerClient {
 
     IComposerHal* mHal;
     std::unique_ptr<IResourceManager> mResources;
-    std::mutex mCommandEngineMutex;
-    std::unique_ptr<ComposerCommandEngine> mCommandEngine GUARDED_BY(mCommandEngineMutex);
+    std::unique_ptr<ComposerCommandEngine> mCommandEngine;
     std::function<void()> mOnClientDestroyed;
     std::unique_ptr<HalEventCallback> mHalEventCallback;
 };
