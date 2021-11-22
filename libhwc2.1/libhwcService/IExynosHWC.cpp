@@ -62,6 +62,8 @@ enum {
     SET_DISPLAY_BRIGHTNESS = 1002,
     SET_DISPLAY_LHBM = 1003,
     SET_LBE_CTRL = 1004,
+    SET_MIN_IDLE_REFRESH_RATE = 1005,
+    SET_REFRESH_RATE_THROTTLE = 1006,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -413,6 +415,26 @@ public:
         if (result) ALOGE("SET_DISPLAY_LHBM transact error(%d)", result);
         return result;
     }
+
+    virtual int32_t setMinIdleRefreshRate(uint32_t display_id, int32_t fps) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(display_id);
+        data.writeInt32(fps);
+        int result = remote()->transact(SET_MIN_IDLE_REFRESH_RATE, data, &reply);
+        if (result) ALOGE("SET_MIN_IDLE_REFRESH_RATE transact error(%d)", result);
+        return result;
+    }
+
+    virtual int32_t setRefreshRateThrottle(uint32_t display_id, int32_t delay_ms) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(display_id);
+        data.writeInt32(delay_ms);
+        int result = remote()->transact(SET_REFRESH_RATE_THROTTLE, data, &reply);
+        if (result) ALOGE("SET_REFRESH_RATE_THROTTLE transact error(%d)", result);
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -665,6 +687,20 @@ status_t BnExynosHWCService::onTransact(
             uint32_t lux = data.readInt32();
             setLbeCtrl(display_id, state, lux);
             return NO_ERROR;
+        } break;
+
+        case SET_MIN_IDLE_REFRESH_RATE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t display_id = data.readUint32();
+            int32_t fps = data.readInt32();
+            return setMinIdleRefreshRate(display_id, fps);
+        } break;
+
+        case SET_REFRESH_RATE_THROTTLE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t display_id = data.readUint32();
+            int32_t delay_ms = data.readInt32();
+            return setRefreshRateThrottle(display_id, delay_ms);
         } break;
 
         default:

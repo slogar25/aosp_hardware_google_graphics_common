@@ -13,10 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "ExynosHWCService.h"
-#include "ExynosVirtualDisplayModule.h"
-#include "ExynosVirtualDisplay.h"
+
+#include <chrono>
+
 #include "ExynosExternalDisplay.h"
+#include "ExynosVirtualDisplay.h"
+#include "ExynosVirtualDisplayModule.h"
 #define HWC_SERVICE_DEBUG 0
 
 namespace android {
@@ -435,6 +439,33 @@ int32_t ExynosHWCService::setDisplayLhbm(int32_t display_id, uint32_t on) {
     if (display != nullptr) {
         display->requestLhbm(!!on);
         return NO_ERROR;
+    }
+
+    return -EINVAL;
+}
+
+int32_t ExynosHWCService::setMinIdleRefreshRate(uint32_t display_id, int32_t fps) {
+    ALOGD("ExynosHWCService::%s() display_id(%u) fps(%d)", __func__, display_id, fps);
+
+    auto display = mHWCCtx->device->getDisplay(display_id);
+
+    if (display != nullptr) {
+        return display->setMinIdleRefreshRate(fps);
+    }
+
+    return -EINVAL;
+}
+
+int32_t ExynosHWCService::setRefreshRateThrottle(uint32_t display_id, int32_t delayMs) {
+    ALOGD("ExynosHWCService::%s() display_id(%u) delayMs(%d)", __func__, display_id, delayMs);
+
+    auto display = mHWCCtx->device->getDisplay(display_id);
+
+    if (display != nullptr) {
+        return display->setRefreshRateThrottleNanos(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::milliseconds(delayMs))
+                        .count());
     }
 
     return -EINVAL;
