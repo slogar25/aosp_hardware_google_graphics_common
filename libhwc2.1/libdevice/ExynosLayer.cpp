@@ -19,6 +19,8 @@
 #include <sys/mman.h>
 #include <hardware/hwcomposer_defs.h>
 #include <hardware/exynos/ion.h>
+
+#include "BrightnessController.h"
 #include "ExynosLayer.h"
 #include "ExynosResourceManager.h"
 #include "ExynosHWCDebug.h"
@@ -138,6 +140,7 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.sourceCrop = mSourceCrop;
     mPreprocessedInfo.displayFrame = mDisplayFrame;
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
+    mPreprocessedInfo.sdrDimRatio = 1.0f;
 
     if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
         mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
@@ -342,6 +345,23 @@ int32_t ExynosLayer::doPreProcess()
         setGeometryChanged(GEOMETRY_LAYER_PRIORITY_CHANGED);
 
     mOverlayPriority = priority;
+
+    if (mDisplay->mBrightnessController) {
+        float displayWhitePointNits = -1;
+        mDisplay->mBrightnessController->getDisplayWhitePointNits(&displayWhitePointNits);
+        if (mWhitePointNits >= 0) {
+            if (mWhitePointNits < displayWhitePointNits) {
+                mPreprocessedInfo.sdrDimRatio = mWhitePointNits / displayWhitePointNits;
+                // in case of small floating error
+                if (mPreprocessedInfo.sdrDimRatio >= 0.999) {
+                    mPreprocessedInfo.sdrDimRatio = 1.0;
+                }
+            }
+            // any error should have been reported by
+            // BrightnessController::validateLayerWhitePointNits
+        }
+    }
+
     return NO_ERROR;
 }
 
@@ -700,6 +720,17 @@ int32_t ExynosLayer::setLayerGenericMetadata(hwc2_layer_t __unused layer,
     return HWC2_ERROR_UNSUPPORTED;
 }
 
+int32_t ExynosLayer::setLayerWhitePointNits(float whitePointNits)
+{
+    if (mDisplay->mBrightnessController == nullptr ||
+        !mDisplay->mBrightnessController->validateLayerWhitePointNits(whitePointNits)) {
+        return HWC2_ERROR_BAD_PARAMETER;
+    }
+
+    mWhitePointNits = whitePointNits;
+    return HWC2_ERROR_NONE;
+}
+
 void ExynosLayer::resetValidateData()
 {
     mValidateCompositionType = HWC2_COMPOSITION_INVALID;
@@ -981,6 +1012,13 @@ void ExynosLayer::dump(String8& result)
                           .add("supportedMPPFlag", mSupportedMPPFlag, true)
                           .build()
                           .c_str());
+
+    {
+        TableBuilder tb;
+        tb.add("wp nits", mWhitePointNits)
+          .add("dim ratio", mPreprocessedInfo.sdrDimRatio);
+        result.append(tb.build().c_str());
+    }
 
     if ((mDisplay != NULL) && (mDisplay->mResourceManager != NULL)) {
         result.appendFormat("MPPFlags for otfMPP\n");

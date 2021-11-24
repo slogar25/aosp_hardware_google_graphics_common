@@ -112,7 +112,6 @@ ndk::ScopedAStatus ComposerClient::executeCommands(const std::vector<DisplayComm
                                                    std::vector<CommandResultPayload>* results) {
     DEBUG_FUNC();
     auto err = mCommandEngine->execute(commands, results);
-    mCommandEngine->reset();
     return TO_BINDER_STATUS(err);
 }
 
@@ -494,8 +493,10 @@ void ComposerClient::destroyResources() {
             std::vector<int64_t> requestedLayers;
             std::vector<int32_t> requestMasks;
             ClientTargetProperty clientTargetProperty;
+            float clientWhitePointNits;
             mHal->validateDisplay(display, &changedLayers, &compositionTypes, &displayRequestMask,
-                                  &requestedLayers, &requestMasks, &clientTargetProperty);
+                                  &requestedLayers, &requestMasks, &clientTargetProperty,
+                                  &clientWhitePointNits);
             mHal->acceptDisplayChanges(display);
 
             ndk::ScopedFileDescriptor presentFence;

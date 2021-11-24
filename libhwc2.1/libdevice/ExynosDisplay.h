@@ -804,11 +804,12 @@ class ExynosDisplay {
          */
         int32_t getDisplayBrightnessSupport(bool* outSupport);
 
-        /* setDisplayBrightness(displayToken, brightnesss)
+        /* setDisplayBrightness(displayToken, brightnesss, waitPresent)
          * Descriptor: HWC2_FUNCTION_SET_DISPLAY_BRIGHTNESS
          * Parameters:
          *   brightness - a number between 0.0f (minimum brightness) and 1.0f (maximum brightness), or
          *          -1.0f to turn the backlight off.
+         *   waitPresent - apply this brightness change at next Present time.
          *
          * Returns HWC2_ERROR_NONE or one of the following errors:
          *   HWC2_ERROR_BAD_DISPLAY   when the display is invalid, or
@@ -816,7 +817,7 @@ class ExynosDisplay {
          *   HWC2_ERROR_BAD_PARAMETER when the brightness is invalid, or
          *   HWC2_ERROR_NO_RESOURCES  when the brightness cannot be applied.
          */
-        virtual int32_t setDisplayBrightness(float brightness);
+        virtual int32_t setDisplayBrightness(float brightness, bool waitPresent = false);
 
         /* getDisplayConnectionType(..., outType)
          * Descriptor: HWC2_FUNCTION_GET_DISPLAY_CONNECTION_TYPE
@@ -982,6 +983,20 @@ class ExynosDisplay {
          *       display
          */
         int32_t getClientTargetProperty(hwc_client_target_property_t* outClientTargetProperty);
+
+        /*
+         * HWC3
+         *
+         * Retrieves the client target white point nits.
+         */
+        int32_t getClientTargetWhitePointNits(float* outClientTargetWhitePointNits);
+
+        /*
+         * HWC3
+         *
+         * Execute any pending brightness changes.
+         */
+        int32_t flushDisplayBrightnessChange();
 
         /* setActiveConfig MISCs */
         bool isBadConfig(hwc2_config_t config);

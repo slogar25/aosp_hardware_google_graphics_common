@@ -3528,11 +3528,12 @@ int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::setDisplayBrightness(float brightness)
+int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
 {
     if (mBrightnessController) {
         return mBrightnessController->processDisplayBrightness(brightness,
-                                         [this]() { mDevice->invalidate(); });
+                                         [this]() { mDevice->invalidate(); }, mVsyncPeriod,
+                                         waitPresent);
     }
     return HWC2_ERROR_UNSUPPORTED;
 }
@@ -3684,6 +3685,14 @@ int32_t ExynosDisplay::getClientTargetProperty(hwc_client_target_property_t* out
     outClientTargetProperty->pixelFormat = HAL_PIXEL_FORMAT_RGBA_8888;
     outClientTargetProperty->dataspace = HAL_DATASPACE_UNKNOWN;
     return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::getClientTargetWhitePointNits(float* outClientTargetWhitePointNits)
+{
+    if (mBrightnessController) {
+        return mBrightnessController->getDisplayWhitePointNits(outClientTargetWhitePointNits);
+    }
+    return HWC2_ERROR_UNSUPPORTED;
 }
 
 bool ExynosDisplay::isBadConfig(hwc2_config_t config)
@@ -5385,4 +5394,11 @@ void ExynosDisplay::cleanupAfterClientDeath() {
     // before we can skip the static layers
     mClientCompositionInfo.mSkipStaticInitFlag = false;
     mClientCompositionInfo.mSkipFlag = false;
+}
+
+int32_t ExynosDisplay::flushDisplayBrightnessChange() {
+    if (mBrightnessController) {
+        return mBrightnessController->applyPendingChangeViaSysfs(mVsyncPeriod);
+    }
+    return NO_ERROR;
 }
