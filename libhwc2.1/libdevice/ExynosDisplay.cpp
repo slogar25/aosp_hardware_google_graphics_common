@@ -656,7 +656,6 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mDeviceYres(0),
         mColorMode(HAL_COLOR_MODE_NATIVE),
         mSkipFrame(false),
-        mEarlyWakeupFd(NULL),
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
         mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE) {
@@ -3643,14 +3642,8 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     updateBtsVsyncPeriod(vsync_period);
 
     bool earlyWakeupNeeded = checkRrCompensationEnabled();
-    if (earlyWakeupNeeded && mEarlyWakeupFd != NULL) {
-        char val = '1';
-        fwrite(&val, sizeof(val), 1, mEarlyWakeupFd);
-        if (ferror(mEarlyWakeupFd)){
-            ALOGE("early wakup fd write failed");
-            clearerr(mEarlyWakeupFd);
-        }
-        rewind(mEarlyWakeupFd);
+    if (earlyWakeupNeeded) {
+        setEarlyWakeupDisplay();
     }
 
     return HWC2_ERROR_NONE;
@@ -3978,7 +3971,7 @@ int32_t ExynosDisplay::setVsyncEnabledInternal(
         val = 1;
         if (mVsyncState != HWC2_VSYNC_ENABLE) {
             /* TODO: remove it once driver can handle on its own */
-            setWakeupDisplay();
+            setEarlyWakeupDisplay();
         }
     } else {
         gettimeofday(&updateTimeInfo.lastDisableVsyncTime, NULL);

@@ -37,7 +37,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         virtual bool getLhbmState();
         virtual void notifyLhbmState(bool enabled);
-        virtual void setWakeupDisplay();
+        virtual void setEarlyWakeupDisplay();
 
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t doDisplayConfigInternal(hwc2_config_t config) override;
@@ -91,7 +91,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         std::mutex lhbm_mutex_;
         std::condition_variable lhbm_cond_;
 
-        FILE* mWakeupDispFd;
+        FILE* mEarlyWakeupDispFd;
         static constexpr const char* kWakeupDispFilePath =
                 "/sys/devices/platform/1c300000.drmdecon/early_wakeup";
 

@@ -102,22 +102,17 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mResolutionInfo.nDSCXSliceSize[2] = 720;
     mResolutionInfo.nPanelType[2] = PANEL_LEGACY;
 
-#if defined EARLY_WAKUP_NODE_BASE
-    mEarlyWakeupFd = fopen(EARLY_WAKUP_NODE_BASE, "w");
-    if (mEarlyWakeupFd == NULL)
-        ALOGE("%s open failed! %s", EARLY_WAKUP_NODE_BASE, strerror(errno));
-#endif
-
-    mWakeupDispFd = fopen(kWakeupDispFilePath, "w");
-    if (mWakeupDispFd == nullptr) ALOGE("wake up display node open failed! %s", strerror(errno));
+    mEarlyWakeupDispFd = fopen(EARLY_WAKUP_NODE_0_BASE, "w");
+    if (mEarlyWakeupDispFd == nullptr)
+        ALOGE("open %s failed! %s", EARLY_WAKUP_NODE_0_BASE, strerror(errno));
     mBrightnessController = std::make_unique<BrightnessController>(mIndex);
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
 {
-    if (mWakeupDispFd) {
-        fclose(mWakeupDispFd);
-        mWakeupDispFd = nullptr;
+    if (mEarlyWakeupDispFd) {
+        fclose(mEarlyWakeupDispFd);
+        mEarlyWakeupDispFd = nullptr;
     }
 }
 
@@ -437,9 +432,9 @@ void ExynosPrimaryDisplay::notifyLhbmState(bool enabled) {
     mLhbmOn = enabled;
 }
 
-void ExynosPrimaryDisplay::setWakeupDisplay() {
-    if (mWakeupDispFd) {
-        writeFileNode(mWakeupDispFd, 1);
+void ExynosPrimaryDisplay::setEarlyWakeupDisplay() {
+    if (mEarlyWakeupDispFd) {
+        writeFileNode(mEarlyWakeupDispFd, 1);
     }
 }
 

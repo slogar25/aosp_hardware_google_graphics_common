@@ -488,8 +488,6 @@ class ExynosDisplay {
         // Skip present frame if there was no validate after power on
         bool mSkipFrame;
 
-        FILE *mEarlyWakeupFd;
-
         hwc_vsync_period_change_constraints_t mVsyncPeriodChangeConstraints;
         hwc_vsync_period_change_timeline_t mVsyncAppliedTimeLine;
         hwc_request_state_t mConfigRequestState;
@@ -1076,7 +1074,7 @@ class ExynosDisplay {
         virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; }
         virtual bool getLhbmState() { return false; };
         virtual void notifyLhbmState(bool __unused enabled) {}
-        virtual void setWakeupDisplay() {}
+        virtual void setEarlyWakeupDisplay() {}
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
