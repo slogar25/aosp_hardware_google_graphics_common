@@ -279,7 +279,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
     return ret;
 }
 
-int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(uint64_t deadlineTime, bool forceUpdate) {
+int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, bool forceUpdate) {
     int32_t ret = checkIdleHintSupport();
     if (ret != NO_ERROR) {
         return ret;
@@ -337,24 +337,27 @@ void ExynosDisplay::PowerHalHintWorker::signalIdle() {
     Signal();
 }
 
+bool ExynosDisplay::PowerHalHintWorker::needUpdateIdleHintLocked(int64_t &timeout) {
+    if (!mIdleHintIsSupported) {
+        return false;
+    }
+
+    int64_t currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
+    bool shouldEnableIdleHint = (mIdleHintDeadlineTime < currentTime);
+    if (mIdleHintIsEnabled != shouldEnableIdleHint || mForceUpdateIdleHint) {
+        return true;
+    }
+
+    timeout = mIdleHintDeadlineTime - currentTime;
+    return false;
+}
+
 void ExynosDisplay::PowerHalHintWorker::Routine() {
     Lock();
     int ret = 0;
-    if (!mNeedUpdateRefreshRateHint) {
-        if (mIdleHintIsSupported) {
-            uint64_t currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
-            bool shouldEnableIdleHint = (mIdleHintDeadlineTime < currentTime);
-            if (mIdleHintIsEnabled == shouldEnableIdleHint) {
-                if (mIdleHintIsEnabled) {
-                    ret = WaitForSignalOrExitLocked();
-                } else {
-                    uint64_t timeout = mIdleHintDeadlineTime - currentTime;
-                    ret = WaitForSignalOrExitLocked(timeout);
-                }
-            }
-        } else if (mIdleHintSupportIsChecked) {
-            ret = WaitForSignalOrExitLocked();
-        }
+    int64_t timeout = -1;
+    if (!mNeedUpdateRefreshRateHint && !needUpdateIdleHintLocked(timeout)) {
+        ret = WaitForSignalOrExitLocked(timeout);
     }
 
     if (ret == -EINTR) {
@@ -363,7 +366,7 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
     }
 
     bool needUpdateRefreshRateHint = mNeedUpdateRefreshRateHint;
-    uint64_t deadlineTime = mIdleHintDeadlineTime;
+    int64_t deadlineTime = mIdleHintDeadlineTime;
     hwc2_power_mode_t powerMode = mPowerModeState;
     uint32_t vsyncPeriod = mVsyncPeriod;
 

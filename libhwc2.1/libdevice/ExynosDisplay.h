@@ -1223,7 +1223,8 @@ class ExynosDisplay {
             void forceUpdateHints();
 
             int32_t checkIdleHintSupport();
-            int32_t updateIdleHint(uint64_t deadlineTime, bool forceUpdate);
+            int32_t updateIdleHint(int64_t deadlineTime, bool forceUpdate);
+            bool needUpdateIdleHintLocked(int64_t& timeout) REQUIRES(mutex_);
 
             bool mNeedUpdateRefreshRateHint;
 
@@ -1238,7 +1239,7 @@ class ExynosDisplay {
 
             bool mIdleHintIsEnabled;
             bool mForceUpdateIdleHint;
-            uint64_t mIdleHintDeadlineTime;
+            int64_t mIdleHintDeadlineTime;
 
             // whether idle hint support is checked
             bool mIdleHintSupportIsChecked;
