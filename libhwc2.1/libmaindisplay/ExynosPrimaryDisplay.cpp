@@ -438,6 +438,22 @@ void ExynosPrimaryDisplay::setEarlyWakeupDisplay() {
     }
 }
 
+void ExynosPrimaryDisplay::setExpectedPresentTime(uint64_t timestamp) {
+    mExpectedPresentTime.store(timestamp);
+}
+
+uint64_t ExynosPrimaryDisplay::getPendingExpectedPresentTime() {
+    if (mExpectedPresentTime.is_dirty()) {
+        return mExpectedPresentTime.get();
+    }
+
+    return 0;
+}
+
+void ExynosPrimaryDisplay::applyExpectedPresentTime() {
+    mExpectedPresentTime.clear_dirty();
+}
+
 int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int fps) {
     mMinIdleRefreshRate = fps;
 

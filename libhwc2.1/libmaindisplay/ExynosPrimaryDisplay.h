@@ -38,6 +38,9 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual bool getLhbmState();
         virtual void notifyLhbmState(bool enabled);
         virtual void setEarlyWakeupDisplay();
+        virtual void setExpectedPresentTime(uint64_t timestamp);
+        virtual uint64_t getPendingExpectedPresentTime();
+        virtual void applyExpectedPresentTime();
 
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t doDisplayConfigInternal(hwc2_config_t config) override;
@@ -93,6 +96,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         FILE* mEarlyWakeupDispFd;
         static constexpr const char* kWakeupDispFilePath =
                 "/sys/devices/platform/1c300000.drmdecon/early_wakeup";
+
+        CtrlValue<uint64_t> mExpectedPresentTime;
 
         void calculateTimeline(hwc2_config_t config,
                                hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,

@@ -1656,7 +1656,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
     if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
-        HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
+        HWC_LOGE(mExynosDisplay, "failed to update color settings (%d)", ret);
         return ret;
     }
 
@@ -1665,8 +1665,19 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
                                             mDrmConnector->mipi_sync(),
                                             mipi_sync_type)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set mipi_sync property", __func__);
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set mipi_sync property (%d)", __func__, ret);
         }
+    }
+
+    auto expectedPresentTime = mExynosDisplay->getPendingExpectedPresentTime();
+    if (expectedPresentTime != 0) {
+        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                                            mDrmCrtc->expected_present_time_property(),
+                                            expectedPresentTime)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set expected_present_time property (%d)",
+                     __func__, ret);
+        }
+        mExynosDisplay->applyExpectedPresentTime();
     }
 
     if ((ret = drmReq.commit(flags, true)) < 0) {

@@ -1075,6 +1075,9 @@ class ExynosDisplay {
         virtual bool getLhbmState() { return false; };
         virtual void notifyLhbmState(bool __unused enabled) {}
         virtual void setEarlyWakeupDisplay() {}
+        virtual void setExpectedPresentTime(uint64_t __unused timestamp) {}
+        virtual uint64_t getPendingExpectedPresentTime() { return 0; }
+        virtual void applyExpectedPresentTime() {}
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
