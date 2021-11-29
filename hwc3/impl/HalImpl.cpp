@@ -266,8 +266,17 @@ int32_t HalImpl::getColorModes(int64_t display, std::vector<ColorMode>* outModes
 }
 
 int32_t HalImpl::getDataspaceSaturationMatrix([[maybe_unused]] common::Dataspace dataspace,
-                                              [[maybe_unused]] std::vector<float>* matrix) {
-    return HWC2_ERROR_UNSUPPORTED;
+                                              std::vector<float>* matrix) {
+    // Pixel HWC does not support dataspace saturation matrix, return unit matrix.
+    std::vector<float> unitMatrix = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+
+    *matrix = std::move(unitMatrix);
+    return HWC2_ERROR_NONE;
 }
 
 int32_t HalImpl::getDisplayAttribute(int64_t display, int32_t config,
