@@ -338,6 +338,8 @@ class ExynosDevice {
         int32_t setLhbmState(bool enabled);
         bool getLhbmState();
 
+        bool isColorCalibratedByDevice();
+
         template <class Operator>
         void findActiveDisplay(Operator optor);
 

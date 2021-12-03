@@ -1016,6 +1016,11 @@ bool ExynosDevice::isLbeSupported() {
     return mLbeSupported;
 }
 
+bool ExynosDevice::isColorCalibratedByDevice() {
+    ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    return display->isColorCalibratedByDevice();
+}
+
 template <class Operator>
 void ExynosDevice::findActiveDisplay(Operator optor) {
     for (uint32_t i = 0; i < mDisplays.size(); i++) {
