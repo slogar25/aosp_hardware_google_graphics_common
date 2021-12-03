@@ -26,7 +26,7 @@ BrightnessController::BrightnessController(int32_t panelIndex) :
           mPanelIndex(panelIndex),
           mEnhanceHbmReq(false),
           mLhbmReq(false),
-          mBrightnessFloatReq(0),
+          mBrightnessFloatReq(-1),
           mBrightnessLevel(0),
           mGhbm(HbmMode::OFF),
           mDimming(false),
@@ -242,7 +242,7 @@ void BrightnessController::onClearDisplay() {
     std::lock_guard<std::mutex> lock(mBrightnessMutex);
     mEnhanceHbmReq.reset(false);
     mLhbmReq.reset(false);
-    mBrightnessFloatReq.reset(0);
+    mBrightnessFloatReq.reset(-1);
     mInstantHbmReq.reset(false);
 
     mBrightnessLevel.reset(0);
