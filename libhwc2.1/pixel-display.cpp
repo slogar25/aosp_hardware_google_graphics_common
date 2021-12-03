@@ -137,7 +137,11 @@ ndk::ScopedAStatus Display::getLhbmState(bool *_aidl_return) {
 ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &native_handle,
                                                        const std::string &imageName,
                                                        int *_aidl_return) {
-    *_aidl_return = readCompensationImage(native_handle, imageName);
+    if (mDevice && mDevice->isColorCalibratedByDevice()) {
+        *_aidl_return = readCompensationImage(native_handle, imageName);
+    } else {
+        *_aidl_return = -1;
+    }
     return ndk::ScopedAStatus::ok();
 }
 } // namespace display
