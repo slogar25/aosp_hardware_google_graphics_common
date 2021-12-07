@@ -482,7 +482,7 @@ int32_t HalImpl::getReadbackBufferAttributes(int64_t display,
     RET_IF_ERR(halDisplay->getReadbackBufferAttributes(&format, &dataspace));
 
     h2a::translate(format, attrs->format);
-    h2a::translate(format, attrs->dataspace);
+    h2a::translate(dataspace, attrs->dataspace);
 
     return HWC2_ERROR_NONE;
 }
