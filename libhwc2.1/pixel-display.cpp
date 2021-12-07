@@ -23,6 +23,8 @@
 #include <sys/types.h>
 #include <utils/Errors.h>
 
+#include "ExynosDisplay.h"
+
 extern int32_t load_png_image(const char *filepath, buffer_handle_t buffer);
 
 using ::aidl::com::google::hardware::pixel::display::Display;
@@ -143,6 +145,22 @@ ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &nativ
         *_aidl_return = -1;
     }
     return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus Display::setMinIdleRefreshRate(int fps, int *_aidl_return) {
+    if (mDevice) {
+        *_aidl_return = mDevice->setMinIdleRefreshRate(fps);
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_return) {
+    if (mDevice) {
+        *_aidl_return = mDevice->setRefreshRateThrottle(delayMs);
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 } // namespace display
 } // namespace pixel

@@ -19,8 +19,11 @@
 
 #include "ExynosPrimaryDisplay.h"
 
-#include <fstream>
+#include <linux/fb.h>
 #include <poll.h>
+
+#include <chrono>
+#include <fstream>
 
 #include "ExynosDevice.h"
 #include "ExynosDisplayDrmInterface.h"
@@ -28,8 +31,6 @@
 #include "ExynosExternalDisplay.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
-
-#include <linux/fb.h>
 
 extern struct exynos_hwc_control exynosHWCControl;
 
@@ -68,8 +69,11 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
 }
 
 ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
-    :   ExynosDisplay(index, device)
-{
+      : ExynosDisplay(index, device),
+        mMinIdleRefreshRate(0),
+        mRefreshRateDelayNanos(0),
+        mLastRefreshRateAppliedNanos(0),
+        mAppliedActiveConfig(0) {
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
 
@@ -249,7 +253,7 @@ int32_t ExynosPrimaryDisplay::applyPendingConfig() {
 
 int32_t ExynosPrimaryDisplay::setPowerOn() {
     ATRACE_CALL();
-
+    updateAppliedActiveConfig(0, 0);
     int ret = applyPendingConfig();
 
     if (mPowerModeState == HWC2_POWER_MODE_OFF) {
@@ -587,4 +591,116 @@ void ExynosPrimaryDisplay::setWakeupDisplay() {
     if (mWakeupDispFd) {
         writeFileNode(mWakeupDispFd, 1);
     }
+}
+
+int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int fps) {
+    mMinIdleRefreshRate = fps;
+
+    const std::string path = getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "min_vrefresh";
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        ALOGW("Unable to open node '%s', error = %s", path.c_str(), strerror(errno));
+        return errno;
+    } else {
+        ofs << mMinIdleRefreshRate;
+        ofs.close();
+        ALOGI("ExynosPrimaryDisplay::%s() writes min_vrefresh(%d) to the sysfs node", __func__,
+              fps);
+    }
+    return NO_ERROR;
+}
+
+int ExynosPrimaryDisplay::setRefreshRateThrottleNanos(const int64_t delayNanos) {
+    mRefreshRateDelayNanos = delayNanos;
+
+    const int32_t refreshRateDelayMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                               std::chrono::nanoseconds(mRefreshRateDelayNanos))
+                                               .count();
+    const std::string path = getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "idle_delay_ms";
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        ALOGW("Unable to open node '%s', error = %s", path.c_str(), strerror(errno));
+        return errno;
+    } else {
+        ofs << refreshRateDelayMs;
+        ofs.close();
+        ALOGI("ExynosPrimaryDisplay::%s() writes idle_delay_ms(%d) to the sysfs node", __func__,
+              refreshRateDelayMs);
+    }
+
+    return NO_ERROR;
+}
+
+void ExynosPrimaryDisplay::dump(String8 &result) {
+    ExynosDisplay::dump(result);
+    result.appendFormat("Min idle refresh rate: %d\n", mMinIdleRefreshRate);
+    result.appendFormat("Refresh rate delay: %" PRId64 "ns\n\n", mRefreshRateDelayNanos);
+}
+
+void ExynosPrimaryDisplay::calculateTimeline(
+        hwc2_config_t config, hwc_vsync_period_change_constraints_t *vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t *outTimeline) {
+    int64_t desiredUpdateTime = vsyncPeriodChangeConstraints->desiredTimeNanos;
+    const int64_t origDesiredUpdateTime = desiredUpdateTime;
+    const int64_t threshold = mRefreshRateDelayNanos;
+    int64_t lastUpdateDelta = 0;
+    int64_t actualChangeTime = 0;
+    bool isDelayed = false;
+
+    /* actualChangeTime includes transient duration */
+    mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
+
+    outTimeline->refreshRequired = true;
+
+    /* when refresh rate is from high to low */
+    if (threshold != 0 && mLastRefreshRateAppliedNanos != 0 &&
+        mDisplayConfigs[mActiveConfig].vsyncPeriod < mDisplayConfigs[config].vsyncPeriod) {
+        lastUpdateDelta = desiredUpdateTime - mLastRefreshRateAppliedNanos;
+        if (lastUpdateDelta < threshold) {
+            /* in this case, the active config change needs to be delayed */
+            isDelayed = true;
+            desiredUpdateTime += threshold - lastUpdateDelta;
+        }
+    }
+    mVsyncPeriodChangeConstraints.desiredTimeNanos = desiredUpdateTime;
+
+    getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos, actualChangeTime,
+                         outTimeline->newVsyncAppliedTimeNanos, outTimeline->refreshTimeNanos);
+
+    if (isDelayed) {
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "requested config : %d(%d)->%d(%d) is delayed! "
+                     "delta %" PRId64 ", delay %" PRId64 ", threshold %" PRId64 ", "
+                     "desired %" PRId64 "->%" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64
+                     ", refreshTimeNanos:%" PRId64,
+                     mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod, config,
+                     mDisplayConfigs[config].vsyncPeriod, lastUpdateDelta,
+                     threshold - lastUpdateDelta, threshold, origDesiredUpdateTime,
+                     mVsyncPeriodChangeConstraints.desiredTimeNanos,
+                     outTimeline->newVsyncAppliedTimeNanos, outTimeline->refreshTimeNanos);
+    } else {
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "requested config : %d(%d)->%d(%d), "
+                     "lastUpdateDelta %" PRId64 ", threshold %" PRId64 ", "
+                     "desired %" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64 "",
+                     mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod, config,
+                     mDisplayConfigs[config].vsyncPeriod, lastUpdateDelta, threshold,
+                     mVsyncPeriodChangeConstraints.desiredTimeNanos,
+                     outTimeline->newVsyncAppliedTimeNanos);
+    }
+}
+
+void ExynosPrimaryDisplay::updateAppliedActiveConfig(const hwc2_config_t newConfig,
+                                                     const int64_t ts) {
+    if (mAppliedActiveConfig == 0 ||
+        getDisplayVsyncPeriodFromConfig(mAppliedActiveConfig) !=
+                getDisplayVsyncPeriodFromConfig(newConfig)) {
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "%s mAppliedActiveConfig(%d->%d), mLastRefreshRateAppliedNanos(%" PRIu64
+                     " -> %" PRIu64 ")",
+                     __func__, mAppliedActiveConfig, newConfig, mLastRefreshRateAppliedNanos, ts);
+        mLastRefreshRateAppliedNanos = ts;
+    }
+
+    mAppliedActiveConfig = newConfig;
 }

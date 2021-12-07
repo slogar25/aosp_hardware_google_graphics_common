@@ -76,6 +76,9 @@ public:
     virtual int32_t setDisplayBrightness(int32_t display_id, float brightness);
     virtual int32_t setDisplayLhbm(int32_t display_id, uint32_t on);
 
+    virtual int32_t setMinIdleRefreshRate(uint32_t display_id, int32_t fps);
+    virtual int32_t setRefreshRateThrottle(uint32_t display_id, int32_t delayMs);
+
 private:
     friend class Singleton<ExynosHWCService>;
     ExynosHWCService();
