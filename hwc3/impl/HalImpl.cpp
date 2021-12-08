@@ -536,6 +536,16 @@ int32_t HalImpl::presentDisplay(int64_t display, ndk::ScopedFileDescriptor& fenc
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
+   // TODO: not expect acceptDisplayChanges if there are no changes to accept
+    if (halDisplay->mRenderingState == RENDERING_STATE_VALIDATED) {
+        LOG(INFO) << halDisplay->mDisplayName.string()
+                   << ": acceptDisplayChanges was not called";
+        if (halDisplay->acceptDisplayChanges() != HWC2_ERROR_NONE) {
+            LOG(ERROR) << halDisplay->mDisplayName.string()
+            << ": acceptDisplayChanges is failed";
+        }
+    }
+
     int32_t hwcFence;
     RET_IF_ERR(halDisplay->presentDisplay(&hwcFence));
     h2a::translate(hwcFence, fence);
