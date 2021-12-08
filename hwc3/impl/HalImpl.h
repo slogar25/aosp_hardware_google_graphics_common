@@ -94,13 +94,13 @@ class HalImpl : public IComposerHal {
                             const std::vector<common::Rect>& damage) override;
     int32_t setColorMode(int64_t display, ColorMode mode, RenderIntent intent) override;
     int32_t setColorTransform(int64_t display, const std::vector<float>& matrix,
-                              int32_t hint) override;
+                              common::ColorTransform hint) override;
     int32_t setContentType(int64_t display, ContentType contentType) override;
     int32_t setDisplayBrightness(int64_t display, float brightness) override;
     int32_t setDisplayedContentSamplingEnabled(int64_t display, bool enable,
                                                FormatColorComponent componentMask,
                                                int64_t maxFrames) override;
-    int32_t setLayerBlendMode(int64_t display, int64_t layer, BlendMode mode) override;
+    int32_t setLayerBlendMode(int64_t display, int64_t layer, common::BlendMode mode) override;
     int32_t setLayerBuffer(int64_t display, int64_t layer, buffer_handle_t buffer,
                            const ndk::ScopedFileDescriptor& acquireFence) override;
     int32_t setLayerColor(int64_t display, int64_t layer, Color color) override;
@@ -112,21 +112,21 @@ class HalImpl : public IComposerHal {
     int32_t setLayerDisplayFrame(int64_t display, int64_t layer,
                                  const common::Rect& frame) override;
     int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) override;
-    int32_t setLayerGenericMetadata(int64_t display, int64_t layer, const std::string& key,
-                                    bool mandatory, const std::vector<uint8_t>& value) override;
+    int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
+                                    const command::GenericMetadata& metadata) override;
     int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
-                                     const std::vector<PerFrameMetadata>& metadata) override;
+                            const std::vector<std::optional<PerFrameMetadata>>& metadata) override;
     int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
-                                          const std::vector<PerFrameMetadataBlob>& blobs) override;
+                            const std::vector<std::optional<PerFrameMetadataBlob>>& blobs) override;
     int32_t setLayerPlaneAlpha(int64_t display, int64_t layer, float alpha) override;
     int32_t setLayerSidebandStream(int64_t display, int64_t layer,
                                    buffer_handle_t stream) override;
     int32_t setLayerSourceCrop(int64_t display, int64_t layer, const common::FRect& crop) override;
     int32_t setLayerSurfaceDamage(int64_t display, int64_t layer,
-                                  const std::vector<common::Rect>& damage) override;
+                                  const std::vector<std::optional<common::Rect>>& damage) override;
     int32_t setLayerTransform(int64_t display, int64_t layer, common::Transform transform) override;
     int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
-                                  const std::vector<common::Rect>& visible) override;
+                          const std::vector<std::optional<common::Rect>>& visible) override;
     int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) override;
     int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                             const ndk::ScopedFileDescriptor& releaseFence) override;
@@ -138,7 +138,7 @@ class HalImpl : public IComposerHal {
                             std::vector<Composition>* outCompositionTypes,
                             uint32_t* outDisplayRequestMask,
                             std::vector<int64_t>* outRequestedLayers,
-                            std::vector<uint32_t>* outRequestMasks,
+                            std::vector<int32_t>* outRequestMasks,
                             ClientTargetProperty* outClientTargetProperty) override;
 
     EventCallback* getEventCallback() { return mEventCallback; }

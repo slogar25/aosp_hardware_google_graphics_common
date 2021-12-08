@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include <aidl/android/hardware/graphics/composer3/Command.h>
-
 #include "ComposerCommandEngine.h"
 #include "Util.h"
 
@@ -27,687 +25,408 @@
 // and adapt to aidl structures.
 namespace aidl::android::hardware::graphics::composer3::impl {
 
+#define DISPATCH_LAYER_COMMAND(layerCmd, field, funcName)                    \
+    do {                                                                     \
+        if (layerCmd.field) {                                                \
+            executeSetLayer##funcName(layerCmd.display,                      \
+                                      layerCmd.layer, *layerCmd.field);      \
+        }                                                                    \
+    } while (0)
+
+#define DISPATCH_DISPLAY_COMMAND(displayCmd, field, funcName)                \
+    do {                                                                     \
+        if (displayCmd.field) {                                              \
+            execute##funcName(displayCmd.display, *displayCmd.field);        \
+        }                                                                    \
+    } while (0)
+
+#define DISPATCH_DISPLAY_BOOL_COMMAND(displayCmd, field, funcName)           \
+    do {                                                                     \
+        if (displayCmd.field) {                                              \
+            execute##funcName(displayCmd.display);                           \
+        }                                                                    \
+    } while (0)
+
 bool ComposerCommandEngine::init() {
-    mWriter = std::make_unique<CommandWriterBase>(kWriterInitialSize);
+    mWriter = std::make_unique<CommandWriterBase>();
     return (mWriter != nullptr);
 }
 
-int32_t ComposerCommandEngine::execute(int32_t inLength,
-                                       const std::vector<AidlNativeHandle>& inHandles,
-                                       ExecuteCommandsStatus* status) {
-    DEBUG_FUNC();
-    // inHandles is not declared as const in AIDL sub code and is not used after this call.
-    // drop the const to avoid dup the handles
-    auto& handles = const_cast<std::vector<AidlNativeHandle>&>(inHandles);
-    if (!readQueue(inLength, std::move(handles))) {
-        return IComposerClient::EX_BAD_PARAMETER;
-    }
-
-    Command command;
-    uint16_t length = 0;
-    while (!isEmpty()) {
-        if (!beginCommand(&command, &length)) {
+int32_t ComposerCommandEngine::execute(const std::vector<command::CommandPayload>& commands,
+                                       std::vector<command::CommandResultPayload>* result) {
+    mCommandIndex = 0;
+    for (const auto& command : commands) {
+        switch (command.getTag()) {
+        case command::CommandPayload::displayCommand:
+            dispatchDisplayCommand(command.get<command::CommandPayload::displayCommand>());
             break;
-        }
 
-        bool parsed = executeCommand(command, length);
-        endCommand();
-
-        if (!parsed) {
-            LOG(ERROR) << "failed to parse command: 0x" << std::hex
-                       << static_cast<uint32_t>(command)
-                       << ", len: " << std::dec << length;
+        case command::CommandPayload::layerCommand:
+            dispatchLayerCommand(command.get<command::CommandPayload::layerCommand>());
             break;
-        }
-    }
 
-    if (!isEmpty()) {
-        return IComposerClient::EX_BAD_PARAMETER;
-    }
-
-    return mWriter->writeQueue(&status->queueChanged, &status->length, &status->handles)
-            ? 0
-            : IComposerClient::EX_NO_RESOURCES;
-}
-
-bool ComposerCommandEngine::executeCommand(Command command, uint16_t length) {
-    DEBUG_FUNC();
-    switch (command) {
-        case Command::SELECT_DISPLAY:
-            return executeSelectDisplay(length);
-        case Command::SELECT_LAYER:
-            return executeSelectLayer(length);
-        case Command::SET_COLOR_TRANSFORM:
-            return executeSetColorTransform(length);
-        case Command::SET_CLIENT_TARGET:
-            return executeSetClientTarget(length);
-        case Command::SET_OUTPUT_BUFFER:
-            return executeSetOutputBuffer(length);
-        case Command::VALIDATE_DISPLAY:
-            return executeValidateDisplay(length);
-        case Command::PRESENT_OR_VALIDATE_DISPLAY:
-            return executePresentOrValidateDisplay(length);
-        case Command::ACCEPT_DISPLAY_CHANGES:
-            return executeAcceptDisplayChanges(length);
-        case Command::PRESENT_DISPLAY:
-            return executePresentDisplay(length);
-        case Command::SET_LAYER_CURSOR_POSITION:
-            return executeSetLayerCursorPosition(length);
-        case Command::SET_LAYER_BUFFER:
-            return executeSetLayerBuffer(length);
-        case Command::SET_LAYER_SURFACE_DAMAGE:
-            return executeSetLayerSurfaceDamage(length);
-        case Command::SET_LAYER_BLEND_MODE:
-            return executeSetLayerBlendMode(length);
-        case Command::SET_LAYER_COLOR:
-            return executeSetLayerColor(length);
-        case Command::SET_LAYER_COMPOSITION_TYPE:
-            return executeSetLayerCompositionType(length);
-        case Command::SET_LAYER_DATASPACE:
-            return executeSetLayerDataspace(length);
-        case Command::SET_LAYER_DISPLAY_FRAME:
-            return executeSetLayerDisplayFrame(length);
-        case Command::SET_LAYER_PLANE_ALPHA:
-            return executeSetLayerPlaneAlpha(length);
-        case Command::SET_LAYER_SIDEBAND_STREAM:
-            return executeSetLayerSidebandStream(length);
-        case Command::SET_LAYER_SOURCE_CROP:
-            return executeSetLayerSourceCrop(length);
-        case Command::SET_LAYER_TRANSFORM:
-            return executeSetLayerTransform(length);
-        case Command::SET_LAYER_VISIBLE_REGION:
-            return executeSetLayerVisibleRegion(length);
-        case Command::SET_LAYER_Z_ORDER:
-            return executeSetLayerZOrder(length);
-        case Command::SET_LAYER_PER_FRAME_METADATA:
-            return executeSetLayerPerFrameMetadata(length);
-        case Command::SET_LAYER_FLOAT_COLOR:
-            return executeSetLayerFloatColor(length);
-        case Command::SET_LAYER_COLOR_TRANSFORM:
-            return executeSetLayerColorTransform(length);
-        case Command::SET_LAYER_PER_FRAME_METADATA_BLOBS:
-            return executeSetLayerPerFrameMetadataBlobs(length);
-        case Command::SET_LAYER_GENERIC_METADATA:
-            return executeSetLayerGenericMetadata(length);
         default:
-            return false;
+            LOG(WARNING) << "unsupported command type " << command.toString();
+            break;
+        }
+        ++mCommandIndex;
     }
+
+    *result = mWriter->getPendingCommandResults();
+    return 0;
 }
 
-int32_t ComposerCommandEngine::executeValidateDisplayInternal() {
+void ComposerCommandEngine::dispatchDisplayCommand(const command::DisplayCommand& command) {
+    DISPATCH_DISPLAY_COMMAND(command, colorTransform, SetColorTransform);
+    DISPATCH_DISPLAY_COMMAND(command, clientTarget, SetClientTarget);
+    DISPATCH_DISPLAY_COMMAND(command, virtualDisplayOutputBuffer, SetOutputBuffer);
+    // TODO: (b/196171661) SDR & HDR blending
+    // DISPATCH_DISPLAY_COMMAND(command, displayBrightness, SetDisplayBrightness);
+    DISPATCH_DISPLAY_BOOL_COMMAND(command, validateDisplay, ValidateDisplay);
+    DISPATCH_DISPLAY_BOOL_COMMAND(command, acceptDisplayChanges, AcceptDisplayChanges);
+    DISPATCH_DISPLAY_BOOL_COMMAND(command, presentDisplay, PresentDisplay);
+    DISPATCH_DISPLAY_BOOL_COMMAND(command, presentOrValidateDisplay, PresentOrValidateDisplay);
+}
+
+void ComposerCommandEngine::dispatchLayerCommand(const command::LayerCommand &command) {
+    DISPATCH_LAYER_COMMAND(command, cursorPosition, CursorPosition);
+    DISPATCH_LAYER_COMMAND(command, buffer, Buffer);
+    DISPATCH_LAYER_COMMAND(command, damage, SurfaceDamage);
+    DISPATCH_LAYER_COMMAND(command, blendMode, BlendMode);
+    DISPATCH_LAYER_COMMAND(command, color, Color);
+    DISPATCH_LAYER_COMMAND(command, floatColor, FloatColor);
+    DISPATCH_LAYER_COMMAND(command, composition, Composition);
+    DISPATCH_LAYER_COMMAND(command, dataspace, Dataspace);
+    DISPATCH_LAYER_COMMAND(command, displayFrame, DisplayFrame);
+    DISPATCH_LAYER_COMMAND(command, planeAlpha, PlaneAlpha);
+    DISPATCH_LAYER_COMMAND(command, sidebandStream, SidebandStream);
+    DISPATCH_LAYER_COMMAND(command, sourceCrop, SourceCrop);
+    DISPATCH_LAYER_COMMAND(command, transform, Transform);
+    DISPATCH_LAYER_COMMAND(command, visibleRegion, VisibleRegion);
+    DISPATCH_LAYER_COMMAND(command, z, ZOrder);
+    DISPATCH_LAYER_COMMAND(command, colorTransform, ColorTransform);
+    // TODO: (b/196171661) add support for mixed composition
+    // DISPATCH_LAYER_COMMAND(command, whitePointNits, WhitePointNits);
+    DISPATCH_LAYER_COMMAND(command, genericMetadata, GenericMetadata);
+    DISPATCH_LAYER_COMMAND(command, perFrameMetadata, PerFrameMetadata);
+    DISPATCH_LAYER_COMMAND(command, perFrameMetadataBlob, PerFrameMetadataBlobs);
+}
+
+int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
     std::vector<int64_t> changedLayers;
     std::vector<Composition> compositionTypes;
     uint32_t displayRequestMask = 0x0;
     std::vector<int64_t> requestedLayers;
-    std::vector<uint32_t> requestMasks;
+    std::vector<int32_t> requestMasks;
     ClientTargetProperty clientTargetProperty{common::PixelFormat::RGBA_8888,
                                               common::Dataspace::UNKNOWN};
-    auto err = mHal->validateDisplay(mCurrentDisplay, &changedLayers, &compositionTypes,
+    auto err = mHal->validateDisplay(display, &changedLayers, &compositionTypes,
                                      &displayRequestMask, &requestedLayers, &requestMasks,
                                      &clientTargetProperty);
-    mResources->setDisplayMustValidateState(mCurrentDisplay, false);
+    mResources->setDisplayMustValidateState(display, false);
     if (!err) {
-        mWriter->setChangedCompositionTypes(changedLayers, compositionTypes);
-        mWriter->setDisplayRequests(displayRequestMask, requestedLayers, requestMasks);
-        mWriter->setClientTargetProperty(clientTargetProperty);
+        mWriter->setChangedCompositionTypes(display, changedLayers, compositionTypes);
+        mWriter->setDisplayRequests(display, displayRequestMask, requestedLayers, requestMasks);
+        // TODO: (b/196171661) sdr/hdr composition, use 1.0
+        mWriter->setClientTargetProperty(display, clientTargetProperty, 1.0f);
     } else {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
     return err;
 }
 
-bool ComposerCommandEngine::executeSelectDisplay(uint16_t length) {
-    if (length != CommandWriterBase::kSelectDisplayLength) {
-        return false;
-    }
-
-    mCurrentDisplay = read64();
-    mWriter->selectDisplay(mCurrentDisplay);
-
-    return true;
-}
-
-bool ComposerCommandEngine::executeSelectLayer(uint16_t length) {
-    if (length != CommandWriterBase::kSelectLayerLength) {
-        return false;
-    }
-
-    mCurrentLayer = read64();
-
-    return true;
-}
-
-bool ComposerCommandEngine::executeSetColorTransform(uint16_t length) {
-    if (length != CommandWriterBase::kSetColorTransformLength) {
-        return false;
-    }
-
-    std::vector<float> matrix(16);
-    for (int i = 0; i < 16; i++) {
-        matrix[i] = readFloat();
-    }
-    auto transform = readSigned();
-
-    auto err = mHal->setColorTransform(mCurrentDisplay, matrix, transform);
+void ComposerCommandEngine::executeSetColorTransform(int64_t display,
+                            const command::ColorTransformPayload& command) {
+    auto err = mHal->setColorTransform(display, command.matrix, command.hint);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetClientTarget(uint16_t length) {
-    // 4 parameters followed by N rectangles
-    if ((length - 4) % 4 != 0) {
-        return false;
-    }
-
-    bool useCache = false;
-    auto slot = read();
-    auto handle = readHandle(&useCache);
-    auto fence = readAidlFence();
-    common::Dataspace dataspace = static_cast<common::Dataspace>(readSigned());
-    auto damage = readRegion((length - 4) / 4);
+void ComposerCommandEngine::executeSetClientTarget(int64_t display,
+                                                   const command::ClientTarget& command) {
+    bool useCache = !command.buffer.handle;
+    buffer_handle_t handle = useCache
+                             ? nullptr
+                             : ::android::makeFromAidl(*command.buffer.handle);
     buffer_handle_t clientTarget;
-
     auto bufferReleaser = mResources->createReleaser(true);
-    auto err = mResources->getDisplayClientTarget(mCurrentDisplay, slot, useCache, handle,
+    auto err = mResources->getDisplayClientTarget(display, command.buffer.slot, useCache, handle,
                                                   clientTarget, bufferReleaser.get());
     if (!err) {
-        err = mHal->setClientTarget(mCurrentDisplay, clientTarget, fence, dataspace,
-                                    damage);
+        err = mHal->setClientTarget(display, clientTarget, command.buffer.fence,
+                                    command.dataspace, command.damage);
+        if (err) {
+            LOG(ERROR) << __func__ << " setClientTarget: err " << err;
+            mWriter->setError(mCommandIndex, err);
+        }
     } else {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << " getDisplayClientTarget : err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetOutputBuffer(uint16_t length) {
-    if (length != CommandWriterBase::kSetOutputBufferLength) {
-        return false;
-    }
-
-    bool useCache = false;
-    auto slot = read();
-    auto handle = readHandle(&useCache);
-    auto fence = readAidlFence();
+void ComposerCommandEngine::executeSetOutputBuffer(uint64_t display,
+                                                   const command::Buffer& buffer) {
+    bool useCache = !buffer.handle;
+    buffer_handle_t handle = useCache
+                             ? nullptr
+                             : ::android::makeFromAidl(*buffer.handle);
     buffer_handle_t outputBuffer;
-
     auto bufferReleaser = mResources->createReleaser(true);
-    auto err = mResources->getDisplayOutputBuffer(mCurrentDisplay, slot, useCache, handle,
+    auto err = mResources->getDisplayOutputBuffer(display, buffer.slot, useCache, handle,
                                                   outputBuffer, bufferReleaser.get());
     if (!err) {
-        err = mHal->setOutputBuffer(mCurrentDisplay, outputBuffer, fence);
+        err = mHal->setOutputBuffer(display, outputBuffer, buffer.fence);
+        if (err) {
+            LOG(ERROR) << __func__ << " setOutputBuffer: err " << err;
+            mWriter->setError(mCommandIndex, err);
+        }
     } else {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << " getDisplayOutputBuffer: err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeValidateDisplay(uint16_t length) {
-    if (length != CommandWriterBase::kValidateDisplayLength) {
-        return false;
-    }
-    executeValidateDisplayInternal();
-    return true;
+void ComposerCommandEngine::executeValidateDisplay(int64_t display) {
+    executeValidateDisplayInternal(display);
 }
 
-bool ComposerCommandEngine::executePresentOrValidateDisplay(uint16_t length) {
-    if (length != CommandWriterBase::kPresentOrValidateDisplayLength) {
-        return false;
-    }
-
+void ComposerCommandEngine::executePresentOrValidateDisplay(int64_t display) {
+    int err;
     // First try to Present as is.
     if (mHal->hasCapability(Capability::SKIP_VALIDATE)) {
-        ndk::ScopedFileDescriptor presentFence;
-        std::vector<int64_t> layers;
-        std::vector<ndk::ScopedFileDescriptor> fences;
-        auto err = mResources->mustValidateDisplay(mCurrentDisplay)
-                ? IComposerClient::EX_NOT_VALIDATED
-                : mHal->presentDisplay(mCurrentDisplay, presentFence, &layers, &fences);
+        err = executePresentDisplay(display);
         if (!err) {
-            mWriter->setPresentOrValidateResult(1);
-            // ownership is transferred to Writer
-            mWriter->setPresentFence(takeFence(presentFence));
-            mWriter->setReleaseFences(layers, takeFence(fences));
-            return true;
+            mWriter->setPresentOrValidateResult(display,
+                                                command::PresentOrValidate::Result::Presented);
+            return;
         }
     }
 
-    // Present has failed. We need to fallback to validate
-    auto err = executeValidateDisplayInternal();
+    // Fallback to validate
+    err = executeValidateDisplayInternal(display);
     if (!err) {
-        mWriter->setPresentOrValidateResult(0);
+        mWriter->setPresentOrValidateResult(display, command::PresentOrValidate::Result::Validated);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeAcceptDisplayChanges(uint16_t length) {
-    if (length != CommandWriterBase::kAcceptDisplayChangesLength) {
-        return false;
-    }
-
-    auto err = mHal->acceptDisplayChanges(mCurrentDisplay);
+void ComposerCommandEngine::executeAcceptDisplayChanges(int64_t display) {
+    auto err = mHal->acceptDisplayChanges(display);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executePresentDisplay(uint16_t length) {
-    if (length != CommandWriterBase::kPresentDisplayLength) {
-        return false;
-    }
-
+int ComposerCommandEngine::executePresentDisplay(int64_t display) {
     ndk::ScopedFileDescriptor presentFence;
     std::vector<int64_t> layers;
     std::vector<ndk::ScopedFileDescriptor> fences;
-    auto err = mHal->presentDisplay(mCurrentDisplay, presentFence, &layers, &fences);
+    auto err = mResources->mustValidateDisplay(display)
+            ? IComposerClient::EX_NOT_VALIDATED
+            : mHal->presentDisplay(display, presentFence, &layers, &fences);
     if (!err) {
-        // ownership is transferred to Writer
-        mWriter->setPresentFence(takeFence(presentFence));
-        mWriter->setReleaseFences(layers, takeFence(fences));
-    } else {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        mWriter->setPresentFence(display, std::move(presentFence));
+        mWriter->setReleaseFences(display, layers, std::move(fences));
     }
-
-    return true;
+    return err;
 }
 
-bool ComposerCommandEngine::executeSetLayerCursorPosition(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerCursorPositionLength) {
-        return false;
-    }
-
-    auto err = mHal->setLayerCursorPosition(mCurrentDisplay, mCurrentLayer, readSigned(),
-                                            readSigned());
+void ComposerCommandEngine::executeSetLayerCursorPosition(int64_t display, int64_t layer,
+                                       const common::Point& cursorPosition) {
+    auto err = mHal->setLayerCursorPosition(display, layer, cursorPosition.x, cursorPosition.y);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerBuffer(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerBufferLength) {
-        return false;
-    }
-
-    bool useCache = false;
-    auto slot = read();
-    auto handle = readHandle(&useCache);
-    auto fence = readAidlFence();
-
-    buffer_handle_t buffer;
+void ComposerCommandEngine::executeSetLayerBuffer(int64_t display, int64_t layer,
+                                                  const command::Buffer& buffer) {
+    bool useCache = !buffer.handle;
+    buffer_handle_t handle = useCache
+                             ? nullptr
+                             : ::android::makeFromAidl(*buffer.handle);
+    buffer_handle_t hwcBuffer;
     auto bufferReleaser = mResources->createReleaser(true);
-    auto err = mResources->getLayerBuffer(mCurrentDisplay, mCurrentLayer, slot, useCache,
-                                          handle, buffer, bufferReleaser.get());
+    auto err = mResources->getLayerBuffer(display, layer, buffer.slot, useCache,
+                                          handle, hwcBuffer, bufferReleaser.get());
     if (!err) {
-        err = mHal->setLayerBuffer(mCurrentDisplay, mCurrentLayer, buffer, fence);
+        err = mHal->setLayerBuffer(display, layer, hwcBuffer, buffer.fence);
+        if (err) {
+            LOG(ERROR) << __func__ << ": setLayerBuffer err " << err;
+            mWriter->setError(mCommandIndex, err);
+        }
     } else {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": getLayerBuffer err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerSurfaceDamage(uint16_t length) {
-    // N rectangles
-    if (length % 4 != 0) {
-        return false;
-    }
-
-    auto damage = readRegion(length / 4);
-    auto err = mHal->setLayerSurfaceDamage(mCurrentDisplay, mCurrentLayer, damage);
+void ComposerCommandEngine::executeSetLayerSurfaceDamage(int64_t display, int64_t layer,
+                              const std::vector<std::optional<common::Rect>>& damage) {
+    auto err = mHal->setLayerSurfaceDamage(display, layer, damage);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerBlendMode(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerBlendModeLength) {
-        return false;
-    }
-
-    BlendMode mode = static_cast<BlendMode>(readSigned());
-    auto err = mHal->setLayerBlendMode(mCurrentDisplay, mCurrentLayer, mode);
+void ComposerCommandEngine::executeSetLayerBlendMode(int64_t display, int64_t layer,
+                                          const command::ParcelableBlendMode& blendMode) {
+    auto err = mHal->setLayerBlendMode(display, layer, blendMode.blendMode);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerColor(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerColorLength) {
-        return false;
-    }
-
-    auto err = mHal->setLayerColor(mCurrentDisplay, mCurrentLayer, readColor());
+void ComposerCommandEngine::executeSetLayerColor(int64_t display, int64_t layer,
+                                                 const Color& color) {
+    auto err = mHal->setLayerColor(display, layer, color);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerCompositionType(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerCompositionTypeLength) {
-        return false;
-    }
-
-    Composition type = static_cast<Composition>(readSigned());
-    auto err = mHal->setLayerCompositionType(mCurrentDisplay, mCurrentLayer, type);
+void ComposerCommandEngine::executeSetLayerComposition(int64_t display, int64_t layer,
+                                        const command::ParcelableComposition& composition) {
+    auto err = mHal->setLayerCompositionType(display, layer, composition.composition);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerDataspace(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerDataspaceLength) {
-        return false;
-    }
-
-    common::Dataspace dataspace = static_cast<common::Dataspace>(readSigned());
-    auto err = mHal->setLayerDataspace(mCurrentDisplay, mCurrentLayer, dataspace);
+void ComposerCommandEngine::executeSetLayerDataspace(int64_t display, int64_t layer,
+                                          const command::ParcelableDataspace& dataspace) {
+    auto err = mHal->setLayerDataspace(display, layer, dataspace.dataspace);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerDisplayFrame(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerDisplayFrameLength) {
-        return false;
-    }
-
-    auto err = mHal->setLayerDisplayFrame(mCurrentDisplay, mCurrentLayer, readRect());
+void ComposerCommandEngine::executeSetLayerDisplayFrame(int64_t display, int64_t layer,
+                                                        const common::Rect& rect) {
+    auto err = mHal->setLayerDisplayFrame(display, layer, rect);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerPlaneAlpha(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerPlaneAlphaLength) {
-        return false;
-    }
-
-    auto err = mHal->setLayerPlaneAlpha(mCurrentDisplay, mCurrentLayer, readFloat());
+void ComposerCommandEngine::executeSetLayerPlaneAlpha(int64_t display, int64_t layer,
+                                                   const command::PlaneAlpha& planeAlpha) {
+  auto err = mHal->setLayerPlaneAlpha(display, layer, planeAlpha.alpha);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerSidebandStream(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerSidebandStreamLength) {
-        return false;
-    }
-
-    bool useCache;
-    auto handle = readHandle(&useCache);
+void ComposerCommandEngine::executeSetLayerSidebandStream(int64_t display, int64_t layer,
+                                                 const AidlNativeHandle& sidebandStream) {
+    buffer_handle_t handle = ::android::makeFromAidl(sidebandStream);
     buffer_handle_t stream;
 
     auto bufferReleaser = mResources->createReleaser(false);
-    auto err = mResources->getLayerSidebandStream(mCurrentDisplay, mCurrentLayer, handle,
+    auto err = mResources->getLayerSidebandStream(display, layer, handle,
                                                   stream, bufferReleaser.get());
     if (err) {
-        err = mHal->setLayerSidebandStream(mCurrentDisplay, mCurrentLayer, stream);
+        err = mHal->setLayerSidebandStream(display, layer, stream);
     }
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerSourceCrop(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerSourceCropLength) {
-        return false;
-    }
-
-    auto err = mHal->setLayerSourceCrop(mCurrentDisplay, mCurrentLayer, readFRect());
+void ComposerCommandEngine::executeSetLayerSourceCrop(int64_t display, int64_t layer,
+                                                      const common::FRect& sourceCrop) {
+    auto err = mHal->setLayerSourceCrop(display, layer, sourceCrop);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerTransform(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerTransformLength) {
-        return false;
-    }
-
-    common::Transform transform = static_cast<common::Transform>(readSigned());
-    auto err = mHal->setLayerTransform(mCurrentDisplay, mCurrentLayer, transform);
+void ComposerCommandEngine::executeSetLayerTransform(int64_t display, int64_t layer,
+                                            const command::ParcelableTransform& transform) {
+    auto err = mHal->setLayerTransform(display, layer, transform.transform);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerVisibleRegion(uint16_t length) {
-    // N rectangles
-    if (length % 4 != 0) {
-        return false;
-    }
-
-    auto region = readRegion(length / 4);
-    auto err = mHal->setLayerVisibleRegion(mCurrentDisplay, mCurrentLayer, region);
+void ComposerCommandEngine::executeSetLayerVisibleRegion(int64_t display, int64_t layer,
+                          const std::vector<std::optional<common::Rect>>& visibleRegion) {
+    auto err = mHal->setLayerVisibleRegion(display, layer, visibleRegion);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerZOrder(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerZOrderLength) {
-        return false;
-    }
-
-    auto err = mHal->setLayerZOrder(mCurrentDisplay, mCurrentLayer, read());
+void ComposerCommandEngine::executeSetLayerZOrder(int64_t display, int64_t layer,
+                                                  const command::ZOrder& zOrder) {
+    auto err = mHal->setLayerZOrder(display, layer, zOrder.z);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerPerFrameMetadata(uint16_t length) {
-    // (key, value) pairs
-    if (length % 2 != 0) {
-        return false;
-    }
-
-    std::vector<PerFrameMetadata> metadata;
-    metadata.reserve(length / 2);
-    while (length > 0) {
-        metadata.emplace_back(
-                PerFrameMetadata{static_cast<PerFrameMetadataKey>(readSigned()), readFloat()});
-        length -= 2;
-    }
-
-    auto err = mHal->setLayerPerFrameMetadata(mCurrentDisplay, mCurrentLayer, metadata);
+void ComposerCommandEngine::executeSetLayerPerFrameMetadata(int64_t display, int64_t layer,
+                const std::vector<std::optional<PerFrameMetadata>>& perFrameMetadata) {
+    auto err = mHal->setLayerPerFrameMetadata(display, layer, perFrameMetadata);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerFloatColor(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerFloatColorLength) {
-        return false;
-    }
-
-    auto err = mHal->setLayerFloatColor(mCurrentDisplay, mCurrentLayer, readFloatColor());
+void ComposerCommandEngine::executeSetLayerFloatColor(int64_t display, int64_t layer,
+                                                      const FloatColor& floatColor) {
+    auto err = mHal->setLayerFloatColor(display, layer, floatColor);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerColorTransform(uint16_t length) {
-    if (length != CommandWriterBase::kSetLayerColorTransformLength) {
-        return false;
-    }
-
-    std::vector<float> matrix(16);
-    for (int i = 0; i < 16; i++) {
-        matrix[i] = readFloat();
-    }
-    auto err = mHal->setLayerColorTransform(mCurrentDisplay, mCurrentLayer, matrix);
+void ComposerCommandEngine::executeSetLayerColorTransform(int64_t display, int64_t layer,
+                                                       const std::vector<float>& matrix) {
+    auto err = mHal->setLayerColorTransform(display, layer, matrix);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(uint16_t length) {
-    // must have at least one metadata blob
-    // of at least size 1 in queue (i.e {/*numBlobs=*/1, key, size, blob})
-    if (length < 4) {
-        return false;
-    }
-
-    uint32_t numBlobs = read();
-    length--;
-
-    std::vector<PerFrameMetadataBlob> metadata;
-
-    for (size_t i = 0; i < numBlobs; i++) {
-        PerFrameMetadataKey key = static_cast<PerFrameMetadataKey>(readSigned());
-        uint32_t blobSize = read();
-
-        length -= 2;
-
-        if (length * sizeof(uint32_t) < blobSize) {
-            return false;
-        }
-
-        metadata.push_back({key, std::vector<uint8_t>()});
-        PerFrameMetadataBlob& metadataBlob = metadata.back();
-        metadataBlob.blob.resize(blobSize);
-        readBlob(blobSize, metadataBlob.blob.data());
-    }
-    auto err = mHal->setLayerPerFrameMetadataBlobs(mCurrentDisplay, mCurrentLayer, metadata);
+void ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
+                      const std::vector<std::optional<PerFrameMetadataBlob>>& metadata) {
+    auto err = mHal->setLayerPerFrameMetadataBlobs(display, layer, metadata);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-    return true;
 }
 
-bool ComposerCommandEngine::executeSetLayerGenericMetadata(uint16_t length) {
-    // We expect at least two buffer lengths and a mandatory flag
-    if (length < 3) {
-        return false;
-    }
-
-    const uint32_t keySize = read();
-    std::string key;
-    key.resize(keySize);
-    readBlob(keySize, key.data());
-
-    const bool mandatory = read();
-
-    const uint32_t valueSize = read();
-    std::vector<uint8_t> value(valueSize);
-    readBlob(valueSize, value.data());
+void ComposerCommandEngine::executeSetLayerGenericMetadata(int64_t display, int64_t layer,
+                                        const command::GenericMetadata& metadata) {
 
     auto err =
-            mHal->setLayerGenericMetadata(mCurrentDisplay, mCurrentLayer, key, mandatory, value);
+            mHal->setLayerGenericMetadata(display, layer, metadata);
     if (err) {
-        LOG(WARNING) << __func__ << ": err " << err;
-        mWriter->setError(getCommandLoc(), err);
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
     }
-
-    return true;
-}
-
-common::Rect ComposerCommandEngine::readRect() {
-    return common::Rect{
-            readSigned(),
-            readSigned(),
-            readSigned(),
-            readSigned(),
-    };
-}
-
-std::vector<common::Rect> ComposerCommandEngine::readRegion(size_t count) {
-    std::vector<common::Rect> region;
-    region.reserve(count);
-    while (count > 0) {
-        region.emplace_back(readRect());
-        count--;
-    }
-
-    return region;
-}
-
-common::FRect ComposerCommandEngine::readFRect() {
-    return common::FRect {
-            readFloat(),
-            readFloat(),
-            readFloat(),
-            readFloat(),
-    };
-}
-
-FloatColor ComposerCommandEngine::readFloatColor() {
-    return FloatColor {
-            readFloat(),
-            readFloat(),
-            readFloat(),
-            readFloat(),
-    };
-}
-
-void ComposerCommandEngine::readBlob(uint32_t size, void* blob) {
-    memcpy(blob, &mData[mDataRead], size);
-    uint32_t numElements = size / sizeof(uint32_t);
-    mDataRead += numElements;
-    mDataRead += (size - numElements * sizeof(uint32_t) != 0) ? 1 : 0;
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl

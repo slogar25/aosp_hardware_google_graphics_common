@@ -621,11 +621,13 @@ int32_t HalImpl::setColorMode(int64_t display, ColorMode mode, RenderIntent inte
 }
 
 int32_t HalImpl::setColorTransform(int64_t display, const std::vector<float>& matrix,
-                                   int32_t hint) {
+                                   common::ColorTransform hint) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    return halDisplay->setColorTransform(matrix.data(), hint);
+    int32_t hwcHint;
+    a2h::translate(hint, hwcHint);
+    return halDisplay->setColorTransform(matrix.data(), hwcHint);
 }
 
 int32_t HalImpl::setContentType(int64_t display, ContentType contentType) {
@@ -652,7 +654,7 @@ int32_t HalImpl::setDisplayedContentSamplingEnabled(
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t HalImpl::setLayerBlendMode(int64_t display, int64_t layer, BlendMode mode) {
+int32_t HalImpl::setLayerBlendMode(int64_t display, int64_t layer, common::BlendMode mode) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
@@ -729,45 +731,51 @@ int32_t HalImpl::setLayerFloatColor([[maybe_unused]] int64_t display,
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t HalImpl::setLayerGenericMetadata([[maybe_unused]] int64_t display,
-                                         [[maybe_unused]] int64_t layer,
-                                         [[maybe_unused]] const std::string& key,
-                                         [[maybe_unused]] bool mandatory,
-                                         [[maybe_unused]] const std::vector<uint8_t>& value) {
+int32_t HalImpl::setLayerGenericMetadata(
+            [[maybe_unused]] int64_t display, [[maybe_unused]] int64_t layer,
+            [[maybe_unused]] const command::GenericMetadata& metadata) {
     return HWC2_ERROR_UNSUPPORTED;
 }
 
 int32_t HalImpl::setLayerPerFrameMetadata(int64_t display, int64_t layer,
-                                     const std::vector<PerFrameMetadata>& metadata) {
+                           const std::vector<std::optional<PerFrameMetadata>>& metadata) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
     uint32_t count = metadata.size();
-    std::vector<int32_t> keys(count);
-    std::vector<float> values(count);
+    std::vector<int32_t> keys;
+    std::vector<float> values;
 
     for (uint32_t ix = 0; ix < count; ++ix) {
-        a2h::translate(metadata[ix].key, keys[ix]);
-        a2h::translate(metadata[ix].value, values[ix]);
+        if (metadata[ix]) {
+            int32_t key;
+            a2h::translate(metadata[ix]->key, key);
+            keys.push_back(key);
+            values.push_back(metadata[ix]->value);
+        }
     }
 
     return halLayer->setLayerPerFrameMetadata(count, keys.data(), values.data());
 }
 
 int32_t HalImpl::setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
-                                          const std::vector<PerFrameMetadataBlob>& blobs) {
+                           const std::vector<std::optional<PerFrameMetadataBlob>>& blobs) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
     uint32_t count = blobs.size();
-    std::vector<int32_t> keys(count);
-    std::vector<uint32_t> sizes(count);
-    std::vector<uint8_t> values(count);
+    std::vector<int32_t> keys;
+    std::vector<uint32_t> sizes;
+    std::vector<uint8_t> values;
 
     for (uint32_t ix = 0; ix < count; ++ix) {
-        a2h::translate(blobs[ix].key, keys[ix]);
-        sizes[ix] = blobs[ix].blob.size();
-        values.insert(values.end(), blobs[ix].blob.begin(), blobs[ix].blob.end());
+        if (blobs[ix]) {
+            int32_t key;
+            a2h::translate(blobs[ix]->key, key);
+            keys.push_back(key);
+            sizes.push_back(blobs[ix]->blob.size());
+            values.insert(values.end(), blobs[ix]->blob.begin(), blobs[ix]->blob.end());
+        }
     }
 
     return halLayer->setLayerPerFrameMetadataBlobs(count, keys.data(), sizes.data(),
@@ -797,7 +805,7 @@ int32_t HalImpl::setLayerSourceCrop(int64_t display, int64_t layer, const common
 }
 
 int32_t HalImpl::setLayerSurfaceDamage(int64_t display, int64_t layer,
-                                  const std::vector<common::Rect>& damage) {
+                                  const std::vector<std::optional<common::Rect>>& damage) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
@@ -819,7 +827,7 @@ int32_t HalImpl::setLayerTransform(int64_t display, int64_t layer, common::Trans
 }
 
 int32_t HalImpl::setLayerVisibleRegion(int64_t display, int64_t layer,
-                                       const std::vector<common::Rect>& visible) {
+                               const std::vector<std::optional<common::Rect>>& visible) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
@@ -887,7 +895,7 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
                                  std::vector<Composition>* outCompositionTypes,
                                  uint32_t* outDisplayRequestMask,
                                  std::vector<int64_t>* outRequestedLayers,
-                                 std::vector<uint32_t>* outRequestMasks,
+                                 std::vector<int32_t>* outRequestMasks,
                                  ClientTargetProperty* outClientTargetProperty) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
@@ -907,15 +915,14 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
 
     int32_t displayReqs;
     std::vector<hwc2_layer_t> hwcRequestedLayers(reqsCount);
-    std::vector<int32_t> hwcReqMasks(reqsCount);
+    outRequestMasks->resize(reqsCount);
     RET_IF_ERR(halDisplay->getDisplayRequests(&displayReqs, &reqsCount,
-                                              hwcRequestedLayers.data(), hwcReqMasks.data()));
+                                              hwcRequestedLayers.data(), outRequestMasks->data()));
 
     h2a::translate(hwcChangedLayers, *outChangedLayers);
     h2a::translate(hwcCompositionTypes, *outCompositionTypes);
     *outDisplayRequestMask = displayReqs;
     h2a::translate(hwcRequestedLayers, *outRequestedLayers);
-    h2a::translate(hwcReqMasks, *outRequestMasks);
 
     hwc_client_target_property hwcProperty;
     if (!halDisplay->getClientTargetProperty(&hwcProperty)) {

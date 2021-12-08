@@ -106,12 +106,11 @@ ndk::ScopedAStatus ComposerClient::destroyVirtualDisplay(int64_t display) {
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::executeCommands(int32_t inLength,
-                                                   const std::vector<AidlNativeHandle>& inHandles,
-                                                   ExecuteCommandsStatus* status) {
+ndk::ScopedAStatus ComposerClient::executeCommands(
+                            const std::vector<command::CommandPayload>& commands,
+                            std::vector<command::CommandResultPayload>* results) {
     DEBUG_FUNC();
-    std::lock_guard<std::mutex> lock(mCommandEngineMutex);
-    auto err = mCommandEngine->execute(inLength, inHandles, status);
+    auto err = mCommandEngine->execute(commands, results);
     mCommandEngine->reset();
     return TO_BINDER_STATUS(err);
 }
@@ -241,14 +240,6 @@ ndk::ScopedAStatus ComposerClient::getMaxVirtualDisplayCount(int32_t* count) {
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::getOutputCommandQueue(
-        MQDescriptor<int32_t, SynchronizedReadWrite>* descriptor) {
-    DEBUG_FUNC();
-    std::lock_guard<std::mutex> lock(mCommandEngineMutex);
-    mCommandEngine->getOutputMQDescriptor(descriptor);
-    return ndk::ScopedAStatus::ok();
-}
-
 ndk::ScopedAStatus ComposerClient::getPerFrameMetadataKeys(int64_t display,
                                                            std::vector<PerFrameMetadataKey>* keys) {
     DEBUG_FUNC();
@@ -342,14 +333,6 @@ ndk::ScopedAStatus ComposerClient::setDisplayedContentSamplingEnabled(
         int64_t display, bool enable, FormatColorComponent componentMask, int64_t maxFrames) {
     DEBUG_FUNC();
     auto err = mHal->setDisplayedContentSamplingEnabled(display, enable, componentMask, maxFrames);
-    return TO_BINDER_STATUS(err);
-}
-
-ndk::ScopedAStatus ComposerClient::setInputCommandQueue(
-        const MQDescriptor<int32_t, SynchronizedReadWrite>& descriptor) {
-    DEBUG_FUNC();
-    std::lock_guard<std::mutex> lock(mCommandEngineMutex);
-    auto err = mCommandEngine->setInputMQDescriptor(descriptor) ? 0 : EX_NO_RESOURCES;
     return TO_BINDER_STATUS(err);
 }
 
@@ -521,7 +504,7 @@ void ComposerClient::destroyResources() {
             std::vector<Composition> compositionTypes;
             uint32_t displayRequestMask = 0;
             std::vector<int64_t> requestedLayers;
-            std::vector<uint32_t> requestMasks;
+            std::vector<int32_t> requestMasks;
             ClientTargetProperty clientTargetProperty;
             mHal->validateDisplay(display, &changedLayers, &compositionTypes, &displayRequestMask,
                                   &requestedLayers, &requestMasks, &clientTargetProperty);

@@ -73,6 +73,18 @@ inline void translate(const T& in, U& out) {
 }
 
 template <typename T, typename U>
+inline void translate(const std::vector<std::optional<T>>& in, std::vector<U>& out) {
+    out.clear();
+    for (auto const &t : in) {
+        U u;
+        if (t) {
+            translate(*t, u);
+            out.emplace_back(std::move(u));
+        }
+    }
+}
+
+template <typename T, typename U>
 inline void translate(const std::vector<T>& in, std::vector<U>& out) {
     out.clear();
     for (auto const &t : in) {
