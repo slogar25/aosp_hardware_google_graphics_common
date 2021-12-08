@@ -113,7 +113,7 @@ class HalImpl : public IComposerHal {
                                  const common::Rect& frame) override;
     int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) override;
     int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
-                                    const command::GenericMetadata& metadata) override;
+                                    const GenericMetadata& metadata) override;
     int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
                             const std::vector<std::optional<PerFrameMetadata>>& metadata) override;
     int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,

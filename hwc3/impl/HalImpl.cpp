@@ -731,9 +731,9 @@ int32_t HalImpl::setLayerFloatColor([[maybe_unused]] int64_t display,
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t HalImpl::setLayerGenericMetadata(
-            [[maybe_unused]] int64_t display, [[maybe_unused]] int64_t layer,
-            [[maybe_unused]] const command::GenericMetadata& metadata) {
+int32_t HalImpl::setLayerGenericMetadata([[maybe_unused]] int64_t display,
+                                         [[maybe_unused]] int64_t layer,
+                                         [[maybe_unused]] const GenericMetadata& metadata) {
     return HWC2_ERROR_UNSUPPORTED;
 }
 
