@@ -153,16 +153,22 @@ ndk::ScopedAStatus ComposerClient::getDisplayAttribute(int64_t display, int32_t 
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::getDisplayBrightnessSupport(int64_t display, bool* support) {
-    DEBUG_FUNC();
-    auto err = mHal->getDisplayBrightnessSupport(display, support);
-    return TO_BINDER_STATUS(err);
-}
-
 ndk::ScopedAStatus ComposerClient::getDisplayCapabilities(int64_t display,
                                                           std::vector<DisplayCapability>* caps) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayCapabilities(display, caps);
+    if (!err) {
+        return TO_BINDER_STATUS(err);
+    }
+    bool support;
+    err = mHal->getDisplayBrightnessSupport(display, &support);
+    if (err == 0 && support) {
+        caps->push_back(DisplayCapability::BRIGHTNESS);
+    }
+    err = mHal->getDozeSupport(display, &support);
+    if (err == 0 && support) {
+        caps->push_back(DisplayCapability::DOZE);
+    }
     return TO_BINDER_STATUS(err);
 }
 
@@ -211,12 +217,6 @@ ndk::ScopedAStatus ComposerClient::getDisplayedContentSamplingAttributes(
         int64_t display, DisplayContentSamplingAttributes* attrs) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayedContentSamplingAttributes(display, attrs);
-    return TO_BINDER_STATUS(err);
-}
-
-ndk::ScopedAStatus ComposerClient::getDozeSupport(int64_t display, bool* support) {
-    DEBUG_FUNC();
-    auto err = mHal->getDozeSupport(display, support);
     return TO_BINDER_STATUS(err);
 }
 

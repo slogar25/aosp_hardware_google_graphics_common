@@ -72,7 +72,6 @@ class ComposerClient : public BnComposerClient {
                                                     std::vector<float>* matrix) override;
     ndk::ScopedAStatus getDisplayAttribute(int64_t display, int32_t config,
                                            DisplayAttribute attribute, int32_t* value) override;
-    ndk::ScopedAStatus getDisplayBrightnessSupport(int64_t display, bool* support) override;
     ndk::ScopedAStatus getDisplayCapabilities(int64_t display,
                                               std::vector<DisplayCapability>* caps) override;
     ndk::ScopedAStatus getDisplayConfigs(int64_t display, std::vector<int32_t>* configs) override;
@@ -87,7 +86,6 @@ class ComposerClient : public BnComposerClient {
                                                  DisplayContentSample* samples) override;
     ndk::ScopedAStatus getDisplayedContentSamplingAttributes(
             int64_t display, DisplayContentSamplingAttributes* attrs) override;
-    ndk::ScopedAStatus getDozeSupport(int64_t display, bool* support) override;
     ndk::ScopedAStatus getHdrCapabilities(int64_t display, HdrCapabilities* caps) override;
     ndk::ScopedAStatus getLayerGenericMetadataKeys(
             std::vector<LayerGenericMetadataKey>* keys) override;
