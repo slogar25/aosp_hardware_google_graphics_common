@@ -25,12 +25,11 @@
 // and adapt to aidl structures.
 namespace aidl::android::hardware::graphics::composer3::impl {
 
-#define DISPATCH_LAYER_COMMAND(layerCmd, field, funcName)                    \
-    do {                                                                     \
-        if (layerCmd.field) {                                                \
-            executeSetLayer##funcName(layerCmd.display,                      \
-                                      layerCmd.layer, *layerCmd.field);      \
-        }                                                                    \
+#define DISPATCH_LAYER_COMMAND(display, layerCmd, field, funcName)               \
+    do {                                                                         \
+        if (layerCmd.field) {                                                    \
+            executeSetLayer##funcName(display, layerCmd.layer, *layerCmd.field); \
+        }                                                                        \
     } while (0)
 
 #define DISPATCH_DISPLAY_COMMAND(displayCmd, field, funcName)                \
@@ -52,23 +51,11 @@ bool ComposerCommandEngine::init() {
     return (mWriter != nullptr);
 }
 
-int32_t ComposerCommandEngine::execute(const std::vector<command::CommandPayload>& commands,
-                                       std::vector<command::CommandResultPayload>* result) {
+int32_t ComposerCommandEngine::execute(const std::vector<DisplayCommand>& commands,
+                                       std::vector<CommandResultPayload>* result) {
     mCommandIndex = 0;
     for (const auto& command : commands) {
-        switch (command.getTag()) {
-        case command::CommandPayload::displayCommand:
-            dispatchDisplayCommand(command.get<command::CommandPayload::displayCommand>());
-            break;
-
-        case command::CommandPayload::layerCommand:
-            dispatchLayerCommand(command.get<command::CommandPayload::layerCommand>());
-            break;
-
-        default:
-            LOG(WARNING) << "unsupported command type " << command.toString();
-            break;
-        }
+        dispatchDisplayCommand(command);
         ++mCommandIndex;
     }
 
@@ -76,7 +63,11 @@ int32_t ComposerCommandEngine::execute(const std::vector<command::CommandPayload
     return 0;
 }
 
-void ComposerCommandEngine::dispatchDisplayCommand(const command::DisplayCommand& command) {
+void ComposerCommandEngine::dispatchDisplayCommand(const DisplayCommand& command) {
+    for (const auto& layerCmd : command.layers) {
+        dispatchLayerCommand(command.display, layerCmd);
+    }
+
     DISPATCH_DISPLAY_COMMAND(command, colorTransform, SetColorTransform);
     DISPATCH_DISPLAY_COMMAND(command, clientTarget, SetClientTarget);
     DISPATCH_DISPLAY_COMMAND(command, virtualDisplayOutputBuffer, SetOutputBuffer);
@@ -88,28 +79,28 @@ void ComposerCommandEngine::dispatchDisplayCommand(const command::DisplayCommand
     DISPATCH_DISPLAY_BOOL_COMMAND(command, presentOrValidateDisplay, PresentOrValidateDisplay);
 }
 
-void ComposerCommandEngine::dispatchLayerCommand(const command::LayerCommand &command) {
-    DISPATCH_LAYER_COMMAND(command, cursorPosition, CursorPosition);
-    DISPATCH_LAYER_COMMAND(command, buffer, Buffer);
-    DISPATCH_LAYER_COMMAND(command, damage, SurfaceDamage);
-    DISPATCH_LAYER_COMMAND(command, blendMode, BlendMode);
-    DISPATCH_LAYER_COMMAND(command, color, Color);
-    DISPATCH_LAYER_COMMAND(command, floatColor, FloatColor);
-    DISPATCH_LAYER_COMMAND(command, composition, Composition);
-    DISPATCH_LAYER_COMMAND(command, dataspace, Dataspace);
-    DISPATCH_LAYER_COMMAND(command, displayFrame, DisplayFrame);
-    DISPATCH_LAYER_COMMAND(command, planeAlpha, PlaneAlpha);
-    DISPATCH_LAYER_COMMAND(command, sidebandStream, SidebandStream);
-    DISPATCH_LAYER_COMMAND(command, sourceCrop, SourceCrop);
-    DISPATCH_LAYER_COMMAND(command, transform, Transform);
-    DISPATCH_LAYER_COMMAND(command, visibleRegion, VisibleRegion);
-    DISPATCH_LAYER_COMMAND(command, z, ZOrder);
-    DISPATCH_LAYER_COMMAND(command, colorTransform, ColorTransform);
+void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCommand& command) {
+    DISPATCH_LAYER_COMMAND(display, command, cursorPosition, CursorPosition);
+    DISPATCH_LAYER_COMMAND(display, command, buffer, Buffer);
+    DISPATCH_LAYER_COMMAND(display, command, damage, SurfaceDamage);
+    DISPATCH_LAYER_COMMAND(display, command, blendMode, BlendMode);
+    DISPATCH_LAYER_COMMAND(display, command, color, Color);
+    DISPATCH_LAYER_COMMAND(display, command, floatColor, FloatColor);
+    DISPATCH_LAYER_COMMAND(display, command, composition, Composition);
+    DISPATCH_LAYER_COMMAND(display, command, dataspace, Dataspace);
+    DISPATCH_LAYER_COMMAND(display, command, displayFrame, DisplayFrame);
+    DISPATCH_LAYER_COMMAND(display, command, planeAlpha, PlaneAlpha);
+    DISPATCH_LAYER_COMMAND(display, command, sidebandStream, SidebandStream);
+    DISPATCH_LAYER_COMMAND(display, command, sourceCrop, SourceCrop);
+    DISPATCH_LAYER_COMMAND(display, command, transform, Transform);
+    DISPATCH_LAYER_COMMAND(display, command, visibleRegion, VisibleRegion);
+    DISPATCH_LAYER_COMMAND(display, command, z, ZOrder);
+    DISPATCH_LAYER_COMMAND(display, command, colorTransform, ColorTransform);
     // TODO: (b/196171661) add support for mixed composition
-    // DISPATCH_LAYER_COMMAND(command, whitePointNits, WhitePointNits);
-    DISPATCH_LAYER_COMMAND(command, genericMetadata, GenericMetadata);
-    DISPATCH_LAYER_COMMAND(command, perFrameMetadata, PerFrameMetadata);
-    DISPATCH_LAYER_COMMAND(command, perFrameMetadataBlob, PerFrameMetadataBlobs);
+    // DISPATCH_LAYER_COMMAND(display, command, whitePointNits, WhitePointNits);
+    DISPATCH_LAYER_COMMAND(display, command, genericMetadata, GenericMetadata);
+    DISPATCH_LAYER_COMMAND(display, command, perFrameMetadata, PerFrameMetadata);
+    DISPATCH_LAYER_COMMAND(display, command, perFrameMetadataBlob, PerFrameMetadataBlobs);
 }
 
 int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
@@ -137,7 +128,7 @@ int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
 }
 
 void ComposerCommandEngine::executeSetColorTransform(int64_t display,
-                            const command::ColorTransformPayload& command) {
+                                                     const ColorTransformPayload& command) {
     auto err = mHal->setColorTransform(display, command.matrix, command.hint);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
@@ -145,8 +136,7 @@ void ComposerCommandEngine::executeSetColorTransform(int64_t display,
     }
 }
 
-void ComposerCommandEngine::executeSetClientTarget(int64_t display,
-                                                   const command::ClientTarget& command) {
+void ComposerCommandEngine::executeSetClientTarget(int64_t display, const ClientTarget& command) {
     bool useCache = !command.buffer.handle;
     buffer_handle_t handle = useCache
                              ? nullptr
@@ -168,8 +158,7 @@ void ComposerCommandEngine::executeSetClientTarget(int64_t display,
     }
 }
 
-void ComposerCommandEngine::executeSetOutputBuffer(uint64_t display,
-                                                   const command::Buffer& buffer) {
+void ComposerCommandEngine::executeSetOutputBuffer(uint64_t display, const Buffer& buffer) {
     bool useCache = !buffer.handle;
     buffer_handle_t handle = useCache
                              ? nullptr
@@ -200,8 +189,7 @@ void ComposerCommandEngine::executePresentOrValidateDisplay(int64_t display) {
     if (mHal->hasCapability(Capability::SKIP_VALIDATE)) {
         err = executePresentDisplay(display);
         if (!err) {
-            mWriter->setPresentOrValidateResult(display,
-                                                command::PresentOrValidate::Result::Presented);
+            mWriter->setPresentOrValidateResult(display, PresentOrValidate::Result::Presented);
             return;
         }
     }
@@ -209,7 +197,7 @@ void ComposerCommandEngine::executePresentOrValidateDisplay(int64_t display) {
     // Fallback to validate
     err = executeValidateDisplayInternal(display);
     if (!err) {
-        mWriter->setPresentOrValidateResult(display, command::PresentOrValidate::Result::Validated);
+        mWriter->setPresentOrValidateResult(display, PresentOrValidate::Result::Validated);
     }
 }
 
@@ -245,7 +233,7 @@ void ComposerCommandEngine::executeSetLayerCursorPosition(int64_t display, int64
 }
 
 void ComposerCommandEngine::executeSetLayerBuffer(int64_t display, int64_t layer,
-                                                  const command::Buffer& buffer) {
+                                                  const Buffer& buffer) {
     bool useCache = !buffer.handle;
     buffer_handle_t handle = useCache
                              ? nullptr
@@ -276,7 +264,7 @@ void ComposerCommandEngine::executeSetLayerSurfaceDamage(int64_t display, int64_
 }
 
 void ComposerCommandEngine::executeSetLayerBlendMode(int64_t display, int64_t layer,
-                                          const command::ParcelableBlendMode& blendMode) {
+                                                     const ParcelableBlendMode& blendMode) {
     auto err = mHal->setLayerBlendMode(display, layer, blendMode.blendMode);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
@@ -294,7 +282,7 @@ void ComposerCommandEngine::executeSetLayerColor(int64_t display, int64_t layer,
 }
 
 void ComposerCommandEngine::executeSetLayerComposition(int64_t display, int64_t layer,
-                                        const command::ParcelableComposition& composition) {
+                                                       const ParcelableComposition& composition) {
     auto err = mHal->setLayerCompositionType(display, layer, composition.composition);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
@@ -303,7 +291,7 @@ void ComposerCommandEngine::executeSetLayerComposition(int64_t display, int64_t 
 }
 
 void ComposerCommandEngine::executeSetLayerDataspace(int64_t display, int64_t layer,
-                                          const command::ParcelableDataspace& dataspace) {
+                                                     const ParcelableDataspace& dataspace) {
     auto err = mHal->setLayerDataspace(display, layer, dataspace.dataspace);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
@@ -321,8 +309,8 @@ void ComposerCommandEngine::executeSetLayerDisplayFrame(int64_t display, int64_t
 }
 
 void ComposerCommandEngine::executeSetLayerPlaneAlpha(int64_t display, int64_t layer,
-                                                   const command::PlaneAlpha& planeAlpha) {
-  auto err = mHal->setLayerPlaneAlpha(display, layer, planeAlpha.alpha);
+                                                      const PlaneAlpha& planeAlpha) {
+    auto err = mHal->setLayerPlaneAlpha(display, layer, planeAlpha.alpha);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
@@ -356,7 +344,7 @@ void ComposerCommandEngine::executeSetLayerSourceCrop(int64_t display, int64_t l
 }
 
 void ComposerCommandEngine::executeSetLayerTransform(int64_t display, int64_t layer,
-                                            const command::ParcelableTransform& transform) {
+                                                     const ParcelableTransform& transform) {
     auto err = mHal->setLayerTransform(display, layer, transform.transform);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
@@ -374,7 +362,7 @@ void ComposerCommandEngine::executeSetLayerVisibleRegion(int64_t display, int64_
 }
 
 void ComposerCommandEngine::executeSetLayerZOrder(int64_t display, int64_t layer,
-                                                  const command::ZOrder& zOrder) {
+                                                  const ZOrder& zOrder) {
     auto err = mHal->setLayerZOrder(display, layer, zOrder.z);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
@@ -419,8 +407,7 @@ void ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(int64_t display
 }
 
 void ComposerCommandEngine::executeSetLayerGenericMetadata(int64_t display, int64_t layer,
-                                        const command::GenericMetadata& metadata) {
-
+                                                           const GenericMetadata& metadata) {
     auto err =
             mHal->setLayerGenericMetadata(display, layer, metadata);
     if (err) {

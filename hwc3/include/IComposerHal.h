@@ -20,8 +20,6 @@
  * However current patten is the HWC lib does not own buffer resources (HWC lib
  * does own the fences).
  */
-#include <cutils/native_handle.h>
-
 #include <aidl/android/hardware/common/NativeHandle.h>
 #include <aidl/android/hardware/graphics/common/BlendMode.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
@@ -30,53 +28,53 @@
 #include <aidl/android/hardware/graphics/common/Point.h>
 #include <aidl/android/hardware/graphics/common/Rect.h>
 #include <aidl/android/hardware/graphics/common/Transform.h>
+#include <aidl/android/hardware/graphics/composer3/Buffer.h>
 #include <aidl/android/hardware/graphics/composer3/Capability.h>
+#include <aidl/android/hardware/graphics/composer3/ChangedCompositionTypes.h>
+#include <aidl/android/hardware/graphics/composer3/ClientTarget.h>
 #include <aidl/android/hardware/graphics/composer3/ClientTargetProperty.h>
+#include <aidl/android/hardware/graphics/composer3/ClientTargetPropertyWithNits.h>
 #include <aidl/android/hardware/graphics/composer3/Color.h>
 #include <aidl/android/hardware/graphics/composer3/ColorMode.h>
+#include <aidl/android/hardware/graphics/composer3/ColorTransformPayload.h>
+#include <aidl/android/hardware/graphics/composer3/CommandError.h>
+#include <aidl/android/hardware/graphics/composer3/CommandResultPayload.h>
 #include <aidl/android/hardware/graphics/composer3/Composition.h>
 #include <aidl/android/hardware/graphics/composer3/ContentType.h>
-#include <aidl/android/hardware/graphics/composer3/command/Buffer.h>
-#include <aidl/android/hardware/graphics/composer3/command/ChangedCompositionTypes.h>
-#include <aidl/android/hardware/graphics/composer3/command/ClientTarget.h>
-#include <aidl/android/hardware/graphics/composer3/command/ClientTargetPropertyWithNits.h>
-#include <aidl/android/hardware/graphics/composer3/command/ColorTransformPayload.h>
-#include <aidl/android/hardware/graphics/composer3/command/CommandPayload.h>
-#include <aidl/android/hardware/graphics/composer3/command/CommandResultPayload.h>
-#include <aidl/android/hardware/graphics/composer3/command/DisplayCommand.h>
-#include <aidl/android/hardware/graphics/composer3/command/DisplayRequest.h>
-#include <aidl/android/hardware/graphics/composer3/command/Error.h>
-#include <aidl/android/hardware/graphics/composer3/command/GenericMetadata.h>
-#include <aidl/android/hardware/graphics/composer3/command/LayerCommand.h>
-#include <aidl/android/hardware/graphics/composer3/command/ParcelableBlendMode.h>
-#include <aidl/android/hardware/graphics/composer3/command/ParcelableComposition.h>
-#include <aidl/android/hardware/graphics/composer3/command/ParcelableDataspace.h>
-#include <aidl/android/hardware/graphics/composer3/command/ParcelableTransform.h>
-#include <aidl/android/hardware/graphics/composer3/command/PlaneAlpha.h>
-#include <aidl/android/hardware/graphics/composer3/command/PresentFence.h>
-#include <aidl/android/hardware/graphics/composer3/command/PresentOrValidate.h>
-#include <aidl/android/hardware/graphics/composer3/command/ReleaseFences.h>
-#include <aidl/android/hardware/graphics/composer3/command/WhitePointNits.h>
-#include <aidl/android/hardware/graphics/composer3/command/ZOrder.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayAttribute.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
+#include <aidl/android/hardware/graphics/composer3/DisplayCommand.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayConnectionType.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayContentSample.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayContentSamplingAttributes.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayIdentification.h>
+#include <aidl/android/hardware/graphics/composer3/DisplayRequest.h>
 #include <aidl/android/hardware/graphics/composer3/FloatColor.h>
 #include <aidl/android/hardware/graphics/composer3/FormatColorComponent.h>
+#include <aidl/android/hardware/graphics/composer3/GenericMetadata.h>
 #include <aidl/android/hardware/graphics/composer3/HdrCapabilities.h>
+#include <aidl/android/hardware/graphics/composer3/LayerCommand.h>
 #include <aidl/android/hardware/graphics/composer3/LayerGenericMetadataKey.h>
+#include <aidl/android/hardware/graphics/composer3/ParcelableBlendMode.h>
+#include <aidl/android/hardware/graphics/composer3/ParcelableComposition.h>
+#include <aidl/android/hardware/graphics/composer3/ParcelableDataspace.h>
+#include <aidl/android/hardware/graphics/composer3/ParcelableTransform.h>
 #include <aidl/android/hardware/graphics/composer3/PerFrameMetadata.h>
 #include <aidl/android/hardware/graphics/composer3/PerFrameMetadataBlob.h>
 #include <aidl/android/hardware/graphics/composer3/PerFrameMetadataKey.h>
+#include <aidl/android/hardware/graphics/composer3/PlaneAlpha.h>
 #include <aidl/android/hardware/graphics/composer3/PowerMode.h>
+#include <aidl/android/hardware/graphics/composer3/PresentFence.h>
+#include <aidl/android/hardware/graphics/composer3/PresentOrValidate.h>
 #include <aidl/android/hardware/graphics/composer3/ReadbackBufferAttributes.h>
+#include <aidl/android/hardware/graphics/composer3/ReleaseFences.h>
 #include <aidl/android/hardware/graphics/composer3/RenderIntent.h>
+#include <aidl/android/hardware/graphics/composer3/VirtualDisplay.h>
 #include <aidl/android/hardware/graphics/composer3/VsyncPeriodChangeConstraints.h>
 #include <aidl/android/hardware/graphics/composer3/VsyncPeriodChangeTimeline.h>
-#include <aidl/android/hardware/graphics/composer3/VirtualDisplay.h>
+#include <aidl/android/hardware/graphics/composer3/WhitePointNits.h>
+#include <aidl/android/hardware/graphics/composer3/ZOrder.h>
+#include <cutils/native_handle.h>
 
 // avoid naming conflict
 using AidlPixelFormat = aidl::android::hardware::graphics::common::PixelFormat;
@@ -181,7 +179,7 @@ class IComposerHal {
                                          const common::Rect& frame) = 0;
     virtual int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) = 0;
     virtual int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
-                                            const command::GenericMetadata& metadata) = 0;
+                                            const GenericMetadata& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
                             const std::vector<std::optional<PerFrameMetadata>>& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,

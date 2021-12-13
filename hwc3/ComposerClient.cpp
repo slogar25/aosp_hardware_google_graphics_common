@@ -106,9 +106,8 @@ ndk::ScopedAStatus ComposerClient::destroyVirtualDisplay(int64_t display) {
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::executeCommands(
-                            const std::vector<command::CommandPayload>& commands,
-                            std::vector<command::CommandResultPayload>* results) {
+ndk::ScopedAStatus ComposerClient::executeCommands(const std::vector<DisplayCommand>& commands,
+                                                   std::vector<CommandResultPayload>* results) {
     DEBUG_FUNC();
     auto err = mCommandEngine->execute(commands, results);
     mCommandEngine->reset();

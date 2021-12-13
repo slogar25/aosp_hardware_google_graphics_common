@@ -64,8 +64,8 @@ class ComposerClient : public BnComposerClient {
                                             VirtualDisplay* display) override;
     ndk::ScopedAStatus destroyLayer(int64_t display, int64_t layer) override;
     ndk::ScopedAStatus destroyVirtualDisplay(int64_t display) override;
-    ndk::ScopedAStatus executeCommands(const std::vector<command::CommandPayload>& commands,
-                                       std::vector<command::CommandResultPayload>* results) override;
+    ndk::ScopedAStatus executeCommands(const std::vector<DisplayCommand>& commands,
+                                       std::vector<CommandResultPayload>* results) override;
     ndk::ScopedAStatus getActiveConfig(int64_t display, int32_t* config) override;
     ndk::ScopedAStatus getColorModes(int64_t display, std::vector<ColorMode>* colorModes) override;
     ndk::ScopedAStatus getDataspaceSaturationMatrix(common::Dataspace dataspace,
