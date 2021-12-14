@@ -16,6 +16,7 @@
 #ifndef _EXYNOSHWCHELPER_H
 #define _EXYNOSHWCHELPER_H
 
+#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -573,6 +574,7 @@ void writeFileNode(FILE *fd, int value);
 int32_t writeIntToFile(const char *file, uint32_t value);
 uint32_t getDisplayId(int32_t displayType, int32_t displayIndex = 0);
 int32_t load_png_image(const char *filepath, buffer_handle_t buffer);
+int readLineFromFile(const std::string &filename, std::string &out, char delim);
 
 template <typename T>
 struct CtrlValue {

@@ -1352,3 +1352,17 @@ int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
 
     return 0;
 }
+
+int readLineFromFile(const std::string &filename, std::string &out, char delim) {
+    std::ifstream in(filename);
+
+    if (!in) {
+        return -ENOENT;
+    }
+    std::getline(in, out, delim);
+    if (!in) {
+        return -EIO;
+    }
+
+    return android::OK;
+}
