@@ -78,8 +78,10 @@ class FramebufferManager {
             struct BufferDesc {
                 uint64_t bufferId;
                 int drmFormat;
+                bool isSecure;
                 bool operator==(const Framebuffer::BufferDesc &rhs) const {
-                    return (bufferId == rhs.bufferId && drmFormat == rhs.drmFormat);
+                    return (bufferId == rhs.bufferId && drmFormat == rhs.drmFormat &&
+                            isSecure == rhs.isSecure);
                 }
             };
             struct SolidColorDesc {
@@ -116,7 +118,7 @@ class FramebufferManager {
 
         void markInuseLayerLocked(const ExynosLayer *layer) REQUIRES(mMutex);
         void destroyUnusedLayersLocked() REQUIRES(mMutex);
-        void destroyFramebufferLocked() REQUIRES(mMutex);
+        void destroySecureFramebufferLocked() REQUIRES(mMutex);
 
         int mDrmFd = -1;
 
@@ -132,6 +134,7 @@ class FramebufferManager {
         // in mCachedLayerBuffers. When the flag is set, mCachedLayersInuse will
         // keep in-use layers in this frame update. Those unused layers will be
         // freed at the end of the update.
+        // TODO: have a better way to maintain inuse layers
         bool mCacheShrinkPending = false;
         bool mHasSecureFramebuffer = false;
         std::set<const ExynosLayer *> mCachedLayersInuse;
@@ -325,7 +328,7 @@ class ExynosDisplayDrmInterface :
         };
         int32_t createModeBlob(const DrmMode &mode, uint32_t &modeBlob);
         int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
-	int32_t clearDisplayMode(DrmModeAtomicReq &drmReq);
+        int32_t clearDisplayMode(DrmModeAtomicReq &drmReq);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         static std::tuple<uint64_t, int> halToDrmEnum(
