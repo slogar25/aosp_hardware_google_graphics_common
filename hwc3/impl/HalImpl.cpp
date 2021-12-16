@@ -931,4 +931,20 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     return HWC2_ERROR_NONE;
 }
 
+int HalImpl::setExpectedPresentTime(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    if (!expectedPresentTime.has_value()) return HWC2_ERROR_NONE;
+
+    if (halDisplay->getPendingExpectedPresentTime() != 0) {
+        ALOGW("HalImpl: set expected present time multiple times in one frame");
+    }
+
+    halDisplay->setExpectedPresentTime(expectedPresentTime->timestampNanos);
+
+    return HWC2_ERROR_NONE;
+}
+
 } // namespace aidl::android::hardware::graphics::composer3::impl

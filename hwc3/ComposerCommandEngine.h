@@ -44,8 +44,10 @@ class ComposerCommandEngine {
       void executeSetColorTransform(int64_t display, const std::vector<float>& matrix);
       void executeSetClientTarget(int64_t display, const ClientTarget& command);
       void executeSetOutputBuffer(uint64_t display, const Buffer& buffer);
-      void executeValidateDisplay(int64_t display);
-      void executePresentOrValidateDisplay(int64_t display);
+      void executeValidateDisplay(int64_t display,
+                                  const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
+      void executePresentOrValidateDisplay(
+              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
       void executeAcceptDisplayChanges(int64_t display);
       int executePresentDisplay(int64_t display);
 
@@ -84,6 +86,8 @@ class ComposerCommandEngine {
               const std::vector<std::optional<PerFrameMetadataBlob>>& perFrameMetadataBlob);
 
       int32_t executeValidateDisplayInternal(int64_t display);
+      void executeSetExpectedPresentTimeInternal(
+              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
 
       IComposerHal* mHal;
       IResourceManager* mResources;

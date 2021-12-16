@@ -46,6 +46,13 @@ namespace aidl::android::hardware::graphics::composer3::impl {
         }                                                                    \
     } while (0)
 
+#define DISPATCH_DISPLAY_BOOL_COMMAND_AND_DATA(displayCmd, field, data, funcName) \
+    do {                                                                          \
+        if (displayCmd.field) {                                                   \
+            execute##funcName(displayCmd.display, displayCmd.data);               \
+        }                                                                         \
+    } while (0)
+
 bool ComposerCommandEngine::init() {
     mWriter = std::make_unique<ComposerServiceWriter>();
     return (mWriter != nullptr);
@@ -73,10 +80,12 @@ void ComposerCommandEngine::dispatchDisplayCommand(const DisplayCommand& command
     DISPATCH_DISPLAY_COMMAND(command, virtualDisplayOutputBuffer, SetOutputBuffer);
     // TODO: (b/196171661) SDR & HDR blending
     // DISPATCH_DISPLAY_COMMAND(command, displayBrightness, SetDisplayBrightness);
-    DISPATCH_DISPLAY_BOOL_COMMAND(command, validateDisplay, ValidateDisplay);
+    DISPATCH_DISPLAY_BOOL_COMMAND_AND_DATA(command, validateDisplay, expectedPresentTime,
+                                           ValidateDisplay);
     DISPATCH_DISPLAY_BOOL_COMMAND(command, acceptDisplayChanges, AcceptDisplayChanges);
     DISPATCH_DISPLAY_BOOL_COMMAND(command, presentDisplay, PresentDisplay);
-    DISPATCH_DISPLAY_BOOL_COMMAND(command, presentOrValidateDisplay, PresentOrValidateDisplay);
+    DISPATCH_DISPLAY_BOOL_COMMAND_AND_DATA(command, presentOrValidateDisplay, expectedPresentTime,
+                                           PresentOrValidateDisplay);
 }
 
 void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCommand& command) {
@@ -178,11 +187,21 @@ void ComposerCommandEngine::executeSetOutputBuffer(uint64_t display, const Buffe
     }
 }
 
-void ComposerCommandEngine::executeValidateDisplay(int64_t display) {
+void ComposerCommandEngine::executeSetExpectedPresentTimeInternal(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    mHal->setExpectedPresentTime(display, expectedPresentTime);
+}
+
+void ComposerCommandEngine::executeValidateDisplay(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    executeSetExpectedPresentTimeInternal(display, expectedPresentTime);
     executeValidateDisplayInternal(display);
 }
 
-void ComposerCommandEngine::executePresentOrValidateDisplay(int64_t display) {
+void ComposerCommandEngine::executePresentOrValidateDisplay(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    executeSetExpectedPresentTimeInternal(display, expectedPresentTime);
+
     int err;
     // First try to Present as is.
     if (mHal->hasCapability(Capability::SKIP_VALIDATE)) {

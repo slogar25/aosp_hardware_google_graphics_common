@@ -201,7 +201,9 @@ class IComposerHal {
                                     uint32_t* outDisplayRequestMask,
                                     std::vector<int64_t>* outRequestedLayers,
                                     std::vector<int32_t>* outRequestMasks,
-                                    ClientTargetProperty* outClientTargetProperty) = 0; //cmd
+                                    ClientTargetProperty* outClientTargetProperty) = 0;
+    virtual int32_t setExpectedPresentTime(
+            int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::detail
