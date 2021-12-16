@@ -47,7 +47,7 @@ namespace aidl::android::hardware::graphics::composer3::impl {
     } while (0)
 
 bool ComposerCommandEngine::init() {
-    mWriter = std::make_unique<CommandWriterBase>();
+    mWriter = std::make_unique<ComposerServiceWriter>();
     return (mWriter != nullptr);
 }
 
