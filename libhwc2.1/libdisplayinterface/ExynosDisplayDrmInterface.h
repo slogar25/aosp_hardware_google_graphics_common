@@ -429,6 +429,8 @@ class ExynosDisplayDrmInterface :
         void getBrightnessInterfaceSupport();
         void setupBrightnessConfig();
         void parseHbmModeEnums(const DrmProperty &property);
+        void checkHbmSvDimming();
+        void endHbmSvDimming();
         FILE *mHbmModeFd;
         FILE *mDimmingOnFd;
         bool mBrightntessIntfSupported = false;
@@ -514,7 +516,10 @@ class ExynosDisplayDrmInterface :
         BrightnessDimmingUsage mBrightnessDimmingUsage;
         bool mHbmSvDimming;
         int32_t mHbmDimmingTimeUs;
-        struct timeval mHbmDimmingStart;
+        std::thread mDimmingThread;
+        bool mHbmSvDimmingThreadRunning;
+        Condition mHbmSvDimmingCond;
+        Mutex mHbmSvDimmingMutex;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
