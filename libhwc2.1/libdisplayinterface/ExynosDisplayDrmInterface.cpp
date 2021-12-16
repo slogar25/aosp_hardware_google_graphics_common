@@ -405,6 +405,11 @@ ExynosDisplayDrmInterface::~ExynosDisplayDrmInterface()
         mDrmDevice->DestroyPropertyBlob(mDesiredModeState.old_blob_id);
     if (mPartialRegionState.blob_id)
         mDrmDevice->DestroyPropertyBlob(mPartialRegionState.blob_id);
+    if (mHbmSvDimmingThreadRunning) {
+        mHbmSvDimmingThreadRunning = false;
+        mHbmSvDimmingCond.signal();
+        mDimmingThread.join();
+    }
 }
 
 void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
@@ -2326,6 +2331,43 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     return HWC2_ERROR_NONE;
 }
 
+void ExynosDisplayDrmInterface::checkHbmSvDimming() {
+    status_t ret = 0;
+    uint32_t wait = 0;
+
+    while (mHbmSvDimmingThreadRunning) {
+        if (wait == 0) {
+            Mutex::Autolock lock(mHbmSvDimmingMutex);
+            ret = mHbmSvDimmingCond.wait(mHbmSvDimmingMutex);
+        } else {
+            Mutex::Autolock lock(mHbmSvDimmingMutex);
+            ret = mHbmSvDimmingCond.waitRelative(mHbmSvDimmingMutex, us2ns(wait));
+        }
+        // When the time out, it turns dimming off(hbm sv dimming done).
+        // Then, it waits the next hbm sv dimming event.
+        if (ret == TIMED_OUT) {
+            ret = 0;
+            wait = 0;
+            ALOGI("checking the dimming status");
+            endHbmSvDimming();
+        } else {
+            wait = mHbmDimmingTimeUs;
+        }
+    }
+}
+
+void ExynosDisplayDrmInterface::endHbmSvDimming() {
+    Mutex::Autolock lock(mBrightnessUpdateMutex);
+    if (!mHbmSvDimming) return;
+    mHbmSvDimming = false;
+    mBrightnessCtrl.DimmingOn.store(false);
+
+    if (mDimmingOnFd && mBrightnessCtrl.DimmingOn.is_dirty()) {
+        writeFileNode(mDimmingOnFd, mBrightnessCtrl.DimmingOn.get());
+        mBrightnessCtrl.DimmingOn.clear_dirty();
+    }
+}
+
 void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     if (mDrmConnector->brightness_cap().id() == 0) {
         ALOGD("the brightness_cap is not supported");
@@ -2387,6 +2429,10 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
                 property_get_int32("vendor.display.brightness.dimming.usage", 0));
         mHbmDimmingTimeUs =
                 property_get_int32("vendor.display.brightness.dimming.hbm_time", kHbmDimmingTimeUs);
+        if (mBrightnessDimmingUsage == BrightnessDimmingUsage::HBM) {
+            mHbmSvDimmingThreadRunning = true;
+            mDimmingThread = std::thread(&ExynosDisplayDrmInterface::checkHbmSvDimming, this);
+        }
     }
 
     return;
@@ -2500,21 +2546,14 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
         case BrightnessDimmingUsage::HBM:
             if ((static_cast<uint32_t>(hbm_mode) > static_cast<uint32_t>(HbmMode::OFF)) !=
                 mBrightnessCtrl.HbmMode.get() > static_cast<uint32_t>(HbmMode::OFF)) {
-                gettimeofday(&mHbmDimmingStart, NULL);
                 if (brightness_state.hdr_full_screen != mBrightnessState.hdr_full_screen) {
                     mBrightnessState.hdr_full_screen = brightness_state.hdr_full_screen;
                 } else {
                     mHbmSvDimming = true;
+                    mHbmSvDimmingCond.signal();
                 }
             }
-
-            if (mHbmSvDimming) {
-                struct timeval curr_time;
-                gettimeofday(&curr_time, NULL);
-                curr_time.tv_usec += (curr_time.tv_sec - mHbmDimmingStart.tv_sec) * 1000000;
-                long duration = curr_time.tv_usec - mHbmDimmingStart.tv_usec;
-                if (duration > mHbmDimmingTimeUs) mHbmSvDimming = false;
-            }
+            if (mBrightnessLevel.get() == 0) mHbmSvDimming = false;
             dimming_on = dimming_on && (mHbmSvDimming);
             break;
         case BrightnessDimmingUsage::NONE:
