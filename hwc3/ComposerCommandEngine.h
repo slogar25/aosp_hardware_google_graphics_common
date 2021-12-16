@@ -16,9 +16,9 @@
 
 #pragma once
 
-#include <android/hardware/graphics/composer3/command-buffer.h>
 #include <memory>
 
+#include "ComposerServiceWriter.h"
 #include "include/IComposerHal.h"
 #include "include/IResourceManager.h"
 
@@ -89,7 +89,7 @@ class ComposerCommandEngine {
 
       IComposerHal* mHal;
       IResourceManager* mResources;
-      std::unique_ptr<CommandWriterBase> mWriter;
+      std::unique_ptr<ComposerServiceWriter> mWriter;
       int32_t mCommandIndex;
 };
 
