@@ -82,8 +82,6 @@ class ComposerCommandEngine {
       void executeSetLayerPerFrameMetadataBlobs(
               int64_t display, int64_t layer,
               const std::vector<std::optional<PerFrameMetadataBlob>>& perFrameMetadataBlob);
-      void executeSetLayerGenericMetadata(int64_t display, int64_t layer,
-                                          const GenericMetadata& genericMetadata);
 
       int32_t executeValidateDisplayInternal(int64_t display);
 

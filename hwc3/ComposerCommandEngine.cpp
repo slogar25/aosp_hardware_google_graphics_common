@@ -98,7 +98,6 @@ void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCom
     DISPATCH_LAYER_COMMAND(display, command, colorTransform, ColorTransform);
     // TODO: (b/196171661) add support for mixed composition
     // DISPATCH_LAYER_COMMAND(display, command, whitePointNits, WhitePointNits);
-    DISPATCH_LAYER_COMMAND(display, command, genericMetadata, GenericMetadata);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadata, PerFrameMetadata);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadataBlob, PerFrameMetadataBlobs);
 }
@@ -400,16 +399,6 @@ void ComposerCommandEngine::executeSetLayerColorTransform(int64_t display, int64
 void ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
                       const std::vector<std::optional<PerFrameMetadataBlob>>& metadata) {
     auto err = mHal->setLayerPerFrameMetadataBlobs(display, layer, metadata);
-    if (err) {
-        LOG(ERROR) << __func__ << ": err " << err;
-        mWriter->setError(mCommandIndex, err);
-    }
-}
-
-void ComposerCommandEngine::executeSetLayerGenericMetadata(int64_t display, int64_t layer,
-                                                           const GenericMetadata& metadata) {
-    auto err =
-            mHal->setLayerGenericMetadata(display, layer, metadata);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
