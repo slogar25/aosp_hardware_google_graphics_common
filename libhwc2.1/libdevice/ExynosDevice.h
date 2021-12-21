@@ -342,9 +342,6 @@ class ExynosDevice {
 
         bool isColorCalibratedByDevice();
 
-        template <class Operator>
-        void findActiveDisplay(Operator optor);
-
     public:
         void enterToTUI() { mIsInTUI = true; };
         void exitFromTUI() { mIsInTUI = false; };

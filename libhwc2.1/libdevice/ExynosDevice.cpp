@@ -165,15 +165,12 @@ ExynosDevice::ExynosDevice()
 
     PixelDisplayInit(this);
 
+    ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     char value[PROPERTY_VALUE_MAX];
     property_get("vendor.display.lbe.supported", value, "0");
     mLbeSupported = atoi(value) ? true : false;
     if (mLbeSupported) {
-        for (uint32_t i = 0; i < mDisplays.size(); i++) {
-            if (mDisplays[i]->mType == HWC_DISPLAY_PRIMARY) {
-                mDisplays[i]->initLbe();
-            }
-        }
+        primary_display->initLbe();
     }
 }
 
@@ -1021,47 +1018,24 @@ bool ExynosDevice::isColorCalibratedByDevice() {
     return display->isColorCalibratedByDevice();
 }
 
-template <class Operator>
-void ExynosDevice::findActiveDisplay(Operator optor) {
-    for (uint32_t i = 0; i < mDisplays.size(); i++) {
-        /* TODO: consider concurrent displays */
-        if (mDisplays[i]->mType == HWC_DISPLAY_PRIMARY &&
-            mDisplays[i]->mPowerModeState == HWC2_POWER_MODE_ON) {
-            ALOGD("ActiveDisplay = %d", i);
-            return optor(mDisplays[i]);
-        }
-    }
-}
-
 void ExynosDevice::setLbeState(LbeState state) {
     if (mLbeSupported) {
-        findActiveDisplay([=](ExynosDisplay *disp) {
-            disp->setLbeState(state);
-            return;
-        });
-        ALOGD("setLbeState=%hhd", state);
+        ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+        primary_display->setLbeState(state);
     }
 }
 
 void ExynosDevice::setLbeAmbientLight(int value) {
     if (mLbeSupported) {
-        findActiveDisplay([=](ExynosDisplay *disp) {
-            disp->setLbeAmbientLight(value);
-            return;
-        });
-        ALOGD("setLbeAmbientLighte=%d", value);
+        ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+        primary_display->setLbeAmbientLight(value);
     }
 }
 
 LbeState ExynosDevice::getLbeState() {
-    LbeState state = LbeState::OFF;
     if (mLbeSupported) {
-        findActiveDisplay([&state](ExynosDisplay *disp) {
-            state = disp->getLbeState();
-            return;
-        });
-        ALOGD("getLbeState() = %hhd", state);
-        return state;
+        ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+        return primary_display->getLbeState();
     }
     return LbeState::OFF;
 }
