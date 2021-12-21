@@ -620,8 +620,19 @@ int32_t HalImpl::setColorMode(int64_t display, ColorMode mode, RenderIntent inte
     return halDisplay->setColorModeWithRenderIntent(hwcMode, hwcIntent);
 }
 
-int32_t HalImpl::setColorTransform(int64_t display, const std::vector<float>& matrix,
-                                   common::ColorTransform hint) {
+int32_t HalImpl::setColorTransform(int64_t display, const std::vector<float>& matrix) {
+    // clang-format off
+    constexpr std::array<float, 16> kIdentity = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    // clang-format on
+    const bool isIdentity = (std::equal(matrix.begin(), matrix.end(), kIdentity.begin()));
+    const common::ColorTransform hint = isIdentity ? common::ColorTransform::IDENTITY
+                                                   : common::ColorTransform::ARBITRARY_MATRIX;
+
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 

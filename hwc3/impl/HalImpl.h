@@ -93,8 +93,7 @@ class HalImpl : public IComposerHal {
                             const ndk::ScopedFileDescriptor& fence, common::Dataspace dataspace,
                             const std::vector<common::Rect>& damage) override;
     int32_t setColorMode(int64_t display, ColorMode mode, RenderIntent intent) override;
-    int32_t setColorTransform(int64_t display, const std::vector<float>& matrix,
-                              common::ColorTransform hint) override;
+    int32_t setColorTransform(int64_t display, const std::vector<float>& matrix) override;
     int32_t setContentType(int64_t display, ContentType contentType) override;
     int32_t setDisplayBrightness(int64_t display, float brightness) override;
     int32_t setDisplayedContentSamplingEnabled(int64_t display, bool enable,

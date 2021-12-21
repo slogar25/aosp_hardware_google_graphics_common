@@ -68,7 +68,7 @@ void ComposerCommandEngine::dispatchDisplayCommand(const DisplayCommand& command
         dispatchLayerCommand(command.display, layerCmd);
     }
 
-    DISPATCH_DISPLAY_COMMAND(command, colorTransform, SetColorTransform);
+    DISPATCH_DISPLAY_COMMAND(command, colorTransformMatrix, SetColorTransform);
     DISPATCH_DISPLAY_COMMAND(command, clientTarget, SetClientTarget);
     DISPATCH_DISPLAY_COMMAND(command, virtualDisplayOutputBuffer, SetOutputBuffer);
     // TODO: (b/196171661) SDR & HDR blending
@@ -128,8 +128,8 @@ int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
 }
 
 void ComposerCommandEngine::executeSetColorTransform(int64_t display,
-                                                     const ColorTransformPayload& command) {
-    auto err = mHal->setColorTransform(display, command.matrix, command.hint);
+                                                     const std::vector<float>& matrix) {
+    auto err = mHal->setColorTransform(display, matrix);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);

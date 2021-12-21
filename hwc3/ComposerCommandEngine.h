@@ -41,7 +41,7 @@ class ComposerCommandEngine {
       void dispatchDisplayCommand(const DisplayCommand& displayCommand);
       void dispatchLayerCommand(int64_t display, const LayerCommand& displayCommand);
 
-      void executeSetColorTransform(int64_t display, const ColorTransformPayload& command);
+      void executeSetColorTransform(int64_t display, const std::vector<float>& matrix);
       void executeSetClientTarget(int64_t display, const ClientTarget& command);
       void executeSetOutputBuffer(uint64_t display, const Buffer& buffer);
       void executeValidateDisplay(int64_t display);
