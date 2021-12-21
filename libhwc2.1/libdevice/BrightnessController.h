@@ -39,6 +39,8 @@
  */
 class BrightnessController {
 public:
+    using HdrLayerState = displaycolor::HdrLayerState;
+
     class DimmingMsgHandler : public virtual ::android::MessageHandler {
     public:
         enum {
@@ -55,6 +57,7 @@ public:
     BrightnessController(int32_t panelIndex, std::function<void(void)> refresh);
     ~BrightnessController();
 
+    BrightnessController(int32_t panelIndex);
     int initDrm(const DrmDevice& drmDevice,
                 const DrmConnector& connector);
 
@@ -72,7 +75,7 @@ public:
      */
     int processInstantHbm(bool on);
 
-    void updateFrameStates(bool hdrFullScreen) { mHdrFullScreen.store(hdrFullScreen); }
+    void updateFrameStates(HdrLayerState hdrState) { mHdrLayerState.store(hdrState); }
 
     /**
      * Dim ratio to keep the sdr brightness unchange after an instant hbm on with peak brightness.
@@ -113,8 +116,8 @@ public:
         return mInstantHbmReq.get();
     }
 
-    bool isHdrFullScreen() {
-        return mHdrFullScreen.get();
+    HdrLayerState getHdrLayerState() {
+        return mHdrLayerState.get();
     }
 
     bool isSupported() {
@@ -227,9 +230,8 @@ private:
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
 
-    CtrlValue<bool> mHdrFullScreen;
-
     std::function<void(void)> mFrameRefresh;
+    CtrlValue<HdrLayerState> mHdrLayerState;
 
     // these are used by sysfs path to wait drm path bl change task
     // indicationg an unchecked LHBM change in drm path
