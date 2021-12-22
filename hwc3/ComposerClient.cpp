@@ -317,12 +317,6 @@ ndk::ScopedAStatus ComposerClient::setContentType(int64_t display, ContentType t
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::setDisplayBrightness(int64_t display, float brightness) {
-    DEBUG_FUNC();
-    auto err = mHal->setDisplayBrightness(display, brightness);
-    return TO_BINDER_STATUS(err);
-}
-
 ndk::ScopedAStatus ComposerClient::setDisplayedContentSamplingEnabled(
         int64_t display, bool enable, FormatColorComponent componentMask, int64_t maxFrames) {
     DEBUG_FUNC();

@@ -42,6 +42,7 @@
 #include <aidl/android/hardware/graphics/composer3/Composition.h>
 #include <aidl/android/hardware/graphics/composer3/ContentType.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayAttribute.h>
+#include <aidl/android/hardware/graphics/composer3/DisplayBrightness.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCommand.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayConnectionType.h>
@@ -53,6 +54,7 @@
 #include <aidl/android/hardware/graphics/composer3/FormatColorComponent.h>
 #include <aidl/android/hardware/graphics/composer3/HdrCapabilities.h>
 #include <aidl/android/hardware/graphics/composer3/LayerCommand.h>
+#include <aidl/android/hardware/graphics/composer3/Luminance.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableBlendMode.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableComposition.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableDataspace.h>
@@ -70,7 +72,6 @@
 #include <aidl/android/hardware/graphics/composer3/VirtualDisplay.h>
 #include <aidl/android/hardware/graphics/composer3/VsyncPeriodChangeConstraints.h>
 #include <aidl/android/hardware/graphics/composer3/VsyncPeriodChangeTimeline.h>
-#include <aidl/android/hardware/graphics/composer3/WhitePointNits.h>
 #include <aidl/android/hardware/graphics/composer3/ZOrder.h>
 #include <cutils/native_handle.h>
 

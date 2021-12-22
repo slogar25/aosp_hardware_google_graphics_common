@@ -79,7 +79,7 @@ void ComposerCommandEngine::dispatchDisplayCommand(const DisplayCommand& command
     DISPATCH_DISPLAY_COMMAND(command, clientTarget, SetClientTarget);
     DISPATCH_DISPLAY_COMMAND(command, virtualDisplayOutputBuffer, SetOutputBuffer);
     // TODO: (b/196171661) SDR & HDR blending
-    // DISPATCH_DISPLAY_COMMAND(command, displayBrightness, SetDisplayBrightness);
+    // DISPATCH_DISPLAY_COMMAND(command, brightness, SetBrightness);
     DISPATCH_DISPLAY_BOOL_COMMAND_AND_DATA(command, validateDisplay, expectedPresentTime,
                                            ValidateDisplay);
     DISPATCH_DISPLAY_BOOL_COMMAND(command, acceptDisplayChanges, AcceptDisplayChanges);

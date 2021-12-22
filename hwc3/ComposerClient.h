@@ -108,7 +108,6 @@ public:
     ndk::ScopedAStatus setClientTargetSlotCount(int64_t display, int32_t count) override;
     ndk::ScopedAStatus setColorMode(int64_t display, ColorMode mode, RenderIntent intent) override;
     ndk::ScopedAStatus setContentType(int64_t display, ContentType type) override;
-    ndk::ScopedAStatus setDisplayBrightness(int64_t display, float brightness) override;
     ndk::ScopedAStatus setDisplayedContentSamplingEnabled(int64_t display, bool enable,
                                                           FormatColorComponent componentMask,
                                                           int64_t maxFrames) override;
