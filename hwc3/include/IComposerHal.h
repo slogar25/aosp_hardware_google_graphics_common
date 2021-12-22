@@ -22,6 +22,7 @@
  */
 #include <aidl/android/hardware/common/NativeHandle.h>
 #include <aidl/android/hardware/graphics/common/BlendMode.h>
+#include <aidl/android/hardware/graphics/common/ColorTransform.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/graphics/common/FRect.h>
 #include <aidl/android/hardware/graphics/common/PixelFormat.h>
@@ -36,7 +37,6 @@
 #include <aidl/android/hardware/graphics/composer3/ClientTargetPropertyWithNits.h>
 #include <aidl/android/hardware/graphics/composer3/Color.h>
 #include <aidl/android/hardware/graphics/composer3/ColorMode.h>
-#include <aidl/android/hardware/graphics/composer3/ColorTransformPayload.h>
 #include <aidl/android/hardware/graphics/composer3/CommandError.h>
 #include <aidl/android/hardware/graphics/composer3/CommandResultPayload.h>
 #include <aidl/android/hardware/graphics/composer3/Composition.h>
@@ -157,8 +157,7 @@ class IComposerHal {
                                     common::Dataspace dataspace,
                                     const std::vector<common::Rect>& damage) = 0; // cmd
     virtual int32_t setColorMode(int64_t display, ColorMode mode, RenderIntent intent) = 0;
-    virtual int32_t setColorTransform(int64_t display, const std::vector<float>& matrix,
-                                      common::ColorTransform hint) = 0; // cmd
+    virtual int32_t setColorTransform(int64_t display, const std::vector<float>& matrix) = 0; // cmd
     virtual int32_t setContentType(int64_t display, ContentType contentType) = 0;
     virtual int32_t setDisplayBrightness(int64_t display, float brightness) = 0;
     virtual int32_t setDisplayedContentSamplingEnabled(int64_t display, bool enable,
