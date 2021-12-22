@@ -64,6 +64,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
     public:
         // Prepare multi resolution
         ResolutionInfo mResolutionInfo;
+        std::string getPanelSysfsPath(const displaycolor::DisplayType& type);
 
     private:
         static constexpr const char* kDisplayCalFilePath = "/mnt/vendor/persist/display/";
@@ -80,8 +81,6 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t setPowerOff();
         int32_t setPowerDoze(hwc2_power_mode_t mode);
         void firstPowerOn();
-
-        std::string getPanelSysfsPath(const displaycolor::DisplayType& type);
 
         // LHBM
         FILE* mLhbmFd;
