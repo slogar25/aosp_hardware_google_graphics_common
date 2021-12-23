@@ -69,7 +69,6 @@ class HalImpl : public IComposerHal {
                                                   DisplayContentSamplingAttributes* attrs) override;
     int32_t getDozeSupport(int64_t display, bool* support) override;
     int32_t getHdrCapabilities(int64_t display, HdrCapabilities* caps) override;
-    int32_t getLayerGenericMetadataKeys(std::vector<LayerGenericMetadataKey>* keys) override;
     int32_t getMaxVirtualDisplayCount(int32_t* count) override;
     int32_t getPerFrameMetadataKeys(int64_t display,
                                     std::vector<PerFrameMetadataKey>* keys) override;
@@ -111,8 +110,6 @@ class HalImpl : public IComposerHal {
     int32_t setLayerDisplayFrame(int64_t display, int64_t layer,
                                  const common::Rect& frame) override;
     int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) override;
-    int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
-                                    const GenericMetadata& metadata) override;
     int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
                             const std::vector<std::optional<PerFrameMetadata>>& metadata) override;
     int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,

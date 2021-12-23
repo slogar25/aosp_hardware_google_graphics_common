@@ -424,26 +424,6 @@ int32_t HalImpl::getHdrCapabilities(int64_t display, HdrCapabilities* caps) {
     return HWC2_ERROR_NONE;
 }
 
-int32_t HalImpl::getLayerGenericMetadataKeys(std::vector<LayerGenericMetadataKey>* keys) {
-    uint32_t keyLength = 0;
-
-    // Only attempt to load the first 100 keys to avoid an infinite loop
-    // if something goes wrong
-    for (uint32_t index = 0; index < 100; ++index) {
-        mDevice->getLayerGenericMetadataKey(index, &keyLength, nullptr, nullptr);
-        if (keyLength == 0) {
-            break;
-        }
-
-        LayerGenericMetadataKey key;
-        key.name.resize(keyLength);
-        mDevice->getLayerGenericMetadataKey(index, &keyLength, key.name.data(), &key.mandatory);
-        keys->emplace_back(std::move(key));
-    }
-
-    return HWC2_ERROR_NONE;
-}
-
 int32_t HalImpl::getMaxVirtualDisplayCount(int32_t* count) {
     uint32_t hwcCount = mDevice->getMaxVirtualDisplayCount();
     h2a::translate(hwcCount, *count);
@@ -749,12 +729,6 @@ int32_t HalImpl::setLayerDisplayFrame(int64_t display, int64_t layer, const comm
 int32_t HalImpl::setLayerFloatColor([[maybe_unused]] int64_t display,
                                     [[maybe_unused]] int64_t layer,
                                     [[maybe_unused]] FloatColor color) {
-    return HWC2_ERROR_UNSUPPORTED;
-}
-
-int32_t HalImpl::setLayerGenericMetadata([[maybe_unused]] int64_t display,
-                                         [[maybe_unused]] int64_t layer,
-                                         [[maybe_unused]] const GenericMetadata& metadata) {
     return HWC2_ERROR_UNSUPPORTED;
 }
 

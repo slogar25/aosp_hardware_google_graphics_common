@@ -51,10 +51,8 @@
 #include <aidl/android/hardware/graphics/composer3/DisplayRequest.h>
 #include <aidl/android/hardware/graphics/composer3/FloatColor.h>
 #include <aidl/android/hardware/graphics/composer3/FormatColorComponent.h>
-#include <aidl/android/hardware/graphics/composer3/GenericMetadata.h>
 #include <aidl/android/hardware/graphics/composer3/HdrCapabilities.h>
 #include <aidl/android/hardware/graphics/composer3/LayerCommand.h>
-#include <aidl/android/hardware/graphics/composer3/LayerGenericMetadataKey.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableBlendMode.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableComposition.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableDataspace.h>
@@ -132,7 +130,6 @@ class IComposerHal {
             int64_t display, DisplayContentSamplingAttributes* attrs) = 0;
     virtual int32_t getDozeSupport(int64_t display, bool* support) = 0;
     virtual int32_t getHdrCapabilities(int64_t display, HdrCapabilities* caps) = 0;
-    virtual int32_t getLayerGenericMetadataKeys(std::vector<LayerGenericMetadataKey>* keys) = 0;
     virtual int32_t getMaxVirtualDisplayCount(int32_t* count) = 0;
     virtual int32_t getPerFrameMetadataKeys(int64_t display,
                                             std::vector<PerFrameMetadataKey>* keys) = 0;
@@ -177,8 +174,6 @@ class IComposerHal {
     virtual int32_t setLayerDisplayFrame(int64_t display, int64_t layer,
                                          const common::Rect& frame) = 0;
     virtual int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) = 0;
-    virtual int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
-                                            const GenericMetadata& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
                             const std::vector<std::optional<PerFrameMetadata>>& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
