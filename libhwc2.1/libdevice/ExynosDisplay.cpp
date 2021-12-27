@@ -68,8 +68,14 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
         mPowerHalExtAidl(nullptr),
-        mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {
-    InitWorker();
+        mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {}
+
+ExynosDisplay::PowerHalHintWorker::~PowerHalHintWorker() {
+    Exit();
+}
+
+int ExynosDisplay::PowerHalHintWorker::Init() {
+    return InitWorker();
 }
 
 void ExynosDisplay::PowerHalHintWorker::BinderDiedCallback(void *cookie) {
@@ -343,7 +349,8 @@ bool ExynosDisplay::PowerHalHintWorker::needUpdateIdleHintLocked(int64_t &timeou
     }
 
     int64_t currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
-    bool shouldEnableIdleHint = (mIdleHintDeadlineTime < currentTime);
+    bool shouldEnableIdleHint =
+            (mIdleHintDeadlineTime < currentTime) && CC_LIKELY(mIdleHintDeadlineTime > 0);
     if (mIdleHintIsEnabled != shouldEnableIdleHint || mForceUpdateIdleHint) {
         return true;
     }
@@ -692,6 +699,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
     ALOGI("window configs size(%zu)", mDpuData.configs.size());
 
     mLowFpsLayerInfo.initializeInfos();
+
+    mPowerHalHint.Init();
 
     mUseDpu = true;
     mBrightnessState.reset();
