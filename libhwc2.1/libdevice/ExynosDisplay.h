@@ -1127,6 +1127,8 @@ class ExynosDisplay {
         class PowerHalHintWorker : public Worker {
         public:
             PowerHalHintWorker();
+            virtual ~PowerHalHintWorker();
+            int Init();
 
             void signalRefreshRate(hwc2_power_mode_t powerMode, uint32_t vsyncPeriod);
             void signalIdle();

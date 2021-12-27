@@ -51,8 +51,7 @@ class DrmEventListener : public Worker {
  static const uint32_t maxFds = 3;
  public:
   DrmEventListener(DrmDevice *drm);
-  virtual ~DrmEventListener() {
-  }
+  virtual ~DrmEventListener();
 
   int Init();
 
