@@ -27,7 +27,7 @@
 namespace aidl::android::hardware::graphics::composer3::impl {
 
 class ComposerClient : public BnComposerClient {
-  public:
+public:
     ComposerClient(IComposerHal* hal) : mHal(hal) {}
     virtual ~ComposerClient();
     bool init();
@@ -117,7 +117,10 @@ class ComposerClient : public BnComposerClient {
                                          const ndk::ScopedFileDescriptor& releaseFence) override;
     ndk::ScopedAStatus setVsyncEnabled(int64_t display, bool enabled) override;
 
-  private:
+protected:
+    ::ndk::SpAIBinder createBinder() override;
+
+private:
     void destroyResources();
 
     IComposerHal* mHal;

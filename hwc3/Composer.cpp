@@ -16,9 +16,11 @@
 
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
-#include <android-base/logging.h>
-
 #include "Composer.h"
+
+#include <android-base/logging.h>
+#include <android/binder_ibinder_platform.h>
+
 #include "Util.h"
 
 namespace aidl::android::hardware::graphics::composer3::impl {
@@ -82,6 +84,12 @@ void Composer::onClientDestroyed() {
     std::lock_guard<std::mutex> lock(mClientMutex);
     mClient.reset();
     mClientDestroyedCondition.notify_all();
+}
+
+::ndk::SpAIBinder Composer::createBinder() {
+    auto binder = BnComposer::createBinder();
+    AIBinder_setInheritRt(binder.get(), true);
+    return binder;
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl
