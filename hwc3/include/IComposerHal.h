@@ -149,6 +149,9 @@ class IComposerHal {
             int64_t display, int32_t config,
             const VsyncPeriodChangeConstraints& vsyncPeriodChangeConstraints,
             VsyncPeriodChangeTimeline* timeline) = 0;
+    virtual int32_t setBootDisplayConfig(int64_t display, int32_t config) = 0;
+    virtual int32_t clearBootDisplayConfig(int64_t display) = 0;
+    virtual int32_t getPreferredBootDisplayConfig(int64_t display, int32_t* config) = 0;
     virtual int32_t setAutoLowLatencyMode(int64_t display, bool on) = 0;
     virtual int32_t setClientTarget(int64_t display, buffer_handle_t target,
                                     const ndk::ScopedFileDescriptor& fence,
