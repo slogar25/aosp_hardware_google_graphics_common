@@ -934,9 +934,6 @@ void ExynosDisplay::doPreProcessing() {
         (mDevice->mDisplayMode != exynosHWCControl.displayMode))
         setGeometryChanged(GEOMETRY_DEVICE_DISP_MODE_CHAGED);
 
-    if ((ret = mResourceManager->checkScenario(this)) != NO_ERROR)
-        DISPLAY_LOGE("checkScenario error ret(%d)", ret);
-
     if (exynosHWCControl.skipResourceAssign == 0) {
         /* Set any flag to mGeometryChanged */
         setGeometryChanged(GEOMETRY_DEVICE_SCENARIO_CHANGED);
@@ -4282,14 +4279,14 @@ void ExynosDisplay::printConfig(exynos_win_config_data &c)
 
 int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exynos_image *src_img, exynos_image *dst_img)
 {
-    ExynosCompositionInfo compositionInfo;
+    std::optional<ExynosCompositionInfo> compositionInfo;
 
     if (targetType == COMPOSITION_CLIENT)
         compositionInfo = mClientCompositionInfo;
     else if (targetType == COMPOSITION_EXYNOS)
         compositionInfo = mExynosCompositionInfo;
-    else
-        return -EINVAL;
+
+    if (!compositionInfo) return -EINVAL;
 
     src_img->fullWidth = mXres;
     src_img->fullHeight = mYres;
@@ -4300,10 +4297,10 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
     src_img->w = mXres;
     src_img->h = mYres;
 
-    if (compositionInfo.mTargetBuffer != NULL) {
-        src_img->bufferHandle = compositionInfo.mTargetBuffer;
+    if (compositionInfo->mTargetBuffer != NULL) {
+        src_img->bufferHandle = compositionInfo->mTargetBuffer;
 
-        VendorGraphicBufferMeta gmeta(compositionInfo.mTargetBuffer);
+        VendorGraphicBufferMeta gmeta(compositionInfo->mTargetBuffer);
         src_img->format = gmeta.format;
         src_img->usageFlags = gmeta.producer_usage;
     } else {
@@ -4312,16 +4309,16 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
         src_img->usageFlags = 0;
     }
     src_img->layerFlags = 0x0;
-    src_img->acquireFenceFd = compositionInfo.mAcquireFence;
+    src_img->acquireFenceFd = compositionInfo->mAcquireFence;
     src_img->releaseFenceFd = -1;
-    src_img->dataSpace = compositionInfo.mDataSpace;
+    src_img->dataSpace = compositionInfo->mDataSpace;
     src_img->blending = HWC2_BLEND_MODE_PREMULTIPLIED;
     src_img->transform = 0;
-    src_img->compressed = compositionInfo.mCompressed;
+    src_img->compressed = compositionInfo->mCompressed;
     src_img->planeAlpha = 1;
     src_img->zOrder = 0;
     if ((targetType == COMPOSITION_CLIENT) && (mType == HWC_DISPLAY_VIRTUAL)) {
-        if (compositionInfo.mLastIndex < mExynosCompositionInfo.mLastIndex)
+        if (compositionInfo->mLastIndex < mExynosCompositionInfo.mLastIndex)
             src_img->zOrder = 0;
         else
             src_img->zOrder = 1000;
@@ -4348,7 +4345,7 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
         dst_img->dataSpace = colorModeToDataspace(mColorMode);
     dst_img->blending = HWC2_BLEND_MODE_NONE;
     dst_img->transform = 0;
-    dst_img->compressed = compositionInfo.mCompressed;
+    dst_img->compressed = compositionInfo->mCompressed;
     dst_img->planeAlpha = 1;
     dst_img->zOrder = src_img->zOrder;
 
