@@ -78,7 +78,6 @@ class ComposerCommandEngine {
       void executeSetLayerPerFrameMetadata(
               int64_t display, int64_t layer,
               const std::vector<std::optional<PerFrameMetadata>>& perFrameMetadata);
-      void executeSetLayerFloatColor(int64_t display, int64_t layer, const FloatColor& floatColor);
       void executeSetLayerColorTransform(int64_t display, int64_t layer,
                                          const std::vector<float>& colorTransform);
       void executeSetLayerPerFrameMetadataBlobs(

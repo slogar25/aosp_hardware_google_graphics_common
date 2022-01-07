@@ -50,7 +50,6 @@
 #include <aidl/android/hardware/graphics/composer3/DisplayContentSamplingAttributes.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayIdentification.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayRequest.h>
-#include <aidl/android/hardware/graphics/composer3/FloatColor.h>
 #include <aidl/android/hardware/graphics/composer3/FormatColorComponent.h>
 #include <aidl/android/hardware/graphics/composer3/HdrCapabilities.h>
 #include <aidl/android/hardware/graphics/composer3/LayerCommand.h>
@@ -174,7 +173,6 @@ class IComposerHal {
                                       common::Dataspace dataspace) = 0;
     virtual int32_t setLayerDisplayFrame(int64_t display, int64_t layer,
                                          const common::Rect& frame) = 0;
-    virtual int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) = 0;
     virtual int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
                             const std::vector<std::optional<PerFrameMetadata>>& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,

@@ -726,12 +726,6 @@ int32_t HalImpl::setLayerDisplayFrame(int64_t display, int64_t layer, const comm
     return halLayer->setLayerDisplayFrame(hwcFrame);
 }
 
-int32_t HalImpl::setLayerFloatColor([[maybe_unused]] int64_t display,
-                                    [[maybe_unused]] int64_t layer,
-                                    [[maybe_unused]] FloatColor color) {
-    return HWC2_ERROR_UNSUPPORTED;
-}
-
 int32_t HalImpl::setLayerPerFrameMetadata(int64_t display, int64_t layer,
                            const std::vector<std::optional<PerFrameMetadata>>& metadata) {
     ExynosLayer *halLayer;

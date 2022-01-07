@@ -140,14 +140,6 @@ inline void translate(const Color& in, hwc_color_t& out) {
     out.a = in.a;
 }
 
-template<>
-inline void translate(const FloatColor& in, hwc_float_color_t& out) {
-    out.r = in.r;
-    out.g = in.g;
-    out.b = in.b;
-    out.a = in.a;
-}
-
 } // namespace a2h
 
 } // namespace aidl::android::hardware::graphics::composer3::impl

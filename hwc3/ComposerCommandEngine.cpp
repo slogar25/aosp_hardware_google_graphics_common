@@ -94,7 +94,6 @@ void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCom
     DISPATCH_LAYER_COMMAND(display, command, damage, SurfaceDamage);
     DISPATCH_LAYER_COMMAND(display, command, blendMode, BlendMode);
     DISPATCH_LAYER_COMMAND(display, command, color, Color);
-    DISPATCH_LAYER_COMMAND(display, command, floatColor, FloatColor);
     DISPATCH_LAYER_COMMAND(display, command, composition, Composition);
     DISPATCH_LAYER_COMMAND(display, command, dataspace, Dataspace);
     DISPATCH_LAYER_COMMAND(display, command, displayFrame, DisplayFrame);
@@ -391,15 +390,6 @@ void ComposerCommandEngine::executeSetLayerZOrder(int64_t display, int64_t layer
 void ComposerCommandEngine::executeSetLayerPerFrameMetadata(int64_t display, int64_t layer,
                 const std::vector<std::optional<PerFrameMetadata>>& perFrameMetadata) {
     auto err = mHal->setLayerPerFrameMetadata(display, layer, perFrameMetadata);
-    if (err) {
-        LOG(ERROR) << __func__ << ": err " << err;
-        mWriter->setError(mCommandIndex, err);
-    }
-}
-
-void ComposerCommandEngine::executeSetLayerFloatColor(int64_t display, int64_t layer,
-                                                      const FloatColor& floatColor) {
-    auto err = mHal->setLayerFloatColor(display, layer, floatColor);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
