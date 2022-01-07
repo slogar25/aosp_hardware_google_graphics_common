@@ -134,10 +134,17 @@ inline void translate(const bool& in, hwc2_vsync_t& out) {
 
 template<>
 inline void translate(const Color& in, hwc_color_t& out) {
-    out.r = in.r;
-    out.g = in.g;
-    out.b = in.b;
-    out.a = in.a;
+    const auto floatColorToUint8Clamped = [](float val) -> uint8_t {
+        const auto intVal = static_cast<uint64_t>(std::round(255.0f * val));
+        const auto minVal = static_cast<uint64_t>(0);
+        const auto maxVal = static_cast<uint64_t>(255);
+        return std::clamp(intVal, minVal, maxVal);
+    };
+
+    out.r = floatColorToUint8Clamped(in.r);
+    out.g = floatColorToUint8Clamped(in.g);
+    out.b = floatColorToUint8Clamped(in.b);
+    out.a = floatColorToUint8Clamped(in.a);
 }
 
 } // namespace a2h
