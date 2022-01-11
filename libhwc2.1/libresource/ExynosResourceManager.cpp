@@ -1610,6 +1610,13 @@ int32_t ExynosResourceManager::assignLayers(ExynosDisplay * display, uint32_t pr
         layer->setExynosImage(src_img, dst_img);
         layer->setExynosMidImage(dst_img);
 
+        // TODO: call validate function for RCD layer
+        if (layer->mCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION &&
+            src_img.format == HAL_PIXEL_FORMAT_GOOGLE_R_8) {
+            layer->mValidateCompositionType = HWC2_COMPOSITION_DISPLAY_DECORATION;
+            continue;
+        }
+
         compositionType = assignLayer(display, layer, i, m2m_out_img, &m2mMPP, &otfMPP, validateFlag);
         if (compositionType == HWC2_COMPOSITION_DEVICE) {
             if (otfMPP != NULL) {
@@ -1753,6 +1760,9 @@ int32_t ExynosResourceManager::assignWindow(ExynosDisplay *display)
             compositionInfo->mWindowIndex = windowIndex;
             HDEBUGLOGD(eDebugResourceManager, "\t\t[%d] %s Composition windowIndex: %d",
                     i, compositionInfo->getTypeStr().string(), windowIndex);
+        } else if (layer->mValidateCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION) {
+            layer->mWindowIndex = -1;
+            continue;
         } else {
             HWC_LOGE(display, "%s:: Invalid layer compositionType layer(%d), compositionType(%d)",
                     __func__, i, layer->mValidateCompositionType);

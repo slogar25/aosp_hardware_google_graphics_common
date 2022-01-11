@@ -314,6 +314,7 @@ class ExynosDevice {
 
         uint32_t getWindowPlaneNum();
         uint32_t getSpecialPlaneNum();
+        uint32_t getSpecialPlaneNum(uint32_t displayId);
         uint32_t getSpecialPlaneId(uint32_t index);
         uint64_t getSpecialPlaneAttr(uint32_t index);
 

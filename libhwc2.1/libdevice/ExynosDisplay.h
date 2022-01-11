@@ -177,6 +177,7 @@ struct exynos_win_config_data
         WIN_STATE_BUFFER,
         WIN_STATE_UPDATE,
         WIN_STATE_CURSOR,
+        WIN_STATE_RCD,
     } state = WIN_STATE_DISABLED;
 
     uint32_t color = 0;
@@ -212,23 +213,22 @@ struct exynos_dpu_data
 {
     int retire_fence = -1;
     std::vector<exynos_win_config_data> configs;
+    std::vector<exynos_win_config_data> rcdConfigs;
+
     bool enable_win_update = false;
     std::atomic<bool> enable_readback = false;
     struct decon_frame win_update_region = {0, 0, 0, 0, 0, 0};
     struct exynos_readback_info readback_info;
 
-    void init(uint32_t configNum) {
-        for(uint32_t i = 0; i < configNum; i++)
-        {
-            exynos_win_config_data config_data;
-            configs.push_back(config_data);
-        }
+    void init(size_t configNum, size_t rcdConfigNum) {
+        configs.resize(configNum);
+        rcdConfigs.resize(rcdConfigNum);
     };
 
     void reset() {
         retire_fence = -1;
-        for (uint32_t i = 0; i < configs.size(); i++)
-            configs[i].reset();
+        for (auto& config : configs) config.reset();
+        for (auto& config : rcdConfigs) config.reset();
 
         /*
          * Should not initialize readback_info

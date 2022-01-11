@@ -315,6 +315,11 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
         LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
                 __func__, interfaceType);
     mDisplayInterface->init(this);
+
+    mDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));
+    mLastDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));
+    ALOGI("window configs size(%zu) rcd configs zie(%zu)", mDpuData.configs.size(),
+          mDpuData.rcdConfigs.size());
 }
 
 std::string ExynosPrimaryDisplay::getPanelSysfsPath(const DisplayType &type) {

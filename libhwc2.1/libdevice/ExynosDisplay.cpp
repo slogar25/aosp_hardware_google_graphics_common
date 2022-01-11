@@ -995,8 +995,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
     /* The number of window is same with the number of otfMPP */
     mMaxWindowNum = mResourceManager->getOtfMPPs().size();
 
-    mDpuData.init(mMaxWindowNum);
-    mLastDpuData.init(mMaxWindowNum);
+    mDpuData.init(mMaxWindowNum, 0);
+    mLastDpuData.init(mMaxWindowNum, 0);
     ALOGI("window configs size(%zu)", mDpuData.configs.size());
 
     mLowFpsLayerInfo.initializeInfos();
@@ -1819,7 +1819,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     if (layer.mCompressed) {
         cfg.comp_src = DPP_COMP_SRC_GPU;
     }
-    if (otfMPP == NULL) {
+    if (otfMPP == nullptr && layer.mExynosCompositionType != HWC2_COMPOSITION_DISPLAY_DECORATION) {
         HWC_LOGE(this, "%s:: otfMPP is NULL", __func__);
         return -EINVAL;
     }
@@ -1871,6 +1871,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     if ((layer.mExynosCompositionType == HWC2_COMPOSITION_DEVICE) &&
         (layer.mCompositionType == HWC2_COMPOSITION_CURSOR))
         cfg.state = cfg.WIN_STATE_CURSOR;
+    else if (layer.mExynosCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION)
+        cfg.state = cfg.WIN_STATE_RCD;
     else
         cfg.state = cfg.WIN_STATE_BUFFER;
     cfg.dst.x = x;
@@ -2031,16 +2033,19 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     /* Adjust configuration */
     uint32_t srcMaxWidth, srcMaxHeight, srcWidthAlign, srcHeightAlign = 0;
     uint32_t srcXAlign, srcYAlign, srcMaxCropWidth, srcMaxCropHeight, srcCropWidthAlign, srcCropHeightAlign = 0;
-    srcMaxWidth = otfMPP->getSrcMaxWidth(src_img);
-    srcMaxHeight = otfMPP->getSrcMaxHeight(src_img);
-    srcWidthAlign = otfMPP->getSrcWidthAlign(src_img);
-    srcHeightAlign = otfMPP->getSrcHeightAlign(src_img);
-    srcXAlign = otfMPP->getSrcXOffsetAlign(src_img);
-    srcYAlign = otfMPP->getSrcYOffsetAlign(src_img);
-    srcMaxCropWidth = otfMPP->getSrcMaxCropWidth(src_img);
-    srcMaxCropHeight = otfMPP->getSrcMaxCropHeight(src_img);
-    srcCropWidthAlign = otfMPP->getSrcCropWidthAlign(src_img);
-    srcCropHeightAlign = otfMPP->getSrcCropHeightAlign(src_img);
+
+    if (otfMPP != nullptr) {
+        srcMaxWidth = otfMPP->getSrcMaxWidth(src_img);
+        srcMaxHeight = otfMPP->getSrcMaxHeight(src_img);
+        srcWidthAlign = otfMPP->getSrcWidthAlign(src_img);
+        srcHeightAlign = otfMPP->getSrcHeightAlign(src_img);
+        srcXAlign = otfMPP->getSrcXOffsetAlign(src_img);
+        srcYAlign = otfMPP->getSrcYOffsetAlign(src_img);
+        srcMaxCropWidth = otfMPP->getSrcMaxCropWidth(src_img);
+        srcMaxCropHeight = otfMPP->getSrcMaxCropHeight(src_img);
+        srcCropWidthAlign = otfMPP->getSrcCropWidthAlign(src_img);
+        srcCropHeightAlign = otfMPP->getSrcCropHeightAlign(src_img);
+    }
 
     if (cfg.src.x < 0)
         cfg.src.x = 0;
@@ -2320,6 +2325,17 @@ int ExynosDisplay::setWinConfigData() {
         if ((mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_EXYNOS) ||
                 (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT))
             continue;
+        if (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION) {
+            if (CC_UNLIKELY(mDpuData.rcdConfigs.size() == 0)) {
+                DISPLAY_LOGE("%s:: %zu layer has invalid COMPOSITION_TYPE(%d)", __func__, i,
+                             mLayers[i]->mExynosCompositionType);
+                return -EINVAL;
+            }
+
+            if ((ret = configureOverlay(mLayers[i], mDpuData.rcdConfigs[0])) != NO_ERROR)
+                return ret;
+            continue;
+        }
         int32_t windowIndex =  mLayers[i]->mWindowIndex;
         if ((windowIndex < 0) || (windowIndex >= (int32_t)mDpuData.configs.size())) {
             DISPLAY_LOGE("%s:: %zu layer has invalid windowIndex(%d)",
@@ -2747,7 +2763,8 @@ int ExynosDisplay::setReleaseFences() {
 
     for (size_t i = 0; i < mLayers.size(); i++) {
         if ((mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_CLIENT) ||
-            (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_EXYNOS))
+            (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_EXYNOS) ||
+            (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION))
             continue;
         if ((mLayers[i]->mWindowIndex < 0) ||
             (mLayers[i]->mWindowIndex >= mDpuData.configs.size())) {

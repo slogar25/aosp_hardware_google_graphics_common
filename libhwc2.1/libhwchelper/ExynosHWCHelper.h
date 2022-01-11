@@ -132,6 +132,7 @@ typedef struct format_description {
 constexpr int HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED = 0;
 constexpr int DRM_FORMAT_UNDEFINED = 0;
 
+// clang-format off
 const format_description_t exynos_format_desc[] = {
     /* RGB */
     {HAL_PIXEL_FORMAT_RGBA_8888, DECON_PIXEL_FORMAT_RGBA_8888, DRM_FORMAT_RGBA8888,
@@ -248,8 +249,12 @@ const format_description_t exynos_format_desc[] = {
         2, 2, 12, YUV420|BIT10|SBWC, false, String8("EXYNOS_YCrbCb_420_SP_M_10B_SBWC"), 0},
 
     {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
-        0, 0, 0, TYPE_UNDEF, false, String8("ImplDef"), 0}
+        0, 0, 0, TYPE_UNDEF, false, String8("ImplDef"), 0},
+
+    {HAL_PIXEL_FORMAT_GOOGLE_R_8, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_C8,
+        1, 1, 8, RGB|BIT8, true, String8("GOOGLE_R_8"), 0},
 };
+// clang-format on
 
 constexpr size_t FORMAT_MAX_CNT = sizeof(exynos_format_desc) / sizeof(format_description);
 

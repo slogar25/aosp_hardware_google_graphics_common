@@ -392,6 +392,13 @@ void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
     result.appendFormat("\n");
     mResourceManager->dump(result);
 
+    result.appendFormat("special plane num: %d:\n", getSpecialPlaneNum());
+    for (uint32_t index = 0; index < getSpecialPlaneNum(); index++) {
+        result.appendFormat("\tindex: %d attribute 0x%" PRIx64 "\n", getSpecialPlaneId(index),
+                            getSpecialPlaneAttr(index));
+    }
+    result.append("\n");
+
     for (size_t i = 0;i < mDisplays.size(); i++) {
         ExynosDisplay *display = mDisplays[i];
         if (display->mPlugState == true)
@@ -1075,6 +1082,13 @@ uint32_t ExynosDevice::getSpecialPlaneNum()
     /*
      * ExynosDevice might support something special purpose planes.
      * These planes are different with DPP planes.
+     */
+    return mDeviceInterface->getNumSPPChs();
+}
+
+uint32_t ExynosDevice::getSpecialPlaneNum(uint32_t /*displayId*/) {
+    /*
+     * TODO: create the query function for each display
      */
     return mDeviceInterface->getNumSPPChs();
 }

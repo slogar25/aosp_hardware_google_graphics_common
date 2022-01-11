@@ -17,6 +17,7 @@
 #ifndef _EXYNOSLAYER_H
 #define _EXYNOSLAYER_H
 
+#include <aidl/android/hardware/graphics/composer3/Composition.h>
 #include <hardware/hwcomposer2.h>
 #include <log/log.h>
 #include <system/graphics.h>
@@ -38,6 +39,7 @@
 
 using namespace android;
 using namespace vendor::graphics;
+using ::aidl::android::hardware::graphics::composer3::Composition;
 
 class ExynosMPP;
 
@@ -72,6 +74,7 @@ typedef struct pre_processed_layer_info
 } pre_processed_layer_info_t;
 
 enum {
+    HWC2_COMPOSITION_DISPLAY_DECORATION = toUnderlying(Composition::DISPLAY_DECORATION),
     /*add after hwc2_composition_t, margin number here*/
     HWC2_COMPOSITION_EXYNOS = 32,
 };

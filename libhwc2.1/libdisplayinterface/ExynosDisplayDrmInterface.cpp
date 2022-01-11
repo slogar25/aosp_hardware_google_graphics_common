@@ -245,8 +245,23 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         if (fbId != 0) {
             return NO_ERROR;
         }
+    } else if (config.state == config.WIN_STATE_RCD) {
+        bufWidth = config.src.f_w;
+        bufHeight = config.src.f_h;
+        drmFormat = DRM_FORMAT_C8;
+        bufferNum = 1;
+        handles[0] = getBufHandleFromFd(config.fd_idma[0]);
+        bpp = 1;
+        pitches[0] = config.src.f_w * bpp;
+        fbId = findCachedFbId(config.layer,
+                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat,
+                                                                    config.protection}](
+                                      auto &buffer) { return buffer->bufferDesc == bufferDesc; });
+        if (fbId != 0) {
+            return NO_ERROR;
+        }
     } else {
-        ALOGE("%s:: known config state(%d)", __func__, config.state);
+        ALOGE("%s:: unknown config state(%d)", __func__, config.state);
         return -EINVAL;
     }
 
@@ -1634,6 +1649,20 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             }
             hasSecureFrameBuffer |= (isFramebuffer(config.layer) && config.protection);
             /* Set this plane is enabled */
+            planeEnableInfo[plane->id()] = 1;
+        }
+    }
+
+    for (size_t i = 0; i < mExynosDisplay->mDpuData.rcdConfigs.size(); ++i) {
+        exynos_win_config_data &config = mExynosDisplay->mDpuData.rcdConfigs[i];
+        if (config.state == config.WIN_STATE_RCD) {
+            const int channelId =
+                    mExynosDisplay->mDevice->getSpecialPlaneId(0); // TODO: get PlaneId by display
+            auto &plane = mDrmDevice->planes().at(channelId);
+            uint32_t fbId = 0;
+            if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
+                HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
+            }
             planeEnableInfo[plane->id()] = 1;
         }
     }
