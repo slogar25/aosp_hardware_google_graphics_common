@@ -510,6 +510,13 @@ int32_t HalImpl::getSupportedContentTypes(int64_t display, std::vector<ContentTy
     return HWC2_ERROR_NONE;
 }
 
+int32_t HalImpl::flushDisplayBrightnessChange(int64_t display) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->flushDisplayBrightnessChange();
+}
+
 int32_t HalImpl::presentDisplay(int64_t display, ndk::ScopedFileDescriptor& fence,
                        std::vector<int64_t>* outLayers,
                        std::vector<ndk::ScopedFileDescriptor>* outReleaseFences) {
@@ -644,7 +651,7 @@ int32_t HalImpl::setDisplayBrightness(int64_t display, float brightness) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    return halDisplay->setDisplayBrightness(brightness);
+    return halDisplay->setDisplayBrightness(brightness, true /* wait present */);
 }
 
 int32_t HalImpl::setDisplayedContentSamplingEnabled(
@@ -827,6 +834,13 @@ int32_t HalImpl::setLayerVisibleRegion(int64_t display, int64_t layer,
     return halLayer->setLayerVisibleRegion(region);
 }
 
+int32_t HalImpl::setLayerWhitePointNits(int64_t display, int64_t layer, float nits) {
+    ExynosLayer *halLayer;
+    RET_IF_ERR(getHalLayer(display, layer, halLayer));
+
+    return halLayer->setLayerWhitePointNits(nits);
+}
+
 int32_t HalImpl::setLayerZOrder(int64_t display, int64_t layer, uint32_t z) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
@@ -889,7 +903,8 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
                                  uint32_t* outDisplayRequestMask,
                                  std::vector<int64_t>* outRequestedLayers,
                                  std::vector<int32_t>* outRequestMasks,
-                                 ClientTargetProperty* outClientTargetProperty) {
+                                 ClientTargetProperty* outClientTargetProperty,
+                                 float* outClientTargetWhitePointNits) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
@@ -911,6 +926,8 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     outRequestMasks->resize(reqsCount);
     RET_IF_ERR(halDisplay->getDisplayRequests(&displayReqs, &reqsCount,
                                               hwcRequestedLayers.data(), outRequestMasks->data()));
+
+    RET_IF_ERR(halDisplay->getClientTargetWhitePointNits(outClientTargetWhitePointNits));
 
     h2a::translate(hwcChangedLayers, *outChangedLayers);
     h2a::translate(hwcCompositionTypes, *outCompositionTypes);

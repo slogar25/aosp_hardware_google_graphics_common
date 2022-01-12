@@ -65,6 +65,7 @@ typedef struct pre_processed_layer_info
     hwc_frect_t sourceCrop;
     hwc_rect_t displayFrame;
     int interlacedType;
+    float sdrDimRatio;
     /* SBWC exception */
     bool mUsePrivateFormat = false;
     uint32_t mPrivateFormat = 0;
@@ -221,6 +222,11 @@ class ExynosLayer : public ExynosMPPSource {
         android_dataspace mDataSpace; // android_dataspace_t
 
         pre_processed_layer_info mPreprocessedInfo;
+
+        /**
+         * SDR layer white point nits
+         */
+        float mWhitePointNits = -1.0;
 
         /**
          * user defined flag
@@ -414,6 +420,18 @@ class ExynosLayer : public ExynosMPPSource {
         int32_t setLayerGenericMetadata(hwc2_layer_t __unused layer,
                 uint32_t __unused keyLength, const char* __unused key,
                 bool __unused mandatory, uint32_t __unused valueLength, const uint8_t* __unused value);
+
+        /**
+         * setLayerWhitePointNits(float whitePointNits);
+         *
+         * Sets the desired white point for the layer. This is intended to be used when presenting
+         * an SDR layer alongside HDR content. The HDR content will be presented at the display
+         * rightness in nits, and accordingly SDR content shall be dimmed to the desired white point
+         * provided.
+         *
+         * @param whitePointNits is the white point in nits.
+         */
+        int32_t setLayerWhitePointNits(float whitePointNits);
 
         void resetValidateData();
         virtual void dump(String8& result);

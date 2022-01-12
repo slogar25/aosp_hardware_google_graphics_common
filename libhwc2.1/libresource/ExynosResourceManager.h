@@ -197,6 +197,7 @@ class ExynosResourceManager {
         static ExynosMPPVector mOtfMPPs;
         static ExynosMPPVector mM2mMPPs;
         uint32_t mResourceReserved; /* Set MPP logical type for bit operation */
+        float mMinimumSdrDimRatio;
 };
 
 #endif //_EXYNOSRESOURCEMANAGER_H

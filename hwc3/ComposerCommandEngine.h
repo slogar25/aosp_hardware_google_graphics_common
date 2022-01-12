@@ -17,6 +17,7 @@
 #pragma once
 
 #include <memory>
+#include <utils/Mutex.h>
 
 #include "ComposerServiceWriter.h"
 #include "include/IComposerHal.h"
@@ -43,6 +44,7 @@ class ComposerCommandEngine {
 
       void executeSetColorTransform(int64_t display, const std::vector<float>& matrix);
       void executeSetClientTarget(int64_t display, const ClientTarget& command);
+      void executeSetDisplayBrightness(uint64_t display, const DisplayBrightness& command);
       void executeSetOutputBuffer(uint64_t display, const Buffer& buffer);
       void executeValidateDisplay(int64_t display,
                                   const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
@@ -80,9 +82,9 @@ class ComposerCommandEngine {
               const std::vector<std::optional<PerFrameMetadata>>& perFrameMetadata);
       void executeSetLayerColorTransform(int64_t display, int64_t layer,
                                          const std::vector<float>& colorTransform);
-      void executeSetLayerPerFrameMetadataBlobs(
-              int64_t display, int64_t layer,
+      void executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
               const std::vector<std::optional<PerFrameMetadataBlob>>& perFrameMetadataBlob);
+      void executeSetLayerWhitePointNits(int64_t display, int64_t layer, const Luminance& nits);
 
       int32_t executeValidateDisplayInternal(int64_t display);
       void executeSetExpectedPresentTimeInternal(

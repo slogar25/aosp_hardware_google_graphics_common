@@ -329,6 +329,7 @@ enum {
     eReallocOnGoingForDDI         =     0x00020000,
     eInvalidDispFrame             =     0x00040000,
     eExceedMaxLayerNum            =     0x00080000,
+    eExceedSdrDimRatio            =     0x00100000,
     eResourceAssignFail           =     0x20000000,
     eMPPUnsupported               =     0x40000000,
     eUnknown                      =     0x80000000,

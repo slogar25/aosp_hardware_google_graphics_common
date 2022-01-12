@@ -45,10 +45,11 @@ class HalImpl : public IComposerHal {
 
     int32_t acceptDisplayChanges(int64_t display) override;
     int32_t createLayer(int64_t display, int64_t* outLayer) override;
-    int32_t destroyLayer(int64_t display, int64_t layer) override;
     int32_t createVirtualDisplay(uint32_t width, uint32_t height, AidlPixelFormat format,
                                  VirtualDisplay* outDisplay) override;
+    int32_t destroyLayer(int64_t display, int64_t layer) override;
     int32_t destroyVirtualDisplay(int64_t display) override;
+    int32_t flushDisplayBrightnessChange(int64_t display) override;
     int32_t getActiveConfig(int64_t display, int32_t* outConfig) override;
     int32_t getColorModes(int64_t display, std::vector<ColorMode>* outModes) override;
 
@@ -122,6 +123,7 @@ class HalImpl : public IComposerHal {
     int32_t setLayerTransform(int64_t display, int64_t layer, common::Transform transform) override;
     int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
                           const std::vector<std::optional<common::Rect>>& visible) override;
+    int32_t setLayerWhitePointNits(int64_t display, int64_t layer, float nits) override;
     int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) override;
     int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                             const ndk::ScopedFileDescriptor& releaseFence) override;
@@ -134,7 +136,8 @@ class HalImpl : public IComposerHal {
                             uint32_t* outDisplayRequestMask,
                             std::vector<int64_t>* outRequestedLayers,
                             std::vector<int32_t>* outRequestMasks,
-                            ClientTargetProperty* outClientTargetProperty) override;
+                            ClientTargetProperty* outClientTargetProperty,
+                            float* outClientTargetWhitePointNits) override;
     int32_t setExpectedPresentTime(
             int64_t display,
             const std::optional<ClockMonotonicTimestamp> expectedPresentTime) override;

@@ -201,6 +201,10 @@ ExynosResourceManager::ExynosResourceManager(ExynosDevice *device)
 
     mDstBufMgrThread->mRunning = true;
     mDstBufMgrThread->run("DstBufMgrThread");
+
+    char value[PROPERTY_VALUE_MAX];
+    mMinimumSdrDimRatio = property_get("debug.hwc.min_sdr_dimming", value, nullptr) > 0
+                          ? std::atof(value) : 1.0f;
 }
 
 ExynosResourceManager::~ExynosResourceManager()
@@ -1129,6 +1133,9 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
         (layer->mPreprocessedInfo.displayFrame.right > (int32_t)display->mXres) ||
         (layer->mPreprocessedInfo.displayFrame.bottom > (int32_t)display->mYres))
         return eInvalidDispFrame;
+
+    if (layer->mPreprocessedInfo.sdrDimRatio < mMinimumSdrDimRatio)
+        return eExceedSdrDimRatio;
 
     return NO_ERROR;
 }
