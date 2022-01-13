@@ -18,6 +18,9 @@
 //#include <linux/fb.h>
 #include "ExynosDisplay.h"
 
+#include <aidl/android/hardware/power/IPower.h>
+#include <aidl/google/hardware/power/extension/pixel/IPowerExt.h>
+#include <android-base/properties.h>
 #include <android/binder_manager.h>
 #include <cutils/properties.h>
 #include <hardware/hwcomposer_defs.h>
@@ -27,17 +30,15 @@
 #include <sys/ioctl.h>
 #include <utils/CallStack.h>
 
+#include <future>
 #include <map>
 
 #include "BrightnessController.h"
 #include "ExynosExternalDisplay.h"
 #include "ExynosLayer.h"
-#include "exynos_format.h"
-
 #include "VendorGraphicBuffer.h"
-
-#include <aidl/android/hardware/power/IPower.h>
-#include <aidl/google/hardware/power/extension/pixel/IPowerExt.h>
+#include "android-base/parsebool.h"
+#include "exynos_format.h"
 
 /**
  * ExynosDisplay implementation
@@ -68,8 +69,10 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mIdleHintIsSupported(false),
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
+        mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
         mPowerHalExtAidl(nullptr),
-        mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {}
+        mPowerHalAidl(nullptr),
+        mPowerHintSession(nullptr) {}
 
 ExynosDisplay::PowerHalHintWorker::~PowerHalHintWorker() {
     Exit();
@@ -85,31 +88,42 @@ void ExynosDisplay::PowerHalHintWorker::BinderDiedCallback(void *cookie) {
     powerHint->forceUpdateHints();
 }
 
-int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
-    if (mPowerHalExtAidl) {
+int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHal() {
+    if (mPowerHalAidl && mPowerHalExtAidl) {
         return NO_ERROR;
     }
 
     const std::string kInstance = std::string(IPower::descriptor) + "/default";
     ndk::SpAIBinder pwBinder = ndk::SpAIBinder(AServiceManager_getService(kInstance.c_str()));
-    ndk::SpAIBinder pwExtBinder;
 
+    mPowerHalAidl = IPower::fromBinder(pwBinder);
+
+    if (!mPowerHalAidl) {
+        ALOGE("failed to connect power HAL");
+        return -EINVAL;
+    }
+
+    ndk::SpAIBinder pwExtBinder;
     AIBinder_getExtension(pwBinder.get(), pwExtBinder.getR());
+
     mPowerHalExtAidl = IPowerExt::fromBinder(pwExtBinder);
+
     if (!mPowerHalExtAidl) {
+        mPowerHalAidl = nullptr;
         ALOGE("failed to connect power HAL extension");
         return -EINVAL;
     }
 
     AIBinder_linkToDeath(pwExtBinder.get(), mDeathRecipient.get(), reinterpret_cast<void *>(this));
-
+    // ensure the hint session is recreated every time powerhal is recreated
+    mPowerHintSession = nullptr;
     forceUpdateHints();
-    ALOGI("connect power HAL extension successfully");
+    ALOGI("connected power HAL successfully");
     return NO_ERROR;
 }
 
 int32_t ExynosDisplay::PowerHalHintWorker::checkPowerHalExtHintSupport(const std::string &mode) {
-    if (mode.empty() || connectPowerHalExt() != NO_ERROR) {
+    if (mode.empty() || connectPowerHal() != NO_ERROR) {
         return -EINVAL;
     }
 
@@ -140,7 +154,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkPowerHalExtHintSupport(const std
 
 int32_t ExynosDisplay::PowerHalHintWorker::sendPowerHalExtHint(const std::string &mode,
                                                                bool enabled) {
-    if (mode.empty() || connectPowerHalExt() != NO_ERROR) {
+    if (mode.empty() || connectPowerHal() != NO_ERROR) {
         return -EINVAL;
     }
 
@@ -286,6 +300,40 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
     return ret;
 }
 
+int32_t ExynosDisplay::PowerHalHintWorker::checkPowerHintSessionSupport() {
+    Lock();
+    if (mHintSessionSupported.has_value()) {
+        Unlock();
+        return *mHintSessionSupported;
+    }
+    Unlock();
+
+    if (connectPowerHal() != NO_ERROR) {
+        ALOGW("Error connecting to the PowerHAL");
+        return -EINVAL;
+    }
+
+    int64_t rate;
+    // Try to get preferred rate to determine if it's supported
+    auto ret = mPowerHalAidl->getHintSessionPreferredRate(&rate);
+
+    int32_t out;
+    if (ret.isOk()) {
+        ALOGV("Power hint session is supported");
+        out = NO_ERROR;
+    } else if (ret.getExceptionCode() == EX_UNSUPPORTED_OPERATION) {
+        ALOGW("Power hint session unsupported");
+        out = -EOPNOTSUPP;
+    } else {
+        ALOGW("Error checking power hint status");
+        out = -EINVAL;
+    }
+    Lock();
+    mHintSessionSupported = out;
+    Unlock();
+    return out;
+}
+
 int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, bool forceUpdate) {
     int32_t ret = checkIdleHintSupport();
     if (ret != NO_ERROR) {
@@ -309,6 +357,7 @@ void ExynosDisplay::PowerHalHintWorker::forceUpdateHints(void) {
     Lock();
     mPrevRefreshRate = 0;
     mNeedUpdateRefreshRateHint = true;
+    mLastErrorSent = std::nullopt;
     if (mIdleHintSupportIsChecked && mIdleHintIsSupported) {
         mForceUpdateIdleHint = true;
     }
@@ -316,6 +365,136 @@ void ExynosDisplay::PowerHalHintWorker::forceUpdateHints(void) {
     Unlock();
 
     Signal();
+}
+
+int32_t ExynosDisplay::PowerHalHintWorker::sendActualWorkDuration() {
+    Lock();
+    if (mPowerHintSession == nullptr) {
+        ALOGW("Cannot send actual work duration, power hint session not running");
+        Unlock();
+        return -EINVAL;
+    }
+
+    if (!needSendActualWorkDurationLocked()) {
+        Unlock();
+        return NO_ERROR;
+    }
+
+    if (mActualWorkDuration.has_value()) {
+        mLastErrorSent = *mActualWorkDuration - mTargetWorkDuration;
+    }
+
+    std::vector<WorkDuration> hintQueue(std::move(mPowerHintQueue));
+    mPowerHintQueue.clear();
+    Unlock();
+
+    ALOGV("Sending hint update batch");
+    mLastActualReportTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
+    auto ret = mPowerHintSession->reportActualWorkDuration(hintQueue);
+    if (!ret.isOk()) {
+        ALOGW("Failed to report power hint session timing:  %s %s", ret.getMessage(),
+              ret.getDescription().c_str());
+        if (ret.getExceptionCode() == EX_TRANSACTION_FAILED) {
+            Lock();
+            mPowerHalExtAidl = nullptr;
+            Unlock();
+        }
+    }
+    return ret.isOk() ? NO_ERROR : -EINVAL;
+}
+
+int32_t ExynosDisplay::PowerHalHintWorker::updateTargetWorkDuration() {
+    if (sNormalizeTarget) {
+        return NO_ERROR;
+    }
+
+    if (mPowerHintSession == nullptr) {
+        ALOGW("Cannot send target work duration, power hint session not running");
+        return -EINVAL;
+    }
+
+    Lock();
+
+    if (!needUpdateTargetWorkDurationLocked()) {
+        Unlock();
+        return NO_ERROR;
+    }
+
+    nsecs_t targetWorkDuration = mTargetWorkDuration;
+    mLastTargetDurationReported = targetWorkDuration;
+    Unlock();
+
+    ALOGV("Sending target time: %lld ns", static_cast<long long>(targetWorkDuration));
+    auto ret = mPowerHintSession->updateTargetWorkDuration(targetWorkDuration);
+    if (!ret.isOk()) {
+        ALOGW("Failed to send power hint session target:  %s %s", ret.getMessage(),
+              ret.getDescription().c_str());
+        if (ret.getExceptionCode() == EX_TRANSACTION_FAILED) {
+            Lock();
+            mPowerHalExtAidl = nullptr;
+            Unlock();
+        }
+    }
+    return ret.isOk() ? NO_ERROR : -EINVAL;
+}
+
+void ExynosDisplay::PowerHalHintWorker::signalActualWorkDuration(nsecs_t actualDurationNanos) {
+    ATRACE_CALL();
+    Lock();
+
+    if (!usePowerHintSessionLocked()) {
+        Unlock();
+        return;
+    }
+
+    // convert to long long so "%lld" works correctly
+    long long actualNs = actualDurationNanos, targetNs = mTargetWorkDuration;
+    ALOGV("Sending actual work duration of: %lld on target: %lld with error: %lld", actualNs,
+          targetNs, actualNs - targetNs);
+    if (sTraceHintSessionData) {
+        ATRACE_INT64("Measured duration", actualNs);
+        ATRACE_INT64("Target error term", actualNs - targetNs);
+    }
+
+    WorkDuration work;
+    work.timeStampNanos = systemTime();
+    work.durationNanos = actualDurationNanos;
+    if (sNormalizeTarget) {
+        work.durationNanos += mLastTargetDurationReported - mTargetWorkDuration;
+    }
+
+    mPowerHintQueue.push_back(work);
+    // store the non-normalized last value here
+    mActualWorkDuration = actualDurationNanos;
+
+    bool shouldSignal = needSendActualWorkDurationLocked();
+    Unlock();
+    if (shouldSignal) {
+        Signal();
+    }
+}
+
+void ExynosDisplay::PowerHalHintWorker::signalTargetWorkDuration(nsecs_t targetDurationNanos) {
+    Lock();
+    if (!usePowerHintSessionLocked()) {
+        Unlock();
+        return;
+    }
+
+    mTargetWorkDuration = targetDurationNanos - kTargetSafetyMargin.count();
+
+    if (sTraceHintSessionData) ATRACE_INT64("Time target", mTargetWorkDuration);
+    bool shouldSignal = false;
+    if (!sNormalizeTarget) {
+        shouldSignal = needUpdateTargetWorkDurationLocked();
+        if (shouldSignal && mActualWorkDuration.has_value() && sTraceHintSessionData) {
+            ATRACE_INT64("Target error term", *mActualWorkDuration - mTargetWorkDuration);
+        }
+    }
+    Unlock();
+    if (shouldSignal) {
+        Signal();
+    }
 }
 
 void ExynosDisplay::PowerHalHintWorker::signalRefreshRate(hwc2_power_mode_t powerMode,
@@ -361,17 +540,31 @@ bool ExynosDisplay::PowerHalHintWorker::needUpdateIdleHintLocked(int64_t &timeou
 }
 
 void ExynosDisplay::PowerHalHintWorker::Routine() {
+    checkPowerHintSessionSupport();
     Lock();
+    bool useHintSession = usePowerHintSessionLocked();
+    // if the tids have updated, we restart the session
+    if (mTidsUpdated && useHintSession) mPowerHintSession = nullptr;
+    bool needStartHintSession =
+            (mPowerHintSession == nullptr) && useHintSession && !mBinderTids.empty();
     int ret = 0;
     int64_t timeout = -1;
-    if (!mNeedUpdateRefreshRateHint && !needUpdateIdleHintLocked(timeout)) {
+    if (!mNeedUpdateRefreshRateHint && !needUpdateIdleHintLocked(timeout) &&
+        !needSendActualWorkDurationLocked() && !needStartHintSession &&
+        !needUpdateTargetWorkDurationLocked()) {
         ret = WaitForSignalOrExitLocked(timeout);
     }
 
+    // exit() signal received
     if (ret == -EINTR) {
         Unlock();
         return;
     }
+
+    // store internal values so they are consistent after Unlock()
+    // some defined earlier also might have changed during the wait
+    useHintSession = usePowerHintSessionLocked();
+    needStartHintSession = (mPowerHintSession == nullptr) && useHintSession && !mBinderTids.empty();
 
     bool needUpdateRefreshRateHint = mNeedUpdateRefreshRateHint;
     int64_t deadlineTime = mIdleHintDeadlineTime;
@@ -385,6 +578,7 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
      * hints if we clear the flags after the hint update functions work without
      * errors.
      */
+    mTidsUpdated = false;
     mNeedUpdateRefreshRateHint = false;
 
     bool forceUpdateIdleHint = mForceUpdateIdleHint;
@@ -404,7 +598,142 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
             Unlock();
         }
     }
+
+    if (useHintSession) {
+        if (needStartHintSession) {
+            startHintSession();
+        }
+        sendActualWorkDuration();
+        updateTargetWorkDuration();
+    }
 }
+
+void ExynosDisplay::PowerHalHintWorker::addBinderTid(pid_t tid) {
+    Lock();
+    if (mBinderTids.count(tid) != 0) {
+        Unlock();
+        return;
+    }
+    mTidsUpdated = true;
+    mBinderTids.emplace(tid);
+    Unlock();
+    Signal();
+}
+
+void ExynosDisplay::PowerHalHintWorker::removeBinderTid(pid_t tid) {
+    Lock();
+    if (mBinderTids.erase(tid) == 0) {
+        Unlock();
+        return;
+    }
+    mTidsUpdated = true;
+    Unlock();
+    Signal();
+}
+
+int32_t ExynosDisplay::PowerHalHintWorker::startHintSession() {
+    Lock();
+    std::vector<int> tids(mBinderTids.begin(), mBinderTids.end());
+    nsecs_t targetWorkDuration =
+            sNormalizeTarget ? mLastTargetDurationReported : mTargetWorkDuration;
+    // we want to stay locked during this one since it assigns "mPowerHintSession"
+    auto ret = mPowerHalAidl->createHintSession(getpid(), static_cast<uid_t>(getuid()), tids,
+                                                targetWorkDuration, &mPowerHintSession);
+    if (!ret.isOk()) {
+        ALOGW("Failed to start power hal hint session with error  %s %s", ret.getMessage(),
+              ret.getDescription().c_str());
+        if (ret.getExceptionCode() == EX_TRANSACTION_FAILED) {
+            mPowerHalExtAidl = nullptr;
+        }
+        Unlock();
+        return -EINVAL;
+    } else {
+        mLastTargetDurationReported = targetWorkDuration;
+    }
+    Unlock();
+    return NO_ERROR;
+}
+
+bool ExynosDisplay::PowerHalHintWorker::checkPowerHintSessionReadyLocked() {
+    static constexpr const std::chrono::milliseconds maxFlagWaitTime = 20s;
+    static const std::string propName =
+            "persist.device_config.surface_flinger_native_boot.AdpfFeature__adpf_cpu_hint";
+    // wait once for 20 seconds in another thread for the value to become available, or give up
+    static std::future<std::optional<std::string> > enabledFlag =
+            std::async(std::launch::async, &waitForPropertyValue, propName,
+                       maxFlagWaitTime.count());
+    if (!mHintSessionEnabled.has_value() &&
+        (enabledFlag.wait_for(std::chrono::seconds(0)) == std::future_status::ready)) {
+        std::optional<std::string> flagValue = enabledFlag.get();
+        mHintSessionEnabled = flagValue.has_value() &&
+                (base::ParseBool((*flagValue).c_str()) == base::ParseBoolResult::kTrue);
+    }
+    return mHintSessionEnabled.has_value() && mHintSessionSupported.has_value();
+}
+
+bool ExynosDisplay::PowerHalHintWorker::checkPowerHintSessionReady() {
+    Lock();
+    bool out = checkPowerHintSessionReadyLocked();
+    Unlock();
+    return out;
+}
+
+bool ExynosDisplay::PowerHalHintWorker::usePowerHintSessionLocked() {
+    return checkPowerHintSessionReadyLocked() && *mHintSessionEnabled &&
+            *mHintSessionSupported == NO_ERROR;
+}
+
+bool ExynosDisplay::PowerHalHintWorker::usePowerHintSession() {
+    Lock();
+    bool out = usePowerHintSessionLocked();
+    Unlock();
+    return out;
+}
+
+bool ExynosDisplay::PowerHalHintWorker::needUpdateTargetWorkDurationLocked() {
+    if (!usePowerHintSessionLocked() || sNormalizeTarget) return false;
+    // to disable the rate limiter we just use a max deviation of 1
+    nsecs_t maxDeviation = sUseRateLimiter ? kAllowedDeviation.count() : 1;
+    // report if the change in target from our last submission to now exceeds the threshold
+    return abs(mTargetWorkDuration - mLastTargetDurationReported) >= maxDeviation;
+}
+
+bool ExynosDisplay::PowerHalHintWorker::needSendActualWorkDurationLocked() {
+    if (!usePowerHintSessionLocked() || mPowerHintQueue.size() == 0 ||
+        !mActualWorkDuration.has_value()) {
+        return false;
+    }
+    if (!mLastErrorSent.has_value() ||
+        (systemTime(SYSTEM_TIME_MONOTONIC) - mLastActualReportTimestamp) > kStaleTimeout.count()) {
+        return true;
+    }
+    // to effectively disable the rate limiter we just use a max deviation of 1
+    nsecs_t maxDeviation = sUseRateLimiter ? kAllowedDeviation.count() : 1;
+    // report if the change in error term from our last submission to now exceeds the threshold
+    return abs((*mActualWorkDuration - mTargetWorkDuration) - *mLastErrorSent) >= maxDeviation;
+}
+
+// track the tid of any thread that calls in and remove it on thread death
+void ExynosDisplay::PowerHalHintWorker::trackThisThread() {
+    thread_local struct TidTracker {
+        TidTracker(PowerHalHintWorker *worker) : mWorker(worker) {
+            mTid = gettid();
+            mWorker->addBinderTid(mTid);
+        }
+        ~TidTracker() { mWorker->removeBinderTid(mTid); }
+        pid_t mTid;
+        PowerHalHintWorker *mWorker;
+    } tracker(this);
+}
+
+const bool ExynosDisplay::PowerHalHintWorker::sTraceHintSessionData =
+        base::GetBoolProperty(std::string("debug.hwc.trace_hint_sessions"), false);
+
+const bool ExynosDisplay::PowerHalHintWorker::sNormalizeTarget =
+        base::GetBoolProperty(std::string("debug.hwc.normalize_hint_session_durations"), true);
+
+const bool ExynosDisplay::PowerHalHintWorker::sUseRateLimiter =
+        base::GetBoolProperty(std::string("debug.hwc.use_rate_limiter"), true);
 
 int ExynosSortedLayer::compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs)
 {
@@ -2334,6 +2663,9 @@ int ExynosDisplay::deliverWinConfigData() {
         /* wait for 5 vsync */
         int32_t waitTime = mVsyncPeriod / 1000000 * 5;
         gettimeofday(&tv_s, NULL);
+        if (mUsePowerHints) {
+            mRetireFenceWaitTime = systemTime();
+        }
         if (fence_valid(mLastRetireFence)) {
             ATRACE_NAME("waitLastRetireFence");
             if (sync_wait(mLastRetireFence, waitTime) < 0) {
@@ -2351,7 +2683,9 @@ int ExynosDisplay::deliverWinConfigData() {
                 }
             }
         }
-
+        if (mUsePowerHints) {
+            mRetireFenceAcquireTime = systemTime();
+        }
         for (size_t i = 0; i < mDpuData.configs.size(); i++) {
             setFenceInfo(mDpuData.configs[i].acq_fence, this,
                     FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP, FENCE_TO);
@@ -2986,9 +3320,33 @@ int32_t ExynosDisplay::canSkipValidate() {
 }
 
 int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
-
     ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
+
+    // store this once here for the whole frame so it's consistent
+    mUsePowerHints = usePowerHintSession();
+    if (mUsePowerHints) {
+        // adds + removes the tid for adpf tracking
+        mPowerHalHint.trackThisThread();
+        mPresentStartTime = systemTime(SYSTEM_TIME_MONOTONIC);
+        if (mValidateStartTime.has_value()) {
+            // this includes the time between end of validation and start of present
+            mValidationDuration = mPresentStartTime - *mValidateStartTime;
+        } else {
+            mValidationDuration = std::nullopt;
+            // load target time here if validation was skipped
+            mCurrentTarget = getTarget();
+            mPowerHalHint.signalTargetWorkDuration(mCurrentTarget - mPresentStartTime);
+            // if we did not validate (have not sent hint yet) and have data for this case
+            std::optional<nsecs_t> predictedDuration = getPredictedDuration(false);
+            if (predictedDuration.has_value()) {
+                mPowerHalHint.signalActualWorkDuration(*predictedDuration);
+            }
+        }
+        mRetireFenceAcquireTime = std::nullopt;
+        mRetireFenceWaitTime = std::nullopt;
+        mValidateStartTime = std::nullopt;
+    }
 
     int ret = HWC2_ERROR_NONE;
     String8 errString;
@@ -3270,6 +3628,19 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     if (mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
         /* Do not update mVsyncPeriod */
         updateInternalDisplayConfigVariables(mDesiredConfig, false);
+    }
+
+    if (mUsePowerHints) {
+        // update the "last target" now that we know for sure when this frame is due
+        mLastTarget = mCurrentTarget;
+
+        // we add an offset here to keep the flinger and HWC error terms roughly the same
+        static const constexpr std::chrono::nanoseconds kFlingerOffset = 300us;
+        nsecs_t now = systemTime() + kFlingerOffset.count();
+
+        updateAverages(now);
+        mPowerHalHint.signalActualWorkDuration(now - mPresentStartTime +
+                                               mValidationDuration.value_or(0));
     }
 
     return ret;
@@ -4017,6 +4388,16 @@ int32_t ExynosDisplay::validateDisplay(
     mUpdateEventCnt++;
     mUpdateCallCnt++;
     mLastUpdateTimeStamp = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    if (usePowerHintSession()) {
+        mValidateStartTime = mLastUpdateTimeStamp;
+        mCurrentTarget = getTarget();
+        mPowerHalHint.signalTargetWorkDuration(mCurrentTarget - *mValidateStartTime);
+        std::optional<nsecs_t> predictedDuration = getPredictedDuration(true);
+        if (predictedDuration.has_value()) {
+            mPowerHalHint.signalActualWorkDuration(*predictedDuration);
+        }
+    }
 
     checkIgnoreLayers();
     if (mLayers.size() == 0)
@@ -5398,4 +5779,54 @@ int32_t ExynosDisplay::flushDisplayBrightnessChange() {
         return mBrightnessController->applyPendingChangeViaSysfs(mVsyncPeriod);
     }
     return NO_ERROR;
+}
+
+// we can cache the value once it is known to avoid the lock after boot
+// we also only actually check once per frame to keep the value internally consistent
+bool ExynosDisplay::usePowerHintSession() {
+    if (!mUsePowerHintSession.has_value() && mPowerHalHint.checkPowerHintSessionReady()) {
+        mUsePowerHintSession = mPowerHalHint.usePowerHintSession();
+    }
+    return mUsePowerHintSession.value_or(false);
+}
+
+nsecs_t ExynosDisplay::getTarget() {
+    ExynosDisplay *primaryDisplay = mDevice->getDisplay(HWC_DISPLAY_PRIMARY);
+    if (primaryDisplay) {
+        nsecs_t out = primaryDisplay->getPendingExpectedPresentTime();
+        if (out != 0) {
+            return out;
+        }
+    }
+    ALOGE("Could not get hint session time target from primary display");
+    // if it fails return some vaguely reasonable time
+    return systemTime(SYSTEM_TIME_MONOTONIC) + 10000000;
+}
+
+std::optional<nsecs_t> ExynosDisplay::getPredictedDuration(bool duringValidation) {
+    nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+    AveragesKey beforeFenceKey(mLayers.size(), duringValidation, true);
+    AveragesKey afterFenceKey(mLayers.size(), duringValidation, false);
+    if (mRollingAverages.count(beforeFenceKey) == 0 || mRollingAverages.count(afterFenceKey) == 0) {
+        return std::nullopt;
+    }
+    nsecs_t beforeReleaseFence = mRollingAverages[beforeFenceKey].average;
+    nsecs_t afterReleaseFence = mRollingAverages[afterFenceKey].average;
+    return std::make_optional(afterReleaseFence +
+                              (mLastTarget.has_value()
+                                       ? std::max(beforeReleaseFence, *mLastTarget - now)
+                                       : beforeReleaseFence));
+}
+
+void ExynosDisplay::updateAverages(nsecs_t endTime) {
+    if (!mRetireFenceAcquireTime.has_value()) {
+        return;
+    }
+    nsecs_t beforeFenceTime =
+            mValidationDuration.value_or(0) + (*mRetireFenceWaitTime - mPresentStartTime);
+    nsecs_t afterFenceTime = endTime - *mRetireFenceAcquireTime;
+    mRollingAverages[AveragesKey(mLayers.size(), mValidationDuration.has_value(), true)].insert(
+            beforeFenceTime);
+    mRollingAverages[AveragesKey(mLayers.size(), mValidationDuration.has_value(), false)].insert(
+            afterFenceTime);
 }
