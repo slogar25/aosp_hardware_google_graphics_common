@@ -5867,3 +5867,8 @@ void ExynosDisplay::updateAverages(nsecs_t endTime) {
     mRollingAverages[AveragesKey(mLayers.size(), mValidationDuration.has_value(), false)].insert(
             afterFenceTime);
 }
+
+int32_t ExynosDisplay::getRCDLayerSupport(bool &outSupport) {
+    outSupport = mDpuData.rcdConfigs.size() > 0;
+    return NO_ERROR;
+}

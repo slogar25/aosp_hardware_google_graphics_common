@@ -118,7 +118,7 @@ class IComposerHal {
                                                  std::vector<float>* matrix) = 0;
     virtual int32_t getDisplayAttribute(int64_t display, int32_t config,
                                       DisplayAttribute attribute, int32_t* outValue) = 0;
-    virtual int32_t getDisplayBrightnessSupport(int64_t display, bool* outSupport) = 0;
+    virtual int32_t getDisplayBrightnessSupport(int64_t display, bool& outSupport) = 0;
     virtual int32_t getDisplayCapabilities(int64_t display,
                                            std::vector<DisplayCapability>* caps) = 0;
     virtual int32_t getDisplayConfigs(int64_t display, std::vector<int32_t>* configs) = 0;
@@ -132,7 +132,7 @@ class IComposerHal {
             int64_t display, DisplayContentSamplingAttributes* attrs) = 0;
     virtual int32_t getDisplayPhysicalOrientation(int64_t display,
                                                   common::Transform* orientation) = 0;
-    virtual int32_t getDozeSupport(int64_t display, bool* support) = 0;
+    virtual int32_t getDozeSupport(int64_t display, bool& outSupport) = 0;
     virtual int32_t getHdrCapabilities(int64_t display, HdrCapabilities* caps) = 0;
     virtual int32_t getMaxVirtualDisplayCount(int32_t* count) = 0;
     virtual int32_t getPerFrameMetadataKeys(int64_t display,
@@ -213,6 +213,7 @@ class IComposerHal {
     virtual int32_t setExpectedPresentTime(
             int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
     virtual int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) = 0;
+    virtual int32_t getRCDLayerSupport(int64_t display, bool& outSupport) = 0;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::detail

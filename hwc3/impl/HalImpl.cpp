@@ -304,11 +304,11 @@ int32_t HalImpl::getDisplayAttribute(int64_t display, int32_t config,
     return HWC2_ERROR_NONE;
 }
 
-int32_t HalImpl::getDisplayBrightnessSupport(int64_t display, bool* outSupport) {
+int32_t HalImpl::getDisplayBrightnessSupport(int64_t display, bool& outSupport) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    return halDisplay->getDisplayBrightnessSupport(outSupport);
+    return halDisplay->getDisplayBrightnessSupport(&outSupport);
 }
 
 int32_t HalImpl::getDisplayCapabilities(int64_t display,
@@ -415,14 +415,14 @@ int32_t HalImpl::getDisplayPhysicalOrientation(int64_t display,
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t HalImpl::getDozeSupport(int64_t display, bool* support) {
+int32_t HalImpl::getDozeSupport(int64_t display, bool& support) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
     int32_t hwcSupport;
     RET_IF_ERR(halDisplay->getDozeSupport(&hwcSupport));
 
-    h2a::translate(hwcSupport, *support);
+    h2a::translate(hwcSupport, support);
     return HWC2_ERROR_NONE;
 }
 
@@ -1005,6 +1005,13 @@ int HalImpl::setExpectedPresentTime(
     halDisplay->setExpectedPresentTime(expectedPresentTime->timestampNanos);
 
     return HWC2_ERROR_NONE;
+}
+
+int32_t HalImpl::getRCDLayerSupport(int64_t display, bool& outSupport) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->getRCDLayerSupport(outSupport);
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl

@@ -1190,6 +1190,7 @@ class ExynosDisplay {
         }
 
         void cleanupAfterClientDeath();
+        int32_t getRCDLayerSupport(bool& outSupport);
 
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
