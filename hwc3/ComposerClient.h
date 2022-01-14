@@ -45,6 +45,7 @@ public:
           void onVsync(int64_t display, int64_t timestamp, int32_t vsyncPeriodNanos) override;
           void onVsyncPeriodTimingChanged(int64_t display,
                                           const VsyncPeriodChangeTimeline& timeline) override;
+          void onVsyncIdle(int64_t display) override;
           void onSeamlessPossible(int64_t display) override;
 
       private:
@@ -120,6 +121,7 @@ public:
     ndk::ScopedAStatus setReadbackBuffer(int64_t display, const AidlNativeHandle& buffer,
                                          const ndk::ScopedFileDescriptor& releaseFence) override;
     ndk::ScopedAStatus setVsyncEnabled(int64_t display, bool enabled) override;
+    ndk::ScopedAStatus setIdleTimerEnabled(int64_t display, int32_t timeout) override;
 
 protected:
     ::ndk::SpAIBinder createBinder() override;
