@@ -917,6 +917,66 @@ class ExynosDisplay {
                 hwc_vsync_period_change_constraints_t* __unused vsyncPeriodChangeConstraints,
                 hwc_vsync_period_change_timeline_t* __unused outTimeline);
 
+        /**
+         * setBootDisplayConfig(..., config)
+         * Descriptor: HWC2_FUNCTION_SET_BOOT_DISPLAY_CONFIG
+         * Optional for HWC2 devices
+         *
+         * Sets the display config in which the device boots.
+         * If the device is unable to boot in this config for any reason (example HDMI display
+         * changed), the implementation should try to find a config which matches the resolution
+         * and refresh-rate of this config. If no such config exists, the implementation's
+         * preferred display config should be used.
+         *
+         * See also:
+         *     getPreferredBootDisplayConfig
+         *
+         * Parameters:
+         *     config - is the new boot time config for the display.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *     HWC2_ERROR_BAD_DISPLAY - when the display is invalid
+         *     HWC2_ERROR_BAD_CONFIG - when the configuration is invalid
+         *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
+         */
+        int32_t setBootDisplayConfig(int32_t config);
+
+        /**
+         * clearBootDisplayConfig(...)
+         * Descriptor: HWC2_FUNCTION_CLEAR_BOOT_DISPLAY_CONFIG
+         * Optional for HWC2 devices
+         *
+         * Clears the boot display config.
+         * The device should boot in the implementation's preferred display config.
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *     HWC2_ERROR_BAD_DISPLAY - when the display is invalid
+         *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
+         */
+        int32_t clearBootDisplayConfig();
+
+        /**
+         * getPreferredBootDisplayConfig(..., config*)
+         * Descriptor: HWC2_FUNCTION_GET_PREFERRED_DISPLAY_CONFIG
+         * Optional for HWC2 devices
+         *
+         * Returns the implementation's preferred display config.
+         * This is display config used by the implementation at boot time, if the boot
+         * display config has not been requested yet, or if it has been previously cleared.
+         *
+         * See also:
+         *     setBootDisplayConfig
+         *
+         * Parameters:
+         *     outConfig - is the implementation's preferred display config
+         *
+         * Returns HWC2_ERROR_NONE or one of the following errors:
+         *     HWC2_ERROR_BAD_DISPLAY - when the display is invalid
+         *     HWC2_ERROR_BAD_CONFIG - when the configuration is invalid
+         *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
+         */
+        int32_t getPreferredBootDisplayConfig(int32_t* outConfig);
+
         /* setAutoLowLatencyMode(displayToken, on)
          * Descriptor: HWC2_FUNCTION_SET_AUTO_LOW_LATENCY_MODE
          * Optional for HWC2 devices

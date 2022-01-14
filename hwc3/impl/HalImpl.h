@@ -88,6 +88,9 @@ class HalImpl : public IComposerHal {
             int64_t display, int32_t config,
             const VsyncPeriodChangeConstraints& vsyncPeriodChangeConstraints,
             VsyncPeriodChangeTimeline* timeline) override;
+    int32_t setBootDisplayConfig(int64_t display, int32_t config) override;
+    int32_t clearBootDisplayConfig(int64_t display) override;
+    int32_t getPreferredBootDisplayConfig(int64_t display, int32_t* config) override;
     int32_t setAutoLowLatencyMode(int64_t display, bool on) override;
     int32_t setClientTarget(int64_t display, buffer_handle_t target,
                             const ndk::ScopedFileDescriptor& fence, common::Dataspace dataspace,

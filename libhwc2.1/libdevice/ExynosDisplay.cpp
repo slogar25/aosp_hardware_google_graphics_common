@@ -4027,6 +4027,18 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosDisplay::setBootDisplayConfig(int32_t config) {
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
+int32_t ExynosDisplay::clearBootDisplayConfig() {
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
+int32_t ExynosDisplay::getPreferredBootDisplayConfig(int32_t *outConfig) {
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
 int32_t ExynosDisplay::setAutoLowLatencyMode(bool __unused on)
 {
     return HWC2_ERROR_UNSUPPORTED;

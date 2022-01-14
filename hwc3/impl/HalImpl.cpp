@@ -578,6 +578,27 @@ int32_t HalImpl::setActiveConfigWithConstraints(
     return HWC2_ERROR_NONE;
 }
 
+int32_t HalImpl::setBootDisplayConfig(int64_t display, int32_t config) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->setBootDisplayConfig(config);
+}
+
+int32_t HalImpl::clearBootDisplayConfig(int64_t display) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->clearBootDisplayConfig();
+}
+
+int32_t HalImpl::getPreferredBootDisplayConfig(int64_t display, int32_t* config) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->getPreferredBootDisplayConfig(config);
+}
+
 int32_t HalImpl::setAutoLowLatencyMode(int64_t display, bool on) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));

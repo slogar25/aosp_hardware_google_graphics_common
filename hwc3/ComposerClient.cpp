@@ -291,6 +291,24 @@ ndk::ScopedAStatus ComposerClient::setActiveConfigWithConstraints(
     return TO_BINDER_STATUS(err);
 }
 
+ndk::ScopedAStatus ComposerClient::setBootDisplayConfig(int64_t display, int32_t config) {
+    DEBUG_FUNC();
+    auto err = mHal->setBootDisplayConfig(display, config);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::clearBootDisplayConfig(int64_t display) {
+    DEBUG_FUNC();
+    auto err = mHal->clearBootDisplayConfig(display);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::getPreferredBootDisplayConfig(int64_t display, int32_t* config) {
+    DEBUG_FUNC();
+    auto err = mHal->getPreferredBootDisplayConfig(display, config);
+    return TO_BINDER_STATUS(err);
+}
+
 ndk::ScopedAStatus ComposerClient::setAutoLowLatencyMode(int64_t display, bool on) {
     DEBUG_FUNC();
     auto err = mHal->setAutoLowLatencyMode(display, on);
