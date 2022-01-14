@@ -222,6 +222,13 @@ ndk::ScopedAStatus ComposerClient::getDisplayedContentSamplingAttributes(
     return TO_BINDER_STATUS(err);
 }
 
+ndk::ScopedAStatus ComposerClient::getDisplayPhysicalOrientation(int64_t display,
+                                                                 common::Transform* orientation) {
+    DEBUG_FUNC();
+    auto err = mHal->getDisplayPhysicalOrientation(display, orientation);
+    return TO_BINDER_STATUS(err);
+}
+
 ndk::ScopedAStatus ComposerClient::getHdrCapabilities(int64_t display, HdrCapabilities* caps) {
     DEBUG_FUNC();
     auto err = mHal->getHdrCapabilities(display, caps);

@@ -67,6 +67,7 @@ class HalImpl : public IComposerHal {
                                       DisplayContentSample* samples) override;
     int32_t getDisplayedContentSamplingAttributes(int64_t display,
                                                   DisplayContentSamplingAttributes* attrs) override;
+    int32_t getDisplayPhysicalOrientation(int64_t display, common::Transform* orientation) override;
     int32_t getDozeSupport(int64_t display, bool* support) override;
     int32_t getHdrCapabilities(int64_t display, HdrCapabilities* caps) override;
     int32_t getMaxVirtualDisplayCount(int32_t* count) override;
