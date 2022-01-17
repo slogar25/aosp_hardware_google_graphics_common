@@ -65,7 +65,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	libhardware_legacy libutils \
 	libsync libacryl libui libion_google libdrmresource libdrm \
 	libvendorgraphicbuffer libbinder_ndk \
-	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk
+	android.hardware.power-V1-ndk pixel-power-ext-V1-ndk
 
 LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V4-ndk \
                           libbinder_ndk \
