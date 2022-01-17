@@ -101,13 +101,13 @@ void BrightnessController::initBrightnessTable(const DrmDevice& drmDevice,
     mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)] = BrightnessTable(cap->normal);
     mBrightnessTable[toUnderlying(BrightnessRange::HBM)] = BrightnessTable(cap->hbm);
 
-    drmModeFreePropertyBlob(blob);
-
     parseHbmModeEnums(connector.hbm_mode());
 
     // init to min before SF sets the brightness
     mDisplayWhitePointNits = cap->normal.nits.min;
     mBrightnessIntfSupported = true;
+
+    drmModeFreePropertyBlob(blob);
 }
 
 int BrightnessController::processEnhancedHbm(bool on) {
