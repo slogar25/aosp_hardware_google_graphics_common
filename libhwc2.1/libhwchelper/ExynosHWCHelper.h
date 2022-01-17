@@ -16,21 +16,23 @@
 #ifndef _EXYNOSHWCHELPER_H
 #define _EXYNOSHWCHELPER_H
 
-#include <drm/drm_fourcc.h>
-#include <hardware/hwcomposer2.h>
-#include <utils/String8.h>
-
 #include <fstream>
-#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include <drm/drm_fourcc.h>
+#include <hardware/hwcomposer2.h>
+#include <utils/String8.h>
+
+#include <optional>
+
 #include "DeconCommonHeader.h"
-#include "VendorGraphicBuffer.h"
 #include "VendorVideoAPI.h"
-#include "exynos_format.h"
 #include "exynos_sync.h"
+
+#include "VendorGraphicBuffer.h"
+#include "exynos_format.h"
 #include "mali_gralloc_formats.h"
 
 #define MAX_FENCE_NAME 64
@@ -600,24 +602,5 @@ template <typename T>
 constexpr typename std::underlying_type<T>::type toUnderlying(T v) {
     return static_cast<typename std::underlying_type<T>::type>(v);
 }
-
-template <size_t bufferSize>
-struct RollingAverage {
-    std::array<int64_t, bufferSize> buffer{0};
-    int64_t total = 0;
-    int64_t average;
-    size_t elems = 0;
-    size_t buffer_index = 0;
-    void insert(int64_t newTime) {
-        total += newTime - buffer[buffer_index];
-        buffer[buffer_index] = newTime;
-        buffer_index = (buffer_index + 1) % bufferSize;
-        elems = std::min(elems + 1, bufferSize);
-        average = total / elems;
-    }
-};
-
-// Waits for a given property value, or returns std::nullopt if unavailable
-std::optional<std::string> waitForPropertyValue(const std::string &property, int64_t timeoutMs);
 
 #endif
