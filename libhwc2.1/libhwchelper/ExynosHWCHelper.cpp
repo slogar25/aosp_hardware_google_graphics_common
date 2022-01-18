@@ -30,6 +30,7 @@
 #include "ExynosLayer.h"
 #include "ExynosResourceRestriction.h"
 #include "VendorVideoAPI.h"
+#include "android-base/properties.h"
 #include "exynos_sync.h"
 
 using vendor::graphics::BufferUsage;
@@ -1365,4 +1366,15 @@ int readLineFromFile(const std::string &filename, std::string &out, char delim) 
     }
 
     return android::OK;
+}
+
+std::optional<std::string> waitForPropertyValue(const std::string& property, int64_t timeoutMs) {
+    if (!android::base::WaitForPropertyCreation(property, std::chrono::milliseconds(timeoutMs))) {
+        return std::nullopt;
+    }
+    std::string out = android::base::GetProperty(property, "unknown");
+    if (out == "unknown") {
+        return std::nullopt;
+    }
+    return std::make_optional(out);
 }
