@@ -129,6 +129,8 @@ class IComposerHal {
                                             int64_t timestamp, DisplayContentSample* samples) = 0;
     virtual int32_t getDisplayedContentSamplingAttributes(
             int64_t display, DisplayContentSamplingAttributes* attrs) = 0;
+    virtual int32_t getDisplayPhysicalOrientation(int64_t display,
+                                                  common::Transform* orientation) = 0;
     virtual int32_t getDozeSupport(int64_t display, bool* support) = 0;
     virtual int32_t getHdrCapabilities(int64_t display, HdrCapabilities* caps) = 0;
     virtual int32_t getMaxVirtualDisplayCount(int32_t* count) = 0;

@@ -86,6 +86,8 @@ public:
                                                  DisplayContentSample* samples) override;
     ndk::ScopedAStatus getDisplayedContentSamplingAttributes(
             int64_t display, DisplayContentSamplingAttributes* attrs) override;
+    ndk::ScopedAStatus getDisplayPhysicalOrientation(int64_t display,
+                                                     common::Transform* orientation) override;
     ndk::ScopedAStatus getHdrCapabilities(int64_t display, HdrCapabilities* caps) override;
     ndk::ScopedAStatus getMaxVirtualDisplayCount(int32_t* count) override;
     ndk::ScopedAStatus getPerFrameMetadataKeys(int64_t display,
