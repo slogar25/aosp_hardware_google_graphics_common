@@ -349,6 +349,7 @@ class ExynosDisplayDrmInterface :
         void parseRangeEnums(const DrmProperty &property);
         void parseColorModeEnums(const DrmProperty &property);
         void parseMipiSyncEnums(const DrmProperty &property);
+        void updateMountOrientation();
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
         int32_t clearWritebackCommit(DrmModeAtomicReq &drmReq);
