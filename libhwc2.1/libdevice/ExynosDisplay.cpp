@@ -1474,7 +1474,7 @@ int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
                         compositionInfo.mWindowIndex,
                         config.fd_idma[0], config.fd_idma[1], config.fd_idma[2]);
                 DISPLAY_LOGE("=============================  dump last win configs  ===================================");
-                for (size_t i = 0; i <= mLastDpuData.configs.size(); i++) {
+                for (size_t i = 0; i < mLastDpuData.configs.size(); i++) {
                     android::String8 result;
                     result.appendFormat("config[%zu]\n", i);
                     dumpConfig(result, mLastDpuData.configs[i]);
@@ -2439,7 +2439,7 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
         fwrite(result.string(), 1, result.size(), pFile);
     }
     result.clear();
-    for (size_t i = 0; i <= mDpuData.configs.size(); i++) {
+    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
         ALOGD("config[%zu]", i);
         printConfig(mDpuData.configs[i]);
         if (pFile != NULL) {
@@ -2749,10 +2749,15 @@ int ExynosDisplay::setReleaseFences() {
     }
 
     // DPU doesn't close acq_fence, HWC should close it.
-    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
-        if (mDpuData.configs[i].acq_fence != -1)
-            fence_close(mDpuData.configs[i].acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
-        mDpuData.configs[i].acq_fence = -1;
+    for (auto &config : mDpuData.configs) {
+        if (config.acq_fence != -1)
+            fence_close(config.acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
+        config.acq_fence = -1;
+    }
+    for (auto &config : mDpuData.rcdConfigs) {
+        if (config.acq_fence != -1)
+            fence_close(config.acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
+        config.acq_fence = -1;
     }
     // DPU doesn't close rel_fence of readback buffer, HWC should close it
     if (mDpuData.readback_info.rel_fence >= 0) {
@@ -5249,6 +5254,9 @@ int ExynosDisplay::handleWindowUpdate()
     hwc_rect damageRect = {(int)mXres, (int)mYres, 0, 0};
 
     for (size_t i = 0; i < mLayers.size(); i++) {
+        if (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION) {
+            continue;
+        }
         excp = getLayerRegion(mLayers[i], &damageRect, eDamageRegionByDamage);
         if (excp == eDamageRegionPartial) {
             DISPLAY_LOGD(eDebugWindowUpdate, "layer(%zu) partial : %d, %d, %d, %d", i,
@@ -5466,15 +5474,21 @@ void ExynosDisplay::closeFencesForSkipFrame(rendering_state renderingState)
 }
 void ExynosDisplay::closeFences()
 {
-    for (size_t i = 0; i < mDpuData.configs.size(); i++) {
-        if (mDpuData.configs[i].acq_fence != -1)
-            fence_close(mDpuData.configs[i].acq_fence, this,
-                    FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
-        mDpuData.configs[i].acq_fence = -1;
-        if (mDpuData.configs[i].rel_fence >= 0)
-            fence_close(mDpuData.configs[i].rel_fence, this,
-                    FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP);
-        mDpuData.configs[i].rel_fence = -1;
+    for (auto &config : mDpuData.configs) {
+        if (config.acq_fence != -1)
+            fence_close(config.acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
+        config.acq_fence = -1;
+        if (config.rel_fence >= 0)
+            fence_close(config.rel_fence, this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP);
+        config.rel_fence = -1;
+    }
+    for (auto &config : mDpuData.rcdConfigs) {
+        if (config.acq_fence != -1)
+            fence_close(config.acq_fence, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_DPP);
+        config.acq_fence = -1;
+        if (config.rel_fence >= 0)
+            fence_close(config.rel_fence, this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_DPP);
+        config.rel_fence = -1;
     }
     for (size_t i = 0; i < mLayers.size(); i++) {
         if (mLayers[i]->mReleaseFence > 0) {
@@ -5742,6 +5756,7 @@ void ExynosDisplay::traceLayerTypes() {
     size_t dpu_count = 0;
     size_t gpu_count = 0;
     size_t skip_count = 0;
+    size_t rcd_count = 0;
     for(auto const& layer: mLayers) {
         switch (layer->mExynosCompositionType) {
             case HWC2_COMPOSITION_EXYNOS:
@@ -5757,13 +5772,19 @@ void ExynosDisplay::traceLayerTypes() {
             case HWC2_COMPOSITION_DEVICE:
                 dpu_count++;
                 break;
+            case HWC2_COMPOSITION_DISPLAY_DECORATION:
+                ++rcd_count;
+                break;
             default:
+                ALOGW("%s: Unknown layer composition type: %d", __func__,
+                      layer->mExynosCompositionType);
                 break;
         }
     }
     ATRACE_INT("HWComposer: DPU Layer", dpu_count);
     ATRACE_INT("HWComposer: G2D Layer", g2d_count);
     ATRACE_INT("HWComposer: GPU Layer", gpu_count);
+    ATRACE_INT("HWComposer: RCD Layer", rcd_count);
     ATRACE_INT("HWComposer: DPU Cached Layer", skip_count);
     ATRACE_INT("HWComposer: SF Cached Layer", mIgnoreLayers.size());
     ATRACE_INT("HWComposer: Total Layer", mLayers.size() + mIgnoreLayers.size());
