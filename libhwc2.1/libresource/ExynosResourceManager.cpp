@@ -380,6 +380,33 @@ int32_t ExynosResourceManager::doAllocDstBufs(uint32_t Xres, uint32_t Yres)
     return ret;
 }
 
+int32_t ExynosResourceManager::checkScenario(ExynosDisplay __unused *display) {
+    uint32_t prevResourceReserved = mResourceReserved;
+    mResourceReserved = 0x0;
+    /* Check whether camera preview is running */
+    ExynosDisplay *exynosDisplay = NULL;
+    for (uint32_t i = 0; i < mDevice->mDisplays.size(); i++) {
+        exynosDisplay = mDevice->mDisplays[i];
+        if ((exynosDisplay != NULL) && (exynosDisplay->mPlugState == true)) {
+            for (uint32_t i = 0; i < exynosDisplay->mLayers.size(); i++) {
+                ExynosLayer *layer = exynosDisplay->mLayers[i];
+                VendorGraphicBufferMeta gmeta(layer->mLayerBuffer);
+                if ((layer->mLayerBuffer != NULL) &&
+                    (gmeta.producer_usage & BufferUsage::CAMERA_OUTPUT)) {
+                    mResourceReserved |= (MPP_LOGICAL_G2D_YUV | MPP_LOGICAL_G2D_RGB);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (prevResourceReserved != mResourceReserved) {
+        mDevice->setGeometryChanged(GEOMETRY_DEVICE_SCENARIO_CHANGED);
+    }
+
+    return NO_ERROR;
+}
+
 /**
  * @param * display
  * @return int

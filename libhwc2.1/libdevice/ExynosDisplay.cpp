@@ -1264,6 +1264,9 @@ void ExynosDisplay::doPreProcessing() {
         (mDevice->mDisplayMode != exynosHWCControl.displayMode))
         setGeometryChanged(GEOMETRY_DEVICE_DISP_MODE_CHAGED);
 
+    if ((ret = mResourceManager->checkScenario(this)) != NO_ERROR)
+        DISPLAY_LOGE("checkScenario error ret(%d)", ret);
+
     if (exynosHWCControl.skipResourceAssign == 0) {
         /* Set any flag to mGeometryChanged */
         setGeometryChanged(GEOMETRY_DEVICE_SCENARIO_CHANGED);

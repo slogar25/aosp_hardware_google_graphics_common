@@ -142,6 +142,7 @@ class ExynosResourceManager {
         virtual int32_t assignLayer(ExynosDisplay *display, ExynosLayer *layer, uint32_t layer_index,
                 exynos_image &m2m_out_img, ExynosMPP **m2mMPP, ExynosMPP **otfMPP, uint32_t &overlayInfo);
         virtual int32_t assignWindow(ExynosDisplay *display);
+        virtual int32_t checkScenario(ExynosDisplay *display);
         int32_t updateResourceState();
         static float getResourceUsedCapa(ExynosMPP &mpp);
         int32_t updateExynosComposition(ExynosDisplay *display);
