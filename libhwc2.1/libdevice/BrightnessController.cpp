@@ -22,31 +22,55 @@
 #include "BrightnessController.h"
 #include "ExynosHWCModule.h"
 
-BrightnessController::BrightnessController(int32_t panelIndex) :
-          mPanelIndex(panelIndex),
-          mEnhanceHbmReq(false),
-          mLhbmReq(false),
-          mBrightnessFloatReq(-1),
-          mBrightnessLevel(0),
-          mGhbm(HbmMode::OFF),
-          mDimming(false),
-          mLhbm(false),
-          mHdrFullScreen(false) {
+BrightnessController::BrightnessController(int32_t panelIndex, std::function<void(void)> refresh)
+      : mPanelIndex(panelIndex),
+        mEnhanceHbmReq(false),
+        mLhbmReq(false),
+        mBrightnessFloatReq(-1),
+        mBrightnessLevel(0),
+        mGhbm(HbmMode::OFF),
+        mDimming(false),
+        mLhbm(false),
+        mHdrFullScreen(false),
+        mFrameRefresh(refresh) {
     initBrightnessSysfs();
+}
+
+BrightnessController::~BrightnessController() {
+    if (mDimmingLooper) {
+        mDimmingLooper->removeMessages(mDimmingHandler);
+    }
+    if (mDimmingThreadRunning) {
+        mDimmingLooper->sendMessage(mDimmingHandler, DimmingMsgHandler::MSG_QUIT);
+        mDimmingThread.join();
+    }
 }
 
 int BrightnessController::initDrm(const DrmDevice& drmDevice,
                                   const DrmConnector& connector) {
     initBrightnessTable(drmDevice, connector);
 
-    mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(
-        property_get_int32("vendor.display.brightness.dimming.usage", 0));
-    mHbmDimmingTimeUs =
-        property_get_int32("vendor.display.brightness.dimming.hbm_time", kHbmDimmingTimeUs);
+    initDimmingUsage();
 
     mLhbmSupported = connector.lhbm_on().id() != 0;
     mGhbmSupported = connector.hbm_mode().id() != 0;
     return NO_ERROR;
+}
+
+void BrightnessController::initDimmingUsage() {
+    mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(
+            property_get_int32("vendor.display.brightness.dimming.usage", 0));
+    mHbmDimmingTimeUs =
+            property_get_int32("vendor.display.brightness.dimming.hbm_time", kHbmDimmingTimeUs);
+
+    if (mBrightnessDimmingUsage == BrightnessDimmingUsage::NORMAL) {
+        mDimming.store(true);
+    }
+
+    if (mBrightnessDimmingUsage == BrightnessDimmingUsage::HBM) {
+        mDimmingHandler = new DimmingMsgHandler(this);
+        mDimmingThread = std::thread(&BrightnessController::dimmingThread, this);
+    }
 }
 
 void BrightnessController::initBrightnessSysfs() {
@@ -123,9 +147,16 @@ int BrightnessController::processEnhancedHbm(bool on) {
     return NO_ERROR;
 }
 
-int BrightnessController::processDisplayBrightness(float brightness,
-                                                   std::function<void(void)> refresh,
-                                                   const nsecs_t vsyncNs,
+void BrightnessController::processDimmingOff() {
+    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    if (mHbmDimming) {
+        mHbmDimming = false;
+        updateStates();
+        mFrameRefresh();
+    }
+}
+
+int BrightnessController::processDisplayBrightness(float brightness, const nsecs_t vsyncNs,
                                                    bool waitPresent) {
     uint32_t level;
     bool ghbm;
@@ -161,7 +192,7 @@ int BrightnessController::processDisplayBrightness(float brightness,
                 if ((mGhbm.get() != HbmMode::OFF) != ghbm) {
                     // this brightness change will go drm path
                     updateStates();
-                    refresh(); // force next frame to update brightness
+                    mFrameRefresh(); // force next frame to update brightness
                     return NO_ERROR;
                 }
             }
@@ -301,10 +332,13 @@ void BrightnessController::onClearDisplay() {
     mBrightnessLevel.reset(0);
     mGhbm.reset(HbmMode::OFF);
     mDimming.reset(false);
+    mHbmDimming = false;
+    if (mBrightnessDimmingUsage == BrightnessDimmingUsage::NORMAL) {
+        mDimming.store(true);
+    }
     mLhbm.reset(false);
 
     mLhbmBrightnessAdj = false;
-    mHbmSvDimming = false;
 }
 
 int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
@@ -411,6 +445,29 @@ int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
     return NO_ERROR;
 }
 
+void BrightnessController::DimmingMsgHandler::handleMessage(const ::android::Message& message) {
+    ALOGI("%s %d", __func__, message.what);
+
+    switch (message.what) {
+        case MSG_DIMMING_OFF:
+            mBrightnessController->processDimmingOff();
+            break;
+
+        case MSG_QUIT:
+            mBrightnessController->mDimmingThreadRunning = false;
+            break;
+    }
+}
+
+void BrightnessController::dimmingThread() {
+    mDimmingLooper = new Looper(false);
+    Looper::setForThread(mDimmingLooper);
+    mDimmingThreadRunning = true;
+    while (mDimmingThreadRunning.load(std::memory_order_relaxed)) {
+        mDimmingLooper->pollOnce(-1);
+    }
+}
+
 // Process all requests to update states for next commit
 int BrightnessController::updateStates() {
     bool ghbm;
@@ -448,22 +505,17 @@ int BrightnessController::updateStates() {
         case BrightnessDimmingUsage::HBM:
             // turn on dimming at HBM on/off
             // turn off dimming after mHbmDimmingTimeUs or there is an instant hbm on/off
-            if (mGhbm.is_dirty()) {
-                gettimeofday(&mHbmDimmingStart, NULL);
-                if (!mHdrFullScreen.is_dirty()) {
-                    mHbmSvDimming = true;
+            if (mGhbm.is_dirty() && dimming) {
+                mHbmDimming = true;
+                if (mDimmingLooper) {
+                    mDimmingLooper->removeMessages(mDimmingHandler,
+                                                   DimmingMsgHandler::MSG_DIMMING_OFF);
+                    mDimmingLooper->sendMessageDelayed(us2ns(mHbmDimmingTimeUs), mDimmingHandler,
+                                                       DimmingMsgHandler::MSG_DIMMING_OFF);
                 }
             }
 
-            if (mHbmSvDimming) {
-                struct timeval curr_time;
-                gettimeofday(&curr_time, NULL);
-                curr_time.tv_usec += (curr_time.tv_sec - mHbmDimmingStart.tv_sec) * 1000000;
-                long duration = curr_time.tv_usec - mHbmDimmingStart.tv_usec;
-                if (duration > mHbmDimmingTimeUs)
-                    mHbmSvDimming = false;
-            }
-            dimming = dimming && (mHbmSvDimming);
+            dimming = dimming && (mHbmDimming);
             break;
 
         case BrightnessDimmingUsage::NONE:
@@ -699,9 +751,8 @@ void BrightnessController::dump(String8& result) {
                         mHdrFullScreen.get(), mUncheckedLhbmRequest.load(),
                         mPendingLhbmStatus.load(), mUncheckedGbhmRequest.load(),
                         mPendingGhbmStatus.load());
-    result.appendFormat("\tdimming usage %d, hbm sv dimming %d, time us %d, start (%ld, %ld)\n",
-                        mBrightnessDimmingUsage, mHbmSvDimming, mHbmDimmingTimeUs,
-                        mHbmDimmingStart.tv_sec, mHbmDimmingStart.tv_usec);
+    result.appendFormat("\tdimming usage %d, hbm dimming %d, time us %d\n", mBrightnessDimmingUsage,
+                        mHbmDimming, mHbmDimmingTimeUs);
     result.appendFormat("\twhite point nits %f\n", mDisplayWhitePointNits);
     result.appendFormat("\n\n");
 }

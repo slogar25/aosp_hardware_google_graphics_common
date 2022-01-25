@@ -3903,9 +3903,8 @@ int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
 int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
 {
     if (mBrightnessController) {
-        return mBrightnessController->processDisplayBrightness(brightness,
-                                         [this]() { mDevice->invalidate(); }, mVsyncPeriod,
-                                         waitPresent);
+        return mBrightnessController->processDisplayBrightness(brightness, mVsyncPeriod,
+                                                               waitPresent);
     }
     return HWC2_ERROR_UNSUPPORTED;
 }

@@ -18,8 +18,11 @@
 #define _BRIGHTNESS_CONTROLLER_H_
 
 #include <drm/samsung_drm.h>
-#include <fstream>
+#include <utils/Looper.h>
 #include <utils/Mutex.h>
+
+#include <fstream>
+#include <thread>
 
 #include "ExynosDisplayDrmInterface.h"
 
@@ -36,13 +39,27 @@
  */
 class BrightnessController {
 public:
-    BrightnessController(int32_t panelIndex);
+    class DimmingMsgHandler : public virtual ::android::MessageHandler {
+    public:
+        enum {
+            MSG_QUIT,
+            MSG_DIMMING_OFF,
+        };
+        DimmingMsgHandler(BrightnessController* bc) : mBrightnessController(bc) {}
+        void handleMessage(const Message& message) override;
+
+    private:
+        BrightnessController* mBrightnessController;
+    };
+
+    BrightnessController(int32_t panelIndex, std::function<void(void)> refresh);
+    ~BrightnessController();
+
     int initDrm(const DrmDevice& drmDevice,
                 const DrmConnector& connector);
 
     int processEnhancedHbm(bool on);
-    int processDisplayBrightness(float bl, std::function<void(void)> refresh,
-                                 const nsecs_t vsyncNs, bool waitPresent = false);
+    int processDisplayBrightness(float bl, const nsecs_t vsyncNs, bool waitPresent = false);
     int processLocalHbm(bool on);
     int applyPendingChangeViaSysfs(const nsecs_t vsyncNs);
     bool validateLayerWhitePointNits(float nits);
@@ -178,8 +195,11 @@ private:
                          const nsecs_t timeoutNs);
     void initBrightnessTable(const DrmDevice& device, const DrmConnector& connector);
     void initBrightnessSysfs();
+    void initDimmingUsage();
     int applyBrightnessViaSysfs(uint32_t level);
     int updateStates() REQUIRES(mBrightnessMutex);
+    void dimmingThread();
+    void processDimmingOff();
 
     void parseHbmModeEnums(const DrmProperty& property);
 
@@ -209,6 +229,8 @@ private:
 
     CtrlValue<bool> mHdrFullScreen;
 
+    std::function<void(void)> mFrameRefresh;
+
     // these are used by sysfs path to wait drm path bl change task
     // indicationg an unchecked LHBM change in drm path
     std::atomic<bool> mUncheckedLhbmRequest = false;
@@ -222,9 +244,12 @@ private:
 
     // these are dimming related
     BrightnessDimmingUsage mBrightnessDimmingUsage = BrightnessDimmingUsage::NORMAL;
-    bool mHbmSvDimming = false;
+    bool mHbmDimming GUARDED_BY(mBrightnessMutex) = false;
     int32_t mHbmDimmingTimeUs = 0;
-    struct timeval mHbmDimmingStart = { 0, 0 };
+    std::thread mDimmingThread;
+    std::atomic<bool> mDimmingThreadRunning;
+    ::android::sp<::android::Looper> mDimmingLooper;
+    ::android::sp<DimmingMsgHandler> mDimmingHandler;
 
     // sysfs path
     std::ofstream mBrightnessOfs;
