@@ -50,9 +50,6 @@ enum {
     SET_DDISCALER,
     GET_EXTERNAL_HDR_CAPA,
     SET_SCALE_DOWN_RATIO,
-#if 0
-    NOTIFY_PSR_EXIT,
-#endif
     SET_HWC_DEBUG = 105,
     GET_HWC_DEBUG = 106,
     SET_HWC_FENCE_DEBUG = 107,
@@ -379,15 +376,6 @@ public:
         return result;
     }
 
-    /*
-    virtual void notifyPSRExit()
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
-        remote()->transact(NOTIFY_PSR_EXIT, data, &reply);
-    }
-    */
-
     int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode)
     {
         ALOGD("null func: %s(%d %d)", __func__, display_id, mode);
@@ -643,44 +631,6 @@ status_t BnExynosHWCService::onTransact(
             reply->writeInt32(error);
             return NO_ERROR;
         } break;
-
-#if 0
-        case SET_HWC_CTL_MAX_OVLY_CNT: {
-            CHECK_INTERFACE(IExynosHWCService, data, reply);
-            int val = data.readInt32();
-            setHWCCtl(SET_HWC_CTL_MAX_OVLY_CNT, val);
-            return NO_ERROR;
-        } break;
-        case SET_HWC_CTL_VIDEO_OVLY_CNT: {
-            CHECK_INTERFACE(IExynosHWCService, data, reply);
-            int val = data.readInt32();
-            setHWCCtl(SET_HWC_CTL_VIDEO_OVLY_CNT, val);
-            return NO_ERROR;
-        } break;
-         case SET_HWC_CTL_DYNAMIC_RECOMP: {
-            CHECK_INTERFACE(IExynosHWCService, data, reply);
-            int val = data.readInt32();
-            setHWCCtl(SET_HWC_CTL_DYNAMIC_RECOMP, val);
-            return NO_ERROR;
-        } break;
-        case SET_HWC_CTL_SKIP_STATIC: {
-            CHECK_INTERFACE(IExynosHWCService, data, reply);
-            int val = data.readInt32();
-            setHWCCtl(SET_HWC_CTL_SKIP_STATIC, val);
-            return NO_ERROR;
-        } break;
-        case SET_HWC_CTL_SECURE_DMA: {
-            CHECK_INTERFACE(IExynosHWCService, data, reply);
-            int val = data.readInt32();
-            setHWCCtl(SET_HWC_CTL_SECURE_DMA, val);
-            return NO_ERROR;
-        } break;
-        case NOTIFY_PSR_EXIT: {
-            CHECK_INTERFACE(IExynosHWCService, data, reply);
-            notifyPSRExit();
-            return NO_ERROR;
-        }
-#endif
         case SET_DISPLAY_DEVICE_MODE: {
             CHECK_INTERFACE(IExynosHWCService, data, reply);
             int32_t display_id = data.readInt32();

@@ -27,12 +27,8 @@ namespace android {
 
 ANDROID_SINGLETON_STATIC_INSTANCE(ExynosHWCService);
 
-ExynosHWCService::ExynosHWCService() :
-    mHWCService(NULL),
-    mHWCCtx(NULL),
-    bootFinishedCallback(NULL),
-    doPSRExit(NULL)
-{
+ExynosHWCService::ExynosHWCService()
+      : mHWCService(NULL), mHWCCtx(NULL), bootFinishedCallback(NULL) {
     ALOGD_IF(HWC_SERVICE_DEBUG, "ExynosHWCService Constructor is called");
 }
 
@@ -322,6 +318,7 @@ int ExynosHWCService::setHWCCtl(uint32_t display, uint32_t ctrl, int32_t val)
     case HWC_CTL_ENABLE_EARLY_START_MPP:
     case HWC_CTL_DISPLAY_MODE:
     case HWC_CTL_DDI_RESOLUTION_CHANGE:
+    case HWC_CTL_DYNAMIC_RECOMP:
     case HWC_CTL_ENABLE_FENCE_TRACER:
     case HWC_CTL_SYS_FENCE_LOGGING:
     case HWC_CTL_DO_FENCE_FILE_DUMP:
@@ -351,25 +348,6 @@ int ExynosHWCService::setDDIScaler(uint32_t display_id, uint32_t width, uint32_t
         return -EINVAL;
     }
 }
-
-#if 0
-void ExynosHWCService::setPSRExitCallback(void (*callback)(exynos_hwc_composer_device_1_t *))
-{
-    ALOGD_IF(HWC_SERVICE_DEBUG, "%s, callback %p", __func__, callback);
-    doPSRExit = callback;
-}
-
-void ExynosHWCService::notifyPSRExit()
-{
-    ALOGD_IF(HWC_SERVICE_DEBUG, "%s, doPSRExit %p", __func__, doPSRExit);
-    if (doPSRExit != NULL) {
-        ALOGD_IF(HWC_SERVICE_DEBUG, "%s, line %d", __func__, __LINE__);
-        doPSRExit(mHWCCtx);
-    }
-    ALOGD_IF(HWC_SERVICE_DEBUG, "%s, line %d", __func__, __LINE__);
-}
-
-#endif
 
 int ExynosHWCService::createServiceLocked()
 {

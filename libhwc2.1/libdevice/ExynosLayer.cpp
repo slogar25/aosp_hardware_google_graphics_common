@@ -101,27 +101,43 @@ ExynosLayer::~ExynosLayer() {
 }
 
 /**
- * @return uint32_t
+ * @return float
  */
-uint32_t ExynosLayer::checkFps() {
+float ExynosLayer::checkFps(bool increaseCount) {
     uint32_t frameDiff;
-    bool wasLowFps = (mFps < LOW_FPS_THRESHOLD) ? true:false;
-    if (mLastLayerBuffer != mLayerBuffer) {
-        mFrameCount++;
-    }
+    mFrameCount += increaseCount ? 1 : 0;
+
     nsecs_t now = systemTime();
-    nsecs_t diff = now - mLastFpsTime;
+    if (mLastFpsTime == 0) { // Initialize values
+        mLastFpsTime = now;
+        mNextLastFpsTime = now;
+        // TODO(b/268474771): set the initial FPS to the correct peak refresh rate
+        mFps = 120;
+        return mFps;
+    }
+
+    nsecs_t diff = now - mNextLastFpsTime;
+    // Update mLastFrameCount for every 5s, to ensure that FPS calculation is only based on
+    // frames in the past at most 10s.
+    if (diff >= kLayerFpsStableTimeNs) {
+        mLastFrameCount = mNextLastFrameCount;
+        mNextLastFrameCount = mFrameCount;
+
+        mLastFpsTime = mNextLastFpsTime;
+        mNextLastFpsTime = now;
+    }
+
+    bool wasLowFps = (mFps < LOW_FPS_THRESHOLD) ? true : false;
+
     if (mFrameCount >= mLastFrameCount)
         frameDiff = (mFrameCount - mLastFrameCount);
     else
         frameDiff = (mFrameCount + (UINT_MAX - mLastFrameCount));
 
-    if (diff >= ms2ns(250)) {
-        mFps = (uint32_t)(frameDiff * float(s2ns(1))) / diff;
-        mLastFrameCount = mFrameCount;
-        mLastFpsTime = now;
-    }
-    bool nowLowFps = (mFps < LOW_FPS_THRESHOLD) ? true:false;
+    diff = now - mLastFpsTime;
+    mFps = (frameDiff * float(s2ns(1))) / diff;
+
+    bool nowLowFps = (mFps < LOW_FPS_THRESHOLD) ? true : false;
 
     if ((mDisplay->mDisplayControl.handleLowFpsLayers) &&
         (wasLowFps != nowLowFps))
@@ -133,7 +149,7 @@ uint32_t ExynosLayer::checkFps() {
 /**
  * @return float
  */
-uint32_t ExynosLayer::getFps() {
+float ExynosLayer::getFps() {
     return mFps;
 }
 
@@ -397,7 +413,11 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
             setGeometryChanged(GEOMETRY_LAYER_FRONT_BUFFER_USAGE_CHANGED);
     }
 
-    mLayerBuffer = buffer;
+    {
+        Mutex::Autolock lock(mDisplay->mDRMutex);
+        mLayerBuffer = buffer;
+        checkFps(mLastLayerBuffer != mLayerBuffer);
+    }
     mPrevAcquireFence =
             fence_close(mPrevAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_UNDEFINED);
     mAcquireFence = fence_close(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_UNDEFINED);
@@ -434,9 +454,6 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
                "layers bufferHandle: %p, mDataSpace: 0x%8x, acquireFence: %d, afbc: %d, "
                "internal_format: 0x%" PRIx64 "",
                mLayerBuffer, mDataSpace, mAcquireFence, mCompressed, internal_format);
-
-    /* Update fps */
-    checkFps();
 
     return 0;
 }
@@ -1094,7 +1111,8 @@ void ExynosLayer::printLayer()
             mLayerBuffer, fd, fd1, fd2, mAcquireFence, mTransform, mCompressed, mDataSpace, getFormatStr(format, mCompressed? AFBC : 0).string());
     result.appendFormat("\tblend: 0x%4x, planeAlpha: %3.1f, zOrder: %d, color[0x%2x, 0x%2x, 0x%2x, 0x%2x]\n",
             mBlending, mPlaneAlpha, mZOrder, mColor.r, mColor.g, mColor.b, mColor.a);
-    result.appendFormat("\tfps: %2d, priority: %d, windowIndex: %d\n", mFps, mOverlayPriority, mWindowIndex);
+    result.appendFormat("\tfps: %.2f, priority: %d, windowIndex: %d\n", mFps, mOverlayPriority,
+                        mWindowIndex);
     result.appendFormat("\tsourceCrop[%7.1f,%7.1f,%7.1f,%7.1f], dispFrame[%5d,%5d,%5d,%5d]\n",
             mSourceCrop.left, mSourceCrop.top, mSourceCrop.right, mSourceCrop.bottom,
             mDisplayFrame.left, mDisplayFrame.top, mDisplayFrame.right, mDisplayFrame.bottom);

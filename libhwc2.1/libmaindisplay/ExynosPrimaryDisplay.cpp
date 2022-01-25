@@ -91,6 +91,14 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mFramesToReachLhbmPeakBrightness =
             property_get_int32("vendor.primarydisplay.lhbm.frames_to_reach_peak_brightness", 3);
 
+    // Allow to enable dynamic recomposition after every power on
+    // since it will always be disabled for every power off
+    // TODO(b/268474771): to enable DR by default if video mode panel is detected
+    if (property_get_int32("vendor.display.dynamic_recomposition", 0) & (1 << index)) {
+        mDRDefault = true;
+        mDREnable = true;
+    }
+
     // Prepare multi resolution
     // Will be exynosHWCControl.multiResoultion
     mResolutionInfo.nNum = 1;

@@ -298,7 +298,7 @@ class ExynosDevice {
         void getCapabilities(uint32_t *outCount, int32_t* outCapabilities);
         void setGeometryChanged(uint64_t changedBit) { mGeometryChanged|= changedBit;};
         void clearGeometryChanged();
-        void setDynamicRecomposition(unsigned int on);
+        void setDynamicRecomposition(uint32_t displayId, unsigned int on);
         bool canSkipValidate();
         bool validateFences(ExynosDisplay *display);
         void compareVsyncPeriod();
