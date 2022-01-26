@@ -524,6 +524,38 @@ void ExynosDisplayDrmInterface::parseMipiSyncEnums(const DrmProperty &property) 
     }
 }
 
+void ExynosDisplayDrmInterface::updateMountOrientation()
+{
+    const std::vector<std::pair<HwcMountOrientation, const char*>> orientationEnums = {
+        { HwcMountOrientation::ROT_0, "Normal" },
+        { HwcMountOrientation::ROT_90, "Left Side Up" },
+        { HwcMountOrientation::ROT_180, "Upside Down" },
+        { HwcMountOrientation::ROT_270, "Right Side Up" },
+    };
+
+    mExynosDisplay->mMountOrientation = HwcMountOrientation::ROT_0;
+    const DrmProperty &orientation = mDrmConnector->orientation();
+    if (orientation.id() == 0)
+        return;
+
+    auto [err, drmOrientation] = orientation.value();
+    if (err) {
+        ALOGW("%s failed to get drm prop value, err: %d", __func__, err);
+        return;
+    }
+
+    for (auto &e : orientationEnums) {
+        uint64_t enumValue;
+        std::tie(enumValue, err) = orientation.GetEnumValueWithName(e.second);
+        if (!err && enumValue == drmOrientation) {
+            mExynosDisplay->mMountOrientation = e.first;
+            return;
+        }
+    }
+
+    ALOGW("%s ignore unrecoganized orientation %" PRId64, __func__, drmOrientation);
+}
+
 uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
 {
     return type+index;
@@ -608,6 +640,7 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     parseColorModeEnums(mDrmCrtc->color_mode_property());
     parseMipiSyncEnums(mDrmConnector->mipi_sync());
+    updateMountOrientation();
 
     if (mExynosDisplay->mBrightnessController &&
             mExynosDisplay->mBrightnessController->initDrm(*mDrmDevice, *mDrmConnector)) {

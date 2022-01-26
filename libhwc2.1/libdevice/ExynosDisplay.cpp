@@ -4606,9 +4606,10 @@ void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
 void ExynosDisplay::dump(String8& result)
 {
     Mutex::Autolock lock(mDisplayMutex);
-    result.appendFormat("[%s] display information size: %d x %d, vsyncState: %d, colorMode: %d, colorTransformHint: %d\n",
-            mDisplayName.string(),
-            mXres, mYres, mVsyncState, mColorMode, mColorTransformHint);
+    result.appendFormat("[%s] display information size: %d x %d, vsyncState: %d, colorMode: %d, "
+                        "colorTransformHint: %d, orientation %d\n",
+                        mDisplayName.string(), mXres, mYres, mVsyncState, mColorMode,
+                        mColorTransformHint, mMountOrientation);
     mClientCompositionInfo.dump(result);
     mExynosCompositionInfo.dump(result);
 
@@ -5579,6 +5580,15 @@ int32_t ExynosDisplay::getHdrCapabilities(uint32_t* outNumTypes,
             outTypes[i] = mHdrTypes[i];
         }
     }
+    return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplay::getMountOrientation(HwcMountOrientation *orientation)
+{
+    if (!orientation)
+        return HWC2_ERROR_BAD_PARAMETER;
+
+    *orientation = mMountOrientation;
     return HWC2_ERROR_NONE;
 }
 

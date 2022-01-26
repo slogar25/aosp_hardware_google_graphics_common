@@ -70,6 +70,7 @@ class DrmConnector {
   const DrmProperty &max_avg_luminance() const;
   const DrmProperty &min_luminance() const;
   const DrmProperty &hdr_formats() const;
+  const DrmProperty &orientation() const;
   const DrmProperty &lp_mode() const;
   const DrmProperty &brightness_cap() const;
   const DrmProperty &brightness_level() const;
@@ -124,6 +125,7 @@ class DrmConnector {
   DrmProperty max_avg_luminance_;
   DrmProperty min_luminance_;
   DrmProperty hdr_formats_;
+  DrmProperty orientation_;
   DrmProperty lp_mode_;
   DrmProperty brightness_cap_;
   DrmProperty brightness_level_;

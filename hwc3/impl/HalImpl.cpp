@@ -395,9 +395,15 @@ int32_t HalImpl::getDisplayedContentSamplingAttributes(
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t HalImpl::getDisplayPhysicalOrientation([[maybe_unused]] int64_t display,
-                                               [[maybe_unused]] common::Transform* orientation) {
-    // TODO(b/214461751): return the physical orientation of the display
+int32_t HalImpl::getDisplayPhysicalOrientation(int64_t display,
+                                               common::Transform* orientation) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    HwcMountOrientation hwcOrientation;
+    RET_IF_ERR(halDisplay->getMountOrientation(&hwcOrientation));
+    h2a::translate(hwcOrientation, *orientation);
+
     return HWC2_ERROR_UNSUPPORTED;
 }
 

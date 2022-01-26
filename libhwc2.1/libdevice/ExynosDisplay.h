@@ -28,6 +28,7 @@
 
 #include "ExynosDisplayInterface.h"
 #include "ExynosHWC.h"
+#include "ExynosHwc3Types.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosMPP.h"
@@ -373,7 +374,7 @@ class ExynosDisplay {
         ExynosDevice *mDevice;
 
         String8 mDisplayName;
-
+        HwcMountOrientation mMountOrientation = HwcMountOrientation::ROT_0;
         Mutex mDisplayMutex;
 
         /** State variables */
@@ -1076,6 +1077,14 @@ class ExynosDisplay {
          * Execute any pending brightness changes.
          */
         int32_t flushDisplayBrightnessChange();
+
+        /*
+         * HWC3
+         *
+         * Get display mount orientation.
+         *
+         */
+        int32_t getMountOrientation(HwcMountOrientation *orientation);
 
         /* setActiveConfig MISCs */
         bool isBadConfig(hwc2_config_t config);
