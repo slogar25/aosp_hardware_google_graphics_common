@@ -99,6 +99,7 @@ class IComposerHal {
         virtual void onVsync(int64_t display, int64_t timestamp, int32_t vsyncPeriodNanos) = 0;
         virtual void onVsyncPeriodTimingChanged(int64_t display,
                                                 const VsyncPeriodChangeTimeline& timeline) = 0;
+        virtual void onVsyncIdle(int64_t display) = 0;
         virtual void onSeamlessPossible(int64_t display) = 0;
     };
     virtual void registerEventCallback(EventCallback* callback) = 0;
@@ -211,6 +212,7 @@ class IComposerHal {
                                     float* outClientTargetWhitePointNits) = 0;
     virtual int32_t setExpectedPresentTime(
             int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
+    virtual int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) = 0;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::detail

@@ -376,6 +376,12 @@ ndk::ScopedAStatus ComposerClient::setVsyncEnabled(int64_t display, bool enabled
     return TO_BINDER_STATUS(err);
 }
 
+ndk::ScopedAStatus ComposerClient::setIdleTimerEnabled(int64_t display, int32_t timeout) {
+    DEBUG_FUNC();
+    auto err = mHal->setIdleTimerEnabled(display, timeout);
+    return TO_BINDER_STATUS(err);
+}
+
 void ComposerClient::HalEventCallback::onHotplug(int64_t display, bool connected) {
     DEBUG_FUNC();
     if (connected) {
@@ -422,6 +428,14 @@ void ComposerClient::HalEventCallback::onVsyncPeriodTimingChanged(
     auto ret = mCallback->onVsyncPeriodTimingChanged(display, timeline);
     if (!ret.isOk()) {
         LOG(ERROR) << "failed to send onVsyncPeriodTimingChanged:" << ret.getDescription();
+    }
+}
+
+void ComposerClient::HalEventCallback::onVsyncIdle(int64_t display) {
+    DEBUG_FUNC();
+    auto ret = mCallback->onVsyncIdle(display);
+    if (!ret.isOk()) {
+        LOG(ERROR) << "failed to send onVsyncIdle:" << ret.getDescription();
     }
 }
 
