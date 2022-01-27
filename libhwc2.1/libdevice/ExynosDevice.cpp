@@ -1119,10 +1119,11 @@ int ExynosDevice::setRefreshRateThrottle(const int delayMs) {
 
     ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     if (display) {
-        return display->setRefreshRateThrottleNanos(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(
-                        std::chrono::milliseconds(delayMs))
-                        .count());
+        return display
+                ->setRefreshRateThrottleNanos(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                                      std::chrono::milliseconds(delayMs))
+                                                      .count(),
+                                              DispIdleTimerRequester::PIXEL_DISP);
     }
     return BAD_VALUE;
 }
