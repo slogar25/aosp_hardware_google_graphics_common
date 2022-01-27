@@ -158,23 +158,19 @@ ndk::ScopedAStatus ComposerClient::getDisplayCapabilities(int64_t display,
                                                           std::vector<DisplayCapability>* caps) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayCapabilities(display, caps);
-    if (!err) {
-        bool support = false;
-        mHal->getRCDLayerSupport(display, support);
-        if (support) {
-            caps->push_back(DisplayCapability::DISPLAY_DECORATION);
-        }
+    if (err) {
         return TO_BINDER_STATUS(err);
     }
-    bool support;
-    err = mHal->getDisplayBrightnessSupport(display, support);
-    if (err == 0 && support) {
-        caps->push_back(DisplayCapability::BRIGHTNESS);
+
+    bool support = false;
+    err = mHal->getRCDLayerSupport(display, support);
+    if (err != ::android::OK) {
+        LOG(ERROR) << "failed to getRCDLayerSupport: " << err;
     }
-    err = mHal->getDozeSupport(display, support);
-    if (err == 0 && support) {
-        caps->push_back(DisplayCapability::DOZE);
+    if (support) {
+        caps->push_back(DisplayCapability::DISPLAY_DECORATION);
     }
+
     return TO_BINDER_STATUS(err);
 }
 

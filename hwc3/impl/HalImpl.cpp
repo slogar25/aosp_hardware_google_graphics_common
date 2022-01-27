@@ -907,7 +907,7 @@ int32_t HalImpl::setOutputBuffer(int64_t display, buffer_handle_t buffer,
 }
 
 int32_t HalImpl::setPowerMode(int64_t display, PowerMode mode) {
-    if (mode == PowerMode::ON_SUSPEND) {
+    if (mode == PowerMode::ON_SUSPEND || mode == PowerMode::DOZE_SUSPEND) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 

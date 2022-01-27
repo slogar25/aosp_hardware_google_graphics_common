@@ -3849,10 +3849,24 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
      * this should be described in display module codes */
 
     uint32_t capabilityNum = 0;
-    if (mBrightnessController && mBrightnessController->isSupported())
-        capabilityNum++;
+    bool isBrightnessSupported = false;
+    int32_t isDozeSupported = 0;
 
-    if (mDisplayInterface->isDozeModeAvailable()) {
+    auto ret = getDisplayBrightnessSupport(&isBrightnessSupported);
+    if (ret != HWC2_ERROR_NONE) {
+        ALOGE("%s: failed to getDisplayBrightnessSupport: %d", __func__, ret);
+        return ret;
+    }
+    if (isBrightnessSupported) {
+        capabilityNum++;
+    }
+
+    ret = getDozeSupport(&isDozeSupported);
+    if (ret != HWC2_ERROR_NONE) {
+        ALOGE("%s: failed to getDozeSupport: %d", __func__, ret);
+        return ret;
+    }
+    if (isDozeSupported) {
         capabilityNum++;
     }
 
@@ -3870,10 +3884,11 @@ int32_t ExynosDisplay::getDisplayCapabilities(uint32_t* outNumCapabilities,
     }
 
     uint32_t index = 0;
-    if (mBrightnessController && mBrightnessController->isSupported())
+    if (isBrightnessSupported) {
         outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_BRIGHTNESS;
+    }
 
-    if (mDisplayInterface->isDozeModeAvailable()) {
+    if (isDozeSupported) {
         outCapabilities[index++] = HWC2_DISPLAY_CAPABILITY_DOZE;
     }
 
