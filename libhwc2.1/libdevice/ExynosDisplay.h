@@ -1291,11 +1291,9 @@ class ExynosDisplay {
             int32_t checkPowerHintSessionSupport();
             bool mNeedUpdateRefreshRateHint;
 
-            // previous refresh rate
-            int mPrevRefreshRate;
-
-            // the refresh rate whose hint failed to be disabled
-            int mPendingPrevRefreshRate;
+            // The last refresh rate hint that is still being enabled
+            // If all refresh rate hints are disabled, then mLastRefreshRateHint = 0
+            int mLastRefreshRateHint;
 
             // support list of refresh rate hints
             std::map<int, bool> mRefreshRateHintSupportMap;

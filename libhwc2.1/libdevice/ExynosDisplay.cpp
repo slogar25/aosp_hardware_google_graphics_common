@@ -60,8 +60,7 @@ constexpr int64_t nsecsIdleHintTimeout = std::chrono::nanoseconds(100ms).count()
 ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
       : Worker("DisplayHints", HAL_PRIORITY_URGENT_DISPLAY),
         mNeedUpdateRefreshRateHint(false),
-        mPrevRefreshRate(0),
-        mPendingPrevRefreshRate(0),
+        mLastRefreshRateHint(0),
         mIdleHintIsEnabled(false),
         mForceUpdateIdleHint(false),
         mIdleHintDeadlineTime(0),
@@ -204,8 +203,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(int refreshRate, 
     int32_t ret = sendPowerHalExtHint(hintStr, enabled);
     if (ret == -ENOTCONN) {
         /* Reset the hints when binder failure occurs */
-        mPrevRefreshRate = 0;
-        mPendingPrevRefreshRate = 0;
+        mLastRefreshRateHint = 0;
     }
     return ret;
 }
@@ -213,30 +211,26 @@ int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(int refreshRate, 
 int32_t ExynosDisplay::PowerHalHintWorker::updateRefreshRateHintInternal(
         hwc2_power_mode_t powerMode, uint32_t vsyncPeriod) {
     int32_t ret = NO_ERROR;
-    /* We should disable pending hint before other operations */
-    if (mPendingPrevRefreshRate) {
-        ret = sendRefreshRateHint(mPendingPrevRefreshRate, false);
+
+    /* TODO: add refresh rate buckets, tracked in b/181100731 */
+    int refreshRate = round(nsecsPerSec / vsyncPeriod * 0.1f) * 10;
+    // skip sending unnecessary hint if it's still the same.
+    if (mLastRefreshRateHint == refreshRate && powerMode == HWC2_POWER_MODE_ON) {
+        return NO_ERROR;
+    }
+
+    if (mLastRefreshRateHint) {
+        ret = sendRefreshRateHint(mLastRefreshRateHint, false);
         if (ret == NO_ERROR) {
-            mPendingPrevRefreshRate = 0;
+            mLastRefreshRateHint = 0;
         } else {
             return ret;
         }
     }
 
+    // disable all refresh rate hints if power mode is not ON.
     if (powerMode != HWC2_POWER_MODE_ON) {
-        if (mPrevRefreshRate) {
-            ret = sendRefreshRateHint(mPrevRefreshRate, false);
-            if (ret == NO_ERROR) {
-                mPrevRefreshRate = 0;
-            }
-        }
         return ret;
-    }
-
-    /* TODO: add refresh rate buckets, tracked in b/181100731 */
-    int refreshRate = round(nsecsPerSec / vsyncPeriod * 0.1f) * 10;
-    if (mPrevRefreshRate == refreshRate) {
-        return NO_ERROR;
     }
 
     ret = checkRefreshRateHintSupport(refreshRate);
@@ -244,33 +238,12 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateRefreshRateHintInternal(
         return ret;
     }
 
-    /*
-     * According to PowerHAL design, while switching to next refresh rate, we
-     * have to enable the next hint first, then disable the previous one so
-     * that the next hint can take effect.
-     */
     ret = sendRefreshRateHint(refreshRate, true);
     if (ret != NO_ERROR) {
         return ret;
     }
 
-    if (mPrevRefreshRate) {
-        ret = sendRefreshRateHint(mPrevRefreshRate, false);
-        if (ret != NO_ERROR) {
-            if (ret != -ENOTCONN) {
-                /*
-                 * We may fail to disable the previous hint and end up multiple
-                 * hints enabled. Save the failed hint as pending hint here, we
-                 * will try to disable it first while entering this function.
-                 */
-                mPendingPrevRefreshRate = mPrevRefreshRate;
-                mPrevRefreshRate = refreshRate;
-            }
-            return ret;
-        }
-    }
-
-    mPrevRefreshRate = refreshRate;
+    mLastRefreshRateHint = refreshRate;
     return ret;
 }
 
@@ -354,7 +327,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, 
 
 void ExynosDisplay::PowerHalHintWorker::forceUpdateHints(void) {
     Lock();
-    mPrevRefreshRate = 0;
+    mLastRefreshRateHint = 0;
     mNeedUpdateRefreshRateHint = true;
     mLastErrorSent = std::nullopt;
     if (mIdleHintSupportIsChecked && mIdleHintIsSupported) {
