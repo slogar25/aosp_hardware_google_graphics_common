@@ -162,15 +162,6 @@ ndk::ScopedAStatus ComposerClient::getDisplayCapabilities(int64_t display,
         return TO_BINDER_STATUS(err);
     }
 
-    bool support = false;
-    err = mHal->getRCDLayerSupport(display, support);
-    if (err != ::android::OK) {
-        LOG(ERROR) << "failed to getRCDLayerSupport: " << err;
-    }
-    if (support) {
-        caps->push_back(DisplayCapability::DISPLAY_DECORATION);
-    }
-
     return TO_BINDER_STATUS(err);
 }
 
@@ -273,6 +264,25 @@ ndk::ScopedAStatus ComposerClient::getSupportedContentTypes(int64_t display,
                                                             std::vector<ContentType>* types) {
     DEBUG_FUNC();
     auto err = mHal->getSupportedContentTypes(display, types);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::getDisplayDecorationSupport(
+        int64_t display, std::optional<common::DisplayDecorationSupport>* supportStruct) {
+    DEBUG_FUNC();
+    bool support = false;
+    auto err = mHal->getRCDLayerSupport(display, support);
+    if (err != ::android::OK) {
+        LOG(ERROR) << "failed to getRCDLayerSupport: " << err;
+    }
+    if (support) {
+        // TODO (b/218499393): determine from mHal instead of hard coding.
+        auto& s = supportStruct->emplace();
+        s.format = common::PixelFormat::R_8;
+        s.alphaInterpretation = common::AlphaInterpretation::COVERAGE;
+    } else {
+        supportStruct->reset();
+    }
     return TO_BINDER_STATUS(err);
 }
 
