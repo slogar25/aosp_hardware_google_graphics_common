@@ -727,7 +727,10 @@ int32_t ExynosLayer::setLayerWhitePointNits(float whitePointNits)
         return HWC2_ERROR_BAD_PARAMETER;
     }
 
-    mWhitePointNits = whitePointNits;
+    if (mWhitePointNits != whitePointNits) {
+        mWhitePointNits = whitePointNits;
+        setGeometryChanged(GEOMETRY_LAYER_WHITEPOINT_CHANGED);
+    }
     return HWC2_ERROR_NONE;
 }
 
