@@ -3876,8 +3876,30 @@ int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
 int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
 {
     if (mBrightnessController) {
-        return mBrightnessController->processDisplayBrightness(brightness, mVsyncPeriod,
+        int err = mBrightnessController->processDisplayBrightness(brightness, mVsyncPeriod,
                                                                waitPresent);
+        if (!err && waitPresent) {
+            // If HDR layer is gone, and SDR layers are dimmed, trigger a validate
+            // display to recalc the dim ratio upon this display brightness change.
+            // This could happen when HDR is gone and DM animates the display
+            // brightnes to current SDR brightness.
+            float displayWp = -1;
+            err = mBrightnessController->getDisplayWhitePointNits(&displayWp);
+            if (!err) {
+                bool sdrDimmed = false;
+                for (size_t i = 0; i < mLayers.size(); i++) {
+                    if (fabs(mLayers[i]->mWhitePointNits - displayWp) > 1e-6) {
+                        sdrDimmed = true;
+                        break;
+                    }
+                }
+                if (sdrDimmed) {
+                    setGeometryChanged(GEOMETRY_LAYER_WHITEPOINT_CHANGED);
+                }
+            }
+        }
+        return err;
+
     }
     return HWC2_ERROR_UNSUPPORTED;
 }
