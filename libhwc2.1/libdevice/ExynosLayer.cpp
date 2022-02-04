@@ -148,6 +148,22 @@ int32_t ExynosLayer::doPreProcess()
         mLayerFlag &= ~(EXYNOS_HWC_DIM_LAYER);
     }
 
+    if (mDisplay->mBrightnessController) {
+        float displayWhitePointNits = -1;
+        mDisplay->mBrightnessController->getDisplayWhitePointNits(&displayWhitePointNits);
+        if (mWhitePointNits >= 0) {
+            if (mWhitePointNits < displayWhitePointNits) {
+                mPreprocessedInfo.sdrDimRatio = mWhitePointNits / displayWhitePointNits;
+                // in case of small floating error
+                if (mPreprocessedInfo.sdrDimRatio >= 0.999) {
+                    mPreprocessedInfo.sdrDimRatio = 1.0;
+                }
+            }
+            // any error should have been reported by
+            // BrightnessController::validateLayerWhitePointNits
+        }
+    }
+
     if (mLayerBuffer == NULL) {
         if (mOverlayPriority != priority)
             setGeometryChanged(GEOMETRY_LAYER_PRIORITY_CHANGED);
@@ -345,22 +361,6 @@ int32_t ExynosLayer::doPreProcess()
         setGeometryChanged(GEOMETRY_LAYER_PRIORITY_CHANGED);
 
     mOverlayPriority = priority;
-
-    if (mDisplay->mBrightnessController) {
-        float displayWhitePointNits = -1;
-        mDisplay->mBrightnessController->getDisplayWhitePointNits(&displayWhitePointNits);
-        if (mWhitePointNits >= 0) {
-            if (mWhitePointNits < displayWhitePointNits) {
-                mPreprocessedInfo.sdrDimRatio = mWhitePointNits / displayWhitePointNits;
-                // in case of small floating error
-                if (mPreprocessedInfo.sdrDimRatio >= 0.999) {
-                    mPreprocessedInfo.sdrDimRatio = 1.0;
-                }
-            }
-            // any error should have been reported by
-            // BrightnessController::validateLayerWhitePointNits
-        }
-    }
 
     return NO_ERROR;
 }
