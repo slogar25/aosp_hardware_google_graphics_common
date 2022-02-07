@@ -685,7 +685,7 @@ int BrightnessController::applyBrightnessViaSysfs(uint32_t level) {
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-bool BrightnessController::validateLayerWhitePointNits(float nits) {
+bool BrightnessController::validateLayerBrightness(float brightness) {
     if (!mBrightnessIntfSupported) {
         return false;
     }
@@ -696,23 +696,13 @@ bool BrightnessController::validateLayerWhitePointNits(float nits) {
         return true;
     }
 
-    if (!std::isfinite(nits)) {
-        ALOGW("%s layer nits %f is not a valid floating value", __func__, nits);
+    if (!std::isfinite(brightness)) {
+        ALOGW("%s layer brightness %f is not a valid floating value", __func__, brightness);
         return false;
     }
 
-    auto minNits = mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mNitsStart;
-    // SF sets layer to -1 nit before the first brightness command or sdr
-    // dimming is not enabled.
-    if (nits != -1 && nits < minNits) {
-        ALOGW("%s layer nits %f < minimum nits %u", __func__, nits, minNits);
-        return false;
-    }
-
-    // allow 1% error due to DM/HWC nits calculation mismatch
-    if (nits > mDisplayWhitePointNits * 1.01f) {
-        ALOGW("%s layer nits %f > current display nits %f", __func__, nits,
-              mDisplayWhitePointNits);
+    if (brightness > 1.f || brightness < 0.f) {
+        ALOGW("%s Brightness is out of [0, 1] range: %f", __func__, brightness);
         return false;
     }
 

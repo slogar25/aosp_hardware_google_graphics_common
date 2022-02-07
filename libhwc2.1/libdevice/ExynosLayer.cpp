@@ -143,28 +143,12 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.sourceCrop = mSourceCrop;
     mPreprocessedInfo.displayFrame = mDisplayFrame;
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
-    mPreprocessedInfo.sdrDimRatio = 1.0f;
+    mPreprocessedInfo.sdrDimRatio = mBrightness;
 
     if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
         mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
     } else {
         mLayerFlag &= ~(EXYNOS_HWC_DIM_LAYER);
-    }
-
-    if (mDisplay->mBrightnessController) {
-        float displayWhitePointNits = -1;
-        mDisplay->mBrightnessController->getDisplayWhitePointNits(&displayWhitePointNits);
-        if (mWhitePointNits >= 0) {
-            if (mWhitePointNits < displayWhitePointNits) {
-                mPreprocessedInfo.sdrDimRatio = mWhitePointNits / displayWhitePointNits;
-                // in case of small floating error
-                if (mPreprocessedInfo.sdrDimRatio >= 0.999) {
-                    mPreprocessedInfo.sdrDimRatio = 1.0;
-                }
-            }
-            // any error should have been reported by
-            // BrightnessController::validateLayerWhitePointNits
-        }
     }
 
     if (mLayerBuffer == NULL) {
@@ -731,16 +715,16 @@ int32_t ExynosLayer::setLayerGenericMetadata(hwc2_layer_t __unused layer,
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t ExynosLayer::setLayerWhitePointNits(float whitePointNits)
-{
+int32_t ExynosLayer::setLayerBrightness(float brightness) {
     if (mDisplay->mBrightnessController == nullptr ||
-        !mDisplay->mBrightnessController->validateLayerWhitePointNits(whitePointNits)) {
+        !mDisplay->mBrightnessController->validateLayerBrightness(brightness)) {
         return HWC2_ERROR_BAD_PARAMETER;
     }
 
-    if (mWhitePointNits != whitePointNits) {
-        mWhitePointNits = whitePointNits;
+    if (mBrightness != brightness) {
+        // Trigger display validation in case client composition is needed.
         setGeometryChanged(GEOMETRY_LAYER_WHITEPOINT_CHANGED);
+        mBrightness = brightness;
     }
     return HWC2_ERROR_NONE;
 }
@@ -1029,8 +1013,7 @@ void ExynosLayer::dump(String8& result)
 
     {
         TableBuilder tb;
-        tb.add("wp nits", mWhitePointNits)
-          .add("dim ratio", mPreprocessedInfo.sdrDimRatio);
+        tb.add("dim ratio", mPreprocessedInfo.sdrDimRatio);
         result.append(tb.build().c_str());
     }
 

@@ -84,7 +84,8 @@ class ComposerCommandEngine {
                                          const std::vector<float>& colorTransform);
       void executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
               const std::vector<std::optional<PerFrameMetadataBlob>>& perFrameMetadataBlob);
-      void executeSetLayerWhitePointNits(int64_t display, int64_t layer, const Luminance& nits);
+      void executeSetLayerBrightness(int64_t display, int64_t layer,
+                                     const LayerBrightness& brightness);
 
       int32_t executeValidateDisplayInternal(int64_t display);
       void executeSetExpectedPresentTimeInternal(
