@@ -74,8 +74,10 @@ LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V1-ndk \
                           libpng \
                           libprocessgroup
 
-LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_hal_headers
-LOCAL_HEADER_LIBRARIES += libgralloc_headers
+LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers \
+			  libbinder_headers google_hal_headers \
+			  libgralloc_headers \
+			  android.hardware.graphics.common-V3-ndk_headers
 
 LOCAL_STATIC_LIBRARIES += libVendorVideoApi
 LOCAL_STATIC_LIBRARIES += libjsoncpp

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <aidl/android/hardware/graphics/common/BufferUsage.h>
 #include <utils/Errors.h>
 #include <linux/videodev2.h>
 #include <sys/mman.h>
@@ -31,6 +32,8 @@
 /**
  * ExynosLayer implementation
  */
+
+using AidlBufferUsage = ::aidl::android::hardware::graphics::common::BufferUsage;
 
 ExynosLayer::ExynosLayer(ExynosDisplay* display)
       : ExynosMPPSource(MPP_SOURCE_LAYER, this),
@@ -341,7 +344,10 @@ int32_t ExynosLayer::doPreProcess()
         mPreprocessedInfo.preProcessed = true;
     }
 
-    if (getDrmMode(mLayerBuffer) != NO_DRM) {
+    if (VendorGraphicBufferMeta::get_usage(mLayerBuffer) &
+               toUnderlying(AidlBufferUsage::FRONT_BUFFER)) {
+        priority = ePriorityMax;
+    } else if (getDrmMode(mLayerBuffer) != NO_DRM) {
         priority = ePriorityMax;
     } else if (mIsHdrLayer) {
         if (isFormatRgb(gmeta.format))
@@ -395,6 +401,11 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
             setGeometryChanged(GEOMETRY_LAYER_DRM_CHANGED);
         if (VendorGraphicBufferMeta::get_format(mLayerBuffer) != gmeta.format)
             setGeometryChanged(GEOMETRY_LAYER_FORMAT_CHANGED);
+        if ((VendorGraphicBufferMeta::get_usage(buffer) &
+                    toUnderlying(AidlBufferUsage::FRONT_BUFFER)) !=
+                (VendorGraphicBufferMeta::get_usage(mLayerBuffer) &
+                    toUnderlying(AidlBufferUsage::FRONT_BUFFER)))
+            setGeometryChanged(GEOMETRY_LAYER_FRONT_BUFFER_USAGE_CHANGED);
     }
 
     mLayerBuffer = buffer;
