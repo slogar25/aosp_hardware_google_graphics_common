@@ -3720,6 +3720,10 @@ int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config, bool force)
         return HWC2_ERROR_BAD_CONFIG;
     }
 
+    if ((mXres != mDisplayConfigs[config].width) ||
+        (mYres != mDisplayConfigs[config].height))
+        setGeometryChanged(GEOMETRY_DISPLAY_RESOLUTION_CHANGED);
+
     updateInternalDisplayConfigVariables(config);
     return HWC2_ERROR_NONE;
 }
@@ -4010,6 +4014,18 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     ATRACE_CALL();
     Mutex::Autolock lock(mDisplayMutex);
 
+    if (mDisplayConfigs[mActiveConfig].groupId != mDisplayConfigs[config].groupId) {
+        if (vsyncPeriodChangeConstraints->seamlessRequired) {
+            DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not allowed");
+            return HWC2_ERROR_SEAMLESS_NOT_ALLOWED;
+        }
+
+        outTimeline->newVsyncAppliedTimeNanos = vsyncPeriodChangeConstraints->desiredTimeNanos;
+
+        // when switching between display group setActiveConfig directly
+        return setActiveConfigInternal(config, false);
+    }
+
     DISPLAY_LOGD(eDebugDisplayConfig,
                  "config(%d), seamless(%d), "
                  "desiredTime(%" PRId64 ")",
@@ -4025,10 +4041,6 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     }
 
     if (vsyncPeriodChangeConstraints->seamlessRequired) {
-        if (mDisplayConfigs[mActiveConfig].groupId != mDisplayConfigs[config].groupId) {
-            DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not allowed");
-            return HWC2_ERROR_SEAMLESS_NOT_ALLOWED;
-        }
         if ((mDisplayInterface->setActiveConfigWithConstraints(config, true)) != NO_ERROR) {
             DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not possible");
             return HWC2_ERROR_SEAMLESS_NOT_POSSIBLE;
