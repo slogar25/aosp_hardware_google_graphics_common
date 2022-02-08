@@ -242,6 +242,11 @@ struct exynos_dpu_data
             return *this;
         }
         configs = configs_data.configs;
+        if (rcdConfigs.size() != configs_data.rcdConfigs.size()) {
+            HWC_LOGE(NULL, "invalid config, it has different rcdConfigs size");
+            return *this;
+        }
+        rcdConfigs = configs_data.rcdConfigs;
         return *this;
     };
 };
