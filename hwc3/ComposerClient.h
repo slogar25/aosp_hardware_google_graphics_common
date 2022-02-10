@@ -16,9 +16,11 @@
 
 #pragma once
 
+#include <aidl/android/hardware/graphics/common/DisplayDecorationSupport.h>
 #include <aidl/android/hardware/graphics/composer3/BnComposerClient.h>
-#include <memory>
 #include <utils/Mutex.h>
+
+#include <memory>
 
 #include "ComposerCommandEngine.h"
 #include "include/IComposerHal.h"
@@ -101,6 +103,8 @@ public:
                                         std::vector<RenderIntent>* intents) override;
     ndk::ScopedAStatus getSupportedContentTypes(int64_t display,
                                                 std::vector<ContentType>* types) override;
+    ndk::ScopedAStatus getDisplayDecorationSupport(
+            int64_t display, std::optional<common::DisplayDecorationSupport>* support) override;
     ndk::ScopedAStatus registerCallback(
             const std::shared_ptr<IComposerCallback>& callback) override;
     ndk::ScopedAStatus setActiveConfig(int64_t display, int32_t config) override;
