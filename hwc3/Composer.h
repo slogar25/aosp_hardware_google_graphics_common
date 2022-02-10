@@ -42,7 +42,7 @@ private:
 
     const std::unique_ptr<IComposerHal> mHal;
     std::mutex mClientMutex;
-    std::weak_ptr<ComposerClient> mClient GUARDED_BY(mClientMutex);
+    bool mClientAlive GUARDED_BY(mClientMutex) = false;
     std::condition_variable mClientDestroyedCondition;
 };
 
