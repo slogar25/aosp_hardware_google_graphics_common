@@ -130,17 +130,17 @@ int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
     uint32_t displayRequestMask = 0x0;
     std::vector<int64_t> requestedLayers;
     std::vector<int32_t> requestMasks;
-    float clientTargetWhitePointNits;
     ClientTargetProperty clientTargetProperty{common::PixelFormat::RGBA_8888,
                                               common::Dataspace::UNKNOWN};
-    auto err = mHal->validateDisplay(display, &changedLayers, &compositionTypes,
-                                     &displayRequestMask, &requestedLayers, &requestMasks,
-                                     &clientTargetProperty, &clientTargetWhitePointNits);
+    auto err =
+            mHal->validateDisplay(display, &changedLayers, &compositionTypes, &displayRequestMask,
+                                  &requestedLayers, &requestMasks, &clientTargetProperty);
     mResources->setDisplayMustValidateState(display, false);
     if (!err) {
         mWriter->setChangedCompositionTypes(display, changedLayers, compositionTypes);
         mWriter->setDisplayRequests(display, displayRequestMask, requestedLayers, requestMasks);
-        mWriter->setClientTargetProperty(display, clientTargetProperty, clientTargetWhitePointNits);
+        static constexpr float kBrightness = 1.f;
+        mWriter->setClientTargetProperty(display, clientTargetProperty, kBrightness);
     } else {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
