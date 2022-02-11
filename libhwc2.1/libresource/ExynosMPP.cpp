@@ -51,6 +51,24 @@ extern struct exynos_hwc_control exynosHWCControl;
 extern feature_support_t feature_table[];
 #endif
 
+/* This function is used to restrict case that current DPU clock calculation formual can't cover
+ * it. Once formula can cover it, the restriction need to be removed.
+ */
+bool checkSpecificRestriction(const struct exynos_image &src, const uint32_t refresh_rate) {
+    if (refresh_rate < 120 || src.bufferHandle == nullptr) {
+        return false;
+    }
+
+    // case: 4k video layer and only height crop 1280 ~ 512 at 120hz
+    VendorGraphicBufferMeta gmeta(src.bufferHandle);
+    if (src.fullWidth == 3840 && src.w == 3840 && src.fullHeight == 2176 && src.h <= 1280 &&
+        src.h >= 512 && isFormatYUV(gmeta.format)) {
+        return true;
+    }
+
+    return false;
+}
+
 void dumpExynosMPPImgInfo(uint32_t type, exynos_mpp_img_info &imgInfo)
 {
     HDEBUGLOGD(type, "\tbuffer: %p, bufferType: %d",
@@ -524,6 +542,10 @@ uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct e
     if (mPhysicalType < MPP_DPP_NUM) {
         float resolution = float(src.w) * float(src.h) * display.getBtsRefreshRate() / 1000;
         if (!checkDownscaleCap(resolution, float(dst.h) / float(display.mYres))) {
+            return 1;
+        }
+
+        if (checkSpecificRestriction(src, display.getBtsRefreshRate())) {
             return 1;
         }
     }
