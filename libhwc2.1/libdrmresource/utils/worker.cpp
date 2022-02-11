@@ -26,7 +26,6 @@ Worker::Worker(const char *name, int priority, bool is_rt)
 }
 
 Worker::~Worker() {
-  Exit();
 }
 
 int Worker::InitWorker() {

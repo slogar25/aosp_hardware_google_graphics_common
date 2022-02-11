@@ -61,13 +61,27 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mPrevRefreshRate(0),
         mPendingPrevRefreshRate(0),
         mIdleHintIsEnabled(false),
+        mForceUpdateIdleHint(false),
         mIdleHintDeadlineTime(0),
         mIdleHintSupportIsChecked(false),
         mIdleHintIsSupported(false),
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
-        mPowerHalExtAidl(nullptr) {
-    InitWorker();
+        mPowerHalExtAidl(nullptr),
+        mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)) {}
+
+ExynosDisplay::PowerHalHintWorker::~PowerHalHintWorker() {
+    Exit();
+}
+
+int ExynosDisplay::PowerHalHintWorker::Init() {
+    return InitWorker();
+}
+
+void ExynosDisplay::PowerHalHintWorker::BinderDiedCallback(void *cookie) {
+    ALOGE("PowerHal is died");
+    auto powerHint = reinterpret_cast<PowerHalHintWorker *>(cookie);
+    powerHint->forceUpdateHints();
 }
 
 int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
@@ -78,6 +92,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
     const std::string kInstance = std::string(IPower::descriptor) + "/default";
     ndk::SpAIBinder pwBinder = ndk::SpAIBinder(AServiceManager_getService(kInstance.c_str()));
     ndk::SpAIBinder pwExtBinder;
+
     AIBinder_getExtension(pwBinder.get(), pwExtBinder.getR());
     mPowerHalExtAidl = IPowerExt::fromBinder(pwExtBinder);
     if (!mPowerHalExtAidl) {
@@ -85,6 +100,9 @@ int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHalExt() {
         return -EINVAL;
     }
 
+    AIBinder_linkToDeath(pwExtBinder.get(), mDeathRecipient.get(), reinterpret_cast<void *>(this));
+
+    forceUpdateHints();
     ALOGI("connect power HAL extension successfully");
     return NO_ERROR;
 }
@@ -140,6 +158,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::sendPowerHalExtHint(const std::string
         }
         return -EINVAL;
     }
+
     return NO_ERROR;
 }
 
@@ -266,22 +285,36 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
     return ret;
 }
 
-int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(uint64_t deadlineTime) {
+int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, bool forceUpdate) {
     int32_t ret = checkIdleHintSupport();
     if (ret != NO_ERROR) {
         return ret;
     }
 
-    bool enableIdleHint = (deadlineTime < systemTime(SYSTEM_TIME_MONOTONIC));
+    bool enableIdleHint =
+            (deadlineTime < systemTime(SYSTEM_TIME_MONOTONIC) && CC_LIKELY(deadlineTime > 0));
     ATRACE_INT("HWCIdleHintTimer:", enableIdleHint);
 
-    if (mIdleHintIsEnabled != enableIdleHint) {
+    if (mIdleHintIsEnabled != enableIdleHint || forceUpdate) {
         ret = sendPowerHalExtHint("DISPLAY_IDLE", enableIdleHint);
         if (ret == NO_ERROR) {
             mIdleHintIsEnabled = enableIdleHint;
         }
     }
     return ret;
+}
+
+void ExynosDisplay::PowerHalHintWorker::forceUpdateHints(void) {
+    Lock();
+    mPrevRefreshRate = 0;
+    mNeedUpdateRefreshRateHint = true;
+    if (mIdleHintSupportIsChecked && mIdleHintIsSupported) {
+        mForceUpdateIdleHint = true;
+    }
+
+    Unlock();
+
+    Signal();
 }
 
 void ExynosDisplay::PowerHalHintWorker::signalRefreshRate(hwc2_power_mode_t powerMode,
@@ -310,19 +343,28 @@ void ExynosDisplay::PowerHalHintWorker::signalIdle() {
     Signal();
 }
 
+bool ExynosDisplay::PowerHalHintWorker::needUpdateIdleHintLocked(int64_t &timeout) {
+    if (!mIdleHintIsSupported) {
+        return false;
+    }
+
+    int64_t currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
+    bool shouldEnableIdleHint =
+            (mIdleHintDeadlineTime < currentTime) && CC_LIKELY(mIdleHintDeadlineTime > 0);
+    if (mIdleHintIsEnabled != shouldEnableIdleHint || mForceUpdateIdleHint) {
+        return true;
+    }
+
+    timeout = mIdleHintDeadlineTime - currentTime;
+    return false;
+}
+
 void ExynosDisplay::PowerHalHintWorker::Routine() {
     Lock();
     int ret = 0;
-    if (!mNeedUpdateRefreshRateHint) {
-        if (!mIdleHintIsSupported || mIdleHintIsEnabled) {
-            ret = WaitForSignalOrExitLocked();
-        } else {
-            uint64_t currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
-            if (mIdleHintDeadlineTime > currentTime) {
-                uint64_t timeout = mIdleHintDeadlineTime - currentTime;
-                ret = WaitForSignalOrExitLocked(timeout);
-            }
-        }
+    int64_t timeout = -1;
+    if (!mNeedUpdateRefreshRateHint && !needUpdateIdleHintLocked(timeout)) {
+        ret = WaitForSignalOrExitLocked(timeout);
     }
 
     if (ret == -EINTR) {
@@ -331,7 +373,7 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
     }
 
     bool needUpdateRefreshRateHint = mNeedUpdateRefreshRateHint;
-    uint64_t deadlineTime = mIdleHintDeadlineTime;
+    int64_t deadlineTime = mIdleHintDeadlineTime;
     hwc2_power_mode_t powerMode = mPowerModeState;
     uint32_t vsyncPeriod = mVsyncPeriod;
 
@@ -343,9 +385,12 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
      * errors.
      */
     mNeedUpdateRefreshRateHint = false;
+
+    bool forceUpdateIdleHint = mForceUpdateIdleHint;
+    mForceUpdateIdleHint = false;
     Unlock();
 
-    updateIdleHint(deadlineTime);
+    updateIdleHint(deadlineTime, forceUpdateIdleHint);
 
     if (needUpdateRefreshRateHint) {
         int32_t rc = updateRefreshRateHintInternal(powerMode, vsyncPeriod);
@@ -654,6 +699,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
     ALOGI("window configs size(%zu)", mDpuData.configs.size());
 
     mLowFpsLayerInfo.initializeInfos();
+
+    mPowerHalHint.Init();
 
     mUseDpu = true;
     mBrightnessState.reset();
@@ -2923,6 +2970,11 @@ int32_t ExynosDisplay::canSkipValidate() {
                 return SKIP_ERR_SKIP_STATIC_CHANGED;
         }
 
+        if (mClientCompositionInfo.mHasCompositionLayer &&
+            mClientCompositionInfo.mTargetBuffer == NULL) {
+            return SKIP_ERR_INVALID_CLIENT_TARGET_BUFFER;
+        }
+
         /*
          * If there is hwc2_layer_request_t
          * validateDisplay() can't be skipped
@@ -3535,14 +3587,42 @@ int32_t ExynosDisplay::getConfigAppliedTime(const uint64_t desiredTime,
 {
     uint32_t transientDuration = mDisplayInterface->getConfigChangeDuration();
     appliedTime = actualChangeTime;
-    while (desiredTime > appliedTime) {
-        DISPLAY_LOGD(eDebugDisplayConfig, "desired time(%" PRId64 ") > applied time(%" PRId64 ")", desiredTime, appliedTime);;
-        appliedTime += mVsyncPeriod;
+
+    if (desiredTime > appliedTime) {
+        const int64_t originalAppliedTime = appliedTime;
+        const int64_t diff = desiredTime - appliedTime;
+        appliedTime += (diff + mVsyncPeriod - 1) / mVsyncPeriod * mVsyncPeriod;
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "desired time(%" PRId64 "), applied time(%" PRId64 "->%" PRId64 ")",
+                     desiredTime, originalAppliedTime, appliedTime);
+    } else {
+        DISPLAY_LOGD(eDebugDisplayConfig, "desired time(%" PRId64 "), applied time(%" PRId64 ")",
+                     desiredTime, appliedTime);
     }
 
     refreshTime = appliedTime - (transientDuration * mVsyncPeriod);
 
     return NO_ERROR;
+}
+
+void ExynosDisplay::calculateTimeline(
+        hwc2_config_t config, hwc_vsync_period_change_constraints_t *vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t *outTimeline) {
+    int64_t actualChangeTime = 0;
+    /* actualChangeTime includes transient duration */
+    mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
+
+    outTimeline->refreshRequired = true;
+    getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos, actualChangeTime,
+                         outTimeline->newVsyncAppliedTimeNanos, outTimeline->refreshTimeNanos);
+
+    DISPLAY_LOGD(eDebugDisplayConfig,
+                 "requested config : %d(%d)->%d(%d), "
+                 "desired %" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64 "",
+                 mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod, config,
+                 mDisplayConfigs[config].vsyncPeriod,
+                 mVsyncPeriodChangeConstraints.desiredTimeNanos,
+                 outTimeline->newVsyncAppliedTimeNanos);
 }
 
 int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
@@ -3552,11 +3632,11 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     ATRACE_CALL();
     Mutex::Autolock lock(mDisplayMutex);
 
-    DISPLAY_LOGD(eDebugDisplayConfig, "%s:: config(%d), seamless(%d), "
-            "desiredTime(%" PRId64, ")",
-            config,
-            vsyncPeriodChangeConstraints->seamlessRequired,
-            vsyncPeriodChangeConstraints->desiredTimeNanos);
+    DISPLAY_LOGD(eDebugDisplayConfig,
+                 "config(%d), seamless(%d), "
+                 "desiredTime(%" PRId64 ")",
+                 config, vsyncPeriodChangeConstraints->seamlessRequired,
+                 vsyncPeriodChangeConstraints->desiredTimeNanos);
 
     if (isBadConfig(config)) return HWC2_ERROR_BAD_CONFIG;
 
@@ -3588,22 +3668,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     mVsyncPeriodChangeConstraints = *vsyncPeriodChangeConstraints;
     mDesiredConfig = config;
 
-    int64_t actualChangeTime = 0;
-    /* actualChangeTime includes transient duration */
-    mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
-
-    outTimeline->refreshRequired = true;
-    getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos,
-            actualChangeTime,
-            outTimeline->newVsyncAppliedTimeNanos,
-            outTimeline->refreshTimeNanos);
-
-    DISPLAY_LOGD(eDebugDisplayConfig, "requested config : %d(%d)->%d(%d), "
-            "desired %" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64 "",
-            mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod,
-            config, mDisplayConfigs[config].vsyncPeriod,
-            mVsyncPeriodChangeConstraints.desiredTimeNanos,
-            outTimeline->newVsyncAppliedTimeNanos);
+    calculateTimeline(config, vsyncPeriodChangeConstraints, outTimeline);
 
     /* mActiveConfig should be changed immediately for internal status */
     mActiveConfig = config;
@@ -3696,9 +3761,23 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     return NO_ERROR;
 }
 
-void ExynosDisplay::updateBtsVsyncPeriod(uint32_t vsync_period, bool forceUpdate) {
-    if (forceUpdate || vsync_period < mBtsVsyncPeriod) {
-        mBtsVsyncPeriod = vsync_period;
+void ExynosDisplay::updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool forceUpdate) {
+    if (vsyncPeriod < mBtsVsyncPeriod) {
+        mBtsVsyncPeriod = vsyncPeriod;
+
+        if (mType == HWC_DISPLAY_PRIMARY) {
+            uint32_t btsRefreshRate = getBtsRefreshRate();
+
+            for (size_t i = 0; i < mLayers.size(); i++) {
+                if (!mLayers[i]->checkDownscaleCap(btsRefreshRate)) {
+                    setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+                    break;
+                }
+            }
+        }
+    } else if (forceUpdate) {
+        /* TODO: add check for resource can re-assign to Device */
+        mBtsVsyncPeriod = vsyncPeriod;
     }
 }
 
@@ -3716,8 +3795,8 @@ void ExynosDisplay::updateRefreshRateHint() {
 int32_t ExynosDisplay::resetConfigRequestStateLocked() {
     mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
     updateBtsVsyncPeriod(mVsyncPeriod, true);
-    DISPLAY_LOGD(eDebugDisplayConfig,"Update mVsyncPeriod %d",
-            mVsyncPeriod);
+    DISPLAY_LOGD(eDebugDisplayConfig, "Update mVsyncPeriod %d by mActiveConfig(%d)", mVsyncPeriod,
+                 mActiveConfig);
 
     updateRefreshRateHint();
 
@@ -3728,6 +3807,7 @@ int32_t ExynosDisplay::resetConfigRequestStateLocked() {
         DISPLAY_LOGD(eDebugDisplayInterfaceConfig, "%s: Change mConfigRequestState (%d) to NONE",
                      __func__, mConfigRequestState);
         mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
+        updateAppliedActiveConfig(mActiveConfig, systemTime(SYSTEM_TIME_MONOTONIC));
     }
     return NO_ERROR;
 }
@@ -3821,8 +3901,10 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
     if (actualChangeTime >= mVsyncPeriodChangeConstraints.desiredTimeNanos) {
         DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig");
         needSetActiveConfig = true;
+        ATRACE_INT("Pending ActiveConfig", 0);
     } else {
         DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending");
+        ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
     }
 
     if (needSetActiveConfig) {
@@ -5337,4 +5419,13 @@ void ExynosDisplay::updateBrightnessState() {
     if (mDisplayInterface->updateBrightness(true /* syncFrame */) != HWC2_ERROR_NONE) {
         ALOGW("Failed to update brighntess");
     }
+}
+
+void ExynosDisplay::cleanupAfterClientDeath() {
+    // Invalidate the client target buffer because it will be freed when the client dies
+    mClientCompositionInfo.mTargetBuffer = NULL;
+    // Invalidate the skip static flag so that we have to get a new target buffer first
+    // before we can skip the static layers
+    mClientCompositionInfo.mSkipStaticInitFlag = false;
+    mClientCompositionInfo.mSkipFlag = false;
 }

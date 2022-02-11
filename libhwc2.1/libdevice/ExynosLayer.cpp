@@ -891,6 +891,28 @@ int32_t ExynosLayer::resetAssignedResource()
     return ret;
 }
 
+bool ExynosLayer::checkDownscaleCap(uint32_t bts_refresh_rate)
+{
+    if (mOtfMPP == nullptr) return true;
+
+    exynos_image src_img;
+    exynos_image dst_img;
+
+    setSrcExynosImage(&src_img);
+    setDstExynosImage(&dst_img);
+
+    const bool isPerpendicular = !!(src_img.transform & HAL_TRANSFORM_ROT_90);
+    const uint32_t srcWidth = isPerpendicular ? src_img.h : src_img.w;
+    const uint32_t srcHeight = isPerpendicular ? src_img.w : src_img.h;
+    const bool scaleDown = (srcWidth > dst_img.w || srcHeight > dst_img.h);
+
+    if (!scaleDown) return true;
+
+    const float resolution = float(src_img.w) * float(src_img.h) * bts_refresh_rate / 1000;
+
+    return mOtfMPP->checkDownscaleCap(resolution, float(dst_img.h) / float(mDisplay->mYres));
+}
+
 void ExynosLayer::setSrcAcquireFence() {
     if (mAcquireFence == -1 && mPrevAcquireFence != -1) {
         mAcquireFence = hwcCheckFenceDebug(mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER,

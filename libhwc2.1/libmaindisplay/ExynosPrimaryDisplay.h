@@ -20,8 +20,6 @@
 
 #include "../libdevice/ExynosDisplay.h"
 
-class ExynosMPPModule;
-
 class ExynosPrimaryDisplay : public ExynosDisplay {
     public:
         /* Methods */
@@ -37,12 +35,20 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         virtual bool isLhbmSupported() { return mLhbmFd ? true : false; }
         virtual int32_t setLhbmState(bool enabled);
+        virtual int32_t setDisplayBrightness(float brightness) override;
+
         virtual bool getLhbmState();
         virtual void notifyLhbmState(bool enabled);
         virtual void setWakeupDisplay();
 
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t doDisplayConfigInternal(hwc2_config_t config) override;
+
+        virtual int setMinIdleRefreshRate(const int fps) override;
+        virtual int setRefreshRateThrottleNanos(const int64_t delayNs) override;
+        virtual void dump(String8& result) override;
+        virtual void updateAppliedActiveConfig(const hwc2_config_t newConfig,
+                                               const int64_t ts) override;
 
     protected:
         /* setPowerMode(int32_t mode)
@@ -66,6 +72,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         static constexpr const char* kPanelGammaCalFilePrefix = "gamma_calib_data";
         enum PanelGammaSource currentPanelGammaSource = PanelGammaSource::GAMMA_DEFAULT;
 
+        bool checkLhbmMode(bool status, nsecs_t timoutNs);
+
         hwc2_config_t mPendActiveConfig = UINT_MAX;
         bool mFirstPowerOn = true;
 
@@ -81,6 +89,10 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         FILE* mLhbmFd;
         bool mLhbmOn;
         bool mLhbmChanged;
+
+        std::atomic<bool> mLastRequestedLhbm;
+        std::atomic<bool> mLhbmStatusPending;
+
         static constexpr const char *kLocalHbmModeFileNode =
                 "/sys/class/backlight/panel0-backlight/local_hbm_mode";
         std::mutex lhbm_mutex_;
@@ -89,6 +101,14 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         FILE* mWakeupDispFd;
         static constexpr const char* kWakeupDispFilePath =
                 "/sys/devices/platform/1c300000.drmdecon/early_wakeup";
+
+        void calculateTimeline(hwc2_config_t config,
+                               hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+                               hwc_vsync_period_change_timeline_t* outTimeline) override;
+        int mMinIdleRefreshRate;
+        int64_t mRefreshRateDelayNanos;
+        int64_t mLastRefreshRateAppliedNanos;
+        hwc2_config_t mAppliedActiveConfig;
 };
 
 #endif

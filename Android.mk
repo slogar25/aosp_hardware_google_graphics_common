@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ifneq ($(filter gs101,$(TARGET_BOARD_PLATFORM)),)
+ifeq (google,$(TARGET_SOC_NAME))
 build_dirs :=  \
     libhwjpeg  \
     libscaler  \

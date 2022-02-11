@@ -332,6 +332,10 @@ class ExynosDevice {
         bool isLhbmSupported();
         int32_t setLhbmState(bool enabled);
         bool getLhbmState();
+        int setMinIdleRefreshRate(const int fps);
+        int setRefreshRateThrottle(const int delayMs);
+
+        bool isColorCalibratedByDevice();
 
     public:
         void enterToTUI() { mIsInTUI = true; };

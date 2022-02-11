@@ -19,6 +19,10 @@
 
 #include "ExynosPrimaryDisplay.h"
 
+#include <linux/fb.h>
+#include <poll.h>
+
+#include <chrono>
 #include <fstream>
 
 #include "ExynosDevice.h"
@@ -28,9 +32,9 @@
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
 
-#include <linux/fb.h>
-
 extern struct exynos_hwc_control exynosHWCControl;
+
+using namespace SOC_VERSION;
 
 static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
@@ -65,8 +69,11 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
 }
 
 ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
-    :   ExynosDisplay(index, device)
-{
+      : ExynosDisplay(index, device),
+        mMinIdleRefreshRate(0),
+        mRefreshRateDelayNanos(0),
+        mLastRefreshRateAppliedNanos(0),
+        mAppliedActiveConfig(0) {
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
 
@@ -94,9 +101,28 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mResolutionInfo.nDSCXSliceSize[2] = 720;
     mResolutionInfo.nPanelType[2] = PANEL_LEGACY;
 
-#if defined(MAX_BRIGHTNESS_NODE_BASE) && defined(BRIGHTNESS_NODE_BASE)
-    FILE *maxBrightnessFd = fopen(MAX_BRIGHTNESS_NODE_BASE, "r");
-    ALOGI("Trying %s open for get max brightness", MAX_BRIGHTNESS_NODE_BASE);
+    static_assert(sizeof(BRIGHTNESS_NODE_0_BASE) != 0 && sizeof(MAX_BRIGHTNESS_NODE_0_BASE) != 0,
+                  "Invalid brightness 0 node");
+    static_assert(sizeof(BRIGHTNESS_NODE_1_BASE) != 0 && sizeof(MAX_BRIGHTNESS_NODE_1_BASE) != 0,
+                  "Invalid brightness 1 node");
+    std::string brightness_node;
+    std::string max_brightness_node;
+    switch (mIndex) {
+        case 0:
+            max_brightness_node = MAX_BRIGHTNESS_NODE_0_BASE;
+            brightness_node = BRIGHTNESS_NODE_0_BASE;
+            break;
+        case 1:
+            max_brightness_node = MAX_BRIGHTNESS_NODE_1_BASE;
+            brightness_node = BRIGHTNESS_NODE_1_BASE;
+            break;
+        default:
+            ALOGE("assgin brightness node failed (mIndex: %d)", mIndex);
+            break;
+    }
+
+    FILE *maxBrightnessFd = fopen(max_brightness_node.c_str(), "r");
+    ALOGI("Trying %s open for get max brightness", max_brightness_node.c_str());
 
     if (maxBrightnessFd != NULL) {
         char val[MAX_BRIGHTNESS_LEN] = {0};
@@ -105,11 +131,11 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
             mMaxBrightness = atoi(val);
             ALOGI("Max brightness : %d", mMaxBrightness);
 
-            mBrightnessFd = fopen(BRIGHTNESS_NODE_BASE, "w+");
-            ALOGI("Trying %s open for brightness control", BRIGHTNESS_NODE_BASE);
+            mBrightnessFd = fopen(brightness_node.c_str(), "w+");
+            ALOGI("Trying %s open for brightness control", brightness_node.c_str());
 
             if (mBrightnessFd == NULL)
-                ALOGE("%s open failed! %s", BRIGHTNESS_NODE_BASE, strerror(errno));
+                ALOGE("%s open failed! %s", brightness_node.c_str(), strerror(errno));
 
         } else {
             ALOGE("Max brightness read failed (size: %zu)", size);
@@ -122,7 +148,6 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     } else {
         ALOGE("Brightness node is not opened");
     }
-#endif
 
 #if defined EARLY_WAKUP_NODE_BASE
     mEarlyWakeupFd = fopen(EARLY_WAKUP_NODE_BASE, "w");
@@ -228,7 +253,7 @@ int32_t ExynosPrimaryDisplay::applyPendingConfig() {
 
 int32_t ExynosPrimaryDisplay::setPowerOn() {
     ATRACE_CALL();
-
+    updateAppliedActiveConfig(0, 0);
     int ret = applyPendingConfig();
 
     if (mPowerModeState == HWC2_POWER_MODE_OFF) {
@@ -441,12 +466,36 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
     return HWC2_ERROR_NONE;
 }
 
+// Both setDisplayBrightness and setLhbmState will change display brightness and
+// each goes different path (sysfs and drm/kms)
+//
+// case 1: setDisplayBrightness happens before setLhbmState
+//         Don't care. brightness change by setLhbmState will happen after brightness
+//         change by setDisplayBrightness.
+//
+// case 2: setLhbmState happends before setDisplayBrightness
+//         block current call until brightness change by setLhbmState completes.
+int32_t ExynosPrimaryDisplay::setDisplayBrightness(float brightness) {
+    if (mLhbmStatusPending) {
+        // This could be done in setLhbmState and block this call on
+        // mLhbmStatusPending. But it may increase the time for UDFPS path
+        checkLhbmMode(mLastRequestedLhbm, ms2ns(200));
+        mLhbmStatusPending = false;
+    }
+    return ExynosDisplay::setDisplayBrightness(brightness);
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
+    ATRACE_CALL();
     requestLhbm(enabled);
     ALOGI("setLhbmState =%d", enabled);
 
     std::unique_lock<std::mutex> lk(lhbm_mutex_);
     mLhbmChanged = false;
+
+    mLhbmStatusPending = true;
+    mLastRequestedLhbm = enabled;
+
     if (!lhbm_cond_.wait_for(lk, std::chrono::milliseconds(1000),
                              [this] { return mLhbmChanged; })) {
         ALOGI("setLhbmState =%d timeout !", enabled);
@@ -456,6 +505,75 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
             mDisplayInterface->waitVBlank();
         return NO_ERROR;
     }
+}
+
+// return immediately if it's already in the status. Otherwise poll the status
+bool ExynosPrimaryDisplay::checkLhbmMode(bool status, nsecs_t timeoutNs) {
+    ATRACE_CALL();
+    char buf[1];
+    auto startTime = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    UniqueFd fd = open(kLocalHbmModeFileNode, O_RDONLY);
+
+    int size = read(fd.get(), buf, 1);
+    if (size != 1) {
+        ALOGE("%s failed to read from %s", __func__, kLocalHbmModeFileNode);
+        return false;
+    }
+
+    if (buf[0] == (status ? '1' : '0')) {
+        return true;
+    }
+
+    struct pollfd pfds[1];
+    int ret = EINVAL;
+
+    pfds[0].fd = fd.get();
+    pfds[0].events = POLLPRI;
+    while (true) {
+        auto currentTime = systemTime(SYSTEM_TIME_MONOTONIC);
+        // int64_t for nsecs_t
+        auto remainTimeNs = timeoutNs - (currentTime - startTime);
+        if (remainTimeNs <= 0) {
+            remainTimeNs = ms2ns(1);
+        }
+        int pollRet = poll(&pfds[0], 1, ns2ms(remainTimeNs));
+        if (pollRet == 0) {
+            ALOGW("%s poll timeout", __func__);
+            // time out
+            ret = ETIMEDOUT;
+            break;
+        } else if (pollRet > 0) {
+            if (!(pfds[0].revents & POLLPRI)) {
+                continue;
+            }
+
+            lseek(fd.get(), 0, SEEK_SET);
+            size = read(fd.get(), buf, 1);
+            if (size == 1) {
+                if (buf[0] == (status ? '1' : '0')) {
+                    ret = 0;
+                } else {
+                    ALOGE("%s status %d expected %d after notified", __func__, buf[0], status);
+                    ret = EINVAL;
+                }
+            } else {
+                ret = EIO;
+                ALOGE("%s failed to read after notified %d", __func__, errno);
+            }
+            break;
+        } else {
+            if (errno == EAGAIN || errno == EINTR) {
+                continue;
+            }
+
+            ALOGE("%s poll failed %d", __func__, errno);
+            ret = errno;
+            break;
+        }
+    };
+
+    return ret == NO_ERROR;
 }
 
 bool ExynosPrimaryDisplay::getLhbmState() {
@@ -473,4 +591,116 @@ void ExynosPrimaryDisplay::setWakeupDisplay() {
     if (mWakeupDispFd) {
         writeFileNode(mWakeupDispFd, 1);
     }
+}
+
+int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int fps) {
+    mMinIdleRefreshRate = fps;
+
+    const std::string path = getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "min_vrefresh";
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        ALOGW("Unable to open node '%s', error = %s", path.c_str(), strerror(errno));
+        return errno;
+    } else {
+        ofs << mMinIdleRefreshRate;
+        ofs.close();
+        ALOGI("ExynosPrimaryDisplay::%s() writes min_vrefresh(%d) to the sysfs node", __func__,
+              fps);
+    }
+    return NO_ERROR;
+}
+
+int ExynosPrimaryDisplay::setRefreshRateThrottleNanos(const int64_t delayNanos) {
+    mRefreshRateDelayNanos = delayNanos;
+
+    const int32_t refreshRateDelayMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                               std::chrono::nanoseconds(mRefreshRateDelayNanos))
+                                               .count();
+    const std::string path = getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "idle_delay_ms";
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        ALOGW("Unable to open node '%s', error = %s", path.c_str(), strerror(errno));
+        return errno;
+    } else {
+        ofs << refreshRateDelayMs;
+        ofs.close();
+        ALOGI("ExynosPrimaryDisplay::%s() writes idle_delay_ms(%d) to the sysfs node", __func__,
+              refreshRateDelayMs);
+    }
+
+    return NO_ERROR;
+}
+
+void ExynosPrimaryDisplay::dump(String8 &result) {
+    ExynosDisplay::dump(result);
+    result.appendFormat("Min idle refresh rate: %d\n", mMinIdleRefreshRate);
+    result.appendFormat("Refresh rate delay: %" PRId64 "ns\n\n", mRefreshRateDelayNanos);
+}
+
+void ExynosPrimaryDisplay::calculateTimeline(
+        hwc2_config_t config, hwc_vsync_period_change_constraints_t *vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t *outTimeline) {
+    int64_t desiredUpdateTime = vsyncPeriodChangeConstraints->desiredTimeNanos;
+    const int64_t origDesiredUpdateTime = desiredUpdateTime;
+    const int64_t threshold = mRefreshRateDelayNanos;
+    int64_t lastUpdateDelta = 0;
+    int64_t actualChangeTime = 0;
+    bool isDelayed = false;
+
+    /* actualChangeTime includes transient duration */
+    mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
+
+    outTimeline->refreshRequired = true;
+
+    /* when refresh rate is from high to low */
+    if (threshold != 0 && mLastRefreshRateAppliedNanos != 0 &&
+        mDisplayConfigs[mActiveConfig].vsyncPeriod < mDisplayConfigs[config].vsyncPeriod) {
+        lastUpdateDelta = desiredUpdateTime - mLastRefreshRateAppliedNanos;
+        if (lastUpdateDelta < threshold) {
+            /* in this case, the active config change needs to be delayed */
+            isDelayed = true;
+            desiredUpdateTime += threshold - lastUpdateDelta;
+        }
+    }
+    mVsyncPeriodChangeConstraints.desiredTimeNanos = desiredUpdateTime;
+
+    getConfigAppliedTime(mVsyncPeriodChangeConstraints.desiredTimeNanos, actualChangeTime,
+                         outTimeline->newVsyncAppliedTimeNanos, outTimeline->refreshTimeNanos);
+
+    if (isDelayed) {
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "requested config : %d(%d)->%d(%d) is delayed! "
+                     "delta %" PRId64 ", delay %" PRId64 ", threshold %" PRId64 ", "
+                     "desired %" PRId64 "->%" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64
+                     ", refreshTimeNanos:%" PRId64,
+                     mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod, config,
+                     mDisplayConfigs[config].vsyncPeriod, lastUpdateDelta,
+                     threshold - lastUpdateDelta, threshold, origDesiredUpdateTime,
+                     mVsyncPeriodChangeConstraints.desiredTimeNanos,
+                     outTimeline->newVsyncAppliedTimeNanos, outTimeline->refreshTimeNanos);
+    } else {
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "requested config : %d(%d)->%d(%d), "
+                     "lastUpdateDelta %" PRId64 ", threshold %" PRId64 ", "
+                     "desired %" PRId64 ", newVsyncAppliedTimeNanos : %" PRId64 "",
+                     mActiveConfig, mDisplayConfigs[mActiveConfig].vsyncPeriod, config,
+                     mDisplayConfigs[config].vsyncPeriod, lastUpdateDelta, threshold,
+                     mVsyncPeriodChangeConstraints.desiredTimeNanos,
+                     outTimeline->newVsyncAppliedTimeNanos);
+    }
+}
+
+void ExynosPrimaryDisplay::updateAppliedActiveConfig(const hwc2_config_t newConfig,
+                                                     const int64_t ts) {
+    if (mAppliedActiveConfig == 0 ||
+        getDisplayVsyncPeriodFromConfig(mAppliedActiveConfig) !=
+                getDisplayVsyncPeriodFromConfig(newConfig)) {
+        DISPLAY_LOGD(eDebugDisplayConfig,
+                     "%s mAppliedActiveConfig(%d->%d), mLastRefreshRateAppliedNanos(%" PRIu64
+                     " -> %" PRIu64 ")",
+                     __func__, mAppliedActiveConfig, newConfig, mLastRefreshRateAppliedNanos, ts);
+        mLastRefreshRateAppliedNanos = ts;
+    }
+
+    mAppliedActiveConfig = newConfig;
 }

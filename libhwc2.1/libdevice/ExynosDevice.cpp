@@ -30,6 +30,7 @@
 #include "VendorGraphicBuffer.h"
 
 using namespace vendor::graphics;
+using namespace SOC_VERSION;
 
 /**
  * ExynosDevice implementation
@@ -439,6 +440,11 @@ int32_t ExynosDevice::registerCallback (
                 if (it->mPlugState)
                     callbackFunc(callbackData, getDisplayId(it->mType, it->mIndex),
                             HWC2_CONNECTION_CONNECTED);
+            }
+        } else {
+            // unregistering callback can be used as a sign of ComposerClient's death
+            for (auto it : mDisplays) {
+                it->cleanupAfterClientDeath();
             }
         }
     }
@@ -1006,6 +1012,11 @@ bool ExynosDevice::isLbeSupported() {
     return mLbeSupported;
 }
 
+bool ExynosDevice::isColorCalibratedByDevice() {
+    ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    return display->isColorCalibratedByDevice();
+}
+
 void ExynosDevice::setLbeState(LbeState state) {
     if (mLbeSupported) {
         ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
@@ -1047,4 +1058,28 @@ bool ExynosDevice::getLhbmState() {
         return display->getLhbmState();
     }
     return false;
+}
+
+int ExynosDevice::setMinIdleRefreshRate(const int fps) {
+    ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    if (display) {
+        return display->setMinIdleRefreshRate(fps);
+    }
+    return BAD_VALUE;
+}
+
+int ExynosDevice::setRefreshRateThrottle(const int delayMs) {
+    if (delayMs < 0) {
+        ALOGE("%s fail: delayMs(%d) is less than 0", __func__, delayMs);
+        return BAD_VALUE;
+    }
+
+    ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    if (display) {
+        return display->setRefreshRateThrottleNanos(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::milliseconds(delayMs))
+                        .count());
+    }
+    return BAD_VALUE;
 }

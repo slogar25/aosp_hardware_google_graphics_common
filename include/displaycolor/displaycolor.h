@@ -30,6 +30,36 @@ using android::hardware::graphics::common::V1_2::ColorMode;
 using android::hardware::graphics::common::V1_2::Dataspace;
 }  // namespace hwc
 
+/**
+ * hwc/displaycolor interface history
+ *
+ * 3.0.0.2021-11-18 calibration info intf
+ * 2.0.0.2021-08-27 pass brightness table for hdr10+
+ * 1.0.0.2021-08-25 Initial release
+ */
+
+constexpr struct DisplayColorIntfVer {
+    uint16_t major; // increase it for new functionalities
+    uint16_t minor; // for bug fix and cause binary incompatible
+    uint16_t patch; // for bug fix and binary compatible
+
+    bool operator==(const DisplayColorIntfVer &rhs) const {
+        return major == rhs.major &&
+            minor == rhs.minor &&
+            patch == rhs.patch;
+    }
+
+    bool Compatible(const DisplayColorIntfVer &rhs) const {
+        return major == rhs.major &&
+            minor == rhs.minor;
+    }
+
+} kInterfaceVersion {
+    3,
+    0,
+    0,
+};
+
 /// A map associating supported RenderIntents for each supported ColorMode
 using ColorModesMap = std::map<hwc::ColorMode, std::vector<hwc::RenderIntent>>;
 
@@ -50,6 +80,25 @@ enum BrightnessMode {
     BM_NOMINAL = 0,
     BM_HBM = 1,
     BM_MAX = 2,
+};
+
+struct DisplayBrightnessTable {
+    float nbm_nits_min;
+    float nbm_nits_max;
+    float hbm_nits_min;
+    float hbm_nits_max;
+
+    uint32_t nbm_dbv_min;
+    uint32_t nbm_dbv_max;
+    uint32_t hbm_dbv_min;
+    uint32_t hbm_dbv_max;
+};
+
+struct DisplayInfo {
+    std::string panel_name;
+    std::string panel_serial;
+
+    DisplayBrightnessTable brightness_table;
 };
 
 struct LayerColorData {
@@ -219,6 +268,13 @@ struct DisplayScene {
     bool hdr_full_screen;
 };
 
+struct CalibrationInfo {
+    bool factory_cal_loaded;
+    bool golden_cal_loaded;
+    bool common_cal_loaded;
+    bool dev_cal_loaded;
+};
+
 /// An interface specifying functions that are HW-agnostic.
 class IDisplayColorGeneric {
    public:
@@ -282,6 +338,13 @@ class IDisplayColorGeneric {
     virtual bool IsRrCompensationEnabled(DisplayType display) = 0;
 
     /**
+     * @brief Get calibration information for each profiles.
+     * @param display The display to get the calibration information.
+     */
+    virtual const CalibrationInfo &GetCalibrationInfo(
+        DisplayType display) const = 0;
+
+    /**
      * @brief Get a map of supported ColorModes, and supported RenderIntents for
      * each ColorMode.
      * @param display The display to get the color modes and render intents.
@@ -289,6 +352,10 @@ class IDisplayColorGeneric {
     virtual const ColorModesMap &ColorModesAndRenderIntents(
         DisplayType display) const = 0;
 };
+
+extern "C" {
+    const DisplayColorIntfVer *GetInterfaceVersion();
+}
 
 }  // namespace displaycolor
 

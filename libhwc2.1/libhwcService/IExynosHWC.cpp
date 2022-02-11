@@ -61,6 +61,9 @@ enum {
     SET_PANEL_GAMMA_TABLE_SOURCE = 1001,
     SET_DISPLAY_BRIGHTNESS = 1002,
     SET_DISPLAY_LHBM = 1003,
+    SET_LBE_CTRL = 1004,
+    SET_MIN_IDLE_REFRESH_RATE = 1005,
+    SET_REFRESH_RATE_THROTTLE = 1006,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -295,6 +298,16 @@ public:
             ALOGE("SET_SCALE_DOWN_RATIO transact error(%d)", result);
     }
 
+    virtual void setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(display_id);
+        data.writeInt32(state);
+        data.writeInt32(lux);
+        int result = remote()->transact(SET_LBE_CTRL, data, &reply);
+        if (result != NO_ERROR) ALOGE("SET_LBE_CTRL transact error(%d)", result);
+    }
+
     virtual void setHWCDebug(int debug)
     {
         Parcel data, reply;
@@ -400,6 +413,26 @@ public:
         data.writeInt32(on);
         int result = remote()->transact(SET_DISPLAY_LHBM, data, &reply);
         if (result) ALOGE("SET_DISPLAY_LHBM transact error(%d)", result);
+        return result;
+    }
+
+    virtual int32_t setMinIdleRefreshRate(uint32_t display_id, int32_t fps) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(display_id);
+        data.writeInt32(fps);
+        int result = remote()->transact(SET_MIN_IDLE_REFRESH_RATE, data, &reply);
+        if (result) ALOGE("SET_MIN_IDLE_REFRESH_RATE transact error(%d)", result);
+        return result;
+    }
+
+    virtual int32_t setRefreshRateThrottle(uint32_t display_id, int32_t delay_ms) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(display_id);
+        data.writeInt32(delay_ms);
+        int result = remote()->transact(SET_REFRESH_RATE_THROTTLE, data, &reply);
+        if (result) ALOGE("SET_REFRESH_RATE_THROTTLE transact error(%d)", result);
         return result;
     }
 };
@@ -645,6 +678,29 @@ status_t BnExynosHWCService::onTransact(
             int32_t error = setDisplayLhbm(display_id, on);
             reply->writeInt32(error);
             return NO_ERROR;
+        } break;
+
+        case SET_LBE_CTRL: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t display_id = data.readInt32();
+            uint32_t state = data.readInt32();
+            uint32_t lux = data.readInt32();
+            setLbeCtrl(display_id, state, lux);
+            return NO_ERROR;
+        } break;
+
+        case SET_MIN_IDLE_REFRESH_RATE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t display_id = data.readUint32();
+            int32_t fps = data.readInt32();
+            return setMinIdleRefreshRate(display_id, fps);
+        } break;
+
+        case SET_REFRESH_RATE_THROTTLE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t display_id = data.readUint32();
+            int32_t delay_ms = data.readInt32();
+            return setRefreshRateThrottle(display_id, delay_ms);
         } break;
 
         default:

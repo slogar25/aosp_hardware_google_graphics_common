@@ -28,6 +28,8 @@
 #define SKIP_FRAME_COUNT 3
 extern struct exynos_hwc_control exynosHWCControl;
 
+using namespace SOC_VERSION;
+
 ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice *device)
     :   ExynosDisplay(index, device)
 {

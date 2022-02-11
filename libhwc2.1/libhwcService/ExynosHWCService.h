@@ -66,6 +66,7 @@ public:
     virtual int  setHWCCtl(uint32_t display, uint32_t ctrl, int32_t val);
 
     virtual int setDDIScaler(uint32_t width, uint32_t height);
+    virtual void setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) override;
 #if 0
     void setPSRExitCallback(void (*callback)(exynos_hwc_composer_device_1_t *));
     virtual void notifyPSRExit();
@@ -74,6 +75,9 @@ public:
     virtual int32_t setPanelGammaTableSource(int32_t display_id, int32_t type, int32_t source);
     virtual int32_t setDisplayBrightness(int32_t display_id, float brightness);
     virtual int32_t setDisplayLhbm(int32_t display_id, uint32_t on);
+
+    virtual int32_t setMinIdleRefreshRate(uint32_t display_id, int32_t fps);
+    virtual int32_t setRefreshRateThrottle(uint32_t display_id, int32_t delayMs);
 
 private:
     friend class Singleton<ExynosHWCService>;

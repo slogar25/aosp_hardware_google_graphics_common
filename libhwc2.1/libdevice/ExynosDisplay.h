@@ -520,7 +520,7 @@ class ExynosDisplay {
         ExynosLowFpsLayerInfo mLowFpsLayerInfo;
 
         // HDR capabilities
-        std::vector<android_hdr_t> mHdrTypes;
+        std::vector<int32_t> mHdrTypes;
         float mMaxLuminance;
         float mMaxAverageLuminance;
         float mMinLuminance;
@@ -726,7 +726,8 @@ class ExynosDisplay {
             SKIP_ERR_HAS_REQUEST,
             SKIP_ERR_DISP_NOT_CONNECTED,
             SKIP_ERR_DISP_NOT_POWER_ON,
-            SKIP_ERR_FORCE_VALIDATE
+            SKIP_ERR_FORCE_VALIDATE,
+            SKIP_ERR_INVALID_CLIENT_TARGET_BUFFER
         };
         virtual int32_t canSkipValidate();
 
@@ -874,7 +875,7 @@ class ExynosDisplay {
          *   HWC2_ERROR_BAD_PARAMETER when the brightness is invalid, or
          *   HWC2_ERROR_NO_RESOURCES  when the brightness cannot be applied.
          */
-        int32_t setDisplayBrightness(float brightness);
+        virtual int32_t setDisplayBrightness(float brightness);
 
         /* getDisplayConnectionType(..., outType)
          * Descriptor: HWC2_FUNCTION_GET_DISPLAY_CONNECTION_TYPE
@@ -1056,7 +1057,7 @@ class ExynosDisplay {
         int32_t getConfigAppliedTime(const uint64_t desiredTime,
                 const uint64_t actualChangeTime,
                 int64_t &appliedTime, int64_t &refreshTime);
-        void updateBtsVsyncPeriod(uint32_t vsync_period, bool forceUpdate = false);
+        void updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool forceUpdate = false);
         uint32_t getBtsRefreshRate() const;
 
         /* TODO : TBD */
@@ -1070,7 +1071,7 @@ class ExynosDisplay {
         /* This function is called by ExynosDisplayInterface class to set acquire fence*/
         int32_t setReadbackBufferAcqFence(int32_t acqFence);
 
-        void dump(String8& result);
+        virtual void dump(String8& result);
 
         virtual int32_t startPostProcessing();
 
@@ -1112,6 +1113,7 @@ class ExynosDisplay {
         virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
         virtual int32_t updatePresentColorConversionInfo() { return NO_ERROR; };
         virtual bool checkRrCompensationEnabled() { return false; };
+        virtual bool isColorCalibratedByDevice() { return false; };
         virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
                                                    const PanelGammaSource& /* source */) {
@@ -1141,6 +1143,8 @@ class ExynosDisplay {
         }
         void requestEnhancedHbm(bool on) { mBrightnessState.enhanced_hbm = on; };
 
+        void cleanupAfterClientDeath();
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
@@ -1169,17 +1173,18 @@ class ExynosDisplay {
             mDevice->invalidate();
         }
 
+        virtual int setMinIdleRefreshRate(const int __unused fps) { return NO_ERROR; }
+        virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos) {
+            return NO_ERROR;
+        }
+
+        virtual void updateAppliedActiveConfig(const hwc2_config_t /*newConfig*/,
+                                               const int64_t /*ts*/) {}
+
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
 
         bool skipSignalIdleForVideoLayer();
-
-        inline uint32_t getDisplayVsyncPeriodFromConfig(hwc2_config_t config) {
-            int32_t vsync_period;
-            getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &vsync_period);
-            assert(vsync_period > 0);
-            return static_cast<uint32_t>(vsync_period);
-        }
 
         /// minimum possible dim rate in the case hbm peak is 1000 nits and norml
         // display brightness is 2 nits
@@ -1200,6 +1205,8 @@ class ExynosDisplay {
         class PowerHalHintWorker : public Worker {
         public:
             PowerHalHintWorker();
+            virtual ~PowerHalHintWorker();
+            int Init();
 
             void signalRefreshRate(hwc2_power_mode_t powerMode, uint32_t vsyncPeriod);
             void signalIdle();
@@ -1208,6 +1215,7 @@ class ExynosDisplay {
             void Routine() override;
 
         private:
+            static void BinderDiedCallback(void*);
             int32_t connectPowerHalExt();
             int32_t checkPowerHalExtHintSupport(const std::string& mode);
             int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
@@ -1216,9 +1224,11 @@ class ExynosDisplay {
             int32_t updateRefreshRateHintInternal(hwc2_power_mode_t powerMode,
                                                   uint32_t vsyncPeriod);
             int32_t sendRefreshRateHint(int refreshRate, bool enabled);
+            void forceUpdateHints();
 
             int32_t checkIdleHintSupport();
-            int32_t updateIdleHint(uint64_t deadlineTime);
+            int32_t updateIdleHint(int64_t deadlineTime, bool forceUpdate);
+            bool needUpdateIdleHintLocked(int64_t& timeout) REQUIRES(mutex_);
 
             bool mNeedUpdateRefreshRateHint;
 
@@ -1232,7 +1242,8 @@ class ExynosDisplay {
             std::map<int, bool> mRefreshRateHintSupportMap;
 
             bool mIdleHintIsEnabled;
-            uint64_t mIdleHintDeadlineTime;
+            bool mForceUpdateIdleHint;
+            int64_t mIdleHintDeadlineTime;
 
             // whether idle hint support is checked
             bool mIdleHintSupportIsChecked;
@@ -1246,9 +1257,23 @@ class ExynosDisplay {
             // for power HAL extension hints
             std::shared_ptr<aidl::google::hardware::power::extension::pixel::IPowerExt>
                     mPowerHalExtAidl;
+            ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
         };
 
         PowerHalHintWorker mPowerHalHint;
+
+    protected:
+        inline uint32_t getDisplayVsyncPeriodFromConfig(hwc2_config_t config) {
+            int32_t vsync_period;
+            getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &vsync_period);
+            assert(vsync_period > 0);
+            return static_cast<uint32_t>(vsync_period);
+        }
+
+        virtual void calculateTimeline(
+                hwc2_config_t config,
+                hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+                hwc_vsync_period_change_timeline_t* outTimeline);
 };
 
 #endif //_EXYNOSDISPLAY_H

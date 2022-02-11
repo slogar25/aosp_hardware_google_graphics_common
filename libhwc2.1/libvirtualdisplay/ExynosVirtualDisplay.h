@@ -21,8 +21,6 @@
 
 #define VIRTUAL_DISLAY_SKIP_LAYER   0x00000100
 
-class ExynosMPPModule;
-
 enum WFDState {
     DISABLE_WFD,
     GOOGLEWFD,
