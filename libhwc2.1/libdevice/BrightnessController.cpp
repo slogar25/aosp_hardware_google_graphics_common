@@ -31,8 +31,8 @@ BrightnessController::BrightnessController(int32_t panelIndex, std::function<voi
         mGhbm(HbmMode::OFF),
         mDimming(false),
         mLhbm(false),
-        mHdrFullScreen(false),
-        mFrameRefresh(refresh) {
+        mFrameRefresh(refresh),
+        mHdrLayerState(HdrLayerState::kHdrNone) {
     initBrightnessSysfs();
 }
 
@@ -441,7 +441,7 @@ int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
         mGhbm.clear_dirty();
     }
 
-    mHdrFullScreen.clear_dirty();
+    mHdrLayerState.clear_dirty();
     return NO_ERROR;
 }
 
@@ -746,9 +746,9 @@ void BrightnessController::dump(String8& result) {
                         mInstantHbmReq.get());
     result.appendFormat("\tstates: brighntess level %d, ghbm %d, dimming %d, lhbm %d\n",
                         mBrightnessLevel.get(), mGhbm.get(), mDimming.get(), mLhbm.get());
-    result.appendFormat("\thdr full screen %d, unchecked lhbm request %d(%d), "
+    result.appendFormat("\thdr layer state %d, unchecked lhbm request %d(%d), "
                         "unchecked ghbm request %d(%d)\n",
-                        mHdrFullScreen.get(), mUncheckedLhbmRequest.load(),
+                        mHdrLayerState.get(), mUncheckedLhbmRequest.load(),
                         mPendingLhbmStatus.load(), mUncheckedGbhmRequest.load(),
                         mPendingGhbmStatus.load());
     result.appendFormat("\tdimming usage %d, hbm dimming %d, time us %d\n", mBrightnessDimmingUsage,

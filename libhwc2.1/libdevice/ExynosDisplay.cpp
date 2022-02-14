@@ -5821,7 +5821,7 @@ void ExynosDisplay::updateBrightnessState() {
     static constexpr float kMaxCll = 10000.0;
     bool clientRgbHdr = false;
     bool instantHbm = false;
-    bool hdrFullScreen = false;
+    BrightnessController::HdrLayerState hdrState = BrightnessController::HdrLayerState::kHdrNone;
 
     for (size_t i = 0; i < mLayers.size(); i++) {
         if (mLayers[i]->mIsHdrLayer) {
@@ -5838,14 +5838,19 @@ void ExynosDisplay::updateBrightnessState() {
                     }
                 }
             }
-            if (mLayers[i]->getDisplayFrameArea() >= mHdrFullScrenAreaThreshold) {
-                hdrFullScreen = true;
-            }
+
+            // If any HDR layer is large, keep the state as kHdrLarge
+            if (hdrState != BrightnessController::HdrLayerState::kHdrLarge
+                && mLayers[i]->getDisplayFrameArea() >= mHdrFullScrenAreaThreshold) {
+                hdrState = BrightnessController::HdrLayerState::kHdrLarge;
+            } else if (hdrState == BrightnessController::HdrLayerState::kHdrNone) {
+                hdrState = BrightnessController::HdrLayerState::kHdrSmall;
+            } // else keep the state (kHdrLarge or kHdrSmall) unchanged.
         }
     }
 
     if (mBrightnessController) {
-        mBrightnessController->updateFrameStates(hdrFullScreen);
+        mBrightnessController->updateFrameStates(hdrState);
         mBrightnessController->processInstantHbm(instantHbm && !clientRgbHdr);
     }
 }

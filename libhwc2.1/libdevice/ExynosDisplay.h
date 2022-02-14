@@ -1067,7 +1067,8 @@ class ExynosDisplay {
          *   HWC2_ERROR_NOT_VALIDATED - validateDisplay has not been called for this
          *       display
          */
-        int32_t getClientTargetProperty(hwc_client_target_property_t* outClientTargetProperty);
+        virtual int32_t getClientTargetProperty(
+                hwc_client_target_property_t* outClientTargetProperty);
 
         /*
          * HWC3
