@@ -65,7 +65,7 @@ public:
     int processDisplayBrightness(float bl, const nsecs_t vsyncNs, bool waitPresent = false);
     int processLocalHbm(bool on);
     int applyPendingChangeViaSysfs(const nsecs_t vsyncNs);
-    bool validateLayerWhitePointNits(float nits);
+    bool validateLayerBrightness(float brightness);
 
     /**
      * processInstantHbm for GHBM UDFPS

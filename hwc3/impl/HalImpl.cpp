@@ -875,11 +875,11 @@ int32_t HalImpl::setLayerVisibleRegion(int64_t display, int64_t layer,
     return halLayer->setLayerVisibleRegion(region);
 }
 
-int32_t HalImpl::setLayerWhitePointNits(int64_t display, int64_t layer, float nits) {
+int32_t HalImpl::setLayerBrightness(int64_t display, int64_t layer, float brightness) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
-    return halLayer->setLayerWhitePointNits(nits);
+    return halLayer->setLayerBrightness(brightness);
 }
 
 int32_t HalImpl::setLayerZOrder(int64_t display, int64_t layer, uint32_t z) {

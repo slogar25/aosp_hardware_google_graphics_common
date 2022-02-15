@@ -127,7 +127,7 @@ class HalImpl : public IComposerHal {
     int32_t setLayerTransform(int64_t display, int64_t layer, common::Transform transform) override;
     int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
                           const std::vector<std::optional<common::Rect>>& visible) override;
-    int32_t setLayerWhitePointNits(int64_t display, int64_t layer, float nits) override;
+    int32_t setLayerBrightness(int64_t display, int64_t layer, float brightness) override;
     int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) override;
     int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                             const ndk::ScopedFileDescriptor& releaseFence) override;
