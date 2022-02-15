@@ -30,6 +30,7 @@
 #include "ExynosLayer.h"
 #include "ExynosResourceRestriction.h"
 #include "VendorVideoAPI.h"
+#include "android-base/properties.h"
 #include "exynos_sync.h"
 
 using vendor::graphics::BufferUsage;
@@ -1351,4 +1352,29 @@ int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
     png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
 
     return 0;
+}
+
+int readLineFromFile(const std::string &filename, std::string &out, char delim) {
+    std::ifstream in(filename);
+
+    if (!in) {
+        return -ENOENT;
+    }
+    std::getline(in, out, delim);
+    if (!in) {
+        return -EIO;
+    }
+
+    return android::OK;
+}
+
+std::optional<std::string> waitForPropertyValue(const std::string& property, int64_t timeoutMs) {
+    if (!android::base::WaitForPropertyCreation(property, std::chrono::milliseconds(timeoutMs))) {
+        return std::nullopt;
+    }
+    std::string out = android::base::GetProperty(property, "unknown");
+    if (out == "unknown") {
+        return std::nullopt;
+    }
+    return std::make_optional(out);
 }

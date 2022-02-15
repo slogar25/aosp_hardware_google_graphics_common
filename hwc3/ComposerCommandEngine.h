@@ -16,9 +16,10 @@
 
 #pragma once
 
-#include <android/hardware/graphics/composer3/command-buffer.h>
 #include <memory>
+#include <utils/Mutex.h>
 
+#include "ComposerServiceWriter.h"
 #include "include/IComposerHal.h"
 #include "include/IResourceManager.h"
 
@@ -41,11 +42,14 @@ class ComposerCommandEngine {
       void dispatchDisplayCommand(const DisplayCommand& displayCommand);
       void dispatchLayerCommand(int64_t display, const LayerCommand& displayCommand);
 
-      void executeSetColorTransform(int64_t display, const ColorTransformPayload& command);
+      void executeSetColorTransform(int64_t display, const std::vector<float>& matrix);
       void executeSetClientTarget(int64_t display, const ClientTarget& command);
+      void executeSetDisplayBrightness(uint64_t display, const DisplayBrightness& command);
       void executeSetOutputBuffer(uint64_t display, const Buffer& buffer);
-      void executeValidateDisplay(int64_t display);
-      void executePresentOrValidateDisplay(int64_t display);
+      void executeValidateDisplay(int64_t display,
+                                  const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
+      void executePresentOrValidateDisplay(
+              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
       void executeAcceptDisplayChanges(int64_t display);
       int executePresentDisplay(int64_t display);
 
@@ -76,20 +80,19 @@ class ComposerCommandEngine {
       void executeSetLayerPerFrameMetadata(
               int64_t display, int64_t layer,
               const std::vector<std::optional<PerFrameMetadata>>& perFrameMetadata);
-      void executeSetLayerFloatColor(int64_t display, int64_t layer, const FloatColor& floatColor);
       void executeSetLayerColorTransform(int64_t display, int64_t layer,
                                          const std::vector<float>& colorTransform);
-      void executeSetLayerPerFrameMetadataBlobs(
-              int64_t display, int64_t layer,
+      void executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
               const std::vector<std::optional<PerFrameMetadataBlob>>& perFrameMetadataBlob);
-      void executeSetLayerGenericMetadata(int64_t display, int64_t layer,
-                                          const GenericMetadata& genericMetadata);
+      void executeSetLayerWhitePointNits(int64_t display, int64_t layer, const Luminance& nits);
 
       int32_t executeValidateDisplayInternal(int64_t display);
+      void executeSetExpectedPresentTimeInternal(
+              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
 
       IComposerHal* mHal;
       IResourceManager* mResources;
-      std::unique_ptr<CommandWriterBase> mWriter;
+      std::unique_ptr<ComposerServiceWriter> mWriter;
       int32_t mCommandIndex;
 };
 

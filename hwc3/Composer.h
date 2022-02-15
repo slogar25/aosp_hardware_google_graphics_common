@@ -25,7 +25,7 @@
 namespace aidl::android::hardware::graphics::composer3::impl {
 
 class Composer : public BnComposer {
-  public:
+public:
     Composer(std::unique_ptr<IComposerHal> hal) : mHal(std::move(hal)) {}
 
     // compser3 api
@@ -33,7 +33,10 @@ class Composer : public BnComposer {
     ndk::ScopedAStatus dumpDebugInfo(std::string* output) override;
     ndk::ScopedAStatus getCapabilities(std::vector<Capability>* caps) override;
 
-  private:
+protected:
+    ::ndk::SpAIBinder createBinder() override;
+
+private:
     bool waitForClientDestroyedLocked(std::unique_lock<std::mutex>& lock);
     void onClientDestroyed();
 

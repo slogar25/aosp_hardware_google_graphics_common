@@ -22,6 +22,7 @@
  */
 #include <aidl/android/hardware/common/NativeHandle.h>
 #include <aidl/android/hardware/graphics/common/BlendMode.h>
+#include <aidl/android/hardware/graphics/common/ColorTransform.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/graphics/common/FRect.h>
 #include <aidl/android/hardware/graphics/common/PixelFormat.h>
@@ -36,12 +37,12 @@
 #include <aidl/android/hardware/graphics/composer3/ClientTargetPropertyWithNits.h>
 #include <aidl/android/hardware/graphics/composer3/Color.h>
 #include <aidl/android/hardware/graphics/composer3/ColorMode.h>
-#include <aidl/android/hardware/graphics/composer3/ColorTransformPayload.h>
 #include <aidl/android/hardware/graphics/composer3/CommandError.h>
 #include <aidl/android/hardware/graphics/composer3/CommandResultPayload.h>
 #include <aidl/android/hardware/graphics/composer3/Composition.h>
 #include <aidl/android/hardware/graphics/composer3/ContentType.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayAttribute.h>
+#include <aidl/android/hardware/graphics/composer3/DisplayBrightness.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCommand.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayConnectionType.h>
@@ -49,12 +50,10 @@
 #include <aidl/android/hardware/graphics/composer3/DisplayContentSamplingAttributes.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayIdentification.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayRequest.h>
-#include <aidl/android/hardware/graphics/composer3/FloatColor.h>
 #include <aidl/android/hardware/graphics/composer3/FormatColorComponent.h>
-#include <aidl/android/hardware/graphics/composer3/GenericMetadata.h>
 #include <aidl/android/hardware/graphics/composer3/HdrCapabilities.h>
 #include <aidl/android/hardware/graphics/composer3/LayerCommand.h>
-#include <aidl/android/hardware/graphics/composer3/LayerGenericMetadataKey.h>
+#include <aidl/android/hardware/graphics/composer3/Luminance.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableBlendMode.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableComposition.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableDataspace.h>
@@ -72,7 +71,6 @@
 #include <aidl/android/hardware/graphics/composer3/VirtualDisplay.h>
 #include <aidl/android/hardware/graphics/composer3/VsyncPeriodChangeConstraints.h>
 #include <aidl/android/hardware/graphics/composer3/VsyncPeriodChangeTimeline.h>
-#include <aidl/android/hardware/graphics/composer3/WhitePointNits.h>
 #include <aidl/android/hardware/graphics/composer3/ZOrder.h>
 #include <cutils/native_handle.h>
 
@@ -101,6 +99,7 @@ class IComposerHal {
         virtual void onVsync(int64_t display, int64_t timestamp, int32_t vsyncPeriodNanos) = 0;
         virtual void onVsyncPeriodTimingChanged(int64_t display,
                                                 const VsyncPeriodChangeTimeline& timeline) = 0;
+        virtual void onVsyncIdle(int64_t display) = 0;
         virtual void onSeamlessPossible(int64_t display) = 0;
     };
     virtual void registerEventCallback(EventCallback* callback) = 0;
@@ -112,13 +111,14 @@ class IComposerHal {
                                          VirtualDisplay* outDisplay) = 0;
     virtual int32_t destroyLayer(int64_t display, int64_t layer) = 0;
     virtual int32_t destroyVirtualDisplay(int64_t display) = 0;
+    virtual int32_t flushDisplayBrightnessChange(int64_t display) = 0;
     virtual int32_t getActiveConfig(int64_t display, int32_t* outConfig) = 0;
     virtual int32_t getColorModes(int64_t display, std::vector<ColorMode>* outModes) = 0;
     virtual int32_t getDataspaceSaturationMatrix(common::Dataspace dataspace,
                                                  std::vector<float>* matrix) = 0;
     virtual int32_t getDisplayAttribute(int64_t display, int32_t config,
                                       DisplayAttribute attribute, int32_t* outValue) = 0;
-    virtual int32_t getDisplayBrightnessSupport(int64_t display, bool* outSupport) = 0;
+    virtual int32_t getDisplayBrightnessSupport(int64_t display, bool& outSupport) = 0;
     virtual int32_t getDisplayCapabilities(int64_t display,
                                            std::vector<DisplayCapability>* caps) = 0;
     virtual int32_t getDisplayConfigs(int64_t display, std::vector<int32_t>* configs) = 0;
@@ -130,9 +130,10 @@ class IComposerHal {
                                             int64_t timestamp, DisplayContentSample* samples) = 0;
     virtual int32_t getDisplayedContentSamplingAttributes(
             int64_t display, DisplayContentSamplingAttributes* attrs) = 0;
-    virtual int32_t getDozeSupport(int64_t display, bool* support) = 0;
+    virtual int32_t getDisplayPhysicalOrientation(int64_t display,
+                                                  common::Transform* orientation) = 0;
+    virtual int32_t getDozeSupport(int64_t display, bool& outSupport) = 0;
     virtual int32_t getHdrCapabilities(int64_t display, HdrCapabilities* caps) = 0;
-    virtual int32_t getLayerGenericMetadataKeys(std::vector<LayerGenericMetadataKey>* keys) = 0;
     virtual int32_t getMaxVirtualDisplayCount(int32_t* count) = 0;
     virtual int32_t getPerFrameMetadataKeys(int64_t display,
                                             std::vector<PerFrameMetadataKey>* keys) = 0;
@@ -151,14 +152,16 @@ class IComposerHal {
             int64_t display, int32_t config,
             const VsyncPeriodChangeConstraints& vsyncPeriodChangeConstraints,
             VsyncPeriodChangeTimeline* timeline) = 0;
+    virtual int32_t setBootDisplayConfig(int64_t display, int32_t config) = 0;
+    virtual int32_t clearBootDisplayConfig(int64_t display) = 0;
+    virtual int32_t getPreferredBootDisplayConfig(int64_t display, int32_t* config) = 0;
     virtual int32_t setAutoLowLatencyMode(int64_t display, bool on) = 0;
     virtual int32_t setClientTarget(int64_t display, buffer_handle_t target,
                                     const ndk::ScopedFileDescriptor& fence,
                                     common::Dataspace dataspace,
                                     const std::vector<common::Rect>& damage) = 0; // cmd
     virtual int32_t setColorMode(int64_t display, ColorMode mode, RenderIntent intent) = 0;
-    virtual int32_t setColorTransform(int64_t display, const std::vector<float>& matrix,
-                                      common::ColorTransform hint) = 0; // cmd
+    virtual int32_t setColorTransform(int64_t display, const std::vector<float>& matrix) = 0; // cmd
     virtual int32_t setContentType(int64_t display, ContentType contentType) = 0;
     virtual int32_t setDisplayBrightness(int64_t display, float brightness) = 0;
     virtual int32_t setDisplayedContentSamplingEnabled(int64_t display, bool enable,
@@ -177,9 +180,6 @@ class IComposerHal {
                                       common::Dataspace dataspace) = 0;
     virtual int32_t setLayerDisplayFrame(int64_t display, int64_t layer,
                                          const common::Rect& frame) = 0;
-    virtual int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) = 0;
-    virtual int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
-                                            const GenericMetadata& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
                             const std::vector<std::optional<PerFrameMetadata>>& metadata) = 0;
     virtual int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
@@ -195,6 +195,7 @@ class IComposerHal {
                                       common::Transform transform) = 0;
     virtual int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
                                  const std::vector<std::optional<common::Rect>>& visible) = 0;
+    virtual int32_t setLayerWhitePointNits(int64_t display, int64_t layer, float nits) = 0;
     virtual int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) = 0;
     virtual int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                                     const ndk::ScopedFileDescriptor& releaseFence) = 0;
@@ -207,7 +208,12 @@ class IComposerHal {
                                     uint32_t* outDisplayRequestMask,
                                     std::vector<int64_t>* outRequestedLayers,
                                     std::vector<int32_t>* outRequestMasks,
-                                    ClientTargetProperty* outClientTargetProperty) = 0; //cmd
+                                    ClientTargetProperty* outClientTargetProperty,
+                                    float* outClientTargetWhitePointNits) = 0;
+    virtual int32_t setExpectedPresentTime(
+            int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
+    virtual int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) = 0;
+    virtual int32_t getRCDLayerSupport(int64_t display, bool& outSupport) = 0;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::detail

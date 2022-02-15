@@ -45,10 +45,11 @@ class HalImpl : public IComposerHal {
 
     int32_t acceptDisplayChanges(int64_t display) override;
     int32_t createLayer(int64_t display, int64_t* outLayer) override;
-    int32_t destroyLayer(int64_t display, int64_t layer) override;
     int32_t createVirtualDisplay(uint32_t width, uint32_t height, AidlPixelFormat format,
                                  VirtualDisplay* outDisplay) override;
+    int32_t destroyLayer(int64_t display, int64_t layer) override;
     int32_t destroyVirtualDisplay(int64_t display) override;
+    int32_t flushDisplayBrightnessChange(int64_t display) override;
     int32_t getActiveConfig(int64_t display, int32_t* outConfig) override;
     int32_t getColorModes(int64_t display, std::vector<ColorMode>* outModes) override;
 
@@ -56,7 +57,7 @@ class HalImpl : public IComposerHal {
                                          std::vector<float>* matrix) override;
     int32_t getDisplayAttribute(int64_t display, int32_t config, DisplayAttribute attribute,
                                 int32_t* outValue) override;
-    int32_t getDisplayBrightnessSupport(int64_t display, bool* outSupport) override;
+    int32_t getDisplayBrightnessSupport(int64_t display, bool& outSupport) override;
     int32_t getDisplayCapabilities(int64_t display, std::vector<DisplayCapability>* caps) override;
     int32_t getDisplayConfigs(int64_t display, std::vector<int32_t>* configs) override;
     int32_t getDisplayConnectionType(int64_t display, DisplayConnectionType* outType) override;
@@ -67,9 +68,9 @@ class HalImpl : public IComposerHal {
                                       DisplayContentSample* samples) override;
     int32_t getDisplayedContentSamplingAttributes(int64_t display,
                                                   DisplayContentSamplingAttributes* attrs) override;
-    int32_t getDozeSupport(int64_t display, bool* support) override;
+    int32_t getDisplayPhysicalOrientation(int64_t display, common::Transform* orientation) override;
+    int32_t getDozeSupport(int64_t display, bool& outSupport) override;
     int32_t getHdrCapabilities(int64_t display, HdrCapabilities* caps) override;
-    int32_t getLayerGenericMetadataKeys(std::vector<LayerGenericMetadataKey>* keys) override;
     int32_t getMaxVirtualDisplayCount(int32_t* count) override;
     int32_t getPerFrameMetadataKeys(int64_t display,
                                     std::vector<PerFrameMetadataKey>* keys) override;
@@ -88,13 +89,15 @@ class HalImpl : public IComposerHal {
             int64_t display, int32_t config,
             const VsyncPeriodChangeConstraints& vsyncPeriodChangeConstraints,
             VsyncPeriodChangeTimeline* timeline) override;
+    int32_t setBootDisplayConfig(int64_t display, int32_t config) override;
+    int32_t clearBootDisplayConfig(int64_t display) override;
+    int32_t getPreferredBootDisplayConfig(int64_t display, int32_t* config) override;
     int32_t setAutoLowLatencyMode(int64_t display, bool on) override;
     int32_t setClientTarget(int64_t display, buffer_handle_t target,
                             const ndk::ScopedFileDescriptor& fence, common::Dataspace dataspace,
                             const std::vector<common::Rect>& damage) override;
     int32_t setColorMode(int64_t display, ColorMode mode, RenderIntent intent) override;
-    int32_t setColorTransform(int64_t display, const std::vector<float>& matrix,
-                              common::ColorTransform hint) override;
+    int32_t setColorTransform(int64_t display, const std::vector<float>& matrix) override;
     int32_t setContentType(int64_t display, ContentType contentType) override;
     int32_t setDisplayBrightness(int64_t display, float brightness) override;
     int32_t setDisplayedContentSamplingEnabled(int64_t display, bool enable,
@@ -111,9 +114,6 @@ class HalImpl : public IComposerHal {
     int32_t setLayerDataspace(int64_t display, int64_t layer, common::Dataspace dataspace) override;
     int32_t setLayerDisplayFrame(int64_t display, int64_t layer,
                                  const common::Rect& frame) override;
-    int32_t setLayerFloatColor(int64_t display, int64_t layer, FloatColor color) override;
-    int32_t setLayerGenericMetadata(int64_t display, int64_t layer,
-                                    const GenericMetadata& metadata) override;
     int32_t setLayerPerFrameMetadata(int64_t display, int64_t layer,
                             const std::vector<std::optional<PerFrameMetadata>>& metadata) override;
     int32_t setLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
@@ -127,6 +127,7 @@ class HalImpl : public IComposerHal {
     int32_t setLayerTransform(int64_t display, int64_t layer, common::Transform transform) override;
     int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
                           const std::vector<std::optional<common::Rect>>& visible) override;
+    int32_t setLayerWhitePointNits(int64_t display, int64_t layer, float nits) override;
     int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) override;
     int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                             const ndk::ScopedFileDescriptor& releaseFence) override;
@@ -134,12 +135,18 @@ class HalImpl : public IComposerHal {
     int32_t setReadbackBuffer(int64_t display, buffer_handle_t buffer,
                               const ndk::ScopedFileDescriptor& releaseFence) override;
     int32_t setVsyncEnabled(int64_t display, bool enabled) override;
+    int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) override;
+    int32_t getRCDLayerSupport(int64_t display, bool& outSupport) override;
     int32_t validateDisplay(int64_t display, std::vector<int64_t>* outChangedLayers,
                             std::vector<Composition>* outCompositionTypes,
                             uint32_t* outDisplayRequestMask,
                             std::vector<int64_t>* outRequestedLayers,
                             std::vector<int32_t>* outRequestMasks,
-                            ClientTargetProperty* outClientTargetProperty) override;
+                            ClientTargetProperty* outClientTargetProperty,
+                            float* outClientTargetWhitePointNits) override;
+    int32_t setExpectedPresentTime(
+            int64_t display,
+            const std::optional<ClockMonotonicTimestamp> expectedPresentTime) override;
 
     EventCallback* getEventCallback() { return mEventCallback; }
 

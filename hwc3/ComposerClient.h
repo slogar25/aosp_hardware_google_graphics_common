@@ -16,9 +16,11 @@
 
 #pragma once
 
+#include <aidl/android/hardware/graphics/common/DisplayDecorationSupport.h>
 #include <aidl/android/hardware/graphics/composer3/BnComposerClient.h>
-#include <memory>
 #include <utils/Mutex.h>
+
+#include <memory>
 
 #include "ComposerCommandEngine.h"
 #include "include/IComposerHal.h"
@@ -27,7 +29,7 @@
 namespace aidl::android::hardware::graphics::composer3::impl {
 
 class ComposerClient : public BnComposerClient {
-  public:
+public:
     ComposerClient(IComposerHal* hal) : mHal(hal) {}
     virtual ~ComposerClient();
     bool init();
@@ -45,6 +47,7 @@ class ComposerClient : public BnComposerClient {
           void onVsync(int64_t display, int64_t timestamp, int32_t vsyncPeriodNanos) override;
           void onVsyncPeriodTimingChanged(int64_t display,
                                           const VsyncPeriodChangeTimeline& timeline) override;
+          void onVsyncIdle(int64_t display) override;
           void onSeamlessPossible(int64_t display) override;
 
       private:
@@ -86,9 +89,9 @@ class ComposerClient : public BnComposerClient {
                                                  DisplayContentSample* samples) override;
     ndk::ScopedAStatus getDisplayedContentSamplingAttributes(
             int64_t display, DisplayContentSamplingAttributes* attrs) override;
+    ndk::ScopedAStatus getDisplayPhysicalOrientation(int64_t display,
+                                                     common::Transform* orientation) override;
     ndk::ScopedAStatus getHdrCapabilities(int64_t display, HdrCapabilities* caps) override;
-    ndk::ScopedAStatus getLayerGenericMetadataKeys(
-            std::vector<LayerGenericMetadataKey>* keys) override;
     ndk::ScopedAStatus getMaxVirtualDisplayCount(int32_t* count) override;
     ndk::ScopedAStatus getPerFrameMetadataKeys(int64_t display,
                                                std::vector<PerFrameMetadataKey>* keys) override;
@@ -100,17 +103,21 @@ class ComposerClient : public BnComposerClient {
                                         std::vector<RenderIntent>* intents) override;
     ndk::ScopedAStatus getSupportedContentTypes(int64_t display,
                                                 std::vector<ContentType>* types) override;
+    ndk::ScopedAStatus getDisplayDecorationSupport(
+            int64_t display, std::optional<common::DisplayDecorationSupport>* support) override;
     ndk::ScopedAStatus registerCallback(
             const std::shared_ptr<IComposerCallback>& callback) override;
     ndk::ScopedAStatus setActiveConfig(int64_t display, int32_t config) override;
     ndk::ScopedAStatus setActiveConfigWithConstraints(
             int64_t display, int32_t config, const VsyncPeriodChangeConstraints& constraints,
             VsyncPeriodChangeTimeline* timeline) override;
+    ndk::ScopedAStatus setBootDisplayConfig(int64_t display, int32_t config) override;
+    ndk::ScopedAStatus clearBootDisplayConfig(int64_t display) override;
+    ndk::ScopedAStatus getPreferredBootDisplayConfig(int64_t display, int32_t* config) override;
     ndk::ScopedAStatus setAutoLowLatencyMode(int64_t display, bool on) override;
     ndk::ScopedAStatus setClientTargetSlotCount(int64_t display, int32_t count) override;
     ndk::ScopedAStatus setColorMode(int64_t display, ColorMode mode, RenderIntent intent) override;
     ndk::ScopedAStatus setContentType(int64_t display, ContentType type) override;
-    ndk::ScopedAStatus setDisplayBrightness(int64_t display, float brightness) override;
     ndk::ScopedAStatus setDisplayedContentSamplingEnabled(int64_t display, bool enable,
                                                           FormatColorComponent componentMask,
                                                           int64_t maxFrames) override;
@@ -118,8 +125,12 @@ class ComposerClient : public BnComposerClient {
     ndk::ScopedAStatus setReadbackBuffer(int64_t display, const AidlNativeHandle& buffer,
                                          const ndk::ScopedFileDescriptor& releaseFence) override;
     ndk::ScopedAStatus setVsyncEnabled(int64_t display, bool enabled) override;
+    ndk::ScopedAStatus setIdleTimerEnabled(int64_t display, int32_t timeout) override;
 
-  private:
+protected:
+    ::ndk::SpAIBinder createBinder() override;
+
+private:
     void destroyResources();
 
     IComposerHal* mHal;

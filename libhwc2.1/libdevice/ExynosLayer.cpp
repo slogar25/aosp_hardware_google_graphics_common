@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
+#include <aidl/android/hardware/graphics/common/BufferUsage.h>
 #include <utils/Errors.h>
 #include <linux/videodev2.h>
 #include <sys/mman.h>
 #include <hardware/hwcomposer_defs.h>
 #include <hardware/exynos/ion.h>
+
+#include "BrightnessController.h"
 #include "ExynosLayer.h"
 #include "ExynosResourceManager.h"
 #include "ExynosHWCDebug.h"
@@ -29,6 +32,8 @@
 /**
  * ExynosLayer implementation
  */
+
+using AidlBufferUsage = ::aidl::android::hardware::graphics::common::BufferUsage;
 
 ExynosLayer::ExynosLayer(ExynosDisplay* display)
       : ExynosMPPSource(MPP_SOURCE_LAYER, this),
@@ -138,11 +143,28 @@ int32_t ExynosLayer::doPreProcess()
     mPreprocessedInfo.sourceCrop = mSourceCrop;
     mPreprocessedInfo.displayFrame = mDisplayFrame;
     mPreprocessedInfo.interlacedType = V4L2_FIELD_NONE;
+    mPreprocessedInfo.sdrDimRatio = 1.0f;
 
     if (mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
         mLayerFlag |= EXYNOS_HWC_DIM_LAYER;
     } else {
         mLayerFlag &= ~(EXYNOS_HWC_DIM_LAYER);
+    }
+
+    if (mDisplay->mBrightnessController) {
+        float displayWhitePointNits = -1;
+        mDisplay->mBrightnessController->getDisplayWhitePointNits(&displayWhitePointNits);
+        if (mWhitePointNits >= 0) {
+            if (mWhitePointNits < displayWhitePointNits) {
+                mPreprocessedInfo.sdrDimRatio = mWhitePointNits / displayWhitePointNits;
+                // in case of small floating error
+                if (mPreprocessedInfo.sdrDimRatio >= 0.999) {
+                    mPreprocessedInfo.sdrDimRatio = 1.0;
+                }
+            }
+            // any error should have been reported by
+            // BrightnessController::validateLayerWhitePointNits
+        }
     }
 
     if (mLayerBuffer == NULL) {
@@ -322,7 +344,10 @@ int32_t ExynosLayer::doPreProcess()
         mPreprocessedInfo.preProcessed = true;
     }
 
-    if (getDrmMode(mLayerBuffer) != NO_DRM) {
+    if (VendorGraphicBufferMeta::get_usage(mLayerBuffer) &
+               toUnderlying(AidlBufferUsage::FRONT_BUFFER)) {
+        priority = ePriorityMax;
+    } else if (getDrmMode(mLayerBuffer) != NO_DRM) {
         priority = ePriorityMax;
     } else if (mIsHdrLayer) {
         if (isFormatRgb(gmeta.format))
@@ -342,6 +367,7 @@ int32_t ExynosLayer::doPreProcess()
         setGeometryChanged(GEOMETRY_LAYER_PRIORITY_CHANGED);
 
     mOverlayPriority = priority;
+
     return NO_ERROR;
 }
 
@@ -375,6 +401,11 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
             setGeometryChanged(GEOMETRY_LAYER_DRM_CHANGED);
         if (VendorGraphicBufferMeta::get_format(mLayerBuffer) != gmeta.format)
             setGeometryChanged(GEOMETRY_LAYER_FORMAT_CHANGED);
+        if ((VendorGraphicBufferMeta::get_usage(buffer) &
+                    toUnderlying(AidlBufferUsage::FRONT_BUFFER)) !=
+                (VendorGraphicBufferMeta::get_usage(mLayerBuffer) &
+                    toUnderlying(AidlBufferUsage::FRONT_BUFFER)))
+            setGeometryChanged(GEOMETRY_LAYER_FRONT_BUFFER_USAGE_CHANGED);
     }
 
     mLayerBuffer = buffer;
@@ -700,6 +731,20 @@ int32_t ExynosLayer::setLayerGenericMetadata(hwc2_layer_t __unused layer,
     return HWC2_ERROR_UNSUPPORTED;
 }
 
+int32_t ExynosLayer::setLayerWhitePointNits(float whitePointNits)
+{
+    if (mDisplay->mBrightnessController == nullptr ||
+        !mDisplay->mBrightnessController->validateLayerWhitePointNits(whitePointNits)) {
+        return HWC2_ERROR_BAD_PARAMETER;
+    }
+
+    if (mWhitePointNits != whitePointNits) {
+        mWhitePointNits = whitePointNits;
+        setGeometryChanged(GEOMETRY_LAYER_WHITEPOINT_CHANGED);
+    }
+    return HWC2_ERROR_NONE;
+}
+
 void ExynosLayer::resetValidateData()
 {
     mValidateCompositionType = HWC2_COMPOSITION_INVALID;
@@ -981,6 +1026,13 @@ void ExynosLayer::dump(String8& result)
                           .add("supportedMPPFlag", mSupportedMPPFlag, true)
                           .build()
                           .c_str());
+
+    {
+        TableBuilder tb;
+        tb.add("wp nits", mWhitePointNits)
+          .add("dim ratio", mPreprocessedInfo.sdrDimRatio);
+        result.append(tb.build().c_str());
+    }
 
     if ((mDisplay != NULL) && (mDisplay->mResourceManager != NULL)) {
         result.appendFormat("MPPFlags for otfMPP\n");

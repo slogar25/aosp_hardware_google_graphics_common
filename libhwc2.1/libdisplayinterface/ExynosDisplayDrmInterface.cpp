@@ -245,8 +245,23 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         if (fbId != 0) {
             return NO_ERROR;
         }
+    } else if (config.state == config.WIN_STATE_RCD) {
+        bufWidth = config.src.f_w;
+        bufHeight = config.src.f_h;
+        drmFormat = DRM_FORMAT_C8;
+        bufferNum = 1;
+        handles[0] = getBufHandleFromFd(config.fd_idma[0]);
+        bpp = 1;
+        pitches[0] = config.src.f_w * bpp;
+        fbId = findCachedFbId(config.layer,
+                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat,
+                                                                    config.protection}](
+                                      auto &buffer) { return buffer->bufferDesc == bufferDesc; });
+        if (fbId != 0) {
+            return NO_ERROR;
+        }
     } else {
-        ALOGE("%s:: known config state(%d)", __func__, config.state);
+        ALOGE("%s:: unknown config state(%d)", __func__, config.state);
         return -EINVAL;
     }
 
@@ -524,6 +539,38 @@ void ExynosDisplayDrmInterface::parseMipiSyncEnums(const DrmProperty &property) 
     }
 }
 
+void ExynosDisplayDrmInterface::updateMountOrientation()
+{
+    const std::vector<std::pair<HwcMountOrientation, const char*>> orientationEnums = {
+        { HwcMountOrientation::ROT_0, "Normal" },
+        { HwcMountOrientation::ROT_90, "Left Side Up" },
+        { HwcMountOrientation::ROT_180, "Upside Down" },
+        { HwcMountOrientation::ROT_270, "Right Side Up" },
+    };
+
+    mExynosDisplay->mMountOrientation = HwcMountOrientation::ROT_0;
+    const DrmProperty &orientation = mDrmConnector->orientation();
+    if (orientation.id() == 0)
+        return;
+
+    auto [err, drmOrientation] = orientation.value();
+    if (err) {
+        ALOGW("%s failed to get drm prop value, err: %d", __func__, err);
+        return;
+    }
+
+    for (auto &e : orientationEnums) {
+        uint64_t enumValue;
+        std::tie(enumValue, err) = orientation.GetEnumValueWithName(e.second);
+        if (!err && enumValue == drmOrientation) {
+            mExynosDisplay->mMountOrientation = e.first;
+            return;
+        }
+    }
+
+    ALOGW("%s ignore unrecoganized orientation %" PRId64, __func__, drmOrientation);
+}
+
 uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
 {
     return type+index;
@@ -608,6 +655,7 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     parseColorModeEnums(mDrmCrtc->color_mode_property());
     parseMipiSyncEnums(mDrmConnector->mipi_sync());
+    updateMountOrientation();
 
     if (mExynosDisplay->mBrightnessController &&
             mExynosDisplay->mBrightnessController->initDrm(*mDrmDevice, *mDrmConnector)) {
@@ -691,22 +739,13 @@ bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
 }
 
 int32_t ExynosDisplayDrmInterface::getLowPowerDrmModeModeInfo() {
-    int ret;
-    uint64_t blobId;
+    auto mode = mDrmConnector->lp_mode();
 
-    std::tie(ret, blobId) = mDrmConnector->lp_mode().value();
-    if (ret) {
-        ALOGE("Fail to get blob id for lp mode");
+    if (!mode.clock()) {
         return HWC2_ERROR_UNSUPPORTED;
     }
-    drmModePropertyBlobPtr blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
-    if (!blob) {
-        ALOGE("Fail to get blob for lp mode(%" PRId64 ")", blobId);
-        return HWC2_ERROR_UNSUPPORTED;
-    }
-    drmModeModeInfo dozeModeInfo = *static_cast<drmModeModeInfoPtr>(blob->data);
-    mDozeDrmMode = DrmMode(&dozeModeInfo);
-    drmModeFreePropertyBlob(blob);
+
+    mDozeDrmMode = mode;
 
     return NO_ERROR;
 }
@@ -1061,6 +1100,22 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
 
     DrmModeAtomicReq drmReq(this);
 
+    uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
+    bool reconfig = false;
+
+    if ((mode.h_display() != mActiveModeState.mode.h_display()) ||
+        (mode.v_display() != mActiveModeState.mode.v_display())) {
+        ret = clearDisplayPlanes(drmReq);
+        if (ret != HWC2_ERROR_NONE) {
+            HWC_LOGE(mExynosDisplay, "%s: Failed to clear planes due to resolution change",
+                     __func__);
+        } else {
+            ALOGD("%s: switching display resolution, clearing planes", __func__);
+        }
+        flags |= DRM_MODE_ATOMIC_NONBLOCK;
+        reconfig = true;
+    }
+
     if ((ret = setDisplayMode(drmReq, modeBlob)) != NO_ERROR) {
         drmReq.addOldBlob(modeBlob);
         HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
@@ -1068,7 +1123,7 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
         return ret;
     }
 
-    if ((ret = drmReq.commit(DRM_MODE_ATOMIC_ALLOW_MODESET, true))) {
+    if ((ret = drmReq.commit(flags, true))) {
         drmReq.addOldBlob(modeBlob);
         HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
                 __func__, ret);
@@ -1078,6 +1133,11 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     mDrmConnector->set_active_mode(mode);
     mActiveModeState.setMode(mode, modeBlob, drmReq);
     mActiveModeState.needs_modeset = false;
+
+    if (reconfig) {
+        mDrmConnector->ResetLpMode();
+        getLowPowerDrmModeModeInfo();
+    }
 
     return HWC2_ERROR_NONE;
 }
@@ -1605,6 +1665,20 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
+    for (size_t i = 0; i < mExynosDisplay->mDpuData.rcdConfigs.size(); ++i) {
+        exynos_win_config_data &config = mExynosDisplay->mDpuData.rcdConfigs[i];
+        if (config.state == config.WIN_STATE_RCD) {
+            const int channelId =
+                    mExynosDisplay->mDevice->getSpecialPlaneId(0); // TODO: get PlaneId by display
+            auto &plane = mDrmDevice->planes().at(channelId);
+            uint32_t fbId = 0;
+            if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
+                HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
+            }
+            planeEnableInfo[plane->id()] = 1;
+        }
+    }
+
     /* Disable unused plane */
     for (auto &plane : mDrmDevice->planes()) {
         if (planeEnableInfo[plane->id()] == 0) {
@@ -1656,7 +1730,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
     if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
-        HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
+        HWC_LOGE(mExynosDisplay, "failed to update color settings (%d)", ret);
         return ret;
     }
 
@@ -1665,8 +1739,19 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
                                             mDrmConnector->mipi_sync(),
                                             mipi_sync_type)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set mipi_sync property", __func__);
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set mipi_sync property (%d)", __func__, ret);
         }
+    }
+
+    auto expectedPresentTime = mExynosDisplay->getPendingExpectedPresentTime();
+    if (expectedPresentTime != 0) {
+        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                                            mDrmCrtc->expected_present_time_property(),
+                                            expectedPresentTime)) < 0) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to set expected_present_time property (%d)",
+                     __func__, ret);
+        }
+        mExynosDisplay->applyExpectedPresentTime();
     }
 
     if ((ret = drmReq.commit(flags, true)) < 0) {
@@ -1726,14 +1811,12 @@ int32_t ExynosDisplayDrmInterface::clearDisplayMode(DrmModeAtomicReq &drmReq)
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
+int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
 {
     int ret = NO_ERROR;
-    DrmModeAtomicReq drmReq(this);
 
     /* Disable all planes */
     for (auto &plane : mDrmDevice->planes()) {
-
         /* Do not disable planes that are reserved to other dispaly */
         ExynosMPP* exynosMPP = mExynosMPPsForPlane[plane->id()];
         if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
@@ -1742,12 +1825,29 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
             continue;
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
-                plane->crtc_property(), 0)) < 0)
-            return ret;
+                                            plane->crtc_property(), 0)) < 0) {
+            break;
+        }
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
-                plane->fb_property(), 0)) < 0)
-            return ret;
+                                            plane->fb_property(), 0)) < 0) {
+            break;
+        }
+    }
+
+    return ret;
+}
+
+int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
+{
+    int ret = NO_ERROR;
+    DrmModeAtomicReq drmReq(this);
+
+    ret = clearDisplayPlanes(drmReq);
+    if (ret != NO_ERROR) {
+        HWC_LOGE(mExynosDisplay, "%s: Failed to clear planes", __func__);
+
+        return ret;
     }
 
     /* Disable readback connector if required */

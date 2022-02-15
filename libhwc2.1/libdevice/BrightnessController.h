@@ -18,8 +18,11 @@
 #define _BRIGHTNESS_CONTROLLER_H_
 
 #include <drm/samsung_drm.h>
-#include <fstream>
+#include <utils/Looper.h>
 #include <utils/Mutex.h>
+
+#include <fstream>
+#include <thread>
 
 #include "ExynosDisplayDrmInterface.h"
 
@@ -36,14 +39,33 @@
  */
 class BrightnessController {
 public:
+    using HdrLayerState = displaycolor::HdrLayerState;
+
+    class DimmingMsgHandler : public virtual ::android::MessageHandler {
+    public:
+        enum {
+            MSG_QUIT,
+            MSG_DIMMING_OFF,
+        };
+        DimmingMsgHandler(BrightnessController* bc) : mBrightnessController(bc) {}
+        void handleMessage(const Message& message) override;
+
+    private:
+        BrightnessController* mBrightnessController;
+    };
+
+    BrightnessController(int32_t panelIndex, std::function<void(void)> refresh);
+    ~BrightnessController();
+
     BrightnessController(int32_t panelIndex);
     int initDrm(const DrmDevice& drmDevice,
                 const DrmConnector& connector);
 
     int processEnhancedHbm(bool on);
-    int processDisplayBrightness(float bl, std::function<void(void)> refresh);
-
+    int processDisplayBrightness(float bl, const nsecs_t vsyncNs, bool waitPresent = false);
     int processLocalHbm(bool on);
+    int applyPendingChangeViaSysfs(const nsecs_t vsyncNs);
+    bool validateLayerWhitePointNits(float nits);
 
     /**
      * processInstantHbm for GHBM UDFPS
@@ -53,7 +75,7 @@ public:
      */
     int processInstantHbm(bool on);
 
-    void updateFrameStates(bool hdrFullScreen) { mHdrFullScreen.store(hdrFullScreen); }
+    void updateFrameStates(HdrLayerState hdrState) { mHdrLayerState.store(hdrState); }
 
     /**
      * Dim ratio to keep the sdr brightness unchange after an instant hbm on with peak brightness.
@@ -69,7 +91,7 @@ public:
     int prepareFrameCommit(ExynosDisplay& display,
                            const DrmConnector& connector,
                            ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
-                           bool &ghbmSync, bool &lhbmSync, bool &blSync);
+                           bool& ghbmSync, bool& lhbmSync, bool& blSync);
 
     bool isGhbmSupported() { return mGhbmSupported; }
     bool isLhbmSupported() { return mLhbmSupported; }
@@ -94,13 +116,26 @@ public:
         return mInstantHbmReq.get();
     }
 
-    bool isHdrFullScreen() {
-        return mHdrFullScreen.get();
+    HdrLayerState getHdrLayerState() {
+        return mHdrLayerState.get();
     }
 
     bool isSupported() {
         // valid mMaxBrightness means both brightness and max_brightness sysfs exist
         return mMaxBrightness > 0;
+    }
+
+    int getDisplayWhitePointNits(float* nits) {
+        if (!nits) {
+            return HWC2_ERROR_BAD_PARAMETER;
+        }
+
+        if (!mBrightnessIntfSupported) {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+
+        *nits = mDisplayWhitePointNits;
+        return NO_ERROR;
     }
 
     void dump(String8 &result);
@@ -157,15 +192,19 @@ private:
     static constexpr const char *kGlobalHbmModeFileNode =
                 "/sys/class/backlight/panel%d-backlight/hbm_mode";
 
-    int queryBrightness(float brightness, bool *ghbm = nullptr, uint32_t *level = nullptr,
+    int queryBrightness(float brightness, bool* ghbm = nullptr, uint32_t* level = nullptr,
                         float *nits = nullptr);
-    int checkSysfsStatus(const char *file, char status, nsecs_t timeoutNs);
+    int checkSysfsStatus(const char *file, const std::string &expectedValue,
+                         const nsecs_t timeoutNs);
     void initBrightnessTable(const DrmDevice& device, const DrmConnector& connector);
     void initBrightnessSysfs();
+    void initDimmingUsage();
     int applyBrightnessViaSysfs(uint32_t level);
     int updateStates() REQUIRES(mBrightnessMutex);
+    void dimmingThread();
+    void processDimmingOff();
 
-    void parseHbmModeEnums(const DrmProperty &property);
+    void parseHbmModeEnums(const DrmProperty& property);
 
     bool mLhbmSupported = false;
     bool mGhbmSupported = false;
@@ -191,23 +230,35 @@ private:
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
 
-    CtrlValue<bool> mHdrFullScreen;
+    std::function<void(void)> mFrameRefresh;
+    CtrlValue<HdrLayerState> mHdrLayerState;
 
     // these are used by sysfs path to wait drm path bl change task
+    // indicationg an unchecked LHBM change in drm path
     std::atomic<bool> mUncheckedLhbmRequest = false;
     std::atomic<bool> mPendingLhbmStatus = false;
+    // indicationg an unchecked GHBM change in drm path
     std::atomic<bool> mUncheckedGbhmRequest = false;
     std::atomic<HbmMode> mPendingGhbmStatus = HbmMode::OFF;
+    // indicating an unchecked brightness change in drm path
+    std::atomic<bool> mUncheckedBlRequest = false;
+    std::atomic<uint32_t> mPendingBl = 0;
 
     // these are dimming related
     BrightnessDimmingUsage mBrightnessDimmingUsage = BrightnessDimmingUsage::NORMAL;
-    bool mHbmSvDimming = false;
+    bool mHbmDimming GUARDED_BY(mBrightnessMutex) = false;
     int32_t mHbmDimmingTimeUs = 0;
-    struct timeval mHbmDimmingStart = { 0, 0 };
+    std::thread mDimmingThread;
+    std::atomic<bool> mDimmingThreadRunning;
+    ::android::sp<::android::Looper> mDimmingLooper;
+    ::android::sp<DimmingMsgHandler> mDimmingHandler;
 
     // sysfs path
     std::ofstream mBrightnessOfs;
     uint32_t mMaxBrightness = 0; // read from sysfs
+
+    // Note IRC or dimming is not in consideration for now.
+    float mDisplayWhitePointNits = 0;
 };
 
 #endif // _BRIGHTNESS_CONTROLLER_H_

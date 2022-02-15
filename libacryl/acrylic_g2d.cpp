@@ -23,6 +23,7 @@
 #include <exynos_format.h> // hardware/smasung_slsi/exynos/include
 #include <hardware/hwcomposer2.h>
 #include <log/log.h>
+#include <mali_gralloc_formats.h>
 #include <sys/ioctl.h>
 #include <system/graphics.h>
 #include <utils/Trace.h>
@@ -502,8 +503,10 @@ static g2d_fmt __halfmt_to_g2dfmt[] = {
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M,      G2D_FMT_NV12,      2, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN,       G2D_FMT_NV12,      1, 0},
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP,             G2D_FMT_NV12,      1, 0},
+    {MALI_GRALLOC_FORMAT_INTERNAL_YUV420_8BIT_I,  G2D_FMT_NV12,      1, 0},
     {HAL_PIXEL_FORMAT_YCBCR_P010,                 G2D_FMT_NV12_P010, 1, 0},
     {HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B,         G2D_FMT_NV12_P010, 1, 0},
+    {MALI_GRALLOC_FORMAT_INTERNAL_YUV420_10BIT_I, G2D_FMT_NV12_P010, 1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_M,        G2D_FMT_NV12_P010, 2, 0},
     {HAL_PIXEL_FORMAT_YCbCr_422_I,                G2D_FMT_YUYV,      1, 0},
     {HAL_PIXEL_FORMAT_EXYNOS_YCrCb_422_I,         G2D_FMT_YVYU,      1, 0},

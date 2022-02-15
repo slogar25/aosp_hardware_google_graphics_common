@@ -14,15 +14,11 @@
  * limitations under the License.
  */
 
+#include <set>
+
 #include "ComposerCommandEngine.h"
 #include "Util.h"
 
-/// The command engine interface is not 'pure' aidl. Conversion to aidl
-// structure is done within this class. Don't mix it with impl/translate.
-// Expect to have an AIDL command interface in the future.
-//
-// The initial implementation is a combination of asop ComposerCommandEngine 2.1 to 2.4
-// and adapt to aidl structures.
 namespace aidl::android::hardware::graphics::composer3::impl {
 
 #define DISPATCH_LAYER_COMMAND(display, layerCmd, field, funcName)               \
@@ -46,37 +42,65 @@ namespace aidl::android::hardware::graphics::composer3::impl {
         }                                                                    \
     } while (0)
 
+#define DISPATCH_DISPLAY_BOOL_COMMAND_AND_DATA(displayCmd, field, data, funcName) \
+    do {                                                                          \
+        if (displayCmd.field) {                                                   \
+            execute##funcName(displayCmd.display, displayCmd.data);               \
+        }                                                                         \
+    } while (0)
+
 bool ComposerCommandEngine::init() {
-    mWriter = std::make_unique<CommandWriterBase>();
+    mWriter = std::make_unique<ComposerServiceWriter>();
     return (mWriter != nullptr);
 }
 
 int32_t ComposerCommandEngine::execute(const std::vector<DisplayCommand>& commands,
                                        std::vector<CommandResultPayload>* result) {
+    std::set<int64_t> displaysPendingBrightenssChange;
     mCommandIndex = 0;
     for (const auto& command : commands) {
         dispatchDisplayCommand(command);
         ++mCommandIndex;
+        // The input commands could have 2+ commands for the same display.
+        // If the first has pending brightness change, the second presentDisplay will apply it.
+        if (command.validateDisplay || command.presentDisplay ||
+            command.presentOrValidateDisplay) {
+            displaysPendingBrightenssChange.erase(command.display);
+        } else if (command.brightness) {
+            displaysPendingBrightenssChange.insert(command.display);
+        }
     }
 
     *result = mWriter->getPendingCommandResults();
-    return 0;
+    mWriter->reset();
+
+    // standalone display brightness command shouldn't wait for next present or validate
+    for (auto display : displaysPendingBrightenssChange) {
+        auto err = mHal->flushDisplayBrightnessChange(display);
+        if (err) {
+            return err;
+        }
+    }
+    return ::android::NO_ERROR;
 }
 
 void ComposerCommandEngine::dispatchDisplayCommand(const DisplayCommand& command) {
+    //  place SetDisplayBrightness before SetLayerWhitePointNits since current
+    //  display brightness is used to validate the layer white point nits.
+    DISPATCH_DISPLAY_COMMAND(command, brightness, SetDisplayBrightness);
     for (const auto& layerCmd : command.layers) {
         dispatchLayerCommand(command.display, layerCmd);
     }
 
-    DISPATCH_DISPLAY_COMMAND(command, colorTransform, SetColorTransform);
+    DISPATCH_DISPLAY_COMMAND(command, colorTransformMatrix, SetColorTransform);
     DISPATCH_DISPLAY_COMMAND(command, clientTarget, SetClientTarget);
     DISPATCH_DISPLAY_COMMAND(command, virtualDisplayOutputBuffer, SetOutputBuffer);
-    // TODO: (b/196171661) SDR & HDR blending
-    // DISPATCH_DISPLAY_COMMAND(command, displayBrightness, SetDisplayBrightness);
-    DISPATCH_DISPLAY_BOOL_COMMAND(command, validateDisplay, ValidateDisplay);
+    DISPATCH_DISPLAY_BOOL_COMMAND_AND_DATA(command, validateDisplay, expectedPresentTime,
+                                           ValidateDisplay);
     DISPATCH_DISPLAY_BOOL_COMMAND(command, acceptDisplayChanges, AcceptDisplayChanges);
     DISPATCH_DISPLAY_BOOL_COMMAND(command, presentDisplay, PresentDisplay);
-    DISPATCH_DISPLAY_BOOL_COMMAND(command, presentOrValidateDisplay, PresentOrValidateDisplay);
+    DISPATCH_DISPLAY_BOOL_COMMAND_AND_DATA(command, presentOrValidateDisplay, expectedPresentTime,
+                                           PresentOrValidateDisplay);
 }
 
 void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCommand& command) {
@@ -85,7 +109,6 @@ void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCom
     DISPATCH_LAYER_COMMAND(display, command, damage, SurfaceDamage);
     DISPATCH_LAYER_COMMAND(display, command, blendMode, BlendMode);
     DISPATCH_LAYER_COMMAND(display, command, color, Color);
-    DISPATCH_LAYER_COMMAND(display, command, floatColor, FloatColor);
     DISPATCH_LAYER_COMMAND(display, command, composition, Composition);
     DISPATCH_LAYER_COMMAND(display, command, dataspace, Dataspace);
     DISPATCH_LAYER_COMMAND(display, command, displayFrame, DisplayFrame);
@@ -96,9 +119,7 @@ void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCom
     DISPATCH_LAYER_COMMAND(display, command, visibleRegion, VisibleRegion);
     DISPATCH_LAYER_COMMAND(display, command, z, ZOrder);
     DISPATCH_LAYER_COMMAND(display, command, colorTransform, ColorTransform);
-    // TODO: (b/196171661) add support for mixed composition
-    // DISPATCH_LAYER_COMMAND(display, command, whitePointNits, WhitePointNits);
-    DISPATCH_LAYER_COMMAND(display, command, genericMetadata, GenericMetadata);
+    DISPATCH_LAYER_COMMAND(display, command, whitePointNits, WhitePointNits);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadata, PerFrameMetadata);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadataBlob, PerFrameMetadataBlobs);
 }
@@ -109,17 +130,17 @@ int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
     uint32_t displayRequestMask = 0x0;
     std::vector<int64_t> requestedLayers;
     std::vector<int32_t> requestMasks;
+    float clientTargetWhitePointNits;
     ClientTargetProperty clientTargetProperty{common::PixelFormat::RGBA_8888,
                                               common::Dataspace::UNKNOWN};
     auto err = mHal->validateDisplay(display, &changedLayers, &compositionTypes,
                                      &displayRequestMask, &requestedLayers, &requestMasks,
-                                     &clientTargetProperty);
+                                     &clientTargetProperty, &clientTargetWhitePointNits);
     mResources->setDisplayMustValidateState(display, false);
     if (!err) {
         mWriter->setChangedCompositionTypes(display, changedLayers, compositionTypes);
         mWriter->setDisplayRequests(display, displayRequestMask, requestedLayers, requestMasks);
-        // TODO: (b/196171661) sdr/hdr composition, use 1.0
-        mWriter->setClientTargetProperty(display, clientTargetProperty, 1.0f);
+        mWriter->setClientTargetProperty(display, clientTargetProperty, clientTargetWhitePointNits);
     } else {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
@@ -128,8 +149,8 @@ int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
 }
 
 void ComposerCommandEngine::executeSetColorTransform(int64_t display,
-                                                     const ColorTransformPayload& command) {
-    auto err = mHal->setColorTransform(display, command.matrix, command.hint);
+                                                     const std::vector<float>& matrix) {
+    auto err = mHal->setColorTransform(display, matrix);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
@@ -179,11 +200,30 @@ void ComposerCommandEngine::executeSetOutputBuffer(uint64_t display, const Buffe
     }
 }
 
-void ComposerCommandEngine::executeValidateDisplay(int64_t display) {
+void ComposerCommandEngine::executeSetExpectedPresentTimeInternal(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    mHal->setExpectedPresentTime(display, expectedPresentTime);
+}
+
+void ComposerCommandEngine::executeValidateDisplay(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    executeSetExpectedPresentTimeInternal(display, expectedPresentTime);
     executeValidateDisplayInternal(display);
 }
 
-void ComposerCommandEngine::executePresentOrValidateDisplay(int64_t display) {
+void ComposerCommandEngine::executeSetDisplayBrightness(uint64_t display,
+                                        const DisplayBrightness& command) {
+    auto err = mHal->setDisplayBrightness(display, command.brightness);
+    if (err) {
+        LOG(ERROR) << __func__ << ": err " << err;
+        mWriter->setError(mCommandIndex, err);
+    }
+}
+
+void ComposerCommandEngine::executePresentOrValidateDisplay(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    executeSetExpectedPresentTimeInternal(display, expectedPresentTime);
+
     int err;
     // First try to Present as is.
     if (mHal->hasCapability(Capability::SKIP_VALIDATE)) {
@@ -220,6 +260,7 @@ int ComposerCommandEngine::executePresentDisplay(int64_t display) {
         mWriter->setPresentFence(display, std::move(presentFence));
         mWriter->setReleaseFences(display, layers, std::move(fences));
     }
+
     return err;
 }
 
@@ -379,15 +420,6 @@ void ComposerCommandEngine::executeSetLayerPerFrameMetadata(int64_t display, int
     }
 }
 
-void ComposerCommandEngine::executeSetLayerFloatColor(int64_t display, int64_t layer,
-                                                      const FloatColor& floatColor) {
-    auto err = mHal->setLayerFloatColor(display, layer, floatColor);
-    if (err) {
-        LOG(ERROR) << __func__ << ": err " << err;
-        mWriter->setError(mCommandIndex, err);
-    }
-}
-
 void ComposerCommandEngine::executeSetLayerColorTransform(int64_t display, int64_t layer,
                                                        const std::vector<float>& matrix) {
     auto err = mHal->setLayerColorTransform(display, layer, matrix);
@@ -397,19 +429,18 @@ void ComposerCommandEngine::executeSetLayerColorTransform(int64_t display, int64
     }
 }
 
-void ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
-                      const std::vector<std::optional<PerFrameMetadataBlob>>& metadata) {
-    auto err = mHal->setLayerPerFrameMetadataBlobs(display, layer, metadata);
+void ComposerCommandEngine::executeSetLayerWhitePointNits(int64_t display, int64_t layer,
+                                                          const Luminance& nits) {
+    auto err = mHal->setLayerWhitePointNits(display, layer, nits.nits);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
     }
 }
 
-void ComposerCommandEngine::executeSetLayerGenericMetadata(int64_t display, int64_t layer,
-                                                           const GenericMetadata& metadata) {
-    auto err =
-            mHal->setLayerGenericMetadata(display, layer, metadata);
+void ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(int64_t display, int64_t layer,
+                      const std::vector<std::optional<PerFrameMetadataBlob>>& metadata) {
+    auto err = mHal->setLayerPerFrameMetadataBlobs(display, layer, metadata);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);

@@ -16,22 +16,21 @@
 #ifndef _EXYNOSHWCHELPER_H
 #define _EXYNOSHWCHELPER_H
 
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include <drm/drm_fourcc.h>
 #include <hardware/hwcomposer2.h>
 #include <utils/String8.h>
 
+#include <fstream>
 #include <optional>
+#include <sstream>
+#include <string>
+#include <vector>
 
 #include "DeconCommonHeader.h"
-#include "VendorVideoAPI.h"
-#include "exynos_sync.h"
-
 #include "VendorGraphicBuffer.h"
+#include "VendorVideoAPI.h"
 #include "exynos_format.h"
+#include "exynos_sync.h"
 #include "mali_gralloc_formats.h"
 
 #define MAX_FENCE_NAME 64
@@ -133,6 +132,7 @@ typedef struct format_description {
 constexpr int HAL_PIXEL_FORMAT_EXYNOS_UNDEFINED = 0;
 constexpr int DRM_FORMAT_UNDEFINED = 0;
 
+// clang-format off
 const format_description_t exynos_format_desc[] = {
     /* RGB */
     {HAL_PIXEL_FORMAT_RGBA_8888, DECON_PIXEL_FORMAT_RGBA_8888, DRM_FORMAT_RGBA8888,
@@ -249,8 +249,12 @@ const format_description_t exynos_format_desc[] = {
         2, 2, 12, YUV420|BIT10|SBWC, false, String8("EXYNOS_YCrbCb_420_SP_M_10B_SBWC"), 0},
 
     {HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_UNDEFINED,
-        0, 0, 0, TYPE_UNDEF, false, String8("ImplDef"), 0}
+        0, 0, 0, TYPE_UNDEF, false, String8("ImplDef"), 0},
+
+    {HAL_PIXEL_FORMAT_GOOGLE_R_8, DECON_PIXEL_FORMAT_MAX, DRM_FORMAT_C8,
+        1, 1, 8, RGB|BIT8, true, String8("GOOGLE_R_8"), 0},
 };
+// clang-format on
 
 constexpr size_t FORMAT_MAX_CNT = sizeof(exynos_format_desc) / sizeof(format_description);
 
@@ -328,6 +332,7 @@ enum {
     eReallocOnGoingForDDI         =     0x00020000,
     eInvalidDispFrame             =     0x00040000,
     eExceedMaxLayerNum            =     0x00080000,
+    eExceedSdrDimRatio            =     0x00100000,
     eResourceAssignFail           =     0x20000000,
     eMPPUnsupported               =     0x40000000,
     eUnknown                      =     0x80000000,
@@ -573,6 +578,7 @@ void writeFileNode(FILE *fd, int value);
 int32_t writeIntToFile(const char *file, uint32_t value);
 uint32_t getDisplayId(int32_t displayType, int32_t displayIndex = 0);
 int32_t load_png_image(const char *filepath, buffer_handle_t buffer);
+int readLineFromFile(const std::string &filename, std::string &out, char delim);
 
 template <typename T>
 struct CtrlValue {
@@ -599,5 +605,24 @@ template <typename T>
 constexpr typename std::underlying_type<T>::type toUnderlying(T v) {
     return static_cast<typename std::underlying_type<T>::type>(v);
 }
+
+template <size_t bufferSize>
+struct RollingAverage {
+    std::array<int64_t, bufferSize> buffer{0};
+    int64_t total = 0;
+    int64_t average;
+    size_t elems = 0;
+    size_t buffer_index = 0;
+    void insert(int64_t newTime) {
+        total += newTime - buffer[buffer_index];
+        buffer[buffer_index] = newTime;
+        buffer_index = (buffer_index + 1) % bufferSize;
+        elems = std::min(elems + 1, bufferSize);
+        average = total / elems;
+    }
+};
+
+// Waits for a given property value, or returns std::nullopt if unavailable
+std::optional<std::string> waitForPropertyValue(const std::string &property, int64_t timeoutMs);
 
 #endif

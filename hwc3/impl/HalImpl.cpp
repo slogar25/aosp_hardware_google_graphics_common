@@ -81,6 +81,14 @@ void vsyncPeriodTimingChanged(hwc2_callback_data_t callbackData,
     hal->getEventCallback()->onVsyncPeriodTimingChanged(display, timeline);
 }
 
+void vsyncIdle(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay) {
+    auto hal = static_cast<HalImpl*>(callbackData);
+    int64_t display;
+
+    h2a::translate(hwcDisplay, display);
+    hal->getEventCallback()->onVsyncIdle(display);
+}
+
 void seamlessPossible(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay) {
     auto hal = static_cast<HalImpl*>(callbackData);
     int64_t display;
@@ -296,11 +304,11 @@ int32_t HalImpl::getDisplayAttribute(int64_t display, int32_t config,
     return HWC2_ERROR_NONE;
 }
 
-int32_t HalImpl::getDisplayBrightnessSupport(int64_t display, bool* outSupport) {
+int32_t HalImpl::getDisplayBrightnessSupport(int64_t display, bool& outSupport) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    return halDisplay->getDisplayBrightnessSupport(outSupport);
+    return halDisplay->getDisplayBrightnessSupport(&outSupport);
 }
 
 int32_t HalImpl::getDisplayCapabilities(int64_t display,
@@ -395,14 +403,26 @@ int32_t HalImpl::getDisplayedContentSamplingAttributes(
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t HalImpl::getDozeSupport(int64_t display, bool* support) {
+int32_t HalImpl::getDisplayPhysicalOrientation(int64_t display,
+                                               common::Transform* orientation) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    HwcMountOrientation hwcOrientation;
+    RET_IF_ERR(halDisplay->getMountOrientation(&hwcOrientation));
+    h2a::translate(hwcOrientation, *orientation);
+
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
+int32_t HalImpl::getDozeSupport(int64_t display, bool& support) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
     int32_t hwcSupport;
     RET_IF_ERR(halDisplay->getDozeSupport(&hwcSupport));
 
-    h2a::translate(hwcSupport, *support);
+    h2a::translate(hwcSupport, support);
     return HWC2_ERROR_NONE;
 }
 
@@ -421,26 +441,6 @@ int32_t HalImpl::getHdrCapabilities(int64_t display, HdrCapabilities* caps) {
                                               &caps->minLuminance));
 
     h2a::translate(hwcHdrTypes, caps->types);
-    return HWC2_ERROR_NONE;
-}
-
-int32_t HalImpl::getLayerGenericMetadataKeys(std::vector<LayerGenericMetadataKey>* keys) {
-    uint32_t keyLength = 0;
-
-    // Only attempt to load the first 100 keys to avoid an infinite loop
-    // if something goes wrong
-    for (uint32_t index = 0; index < 100; ++index) {
-        mDevice->getLayerGenericMetadataKey(index, &keyLength, nullptr, nullptr);
-        if (keyLength == 0) {
-            break;
-        }
-
-        LayerGenericMetadataKey key;
-        key.name.resize(keyLength);
-        mDevice->getLayerGenericMetadataKey(index, &keyLength, key.name.data(), &key.mandatory);
-        keys->emplace_back(std::move(key));
-    }
-
     return HWC2_ERROR_NONE;
 }
 
@@ -530,11 +530,28 @@ int32_t HalImpl::getSupportedContentTypes(int64_t display, std::vector<ContentTy
     return HWC2_ERROR_NONE;
 }
 
+int32_t HalImpl::flushDisplayBrightnessChange(int64_t display) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->flushDisplayBrightnessChange();
+}
+
 int32_t HalImpl::presentDisplay(int64_t display, ndk::ScopedFileDescriptor& fence,
                        std::vector<int64_t>* outLayers,
                        std::vector<ndk::ScopedFileDescriptor>* outReleaseFences) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+   // TODO: not expect acceptDisplayChanges if there are no changes to accept
+    if (halDisplay->mRenderingState == RENDERING_STATE_VALIDATED) {
+        LOG(INFO) << halDisplay->mDisplayName.string()
+                   << ": acceptDisplayChanges was not called";
+        if (halDisplay->acceptDisplayChanges() != HWC2_ERROR_NONE) {
+            LOG(ERROR) << halDisplay->mDisplayName.string()
+            << ": acceptDisplayChanges is failed";
+        }
+    }
 
     int32_t hwcFence;
     RET_IF_ERR(halDisplay->presentDisplay(&hwcFence));
@@ -581,6 +598,27 @@ int32_t HalImpl::setActiveConfigWithConstraints(
     return HWC2_ERROR_NONE;
 }
 
+int32_t HalImpl::setBootDisplayConfig(int64_t display, int32_t config) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->setBootDisplayConfig(config);
+}
+
+int32_t HalImpl::clearBootDisplayConfig(int64_t display) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->clearBootDisplayConfig();
+}
+
+int32_t HalImpl::getPreferredBootDisplayConfig(int64_t display, int32_t* config) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->getPreferredBootDisplayConfig(config);
+}
+
 int32_t HalImpl::setAutoLowLatencyMode(int64_t display, bool on) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
@@ -620,8 +658,19 @@ int32_t HalImpl::setColorMode(int64_t display, ColorMode mode, RenderIntent inte
     return halDisplay->setColorModeWithRenderIntent(hwcMode, hwcIntent);
 }
 
-int32_t HalImpl::setColorTransform(int64_t display, const std::vector<float>& matrix,
-                                   common::ColorTransform hint) {
+int32_t HalImpl::setColorTransform(int64_t display, const std::vector<float>& matrix) {
+    // clang-format off
+    constexpr std::array<float, 16> kIdentity = {
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f,
+    };
+    // clang-format on
+    const bool isIdentity = (std::equal(matrix.begin(), matrix.end(), kIdentity.begin()));
+    const common::ColorTransform hint = isIdentity ? common::ColorTransform::IDENTITY
+                                                   : common::ColorTransform::ARBITRARY_MATRIX;
+
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
@@ -643,7 +692,7 @@ int32_t HalImpl::setDisplayBrightness(int64_t display, float brightness) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    return halDisplay->setDisplayBrightness(brightness);
+    return halDisplay->setDisplayBrightness(brightness, true /* wait present */);
 }
 
 int32_t HalImpl::setDisplayedContentSamplingEnabled(
@@ -723,18 +772,6 @@ int32_t HalImpl::setLayerDisplayFrame(int64_t display, int64_t layer, const comm
     hwc_rect_t hwcFrame;
     a2h::translate(frame, hwcFrame);
     return halLayer->setLayerDisplayFrame(hwcFrame);
-}
-
-int32_t HalImpl::setLayerFloatColor([[maybe_unused]] int64_t display,
-                                    [[maybe_unused]] int64_t layer,
-                                    [[maybe_unused]] FloatColor color) {
-    return HWC2_ERROR_UNSUPPORTED;
-}
-
-int32_t HalImpl::setLayerGenericMetadata([[maybe_unused]] int64_t display,
-                                         [[maybe_unused]] int64_t layer,
-                                         [[maybe_unused]] const GenericMetadata& metadata) {
-    return HWC2_ERROR_UNSUPPORTED;
 }
 
 int32_t HalImpl::setLayerPerFrameMetadata(int64_t display, int64_t layer,
@@ -838,6 +875,13 @@ int32_t HalImpl::setLayerVisibleRegion(int64_t display, int64_t layer,
     return halLayer->setLayerVisibleRegion(region);
 }
 
+int32_t HalImpl::setLayerWhitePointNits(int64_t display, int64_t layer, float nits) {
+    ExynosLayer *halLayer;
+    RET_IF_ERR(getHalLayer(display, layer, halLayer));
+
+    return halLayer->setLayerWhitePointNits(nits);
+}
+
 int32_t HalImpl::setLayerZOrder(int64_t display, int64_t layer, uint32_t z) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
@@ -863,7 +907,7 @@ int32_t HalImpl::setOutputBuffer(int64_t display, buffer_handle_t buffer,
 }
 
 int32_t HalImpl::setPowerMode(int64_t display, PowerMode mode) {
-    if (mode == PowerMode::ON_SUSPEND) {
+    if (mode == PowerMode::ON_SUSPEND || mode == PowerMode::DOZE_SUSPEND) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
@@ -895,12 +939,21 @@ int32_t HalImpl::setVsyncEnabled(int64_t display, bool enabled) {
     return halDisplay->setVsyncEnabled(hwcEnable);
 }
 
+int32_t HalImpl::setIdleTimerEnabled(int64_t display, int32_t __unused timeout) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    // TODO(b/198808492): implement setIdleTimerEnabled
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
 int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChangedLayers,
                                  std::vector<Composition>* outCompositionTypes,
                                  uint32_t* outDisplayRequestMask,
                                  std::vector<int64_t>* outRequestedLayers,
                                  std::vector<int32_t>* outRequestMasks,
-                                 ClientTargetProperty* outClientTargetProperty) {
+                                 ClientTargetProperty* outClientTargetProperty,
+                                 float* outClientTargetWhitePointNits) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
@@ -923,6 +976,8 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     RET_IF_ERR(halDisplay->getDisplayRequests(&displayReqs, &reqsCount,
                                               hwcRequestedLayers.data(), outRequestMasks->data()));
 
+    RET_IF_ERR(halDisplay->getClientTargetWhitePointNits(outClientTargetWhitePointNits));
+
     h2a::translate(hwcChangedLayers, *outChangedLayers);
     h2a::translate(hwcCompositionTypes, *outCompositionTypes);
     *outDisplayRequestMask = displayReqs;
@@ -934,6 +989,29 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     } // else ignore this error
 
     return HWC2_ERROR_NONE;
+}
+
+int HalImpl::setExpectedPresentTime(
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    if (!expectedPresentTime.has_value()) return HWC2_ERROR_NONE;
+
+    if (halDisplay->getPendingExpectedPresentTime() != 0) {
+        ALOGW("HalImpl: set expected present time multiple times in one frame");
+    }
+
+    halDisplay->setExpectedPresentTime(expectedPresentTime->timestampNanos);
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t HalImpl::getRCDLayerSupport(int64_t display, bool& outSupport) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->getRCDLayerSupport(outSupport);
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl

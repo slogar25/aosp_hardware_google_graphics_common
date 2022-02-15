@@ -19,6 +19,8 @@
 #include <android-base/logging.h>
 // hwc2 types
 #include <hardware/hwcomposer2.h>
+// new hwc3 types used by exynosdisplay
+#include "ExynosHwc3Types.h"
 // aidl types
 #include "include/IComposerHal.h"
 
@@ -60,6 +62,32 @@ template<>
 inline void translate(const hwc_client_target_property& in, ClientTargetProperty& out) {
     translate(in.pixelFormat, out.pixelFormat);
     translate(in.dataspace, out.dataspace);
+}
+
+template<>
+inline void translate(const HwcMountOrientation& in, common::Transform& out) {
+    switch (in) {
+    case HwcMountOrientation::ROT_0:
+        out = common::Transform::NONE;
+        break;
+
+    case HwcMountOrientation::ROT_90:
+        out = common::Transform::ROT_90;
+        break;
+
+    case HwcMountOrientation::ROT_180:
+        out = common::Transform::ROT_180;
+        break;
+
+    case HwcMountOrientation::ROT_270:
+        out = common::Transform::ROT_270;
+        break;
+
+    default:
+        LOG(WARNING) << "unrecoganized display orientation: " << static_cast<uint32_t>(in);
+        out = common::Transform::NONE;
+        break;
+    }
 }
 
 } // namespace h2a
@@ -134,18 +162,17 @@ inline void translate(const bool& in, hwc2_vsync_t& out) {
 
 template<>
 inline void translate(const Color& in, hwc_color_t& out) {
-    out.r = in.r;
-    out.g = in.g;
-    out.b = in.b;
-    out.a = in.a;
-}
+    const auto floatColorToUint8Clamped = [](float val) -> uint8_t {
+        const auto intVal = static_cast<uint64_t>(std::round(255.0f * val));
+        const auto minVal = static_cast<uint64_t>(0);
+        const auto maxVal = static_cast<uint64_t>(255);
+        return std::clamp(intVal, minVal, maxVal);
+    };
 
-template<>
-inline void translate(const FloatColor& in, hwc_float_color_t& out) {
-    out.r = in.r;
-    out.g = in.g;
-    out.b = in.b;
-    out.a = in.a;
+    out.r = floatColorToUint8Clamped(in.r);
+    out.g = floatColorToUint8Clamped(in.g);
+    out.b = floatColorToUint8Clamped(in.b);
+    out.a = floatColorToUint8Clamped(in.a);
 }
 
 } // namespace a2h

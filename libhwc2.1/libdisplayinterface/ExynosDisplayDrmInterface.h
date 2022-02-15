@@ -330,6 +330,7 @@ class ExynosDisplayDrmInterface :
         int32_t createModeBlob(const DrmMode &mode, uint32_t &modeBlob);
         int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
         int32_t clearDisplayMode(DrmModeAtomicReq &drmReq);
+        int32_t clearDisplayPlanes(DrmModeAtomicReq &drmReq);
         int32_t chosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         /*
@@ -349,6 +350,7 @@ class ExynosDisplayDrmInterface :
         void parseRangeEnums(const DrmProperty &property);
         void parseColorModeEnums(const DrmProperty &property);
         void parseMipiSyncEnums(const DrmProperty &property);
+        void updateMountOrientation();
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
         int32_t clearWritebackCommit(DrmModeAtomicReq &drmReq);

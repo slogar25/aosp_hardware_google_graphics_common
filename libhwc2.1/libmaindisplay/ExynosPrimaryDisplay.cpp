@@ -105,7 +105,8 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mEarlyWakeupDispFd = fopen(EARLY_WAKUP_NODE_0_BASE, "w");
     if (mEarlyWakeupDispFd == nullptr)
         ALOGE("open %s failed! %s", EARLY_WAKUP_NODE_0_BASE, strerror(errno));
-    mBrightnessController = std::make_unique<BrightnessController>(mIndex);
+    mBrightnessController =
+            std::make_unique<BrightnessController>(mIndex, [this]() { mDevice->invalidate(); });
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
@@ -314,6 +315,11 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
         LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
                 __func__, interfaceType);
     mDisplayInterface->init(this);
+
+    mDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));
+    mLastDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));
+    ALOGI("window configs size(%zu) rcd configs zie(%zu)", mDpuData.configs.size(),
+          mDpuData.rcdConfigs.size());
 }
 
 std::string ExynosPrimaryDisplay::getPanelSysfsPath(const DisplayType &type) {
@@ -436,6 +442,22 @@ void ExynosPrimaryDisplay::setEarlyWakeupDisplay() {
     if (mEarlyWakeupDispFd) {
         writeFileNode(mEarlyWakeupDispFd, 1);
     }
+}
+
+void ExynosPrimaryDisplay::setExpectedPresentTime(uint64_t timestamp) {
+    mExpectedPresentTime.store(timestamp);
+}
+
+uint64_t ExynosPrimaryDisplay::getPendingExpectedPresentTime() {
+    if (mExpectedPresentTime.is_dirty()) {
+        return mExpectedPresentTime.get();
+    }
+
+    return 0;
+}
+
+void ExynosPrimaryDisplay::applyExpectedPresentTime() {
+    mExpectedPresentTime.clear_dirty();
 }
 
 int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int fps) {

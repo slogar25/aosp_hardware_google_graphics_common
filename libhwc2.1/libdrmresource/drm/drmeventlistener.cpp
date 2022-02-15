@@ -36,6 +36,10 @@ DrmEventListener::DrmEventListener(DrmDevice *drm)
     : Worker("drm-event-listener", HAL_PRIORITY_URGENT_DISPLAY), drm_(drm) {
 }
 
+DrmEventListener::~DrmEventListener() {
+    Exit();
+}
+
 int DrmEventListener::Init() {
   struct epoll_event ev;
   char buffer[1024];

@@ -16,9 +16,11 @@
 
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
-#include <android-base/logging.h>
-
 #include "ComposerClient.h"
+
+#include <android-base/logging.h>
+#include <android/binder_ibinder_platform.h>
+
 #include "Util.h"
 
 namespace aidl::android::hardware::graphics::composer3::impl {
@@ -110,7 +112,6 @@ ndk::ScopedAStatus ComposerClient::executeCommands(const std::vector<DisplayComm
                                                    std::vector<CommandResultPayload>* results) {
     DEBUG_FUNC();
     auto err = mCommandEngine->execute(commands, results);
-    mCommandEngine->reset();
     return TO_BINDER_STATUS(err);
 }
 
@@ -157,18 +158,10 @@ ndk::ScopedAStatus ComposerClient::getDisplayCapabilities(int64_t display,
                                                           std::vector<DisplayCapability>* caps) {
     DEBUG_FUNC();
     auto err = mHal->getDisplayCapabilities(display, caps);
-    if (!err) {
+    if (err) {
         return TO_BINDER_STATUS(err);
     }
-    bool support;
-    err = mHal->getDisplayBrightnessSupport(display, &support);
-    if (err == 0 && support) {
-        caps->push_back(DisplayCapability::BRIGHTNESS);
-    }
-    err = mHal->getDozeSupport(display, &support);
-    if (err == 0 && support) {
-        caps->push_back(DisplayCapability::DOZE);
-    }
+
     return TO_BINDER_STATUS(err);
 }
 
@@ -220,16 +213,16 @@ ndk::ScopedAStatus ComposerClient::getDisplayedContentSamplingAttributes(
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::getHdrCapabilities(int64_t display, HdrCapabilities* caps) {
+ndk::ScopedAStatus ComposerClient::getDisplayPhysicalOrientation(int64_t display,
+                                                                 common::Transform* orientation) {
     DEBUG_FUNC();
-    auto err = mHal->getHdrCapabilities(display, caps);
+    auto err = mHal->getDisplayPhysicalOrientation(display, orientation);
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::getLayerGenericMetadataKeys(
-        std::vector<LayerGenericMetadataKey>* keys) {
+ndk::ScopedAStatus ComposerClient::getHdrCapabilities(int64_t display, HdrCapabilities* caps) {
     DEBUG_FUNC();
-    auto err = mHal->getLayerGenericMetadataKeys(keys);
+    auto err = mHal->getHdrCapabilities(display, caps);
     return TO_BINDER_STATUS(err);
 }
 
@@ -274,6 +267,25 @@ ndk::ScopedAStatus ComposerClient::getSupportedContentTypes(int64_t display,
     return TO_BINDER_STATUS(err);
 }
 
+ndk::ScopedAStatus ComposerClient::getDisplayDecorationSupport(
+        int64_t display, std::optional<common::DisplayDecorationSupport>* supportStruct) {
+    DEBUG_FUNC();
+    bool support = false;
+    auto err = mHal->getRCDLayerSupport(display, support);
+    if (err != ::android::OK) {
+        LOG(ERROR) << "failed to getRCDLayerSupport: " << err;
+    }
+    if (support) {
+        // TODO (b/218499393): determine from mHal instead of hard coding.
+        auto& s = supportStruct->emplace();
+        s.format = common::PixelFormat::R_8;
+        s.alphaInterpretation = common::AlphaInterpretation::COVERAGE;
+    } else {
+        supportStruct->reset();
+    }
+    return TO_BINDER_STATUS(err);
+}
+
 ndk::ScopedAStatus ComposerClient::registerCallback(
         const std::shared_ptr<IComposerCallback>& callback) {
     DEBUG_FUNC();
@@ -294,6 +306,24 @@ ndk::ScopedAStatus ComposerClient::setActiveConfigWithConstraints(
         VsyncPeriodChangeTimeline* timeline) {
     DEBUG_FUNC();
     auto err = mHal->setActiveConfigWithConstraints(display, config, constraints, timeline);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::setBootDisplayConfig(int64_t display, int32_t config) {
+    DEBUG_FUNC();
+    auto err = mHal->setBootDisplayConfig(display, config);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::clearBootDisplayConfig(int64_t display) {
+    DEBUG_FUNC();
+    auto err = mHal->clearBootDisplayConfig(display);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::getPreferredBootDisplayConfig(int64_t display, int32_t* config) {
+    DEBUG_FUNC();
+    auto err = mHal->getPreferredBootDisplayConfig(display, config);
     return TO_BINDER_STATUS(err);
 }
 
@@ -319,12 +349,6 @@ ndk::ScopedAStatus ComposerClient::setColorMode(int64_t display, ColorMode mode,
 ndk::ScopedAStatus ComposerClient::setContentType(int64_t display, ContentType type) {
     DEBUG_FUNC();
     auto err = mHal->setContentType(display, type);
-    return TO_BINDER_STATUS(err);
-}
-
-ndk::ScopedAStatus ComposerClient::setDisplayBrightness(int64_t display, float brightness) {
-    DEBUG_FUNC();
-    auto err = mHal->setDisplayBrightness(display, brightness);
     return TO_BINDER_STATUS(err);
 }
 
@@ -360,6 +384,12 @@ ndk::ScopedAStatus ComposerClient::setReadbackBuffer(
 ndk::ScopedAStatus ComposerClient::setVsyncEnabled(int64_t display, bool enabled) {
     DEBUG_FUNC();
     auto err = mHal->setVsyncEnabled(display, enabled);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::setIdleTimerEnabled(int64_t display, int32_t timeout) {
+    DEBUG_FUNC();
+    auto err = mHal->setIdleTimerEnabled(display, timeout);
     return TO_BINDER_STATUS(err);
 }
 
@@ -409,6 +439,14 @@ void ComposerClient::HalEventCallback::onVsyncPeriodTimingChanged(
     auto ret = mCallback->onVsyncPeriodTimingChanged(display, timeline);
     if (!ret.isOk()) {
         LOG(ERROR) << "failed to send onVsyncPeriodTimingChanged:" << ret.getDescription();
+    }
+}
+
+void ComposerClient::HalEventCallback::onVsyncIdle(int64_t display) {
+    DEBUG_FUNC();
+    auto ret = mCallback->onVsyncIdle(display);
+    if (!ret.isOk()) {
+        LOG(ERROR) << "failed to send onVsyncIdle:" << ret.getDescription();
     }
 }
 
@@ -505,8 +543,10 @@ void ComposerClient::destroyResources() {
             std::vector<int64_t> requestedLayers;
             std::vector<int32_t> requestMasks;
             ClientTargetProperty clientTargetProperty;
+            float clientWhitePointNits;
             mHal->validateDisplay(display, &changedLayers, &compositionTypes, &displayRequestMask,
-                                  &requestedLayers, &requestMasks, &clientTargetProperty);
+                                  &requestedLayers, &requestMasks, &clientTargetProperty,
+                                  &clientWhitePointNits);
             mHal->acceptDisplayChanges(display);
 
             ndk::ScopedFileDescriptor presentFence;
@@ -516,6 +556,12 @@ void ComposerClient::destroyResources() {
         }
     });
     mResources.reset();
+}
+
+::ndk::SpAIBinder ComposerClient::createBinder() {
+    auto binder = BnComposerClient::createBinder();
+    AIBinder_setInheritRt(binder.get(), true);
+    return binder;
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl
