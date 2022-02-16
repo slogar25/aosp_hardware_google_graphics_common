@@ -145,6 +145,13 @@ enum class hwc_request_state_t {
     SET_CONFIG_STATE_REQUESTED,
 };
 
+enum class DispIdleTimerRequester : uint32_t {
+    SF = 0,
+    PIXEL_DISP,
+    TEST,
+    MAX,
+};
+
 #define NUM_SKIP_STATIC_LAYER  5
 struct ExynosFrameInfo
 {
@@ -1187,6 +1194,10 @@ class ExynosDisplay {
         virtual void setExpectedPresentTime(uint64_t __unused timestamp) {}
         virtual uint64_t getPendingExpectedPresentTime() { return 0; }
         virtual void applyExpectedPresentTime() {}
+        virtual int32_t getDisplayIdleTimerSupport(bool& outSupport);
+        virtual int32_t setDisplayIdleTimer(const int32_t __unused timeoutMs) {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
@@ -1215,7 +1226,8 @@ class ExynosDisplay {
         void requestLhbm(bool on);
 
         virtual int setMinIdleRefreshRate(const int __unused fps) { return NO_ERROR; }
-        virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos) {
+        virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos,
+                                                const DispIdleTimerRequester __unused requester) {
             return NO_ERROR;
         }
 

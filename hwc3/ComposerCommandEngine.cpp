@@ -119,7 +119,7 @@ void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCom
     DISPATCH_LAYER_COMMAND(display, command, visibleRegion, VisibleRegion);
     DISPATCH_LAYER_COMMAND(display, command, z, ZOrder);
     DISPATCH_LAYER_COMMAND(display, command, colorTransform, ColorTransform);
-    DISPATCH_LAYER_COMMAND(display, command, whitePointNits, WhitePointNits);
+    DISPATCH_LAYER_COMMAND(display, command, brightness, Brightness);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadata, PerFrameMetadata);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadataBlob, PerFrameMetadataBlobs);
 }
@@ -429,9 +429,9 @@ void ComposerCommandEngine::executeSetLayerColorTransform(int64_t display, int64
     }
 }
 
-void ComposerCommandEngine::executeSetLayerWhitePointNits(int64_t display, int64_t layer,
-                                                          const Luminance& nits) {
-    auto err = mHal->setLayerWhitePointNits(display, layer, nits.nits);
+void ComposerCommandEngine::executeSetLayerBrightness(int64_t display, int64_t layer,
+                                                      const LayerBrightness& brightness) {
+    auto err = mHal->setLayerBrightness(display, layer, brightness.brightness);
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);

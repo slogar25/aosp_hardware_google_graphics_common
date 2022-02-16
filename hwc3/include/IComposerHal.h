@@ -52,8 +52,8 @@
 #include <aidl/android/hardware/graphics/composer3/DisplayRequest.h>
 #include <aidl/android/hardware/graphics/composer3/FormatColorComponent.h>
 #include <aidl/android/hardware/graphics/composer3/HdrCapabilities.h>
+#include <aidl/android/hardware/graphics/composer3/LayerBrightness.h>
 #include <aidl/android/hardware/graphics/composer3/LayerCommand.h>
-#include <aidl/android/hardware/graphics/composer3/Luminance.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableBlendMode.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableComposition.h>
 #include <aidl/android/hardware/graphics/composer3/ParcelableDataspace.h>
@@ -119,6 +119,8 @@ class IComposerHal {
     virtual int32_t getDisplayAttribute(int64_t display, int32_t config,
                                       DisplayAttribute attribute, int32_t* outValue) = 0;
     virtual int32_t getDisplayBrightnessSupport(int64_t display, bool& outSupport) = 0;
+    virtual int32_t getDisplayIdleTimerSupport(int64_t display, bool& outSupport) = 0;
+
     virtual int32_t getDisplayCapabilities(int64_t display,
                                            std::vector<DisplayCapability>* caps) = 0;
     virtual int32_t getDisplayConfigs(int64_t display, std::vector<int32_t>* configs) = 0;
@@ -195,7 +197,7 @@ class IComposerHal {
                                       common::Transform transform) = 0;
     virtual int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
                                  const std::vector<std::optional<common::Rect>>& visible) = 0;
-    virtual int32_t setLayerWhitePointNits(int64_t display, int64_t layer, float nits) = 0;
+    virtual int32_t setLayerBrightness(int64_t display, int64_t layer, float brightness) = 0;
     virtual int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) = 0;
     virtual int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                                     const ndk::ScopedFileDescriptor& releaseFence) = 0;

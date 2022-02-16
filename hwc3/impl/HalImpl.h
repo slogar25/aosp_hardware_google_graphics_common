@@ -127,7 +127,7 @@ class HalImpl : public IComposerHal {
     int32_t setLayerTransform(int64_t display, int64_t layer, common::Transform transform) override;
     int32_t setLayerVisibleRegion(int64_t display, int64_t layer,
                           const std::vector<std::optional<common::Rect>>& visible) override;
-    int32_t setLayerWhitePointNits(int64_t display, int64_t layer, float nits) override;
+    int32_t setLayerBrightness(int64_t display, int64_t layer, float brightness) override;
     int32_t setLayerZOrder(int64_t display, int64_t layer, uint32_t z) override;
     int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                             const ndk::ScopedFileDescriptor& releaseFence) override;
@@ -135,6 +135,7 @@ class HalImpl : public IComposerHal {
     int32_t setReadbackBuffer(int64_t display, buffer_handle_t buffer,
                               const ndk::ScopedFileDescriptor& releaseFence) override;
     int32_t setVsyncEnabled(int64_t display, bool enabled) override;
+    int32_t getDisplayIdleTimerSupport(int64_t display, bool& outSupport) override;
     int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) override;
     int32_t getRCDLayerSupport(int64_t display, bool& outSupport) override;
     int32_t validateDisplay(int64_t display, std::vector<int64_t>* outChangedLayers,

@@ -875,11 +875,11 @@ int32_t HalImpl::setLayerVisibleRegion(int64_t display, int64_t layer,
     return halLayer->setLayerVisibleRegion(region);
 }
 
-int32_t HalImpl::setLayerWhitePointNits(int64_t display, int64_t layer, float nits) {
+int32_t HalImpl::setLayerBrightness(int64_t display, int64_t layer, float brightness) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
-    return halLayer->setLayerWhitePointNits(nits);
+    return halLayer->setLayerBrightness(brightness);
 }
 
 int32_t HalImpl::setLayerZOrder(int64_t display, int64_t layer, uint32_t z) {
@@ -939,12 +939,11 @@ int32_t HalImpl::setVsyncEnabled(int64_t display, bool enabled) {
     return halDisplay->setVsyncEnabled(hwcEnable);
 }
 
-int32_t HalImpl::setIdleTimerEnabled(int64_t display, int32_t __unused timeout) {
+int32_t HalImpl::setIdleTimerEnabled(int64_t display, int32_t timeout) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    // TODO(b/198808492): implement setIdleTimerEnabled
-    return HWC2_ERROR_UNSUPPORTED;
+    return halDisplay->setDisplayIdleTimer(timeout);
 }
 
 int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChangedLayers,
@@ -1012,6 +1011,13 @@ int32_t HalImpl::getRCDLayerSupport(int64_t display, bool& outSupport) {
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
     return halDisplay->getRCDLayerSupport(outSupport);
+}
+
+int32_t HalImpl::getDisplayIdleTimerSupport(int64_t display, bool& outSupport) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->getDisplayIdleTimerSupport(outSupport);
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl
