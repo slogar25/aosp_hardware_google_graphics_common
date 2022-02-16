@@ -953,7 +953,7 @@ class ExynosDisplay {
          *     HWC2_ERROR_BAD_CONFIG - when the configuration is invalid
          *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
          */
-        int32_t setBootDisplayConfig(int32_t config);
+        virtual int32_t setBootDisplayConfig(int32_t config);
 
         /**
          * clearBootDisplayConfig(...)
@@ -967,7 +967,7 @@ class ExynosDisplay {
          *     HWC2_ERROR_BAD_DISPLAY - when the display is invalid
          *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
          */
-        int32_t clearBootDisplayConfig();
+        virtual int32_t clearBootDisplayConfig();
 
         /**
          * getPreferredBootDisplayConfig(..., config*)
@@ -990,6 +990,8 @@ class ExynosDisplay {
          *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
          */
         int32_t getPreferredBootDisplayConfig(int32_t* outConfig);
+
+        virtual int32_t getPreferredDisplayConfigInternal(int32_t *outConfig);
 
         /* setAutoLowLatencyMode(displayToken, on)
          * Descriptor: HWC2_FUNCTION_SET_AUTO_LOW_LATENCY_MODE
