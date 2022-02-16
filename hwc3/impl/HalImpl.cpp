@@ -163,11 +163,13 @@ void HalImpl::getCapabilities(std::vector<Capability>* caps) {
 }
 
 void HalImpl::dumpDebugInfo(std::string* output) {
-    uint32_t count = 0;
-    mDevice->dump(&count, nullptr);
+    if (output == nullptr) return;
 
-    output->resize(count);
-    mDevice->dump(&count, output->data());
+    String8 result;
+    mDevice->dump(result);
+
+    output->resize(result.size());
+    output->assign(result.c_str());
 }
 
 void HalImpl::registerEventCallback(EventCallback* callback) {

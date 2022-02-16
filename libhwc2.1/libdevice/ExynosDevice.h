@@ -293,6 +293,7 @@ class ExynosDevice {
         void checkDynamicRecompositionThread();
         int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode);
         int32_t setPanelGammaTableSource(int32_t display_id, int32_t type, int32_t source);
+        void dump(String8 &result);
 
         class captureReadbackClass {
             public:
