@@ -150,6 +150,11 @@ int DrmConnector::Init() {
       ALOGE("Could not get mipi_sync property\n");
   }
 
+  ret = drm_->GetConnectorProperty(*this, "panel_idle_support", &panel_idle_support_);
+  if (ret) {
+      ALOGE("Could not get panel_idle_support property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   properties_.push_back(&edid_property_);
@@ -170,6 +175,7 @@ int DrmConnector::Init() {
   properties_.push_back(&dimming_on_);
   properties_.push_back(&lhbm_on_);
   properties_.push_back(&mipi_sync_);
+  properties_.push_back(&panel_idle_support_);
 
   return 0;
 }
@@ -379,6 +385,10 @@ int DrmConnector::ResetLpMode() {
     UpdateLpMode();
 
     return 0;
+}
+
+const DrmProperty &DrmConnector::panel_idle_support() const {
+    return panel_idle_support_;
 }
 
 DrmEncoder *DrmConnector::encoder() const {
