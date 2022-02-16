@@ -744,5 +744,5 @@ void BrightnessController::dump(String8& result) {
     result.appendFormat("\tdimming usage %d, hbm dimming %d, time us %d\n", mBrightnessDimmingUsage,
                         mHbmDimming, mHbmDimmingTimeUs);
     result.appendFormat("\twhite point nits %f\n", mDisplayWhitePointNits);
-    result.appendFormat("\n\n");
+    result.appendFormat("\n");
 }

@@ -295,6 +295,9 @@ class ExynosDisplayDrmInterface :
         { return NO_ERROR;};
         virtual void destroyLayer(ExynosLayer *layer) override;
 
+        /* For HWC 3.0 APIs */
+        virtual int32_t getDisplayIdleTimerSupport(bool &outSupport);
+
         virtual int32_t waitVBlank();
         float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
 

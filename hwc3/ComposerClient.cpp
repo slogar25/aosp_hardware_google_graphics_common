@@ -162,6 +162,16 @@ ndk::ScopedAStatus ComposerClient::getDisplayCapabilities(int64_t display,
         return TO_BINDER_STATUS(err);
     }
 
+    bool support = false;
+    err = mHal->getDisplayIdleTimerSupport(display, support);
+    if (err != ::android::OK) {
+        LOG(ERROR) << "failed to getDisplayIdleTimerSupport: " << err;
+    }
+
+    if (support) {
+        caps->push_back(DisplayCapability::DISPLAY_IDLE_TIMER);
+    }
+
     return TO_BINDER_STATUS(err);
 }
 
