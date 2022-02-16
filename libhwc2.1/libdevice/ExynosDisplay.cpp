@@ -5920,7 +5920,3 @@ int32_t ExynosDisplay::getRCDLayerSupport(bool &outSupport) {
     outSupport = mDpuData.rcdConfigs.size() > 0;
     return NO_ERROR;
 }
-
-int32_t ExynosDisplay::getDisplayIdleTimerSupport(bool &outSupport) {
-    return mDisplayInterface->getDisplayIdleTimerSupport(outSupport);
-}
