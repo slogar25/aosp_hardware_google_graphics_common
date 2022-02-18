@@ -685,17 +685,9 @@ int BrightnessController::applyBrightnessViaSysfs(uint32_t level) {
     return HWC2_ERROR_UNSUPPORTED;
 }
 
+// brightness is normalized to current display brightness
 bool BrightnessController::validateLayerBrightness(float brightness) {
-    if (!mBrightnessIntfSupported) {
-        return false;
-    }
-
     std::lock_guard<std::mutex> lock(mBrightnessMutex);
-    // skip validation if screen is off
-    if (mBrightnessFloatReq.get() < 0) {
-        return true;
-    }
-
     if (!std::isfinite(brightness)) {
         ALOGW("%s layer brightness %f is not a valid floating value", __func__, brightness);
         return false;
@@ -744,5 +736,5 @@ void BrightnessController::dump(String8& result) {
     result.appendFormat("\tdimming usage %d, hbm dimming %d, time us %d\n", mBrightnessDimmingUsage,
                         mHbmDimming, mHbmDimmingTimeUs);
     result.appendFormat("\twhite point nits %f\n", mDisplayWhitePointNits);
-    result.appendFormat("\n\n");
+    result.appendFormat("\n");
 }

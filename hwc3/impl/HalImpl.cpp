@@ -163,11 +163,13 @@ void HalImpl::getCapabilities(std::vector<Capability>* caps) {
 }
 
 void HalImpl::dumpDebugInfo(std::string* output) {
-    uint32_t count = 0;
-    mDevice->dump(&count, nullptr);
+    if (output == nullptr) return;
 
-    output->resize(count);
-    mDevice->dump(&count, output->data());
+    String8 result;
+    mDevice->dump(result);
+
+    output->resize(result.size());
+    output->assign(result.c_str());
 }
 
 void HalImpl::registerEventCallback(EventCallback* callback) {
@@ -939,12 +941,11 @@ int32_t HalImpl::setVsyncEnabled(int64_t display, bool enabled) {
     return halDisplay->setVsyncEnabled(hwcEnable);
 }
 
-int32_t HalImpl::setIdleTimerEnabled(int64_t display, int32_t __unused timeout) {
+int32_t HalImpl::setIdleTimerEnabled(int64_t display, int32_t timeout) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    // TODO(b/198808492): implement setIdleTimerEnabled
-    return HWC2_ERROR_UNSUPPORTED;
+    return halDisplay->setDisplayIdleTimer(timeout);
 }
 
 int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChangedLayers,
@@ -1012,6 +1013,13 @@ int32_t HalImpl::getRCDLayerSupport(int64_t display, bool& outSupport) {
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
     return halDisplay->getRCDLayerSupport(outSupport);
+}
+
+int32_t HalImpl::getDisplayIdleTimerSupport(int64_t display, bool& outSupport) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->getDisplayIdleTimerSupport(outSupport);
 }
 
 } // namespace aidl::android::hardware::graphics::composer3::impl

@@ -361,7 +361,24 @@ void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
         return;
     }
 
-    android::String8 result;
+    String8 result;
+    dump(result);
+
+    if (outBuffer == NULL) {
+        *outSize = static_cast<uint32_t>(result.length());
+    } else {
+        if (*outSize == 0) {
+            ALOGE("%s:: outSize is 0", __func__);
+            return;
+        }
+        size_t copySize = min(static_cast<size_t>(*outSize), result.size());
+        ALOGI("HWC dump:: resultSize(%zu), outSize(%d), copySize(%zu)", result.size(), *outSize,
+              copySize);
+        strlcpy(outBuffer, result.string(), copySize);
+    }
+}
+
+void ExynosDevice::dump(String8 &result) {
     result.append("\n\n");
 
     struct tm* localTime = (struct tm*)localtime((time_t*)&updateTimeInfo.lastUeventTime.tv_sec);
@@ -404,22 +421,6 @@ void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
         if (display->mPlugState == true)
             display->dump(result);
     }
-
-    if (outBuffer == NULL) {
-        *outSize = (uint32_t)result.length();
-    } else {
-        if (*outSize == 0) {
-            ALOGE("%s:: outSize is 0", __func__);
-            return;
-        }
-        uint32_t copySize = *outSize;
-        if (*outSize > result.size())
-            copySize = (uint32_t)result.size();
-        ALOGI("HWC dump:: resultSize(%zu), outSize(%d), copySize(%d)", result.size(), *outSize, copySize);
-        strlcpy(outBuffer, result.string(), copySize);
-    }
-
-    return;
 }
 
 uint32_t ExynosDevice::getMaxVirtualDisplayCount() {
@@ -1119,10 +1120,11 @@ int ExynosDevice::setRefreshRateThrottle(const int delayMs) {
 
     ExynosDisplay *display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     if (display) {
-        return display->setRefreshRateThrottleNanos(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(
-                        std::chrono::milliseconds(delayMs))
-                        .count());
+        return display
+                ->setRefreshRateThrottleNanos(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                                      std::chrono::milliseconds(delayMs))
+                                                      .count(),
+                                              DispIdleTimerRequester::PIXEL_DISP);
     }
     return BAD_VALUE;
 }

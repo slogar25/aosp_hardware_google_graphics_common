@@ -403,6 +403,18 @@ void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
     mFBManager.cleanup(layer);
 }
 
+int32_t ExynosDisplayDrmInterface::getDisplayIdleTimerSupport(bool &outSupport) {
+    auto [ret, support] = mDrmConnector->panel_idle_support().value();
+    if (ret) {
+        ALOGI("no panel_idle_support drm property or invalid value (%d)", ret);
+        outSupport = false;
+    } else {
+        outSupport = (support > 0);
+    }
+
+    return NO_ERROR;
+}
+
 ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
 {
     mType = INTERFACE_TYPE_DRM;

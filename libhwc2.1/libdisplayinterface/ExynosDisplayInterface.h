@@ -71,6 +71,11 @@ class ExynosDisplayInterface {
         /* For HWC 2.4 APIs */
         virtual int32_t getVsyncAppliedTime(hwc2_config_t __unused config, int64_t* __unused actualChangeTime) {return NO_ERROR;}
         virtual void destroyLayer(ExynosLayer* __unused layer){};
+        /* For HWC 3.0 APIs */
+        virtual int32_t getDisplayIdleTimerSupport(bool& outSupport) {
+            outSupport = false;
+            return NO_ERROR;
+        }
 
         virtual int32_t waitVBlank() { return 0; };
     public:
