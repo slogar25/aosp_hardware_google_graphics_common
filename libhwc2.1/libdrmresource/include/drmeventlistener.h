@@ -33,7 +33,7 @@ class DrmEventHandler {
   virtual ~DrmEventHandler() {
   }
 
-  virtual void HandleEvent(uint64_t timestamp_us) = 0;
+  virtual void handleEvent(uint64_t timestamp_us) = 0;
 };
 
 class DrmHistogramEventHandler {
@@ -41,7 +41,7 @@ public:
     DrmHistogramEventHandler() {}
     virtual ~DrmHistogramEventHandler() {}
 
-    virtual void HandleHistogramEvent(void *) = 0;
+    virtual void handleHistogramEvent(void *) = 0;
 };
 
 class DrmTUIEventHandler {
@@ -51,7 +51,15 @@ class DrmTUIEventHandler {
   virtual ~DrmTUIEventHandler() {
   }
 
-  virtual void HandleTUIEvent() = 0;
+  virtual void handleTUIEvent() = 0;
+};
+
+class DrmPanelIdleEventHandler {
+ public:
+  DrmPanelIdleEventHandler() {}
+  virtual ~DrmPanelIdleEventHandler() {}
+
+  virtual void handleIdleEnterEvent(char const *event) = 0;
 };
 
 class DrmEventListener : public Worker {
@@ -69,6 +77,8 @@ class DrmEventListener : public Worker {
   void UnRegisterHistogramHandler(DrmHistogramEventHandler *handler);
   void RegisterTUIHandler(DrmTUIEventHandler *handler);
   void UnRegisterTUIHandler(DrmTUIEventHandler *handler);
+  void RegisterPanelIdleHandler(DrmPanelIdleEventHandler *handler);
+  void UnRegisterPanelIdleHandler(DrmPanelIdleEventHandler *handler);
 
   bool IsDrmInTUI();
 
@@ -91,6 +101,7 @@ class DrmEventListener : public Worker {
   std::unique_ptr<DrmEventHandler> hotplug_handler_;
   std::unique_ptr<DrmHistogramEventHandler> histogram_handler_;
   std::unique_ptr<DrmTUIEventHandler> tui_handler_;
+  std::unique_ptr<DrmPanelIdleEventHandler> panel_idle_handler_;
 };
 }  // namespace android
 
