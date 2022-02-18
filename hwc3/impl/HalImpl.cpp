@@ -461,9 +461,9 @@ int32_t HalImpl::getPerFrameMetadataKeys(int64_t display,
     uint32_t numKeys = 0;
     auto resManager = mDevice->mResourceManager;
     if (resManager->hasHDR10PlusMPP()) {
-        numKeys = HWC2_HDR10_PLUS_SEI;
+        numKeys = HWC2_HDR10_PLUS_SEI + 1;
     } else {
-        numKeys = HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL;
+        numKeys = HWC2_MAX_FRAME_AVERAGE_LIGHT_LEVEL + 1;
     }
     for (uint32_t i = 0; i < numKeys; ++i) {
         PerFrameMetadataKey key;
