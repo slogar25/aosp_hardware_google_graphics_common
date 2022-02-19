@@ -48,9 +48,11 @@ ndk::ScopedAStatus Composer::createClient(std::shared_ptr<IComposerClient>* outC
     return ndk::ScopedAStatus::ok();
 }
 
-ndk::ScopedAStatus Composer::dumpDebugInfo(std::string* output) {
-    mHal->dumpDebugInfo(output);
-    return ndk::ScopedAStatus::ok();
+binder_status_t Composer::dump(int fd, const char** /*args*/, uint32_t /*numArgs*/) {
+    std::string output;
+    mHal->dumpDebugInfo(&output);
+    write(fd, output.c_str(), output.size());
+    return STATUS_OK;
 }
 
 ndk::ScopedAStatus Composer::getCapabilities(std::vector<Capability>* caps) {
