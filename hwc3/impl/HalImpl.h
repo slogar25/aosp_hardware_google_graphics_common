@@ -143,8 +143,7 @@ class HalImpl : public IComposerHal {
                             uint32_t* outDisplayRequestMask,
                             std::vector<int64_t>* outRequestedLayers,
                             std::vector<int32_t>* outRequestMasks,
-                            ClientTargetProperty* outClientTargetProperty,
-                            float* outClientTargetWhitePointNits) override;
+                            ClientTargetProperty* outClientTargetProperty) override;
     int32_t setExpectedPresentTime(
             int64_t display,
             const std::optional<ClockMonotonicTimestamp> expectedPresentTime) override;

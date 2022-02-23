@@ -4092,14 +4092,6 @@ int32_t ExynosDisplay::getClientTargetProperty(hwc_client_target_property_t* out
     return HWC2_ERROR_NONE;
 }
 
-int32_t ExynosDisplay::getClientTargetWhitePointNits(float* outClientTargetWhitePointNits)
-{
-    if (mBrightnessController) {
-        return mBrightnessController->getDisplayWhitePointNits(outClientTargetWhitePointNits);
-    }
-    return HWC2_ERROR_UNSUPPORTED;
-}
-
 bool ExynosDisplay::isBadConfig(hwc2_config_t config)
 {
     /* Check invalid config */
