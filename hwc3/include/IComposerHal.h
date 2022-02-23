@@ -34,7 +34,7 @@
 #include <aidl/android/hardware/graphics/composer3/ChangedCompositionTypes.h>
 #include <aidl/android/hardware/graphics/composer3/ClientTarget.h>
 #include <aidl/android/hardware/graphics/composer3/ClientTargetProperty.h>
-#include <aidl/android/hardware/graphics/composer3/ClientTargetPropertyWithNits.h>
+#include <aidl/android/hardware/graphics/composer3/ClientTargetPropertyWithBrightness.h>
 #include <aidl/android/hardware/graphics/composer3/Color.h>
 #include <aidl/android/hardware/graphics/composer3/ColorMode.h>
 #include <aidl/android/hardware/graphics/composer3/CommandError.h>
@@ -210,8 +210,7 @@ class IComposerHal {
                                     uint32_t* outDisplayRequestMask,
                                     std::vector<int64_t>* outRequestedLayers,
                                     std::vector<int32_t>* outRequestMasks,
-                                    ClientTargetProperty* outClientTargetProperty,
-                                    float* outClientTargetWhitePointNits) = 0;
+                                    ClientTargetProperty* outClientTargetProperty) = 0;
     virtual int32_t setExpectedPresentTime(
             int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
     virtual int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) = 0;
