@@ -204,7 +204,7 @@ ExynosResourceManager::ExynosResourceManager(ExynosDevice *device)
 
     char value[PROPERTY_VALUE_MAX];
     mMinimumSdrDimRatio = property_get("debug.hwc.min_sdr_dimming", value, nullptr) > 0
-                          ? std::atof(value) : 1.0f;
+                          ? std::atof(value) : 0.0f;
 }
 
 ExynosResourceManager::~ExynosResourceManager()
