@@ -376,6 +376,17 @@ class ExynosDisplayDrmInterface :
             };
         };
 
+        struct BlockingRegionState {
+            struct decon_win_rect mRegion;
+            uint32_t mBlobId = 0;
+
+            inline bool operator==(const decon_win_rect &rhs) const {
+                return mRegion.x == rhs.x && mRegion.y == rhs.y && mRegion.w == rhs.w &&
+                        mRegion.h == rhs.h;
+            }
+            inline bool operator!=(const decon_win_rect &rhs) const { return !(*this == rhs); }
+        };
+
         class DrmReadbackInfo {
             public:
                 void init(DrmDevice *drmDevice, uint32_t displayId);
@@ -414,6 +425,7 @@ class ExynosDisplayDrmInterface :
         ModeState mActiveModeState;
         ModeState mDesiredModeState;
         PartialRegionState mPartialRegionState;
+        BlockingRegionState mBlockState;
         /* Mapping plane id to ExynosMPP, key is plane id */
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;
 
