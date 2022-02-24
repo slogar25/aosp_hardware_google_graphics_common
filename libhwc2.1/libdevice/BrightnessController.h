@@ -125,19 +125,6 @@ public:
         return mMaxBrightness > 0;
     }
 
-    int getDisplayWhitePointNits(float* nits) {
-        if (!nits) {
-            return HWC2_ERROR_BAD_PARAMETER;
-        }
-
-        if (!mBrightnessIntfSupported) {
-            return HWC2_ERROR_UNSUPPORTED;
-        }
-
-        *nits = mDisplayWhitePointNits;
-        return NO_ERROR;
-    }
-
     void dump(String8 &result);
 
     struct BrightnessTable {

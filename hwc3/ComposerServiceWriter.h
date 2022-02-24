@@ -108,12 +108,12 @@ public:
     }
 
     void setClientTargetProperty(int64_t display, const ClientTargetProperty& clientTargetProperty,
-                                 float whitePointNits) {
-        ClientTargetPropertyWithNits clientTargetPropertyWithNits;
-        clientTargetPropertyWithNits.display = display;
-        clientTargetPropertyWithNits.clientTargetProperty = clientTargetProperty;
-        clientTargetPropertyWithNits.whitePointNits = whitePointNits;
-        mCommandsResults.emplace_back(std::move(clientTargetPropertyWithNits));
+                                 float brightness) {
+        ClientTargetPropertyWithBrightness clientTargetPropertyWithBrightness;
+        clientTargetPropertyWithBrightness.display = display;
+        clientTargetPropertyWithBrightness.clientTargetProperty = clientTargetProperty;
+        clientTargetPropertyWithBrightness.brightness = brightness;
+        mCommandsResults.emplace_back(std::move(clientTargetPropertyWithBrightness));
     }
 
     std::vector<CommandResultPayload> getPendingCommandResults() {

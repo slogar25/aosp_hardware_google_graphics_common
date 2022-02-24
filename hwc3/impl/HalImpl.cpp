@@ -953,8 +953,7 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
                                  uint32_t* outDisplayRequestMask,
                                  std::vector<int64_t>* outRequestedLayers,
                                  std::vector<int32_t>* outRequestMasks,
-                                 ClientTargetProperty* outClientTargetProperty,
-                                 float* outClientTargetWhitePointNits) {
+                                 ClientTargetProperty* outClientTargetProperty) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
@@ -976,8 +975,6 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     outRequestMasks->resize(reqsCount);
     RET_IF_ERR(halDisplay->getDisplayRequests(&displayReqs, &reqsCount,
                                               hwcRequestedLayers.data(), outRequestMasks->data()));
-
-    RET_IF_ERR(halDisplay->getClientTargetWhitePointNits(outClientTargetWhitePointNits));
 
     h2a::translate(hwcChangedLayers, *outChangedLayers);
     h2a::translate(hwcCompositionTypes, *outCompositionTypes);
