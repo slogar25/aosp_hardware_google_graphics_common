@@ -953,7 +953,8 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
                                  uint32_t* outDisplayRequestMask,
                                  std::vector<int64_t>* outRequestedLayers,
                                  std::vector<int32_t>* outRequestMasks,
-                                 ClientTargetProperty* outClientTargetProperty) {
+                                 ClientTargetProperty* outClientTargetProperty,
+                                 DimmingStage* outDimmingStage) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
@@ -982,7 +983,9 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     h2a::translate(hwcRequestedLayers, *outRequestedLayers);
 
     hwc_client_target_property hwcProperty;
-    if (!halDisplay->getClientTargetProperty(&hwcProperty)) {
+    HwcDimmingStage hwcDimmingStage;
+    if (!halDisplay->getClientTargetProperty(&hwcProperty, &hwcDimmingStage)) {
+        h2a::translate(hwcDimmingStage, *outDimmingStage);
         h2a::translate(hwcProperty, *outClientTargetProperty);
     } // else ignore this error
 

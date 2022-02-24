@@ -34,6 +34,8 @@ using android::hardware::graphics::common::V1_2::PixelFormat;
 /**
  * hwc/displaycolor interface history
  *
+ * 6.0.0.2022-02-22 Get whether dimming in linear.
+ * 5.0.0.2022-02-17 Add layer dim ratio.
  * 4.0.0.2021-12-20 Get pixel format and dataspace of blending stage.
  * 3.0.0.2021-11-18 calibration info intf
  * 2.0.0.2021-08-27 pass brightness table for hdr10+
@@ -57,7 +59,7 @@ constexpr struct DisplayColorIntfVer {
     }
 
 } kInterfaceVersion {
-    4,
+    6,
     0,
     0,
 };
@@ -116,7 +118,8 @@ struct LayerColorData {
     bool operator==(const LayerColorData &rhs) const {
         return dataspace == rhs.dataspace && matrix == rhs.matrix &&
                static_metadata == rhs.static_metadata &&
-               dynamic_metadata == rhs.dynamic_metadata;
+               dynamic_metadata == rhs.dynamic_metadata &&
+               dim_ratio == rhs.dim_ratio;
     }
 
     /**
@@ -221,6 +224,11 @@ struct LayerColorData {
      * indicates this is an HDR layer.
      */
     HdrDynamicMetadata dynamic_metadata;
+
+    /**
+     * @brief the layer's luminance dim ratio
+     */
+    float dim_ratio = 1.0f;
 };
 
 /**
@@ -372,7 +380,8 @@ class IDisplayColorGeneric {
      */
     virtual int GetBlendingProperty(DisplayType display,
                                     hwc::PixelFormat &pixel_format,
-                                    hwc::Dataspace &dataspace) const = 0;
+                                    hwc::Dataspace &dataspace,
+                                    bool &dimming_linear) const = 0;
 };
 
 extern "C" {
