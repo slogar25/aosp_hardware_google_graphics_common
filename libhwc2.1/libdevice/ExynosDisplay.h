@@ -1080,13 +1080,6 @@ class ExynosDisplay {
         /*
          * HWC3
          *
-         * Retrieves the client target white point nits.
-         */
-        int32_t getClientTargetWhitePointNits(float* outClientTargetWhitePointNits);
-
-        /*
-         * HWC3
-         *
          * Execute any pending brightness changes.
          */
         int32_t flushDisplayBrightnessChange();

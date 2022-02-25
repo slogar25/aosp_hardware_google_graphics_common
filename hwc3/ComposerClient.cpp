@@ -553,10 +553,8 @@ void ComposerClient::destroyResources() {
             std::vector<int64_t> requestedLayers;
             std::vector<int32_t> requestMasks;
             ClientTargetProperty clientTargetProperty;
-            float clientWhitePointNits;
             mHal->validateDisplay(display, &changedLayers, &compositionTypes, &displayRequestMask,
-                                  &requestedLayers, &requestMasks, &clientTargetProperty,
-                                  &clientWhitePointNits);
+                                  &requestedLayers, &requestMasks, &clientTargetProperty);
             mHal->acceptDisplayChanges(display);
 
             ndk::ScopedFileDescriptor presentFence;
