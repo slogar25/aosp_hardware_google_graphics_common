@@ -625,4 +625,7 @@ struct RollingAverage {
 // Waits for a given property value, or returns std::nullopt if unavailable
 std::optional<std::string> waitForPropertyValue(const std::string &property, int64_t timeoutMs);
 
+uint32_t rectSize(const hwc_rect_t &rect);
+void assign(decon_win_rect &win_rect, uint32_t left, uint32_t right, uint32_t width,
+            uint32_t height);
 #endif

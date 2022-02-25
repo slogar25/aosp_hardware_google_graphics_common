@@ -472,4 +472,18 @@ int32_t ExynosHWCService::setRefreshRateThrottle(uint32_t display_id, int32_t de
     return -EINVAL;
 }
 
+int32_t ExynosHWCService::setDisplayRCDLayerEnabled(uint32_t displayId, bool enable) {
+    ALOGD("ExynosHWCService::%s() displayId(%u) enable(%u)", __func__, displayId, enable);
+
+    auto display = mHWCCtx->device->getDisplay(displayId);
+    if (display == nullptr) return -EINVAL;
+
+    auto ret = display->setDebugRCDLayerEnabled(enable);
+
+    mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+    mHWCCtx->device->invalidate();
+
+    return ret;
+}
+
 } //namespace android

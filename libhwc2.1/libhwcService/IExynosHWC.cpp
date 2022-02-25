@@ -64,6 +64,7 @@ enum {
     SET_LBE_CTRL = 1004,
     SET_MIN_IDLE_REFRESH_RATE = 1005,
     SET_REFRESH_RATE_THROTTLE = 1006,
+    SET_DISPLAY_RCDLAYER_ENABLED = 1007,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -435,6 +436,17 @@ public:
         if (result) ALOGE("SET_REFRESH_RATE_THROTTLE transact error(%d)", result);
         return result;
     }
+
+    int32_t setDisplayRCDLayerEnabled(uint32_t displayId, bool enable) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(displayId);
+        data.writeInt32(enable);
+
+        auto result = remote()->transact(SET_DISPLAY_RCDLAYER_ENABLED, data, &reply);
+        ALOGE_IF(result != NO_ERROR, "SET_DISPLAY_RCDLAYER_ENABLED transact error(%d)", result);
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -701,6 +713,13 @@ status_t BnExynosHWCService::onTransact(
             uint32_t display_id = data.readUint32();
             int32_t delay_ms = data.readInt32();
             return setRefreshRateThrottle(display_id, delay_ms);
+        } break;
+
+        case SET_DISPLAY_RCDLAYER_ENABLED: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t displayId = data.readUint32();
+            bool enable = data.readInt32();
+            return setDisplayRCDLayerEnabled(displayId, enable);
         } break;
 
         default:
