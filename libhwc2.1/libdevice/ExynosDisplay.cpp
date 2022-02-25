@@ -1869,12 +1869,17 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
 
     cfg.layer = &layer;
     if ((layer.mExynosCompositionType == HWC2_COMPOSITION_DEVICE) &&
-        (layer.mCompositionType == HWC2_COMPOSITION_CURSOR))
+        (layer.mCompositionType == HWC2_COMPOSITION_CURSOR)) {
         cfg.state = cfg.WIN_STATE_CURSOR;
-    else if (layer.mExynosCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION)
+    } else if (layer.mExynosCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION) {
         cfg.state = cfg.WIN_STATE_RCD;
-    else
+        assign(cfg.block_area, layer.mBlockingRect.left, layer.mBlockingRect.top,
+               layer.mBlockingRect.right - layer.mBlockingRect.left,
+               layer.mBlockingRect.bottom - layer.mBlockingRect.top);
+    } else {
         cfg.state = cfg.WIN_STATE_BUFFER;
+    }
+
     cfg.dst.x = x;
     cfg.dst.y = y;
     cfg.dst.w = w;
@@ -4592,6 +4597,7 @@ int32_t ExynosDisplay::setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos) {
     return HWC2_ERROR_NONE;
 }
 
+// clang-format off
 void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
 {
     DISPLAY_LOGD(eDebugWinConfig|eDebugSkipStaicLayer, "\tstate = %u", c.state);
@@ -4604,8 +4610,8 @@ void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
                 "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
-                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
-                "block(x:%d, y:%d, w:%d, h:%d)",
+                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
+                "block(x:%d, y:%d, w:%u, h:%u), opaque(x:%d, y:%d, w:%u, h:%u)",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
                 c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
@@ -4613,6 +4619,7 @@ void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
                 c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable,
                 c.blending, c.protection, c.compression, c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
+                c.block_area.x, c.block_area.y, c.block_area.w, c.block_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
     }
 }
@@ -4660,8 +4667,8 @@ void ExynosDisplay::dumpConfig(String8 &result, const exynos_win_config_data &c)
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
                 "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
-                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
-                "block(x:%d, y:%d, w:%d, h:%d)\n",
+                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
+                "block(x:%d, y:%d, w:%u, h:%u), opaque(x:%d, y:%d, w:%u, h:%u)\n",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
                 c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
@@ -4669,6 +4676,7 @@ void ExynosDisplay::dumpConfig(String8 &result, const exynos_win_config_data &c)
                 c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable, c.blending, c.protection,
                 c.compression, c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
+                c.block_area.x, c.block_area.y, c.block_area.w, c.block_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
     }
 }
@@ -4684,8 +4692,8 @@ void ExynosDisplay::printConfig(exynos_win_config_data &c)
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
                 "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
-                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%d, h:%d), "
-                "block(x:%d, y:%d, w:%d, h:%d)",
+                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
+                "block(x:%d, y:%d, w:%u, h:%u), opaque(x:%d, y:%d, w:%u, h:%u)",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
                 c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
@@ -4693,9 +4701,11 @@ void ExynosDisplay::printConfig(exynos_win_config_data &c)
                 c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable, c.blending, c.protection,
                 c.compression, c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
+                c.block_area.x, c.block_area.y, c.block_area.w, c.block_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
     }
 }
+// clang-format on
 
 int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exynos_image *src_img, exynos_image *dst_img)
 {
@@ -5891,8 +5901,13 @@ void ExynosDisplay::updateAverages(nsecs_t endTime) {
             afterFenceTime);
 }
 
-int32_t ExynosDisplay::getRCDLayerSupport(bool &outSupport) {
-    outSupport = mDpuData.rcdConfigs.size() > 0;
+int32_t ExynosDisplay::getRCDLayerSupport(bool &outSupport) const {
+    outSupport = mDebugRCDLayerEnabled && mDpuData.rcdConfigs.size() > 0;
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplay::setDebugRCDLayerEnabled(bool enable) {
+    mDebugRCDLayerEnabled = enable;
     return NO_ERROR;
 }
 

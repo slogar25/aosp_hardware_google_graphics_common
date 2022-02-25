@@ -28,6 +28,12 @@ namespace aidl::android::hardware::graphics::composer3::impl {
         }                                                                        \
     } while (0)
 
+#define DISPATCH_LAYER_COMMAND_SIMPLE(display, layerCmd, field, funcName)     \
+    do {                                                                      \
+        dispatchLayerCommand(display, layerCmd.layer, #field, layerCmd.field, \
+                             &IComposerHal::setLayer##funcName);              \
+    } while (0)
+
 #define DISPATCH_DISPLAY_COMMAND(displayCmd, field, funcName)                \
     do {                                                                     \
         if (displayCmd.field) {                                              \
@@ -122,6 +128,7 @@ void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCom
     DISPATCH_LAYER_COMMAND(display, command, brightness, Brightness);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadata, PerFrameMetadata);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadataBlob, PerFrameMetadataBlobs);
+    DISPATCH_LAYER_COMMAND_SIMPLE(display, command, blockingRegion, BlockingRegion);
 }
 
 int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
