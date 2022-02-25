@@ -211,6 +211,11 @@ class ExynosLayer : public ExynosMPPSource {
         hwc_region_t mVisibleRegionScreen;
 
         /**
+         *
+         */
+        hwc_rect_t mBlockingRect;
+
+        /**
          * Z-Order
          */
         uint32_t mZOrder;
@@ -435,6 +440,17 @@ class ExynosLayer : public ExynosMPPSource {
          * @param brightness normalized to current display brightness.
          */
         int32_t setLayerBrightness(float brightness);
+
+        /**
+         * Specifies a region of the layer that is transparent and may be skipped
+         * by the DPU, e.g. using a blocking region, in order to save power. This
+         * is only a hint, so the composition of the layer must look the same
+         * whether or not this region is skipped.
+         *
+         * The region is in screen space and must not exceed the dimensions of
+         * the screen.
+         */
+        int32_t setLayerBlockingRegion(const std::vector<hwc_rect_t>& blockingRegion);
 
         void resetValidateData();
         virtual void dump(String8& result);
