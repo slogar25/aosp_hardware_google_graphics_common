@@ -1012,6 +1012,18 @@ int32_t HalImpl::getRCDLayerSupport(int64_t display, bool& outSupport) {
     return halDisplay->getRCDLayerSupport(outSupport);
 }
 
+int32_t HalImpl::setLayerBlockingRegion(
+        int64_t display, int64_t layer,
+        const std::vector<std::optional<common::Rect>>& blockingRegion) {
+    ExynosLayer* halLayer;
+    RET_IF_ERR(getHalLayer(display, layer, halLayer));
+
+    std::vector<hwc_rect_t> halBlockingRegion;
+    a2h::translate(blockingRegion, halBlockingRegion);
+
+    return halLayer->setLayerBlockingRegion(halBlockingRegion);
+}
+
 int32_t HalImpl::getDisplayIdleTimerSupport(int64_t display, bool& outSupport) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));

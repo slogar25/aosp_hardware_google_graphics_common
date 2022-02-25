@@ -1378,3 +1378,20 @@ std::optional<std::string> waitForPropertyValue(const std::string& property, int
     }
     return std::make_optional(out);
 }
+
+uint32_t rectSize(const hwc_rect_t& rect) {
+    auto width = rect.right - rect.left;
+    auto height = rect.bottom - rect.top;
+
+    if (width <= 0 || height <= 0) return 0;
+
+    return width * height;
+}
+
+void assign(decon_win_rect& win_rect, uint32_t left, uint32_t right, uint32_t width,
+            uint32_t height) {
+    win_rect.x = left;
+    win_rect.y = right;
+    win_rect.w = std::max(0U, width);
+    win_rect.h = std::max(0U, height);
+}
