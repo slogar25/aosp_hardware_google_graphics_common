@@ -436,8 +436,7 @@ int DrmDevice::AttachWriteback(DrmConnector *display_conn) {
   return -EINVAL;
 }
 
-int DrmDevice::CreatePropertyBlob(void *data, size_t length,
-                                  uint32_t *blob_id) {
+int DrmDevice::CreatePropertyBlob(const void *data, size_t length, uint32_t *blob_id) {
   struct drm_mode_create_blob create_blob;
   memset(&create_blob, 0, sizeof(create_blob));
   create_blob.length = length;
