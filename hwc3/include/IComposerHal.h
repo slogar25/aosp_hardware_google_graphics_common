@@ -215,6 +215,9 @@ class IComposerHal {
             int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
     virtual int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) = 0;
     virtual int32_t getRCDLayerSupport(int64_t display, bool& outSupport) = 0;
+    virtual int32_t setLayerBlockingRegion(
+            int64_t display, int64_t layer,
+            const std::vector<std::optional<common::Rect>>& blockingRegion) = 0;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::detail
