@@ -194,6 +194,8 @@ class ExynosResourceManager {
                                                 std::vector<exynos_image> &image_lists);
         exynos_image getAlignedImage(exynos_image image, const ExynosMPP *m2mMpp,
                                      const ExynosMPP *otfMpp) const;
+        int32_t validateRCDLayer(const ExynosDisplay &display, const ExynosLayer &layer,
+                                 const exynos_image &srcImg, const exynos_image &dstImg);
         static ExynosMPPVector mOtfMPPs;
         static ExynosMPPVector mM2mMPPs;
         uint32_t mResourceReserved; /* Set MPP logical type for bit operation */
