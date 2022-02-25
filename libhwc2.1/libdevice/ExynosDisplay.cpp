@@ -5891,8 +5891,13 @@ void ExynosDisplay::updateAverages(nsecs_t endTime) {
             afterFenceTime);
 }
 
-int32_t ExynosDisplay::getRCDLayerSupport(bool &outSupport) {
-    outSupport = mDpuData.rcdConfigs.size() > 0;
+int32_t ExynosDisplay::getRCDLayerSupport(bool &outSupport) const {
+    outSupport = mDebugRCDLayerEnabled && mDpuData.rcdConfigs.size() > 0;
+    return NO_ERROR;
+}
+
+int32_t ExynosDisplay::setDebugRCDLayerEnabled(bool enable) {
+    mDebugRCDLayerEnabled = enable;
     return NO_ERROR;
 }
 
