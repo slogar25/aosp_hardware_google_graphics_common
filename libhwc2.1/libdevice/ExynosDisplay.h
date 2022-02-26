@@ -23,14 +23,15 @@
 #include <utils/KeyedVector.h>
 #include <utils/Vector.h>
 
+#include <atomic>
 #include <chrono>
 #include <set>
 
 #include "ExynosDisplayInterface.h"
 #include "ExynosHWC.h"
-#include "ExynosHwc3Types.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
+#include "ExynosHwc3Types.h"
 #include "ExynosMPP.h"
 #include "ExynosResourceManager.h"
 #include "worker.h"
@@ -1200,7 +1201,8 @@ class ExynosDisplay {
         }
 
         void cleanupAfterClientDeath();
-        int32_t getRCDLayerSupport(bool& outSupport);
+        int32_t getRCDLayerSupport(bool& outSupport) const;
+        int32_t setDebugRCDLayerEnabled(bool enable);
 
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
@@ -1420,6 +1422,7 @@ class ExynosDisplay {
         nsecs_t getTarget();
         void updateAverages(nsecs_t endTime);
         std::optional<nsecs_t> getPredictedDuration(bool duringValidation);
+        atomic_bool mDebugRCDLayerEnabled = true;
 
     protected:
         inline uint32_t getDisplayVsyncPeriodFromConfig(hwc2_config_t config) {

@@ -1469,6 +1469,33 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
             return ret;
     }
 
+    if (config.state == config.WIN_STATE_RCD) {
+        if (plane->block_property().id()) {
+            if (mBlockState != config.block_area) {
+                uint32_t blobId = 0;
+                ret = mDrmDevice->CreatePropertyBlob(&config.block_area, sizeof(config.block_area),
+                                                     &blobId);
+                if (ret || (blobId == 0)) {
+                    HWC_LOGE(mExynosDisplay, "Failed to create blocking region blob id=%d, ret=%d",
+                             blobId, ret);
+                    return ret;
+                }
+
+                mBlockState.mRegion = config.block_area;
+                if (mBlockState.mBlobId) {
+                    drmReq.addOldBlob(mBlockState.mBlobId);
+                }
+                mBlockState.mBlobId = blobId;
+            }
+
+            if ((ret = drmReq.atomicAddProperty(plane->id(), plane->block_property(),
+                                                mBlockState.mBlobId)) < 0) {
+                HWC_LOGE(mExynosDisplay, "Failed to set blocking region property %d", ret);
+                return ret;
+            }
+        }
+    }
+
     return NO_ERROR;
 }
 

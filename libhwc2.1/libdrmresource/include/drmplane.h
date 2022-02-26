@@ -71,6 +71,7 @@ class DrmPlane {
   const DrmProperty &gammut_matrix_property() const;
   const DrmProperty &tone_mapping_property() const;
   const DrmProperty &colormap_property() const;
+  const DrmProperty &block_property() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -113,6 +114,7 @@ class DrmPlane {
   DrmProperty gammut_matrix_;
   DrmProperty tone_mapping_;
   DrmProperty colormap_;
+  DrmProperty block_;
 
   std::vector<DrmProperty *> properties_;
   std::vector<uint32_t> formats_;

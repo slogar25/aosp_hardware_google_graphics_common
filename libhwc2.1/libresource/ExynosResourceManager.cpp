@@ -1132,6 +1132,36 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
     return NO_ERROR;
 }
 
+int32_t ExynosResourceManager::validateRCDLayer(const ExynosDisplay &display,
+                                                const ExynosLayer &layer,
+                                                const exynos_image &srcImg,
+                                                const exynos_image &dstImg) {
+    if (CC_UNLIKELY(srcImg.bufferHandle == NULL || srcImg.format != HAL_PIXEL_FORMAT_GOOGLE_R_8)) {
+        return eInvalidHandle;
+    }
+
+    if (bool supported;
+        CC_UNLIKELY(display.getRCDLayerSupport(supported) != NO_ERROR || !supported))
+        return eUnSupportedUseCase;
+
+    // no rotation
+    if (srcImg.transform & (HAL_TRANSFORM_ROT_90 | HAL_TRANSFORM_ROT_180)) {
+        return eMPPUnsupported;
+    }
+
+    // no scale
+    if (srcImg.w != dstImg.w || srcImg.h != dstImg.h) {
+        return eMPPUnsupported;
+    }
+
+    // b/215335109: IMG_SIZE must be equal or larger than display output
+    if (dstImg.x != 0 || dstImg.y != 0 || dstImg.w != display.mXres || dstImg.h != display.mYres) {
+        return eInvalidDispFrame;
+    }
+
+    return NO_ERROR;
+}
+
 exynos_image ExynosResourceManager::getAlignedImage(exynos_image image, const ExynosMPP *m2mMpp,
                                                     const ExynosMPP *otfMpp) const {
     const auto srcCropWidthAlign = otfMpp ? otfMpp->getSrcCropWidthAlign(image) : 1;
@@ -1612,7 +1642,7 @@ int32_t ExynosResourceManager::assignLayers(ExynosDisplay * display, uint32_t pr
 
         // TODO: call validate function for RCD layer
         if (layer->mCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION &&
-            src_img.format == HAL_PIXEL_FORMAT_GOOGLE_R_8) {
+            validateRCDLayer(*display, *layer, src_img, dst_img) == NO_ERROR) {
             layer->mValidateCompositionType = HWC2_COMPOSITION_DISPLAY_DECORATION;
             continue;
         }

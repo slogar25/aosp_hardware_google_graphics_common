@@ -729,6 +729,20 @@ int32_t ExynosLayer::setLayerBrightness(float brightness) {
     return HWC2_ERROR_NONE;
 }
 
+int32_t ExynosLayer::setLayerBlockingRegion(const std::vector<hwc_rect_t>& blockingRegion) {
+    hwc_rect_t maxRect;
+
+    for (auto rect : blockingRegion) {
+        maxRect = std::max(maxRect, rect, [](const hwc_rect_t& lhs, const hwc_rect_t& rhs) {
+            return rectSize(lhs) < rectSize(rhs);
+        });
+    }
+
+    mBlockingRect = maxRect;
+
+    return HWC2_ERROR_NONE;
+}
+
 void ExynosLayer::resetValidateData()
 {
     mValidateCompositionType = HWC2_COMPOSITION_INVALID;
