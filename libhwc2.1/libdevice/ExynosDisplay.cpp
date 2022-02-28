@@ -3323,6 +3323,32 @@ int32_t ExynosDisplay::canSkipValidate() {
     return NO_ERROR;
 }
 
+bool ExynosDisplay::isFullScreenComposition() {
+    hwc_rect_t dispRect = { INT_MAX, INT_MAX, 0, 0 };
+    for (auto layer : mLayers) {
+        auto &r = layer->mDisplayFrame;
+
+        if (r.top < dispRect.top)
+            dispRect.top = r.top;
+        if (r.left < dispRect.left)
+            dispRect.left = r.left;
+        if (r.bottom > dispRect.bottom)
+            dispRect.bottom = r.bottom;
+        if (r.right > dispRect.right)
+            dispRect.right = r.right;
+    }
+
+    if ((dispRect.top != 0) || (dispRect.left != 0) ||
+            (dispRect.right != mXres) || (dispRect.bottom != mYres)) {
+        ALOGD("invalid displayFrame disp=[%d %d %d %d] expected=%dx%d",
+                dispRect.left, dispRect.top, dispRect.right, dispRect.bottom,
+                mXres, mYres);
+        return false;
+    }
+
+    return true;
+}
+
 int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
@@ -3365,10 +3391,18 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     Mutex::Autolock lock(mDisplayMutex);
 
-    if (mPauseDisplay || mDevice->isInTUI()) {
+    bool dropFrame = false;
+    if ((mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) &&
+            !isFullScreenComposition()) {
+        ALOGD("presentDisplay: drop invalid frame during resolution switch");
+        dropFrame = true;
+    }
+
+    if (dropFrame || mPauseDisplay || mDevice->isInTUI()) {
         closeFencesForSkipFrame(RENDERING_STATE_PRESENTED);
         *outRetireFence = -1;
         mRenderingState = RENDERING_STATE_PRESENTED;
+        applyExpectedPresentTime();
         return ret;
     }
 
@@ -3726,8 +3760,10 @@ int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config, bool force)
     }
 
     if ((mXres != mDisplayConfigs[config].width) ||
-        (mYres != mDisplayConfigs[config].height))
+        (mYres != mDisplayConfigs[config].height)) {
+        mRenderingState = RENDERING_STATE_NONE;
         setGeometryChanged(GEOMETRY_DISPLAY_RESOLUTION_CHANGED);
+    }
 
     updateInternalDisplayConfigVariables(config);
     return HWC2_ERROR_NONE;
@@ -4420,6 +4456,12 @@ int32_t ExynosDisplay::validateDisplay(
 
     if (mPauseDisplay)
         return HWC2_ERROR_NONE;
+
+    if ((mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) &&
+            !isFullScreenComposition()) {
+        ALOGD("validateDisplay: drop invalid frame during resolution switch");
+        return HWC2_ERROR_NONE;
+    }
 
     int ret = NO_ERROR;
     bool validateError = false;
