@@ -108,11 +108,12 @@ public:
     }
 
     void setClientTargetProperty(int64_t display, const ClientTargetProperty& clientTargetProperty,
-                                 float brightness) {
+                                 float brightness, const DimmingStage& dimmingStage) {
         ClientTargetPropertyWithBrightness clientTargetPropertyWithBrightness;
         clientTargetPropertyWithBrightness.display = display;
         clientTargetPropertyWithBrightness.clientTargetProperty = clientTargetProperty;
         clientTargetPropertyWithBrightness.brightness = brightness;
+        clientTargetPropertyWithBrightness.dimmingStage = dimmingStage;
         mCommandsResults.emplace_back(std::move(clientTargetPropertyWithBrightness));
     }
 

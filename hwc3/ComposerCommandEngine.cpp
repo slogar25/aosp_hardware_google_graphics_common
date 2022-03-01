@@ -139,15 +139,17 @@ int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
     std::vector<int32_t> requestMasks;
     ClientTargetProperty clientTargetProperty{common::PixelFormat::RGBA_8888,
                                               common::Dataspace::UNKNOWN};
+    DimmingStage dimmingStage;
     auto err =
             mHal->validateDisplay(display, &changedLayers, &compositionTypes, &displayRequestMask,
-                                  &requestedLayers, &requestMasks, &clientTargetProperty);
+                                  &requestedLayers, &requestMasks, &clientTargetProperty,
+                                  &dimmingStage);
     mResources->setDisplayMustValidateState(display, false);
     if (!err) {
         mWriter->setChangedCompositionTypes(display, changedLayers, compositionTypes);
         mWriter->setDisplayRequests(display, displayRequestMask, requestedLayers, requestMasks);
         static constexpr float kBrightness = 1.f;
-        mWriter->setClientTargetProperty(display, clientTargetProperty, kBrightness);
+        mWriter->setClientTargetProperty(display, clientTargetProperty, kBrightness, dimmingStage);
     } else {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
