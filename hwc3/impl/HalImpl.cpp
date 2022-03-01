@@ -414,7 +414,7 @@ int32_t HalImpl::getDisplayPhysicalOrientation(int64_t display,
     RET_IF_ERR(halDisplay->getMountOrientation(&hwcOrientation));
     h2a::translate(hwcOrientation, *orientation);
 
-    return HWC2_ERROR_UNSUPPORTED;
+    return HWC2_ERROR_NONE;
 }
 
 int32_t HalImpl::getDozeSupport(int64_t display, bool& support) {
