@@ -1768,6 +1768,12 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     if (needModesetForReadback)
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
+    /* For Histogram */
+    if (dqeEnable && (ret = setDisplayHistogramSetting(drmReq)) != 0) {
+        HWC_LOGE(mExynosDisplay, "Failed to set display histogram setting (%d)", ret);
+        return ret;
+    }
+
     if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
         HWC_LOGE(mExynosDisplay, "failed to update color settings (%d)", ret);
         return ret;

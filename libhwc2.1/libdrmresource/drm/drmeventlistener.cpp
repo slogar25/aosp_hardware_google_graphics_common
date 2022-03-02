@@ -111,6 +111,15 @@ void DrmEventListener::UnRegisterHotplugHandler(DrmEventHandler *handler) {
     hotplug_handler_ = NULL;
 }
 
+void DrmEventListener::RegisterHistogramHandler(DrmHistogramEventHandler *handler) {
+    assert(!histogram_handler_);
+    histogram_handler_.reset(handler);
+}
+
+void DrmEventListener::UnRegisterHistogramHandler(DrmHistogramEventHandler *handler) {
+    if (handler == histogram_handler_.get()) histogram_handler_ = NULL;
+}
+
 void DrmEventListener::RegisterTUIHandler(DrmTUIEventHandler *handler) {
   if (tui_handler_) {
     ALOGE("TUI handler was already registered");
@@ -194,6 +203,47 @@ void DrmEventListener::UEventHandler() {
   }
 }
 
+void DrmEventListener::DRMEventHandler() {
+    char buffer[1024];
+    int len, i;
+    struct drm_event *e;
+    struct drm_event_vblank *vblank;
+    struct exynos_drm_histogram_event *histo;
+    void *user_data;
+
+    len = read(drm_->fd(), &buffer, sizeof(buffer));
+    if (len == 0) return;
+    if (len < (int)sizeof(*e)) return;
+
+    i = 0;
+    while (i < len) {
+        e = (struct drm_event *)(buffer + i);
+        switch (e->type) {
+            case EXYNOS_DRM_HISTOGRAM_EVENT:
+                if (histogram_handler_) {
+                    histo = (struct exynos_drm_histogram_event *)e;
+                    histogram_handler_->HandleHistogramEvent((void *)&(histo->bins));
+                }
+                break;
+            case DRM_EVENT_FLIP_COMPLETE:
+                vblank = (struct drm_event_vblank *)e;
+                user_data = (void *)(unsigned long)(vblank->user_data);
+                FlipHandler(drm_->fd(), vblank->sequence, vblank->tv_sec, vblank->tv_usec,
+                            user_data);
+                break;
+            case DRM_EVENT_VBLANK:
+            case DRM_EVENT_CRTC_SEQUENCE:
+                /* These DRM events are not handled */
+                break;
+            default:
+                break;
+        }
+        i += e->length;
+    }
+
+    return;
+}
+
 void DrmEventListener::TUIEventHandler() {
   if (!tui_handler_) {
     ALOGE("%s:: tui event handler is not valid", __func__);
@@ -216,11 +266,7 @@ void DrmEventListener::Routine() {
       if (events[n].data.fd == uevent_fd_.get()) {
         UEventHandler();
       } else if (events[n].data.fd == drm_->fd()) {
-        drmEventContext event_context =
-            {.version = 2,
-             .vblank_handler = NULL,
-             .page_flip_handler = DrmEventListener::FlipHandler};
-        drmHandleEvent(drm_->fd(), &event_context);
+          DRMEventHandler();
       }
     } else if (events[n].events & EPOLLPRI) {
       if (tuievent_fd_.get() >= 0 && events[n].data.fd == tuievent_fd_.get()) {

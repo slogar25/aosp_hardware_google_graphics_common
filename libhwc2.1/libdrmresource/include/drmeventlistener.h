@@ -36,6 +36,14 @@ class DrmEventHandler {
   virtual void HandleEvent(uint64_t timestamp_us) = 0;
 };
 
+class DrmHistogramEventHandler {
+public:
+    DrmHistogramEventHandler() {}
+    virtual ~DrmHistogramEventHandler() {}
+
+    virtual void HandleHistogramEvent(void *) = 0;
+};
+
 class DrmTUIEventHandler {
  public:
   DrmTUIEventHandler() {
@@ -57,6 +65,8 @@ class DrmEventListener : public Worker {
 
   void RegisterHotplugHandler(DrmEventHandler *handler);
   void UnRegisterHotplugHandler(DrmEventHandler *handler);
+  void RegisterHistogramHandler(DrmHistogramEventHandler *handler);
+  void UnRegisterHistogramHandler(DrmHistogramEventHandler *handler);
   void RegisterTUIHandler(DrmTUIEventHandler *handler);
   void UnRegisterTUIHandler(DrmTUIEventHandler *handler);
 
@@ -70,6 +80,7 @@ class DrmEventListener : public Worker {
 
  private:
   void UEventHandler();
+  void DRMEventHandler();
   void TUIEventHandler();
 
   UniqueFd epoll_fd_;
@@ -78,6 +89,7 @@ class DrmEventListener : public Worker {
 
   DrmDevice *drm_;
   std::unique_ptr<DrmEventHandler> hotplug_handler_;
+  std::unique_ptr<DrmHistogramEventHandler> histogram_handler_;
   std::unique_ptr<DrmTUIEventHandler> tui_handler_;
 };
 }  // namespace android

@@ -32,14 +32,18 @@ class ExynosDeviceDrmInterface : public ExynosDeviceInterface {
                 std::unique_ptr<ExynosDisplayInterface> &dispInterface) override;
         virtual void updateRestrictions() override;
     protected:
-        class ExynosDrmEventHandler: public DrmEventHandler, public DrmTUIEventHandler {
-            public:
-                void HandleEvent(uint64_t timestamp_us) override;
-                void HandleTUIEvent() override;
-                void init(ExynosDevice *exynosDevice, DrmDevice *drmDevice);
-            private:
-                ExynosDevice *mExynosDevice;
-		DrmDevice *mDrmDevice;
+        class ExynosDrmEventHandler : public DrmEventHandler,
+                                      public DrmHistogramEventHandler,
+                                      public DrmTUIEventHandler {
+        public:
+            void HandleEvent(uint64_t timestamp_us) override;
+            void HandleHistogramEvent(void *bin) override;
+            void HandleTUIEvent() override;
+            void init(ExynosDevice *exynosDevice, DrmDevice *drmDevice);
+
+        private:
+            ExynosDevice *mExynosDevice;
+            DrmDevice *mDrmDevice;
         };
         ResourceManager mDrmResourceManager;
         DrmDevice *mDrmDevice;
