@@ -23,4 +23,10 @@ enum class HwcMountOrientation {
     ROT_270,
 };
 
+enum class HwcDimmingStage {
+    DIMMING_NONE = 0,
+    DIMMING_LINEAR,
+    DIMMING_OETF,
+};
+
 #endif  // EXYNOS_HWC3_TYPES_H_

@@ -41,6 +41,7 @@
 #include <aidl/android/hardware/graphics/composer3/CommandResultPayload.h>
 #include <aidl/android/hardware/graphics/composer3/Composition.h>
 #include <aidl/android/hardware/graphics/composer3/ContentType.h>
+#include <aidl/android/hardware/graphics/composer3/DimmingStage.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayAttribute.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayBrightness.h>
 #include <aidl/android/hardware/graphics/composer3/DisplayCapability.h>
@@ -210,7 +211,8 @@ class IComposerHal {
                                     uint32_t* outDisplayRequestMask,
                                     std::vector<int64_t>* outRequestedLayers,
                                     std::vector<int32_t>* outRequestMasks,
-                                    ClientTargetProperty* outClientTargetProperty) = 0;
+                                    ClientTargetProperty* outClientTargetProperty,
+                                    DimmingStage* outDimmingStage) = 0;
     virtual int32_t setExpectedPresentTime(
             int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) = 0;
     virtual int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) = 0;

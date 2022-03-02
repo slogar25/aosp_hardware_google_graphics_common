@@ -4090,10 +4090,14 @@ int32_t ExynosDisplay::setContentType(int32_t /* hwc2_content_type_t */ contentT
     return HWC2_ERROR_UNSUPPORTED;
 }
 
-int32_t ExynosDisplay::getClientTargetProperty(hwc_client_target_property_t* outClientTargetProperty)
-{
+int32_t ExynosDisplay::getClientTargetProperty(
+                        hwc_client_target_property_t *outClientTargetProperty,
+                        HwcDimmingStage *outDimmingStage) {
     outClientTargetProperty->pixelFormat = HAL_PIXEL_FORMAT_RGBA_8888;
     outClientTargetProperty->dataspace = HAL_DATASPACE_UNKNOWN;
+    if (outDimmingStage != nullptr)
+        *outDimmingStage = HwcDimmingStage::DIMMING_NONE;
+
     return HWC2_ERROR_NONE;
 }
 
