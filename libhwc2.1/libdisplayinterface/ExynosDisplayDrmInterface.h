@@ -301,6 +301,13 @@ class ExynosDisplayDrmInterface :
         virtual int32_t waitVBlank();
         float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
 
+        /* For Histogram */
+        virtual int32_t setDisplayHistogramSetting(
+                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
+            return NO_ERROR;
+        }
+        virtual int32_t setHistogramData(void *__unused bin) { return NO_ERROR; }
+
     protected:
         enum class HalMipiSyncType : uint32_t {
             HAL_MIPI_CMD_SYNC_REFRESH_RATE = 0,
