@@ -541,4 +541,14 @@ int DrmDevice::UpdateCrtcProperty(const DrmCrtc &crtc, DrmProperty *property) {
 int DrmDevice::UpdateConnectorProperty(const DrmConnector &conn, DrmProperty *property) {
     return UpdateObjectProperty(conn.id(), DRM_MODE_OBJECT_CONNECTOR, property);
 }
+
+int DrmDevice::CallVendorIoctl(unsigned long request, void *arg) {
+    int ret = drmIoctl(fd(), request, arg);
+    if (ret) {
+        ALOGE("Failed to call vendor ioctl %lu ioctl_ret= %d", request, ret);
+        return ret;
+    }
+
+    return 0;
+}
 }  // namespace android
