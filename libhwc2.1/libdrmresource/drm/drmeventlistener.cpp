@@ -111,6 +111,15 @@ void DrmEventListener::UnRegisterHotplugHandler(DrmEventHandler *handler) {
     hotplug_handler_ = NULL;
 }
 
+void DrmEventListener::RegisterHistogramHandler(DrmHistogramEventHandler *handler) {
+    assert(!histogram_handler_);
+    histogram_handler_.reset(handler);
+}
+
+void DrmEventListener::UnRegisterHistogramHandler(DrmHistogramEventHandler *handler) {
+    if (handler == histogram_handler_.get()) histogram_handler_ = NULL;
+}
+
 void DrmEventListener::RegisterTUIHandler(DrmTUIEventHandler *handler) {
   if (tui_handler_) {
     ALOGE("TUI handler was already registered");
@@ -199,6 +208,7 @@ void DrmEventListener::DRMEventHandler() {
     int len, i;
     struct drm_event *e;
     struct drm_event_vblank *vblank;
+    struct exynos_drm_histogram_event *histo;
     void *user_data;
 
     len = read(drm_->fd(), &buffer, sizeof(buffer));
@@ -209,10 +219,15 @@ void DrmEventListener::DRMEventHandler() {
     while (i < len) {
         e = (struct drm_event *)(buffer + i);
         switch (e->type) {
+            case EXYNOS_DRM_HISTOGRAM_EVENT:
+                if (histogram_handler_) {
+                    histo = (struct exynos_drm_histogram_event *)e;
+                    histogram_handler_->HandleHistogramEvent((void *)&(histo->bins));
+                }
+                break;
             case DRM_EVENT_FLIP_COMPLETE:
                 vblank = (struct drm_event_vblank *)e;
                 user_data = (void *)(unsigned long)(vblank->user_data);
-
                 FlipHandler(drm_->fd(), vblank->sequence, vblank->tv_sec, vblank->tv_usec,
                             user_data);
                 break;
