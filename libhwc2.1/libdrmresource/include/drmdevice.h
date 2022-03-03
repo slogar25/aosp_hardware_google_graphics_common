@@ -81,8 +81,13 @@ class DrmDevice {
   void RegisterHotplugHandler(DrmEventHandler *handler) {
     event_listener_.RegisterHotplugHandler(handler);
   }
+  void RegisterHistogramHandler(DrmHistogramEventHandler *handler) {
+      event_listener_.RegisterHistogramHandler(handler);
+  }
 
- private:
+  int CallVendorIoctl(unsigned long request, void *arg);
+
+  private:
   int UpdateObjectProperty(int id, int type, DrmProperty *property);
   int TryEncoderForDisplay(int display, DrmEncoder *enc);
   int GetProperty(uint32_t obj_id, uint32_t obj_type, const char *prop_name,
