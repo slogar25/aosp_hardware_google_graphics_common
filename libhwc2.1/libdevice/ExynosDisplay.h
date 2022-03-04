@@ -1193,6 +1193,7 @@ class ExynosDisplay {
         virtual int32_t setDisplayIdleTimer(const int32_t __unused timeoutMs) {
             return HWC2_ERROR_UNSUPPORTED;
         }
+        virtual void handleDisplayIdleEnter(const uint32_t __unused idleTeRefreshRate) {}
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */

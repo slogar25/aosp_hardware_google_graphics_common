@@ -42,6 +42,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual uint64_t getPendingExpectedPresentTime();
         virtual void applyExpectedPresentTime();
         virtual int32_t setDisplayIdleTimer(const int32_t timeoutMs) override;
+        virtual void handleDisplayIdleEnter(const uint32_t idleTeRefreshRate) override;
 
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t doDisplayConfigInternal(hwc2_config_t config) override;
@@ -88,6 +89,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         void firstPowerOn();
         int32_t setDisplayIdleTimerEnabled(const bool enabled);
         int32_t getDisplayIdleTimerEnabled(bool& enabled);
+        void setDisplayNeedHandleIdleExit(const bool needed, const bool force);
+        void initDisplayHandleIdleExit();
 
         // LHBM
         FILE* mLhbmFd;
@@ -114,6 +117,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         bool mDisplayIdleTimerEnabled;
         int64_t mDisplayIdleTimerNanos[toUnderlying(DispIdleTimerRequester::MAX)];
+        std::ofstream mDisplayNeedHandleIdleExitOfs;
+        bool mDisplayNeedHandleIdleExit;
 };
 
 #endif
