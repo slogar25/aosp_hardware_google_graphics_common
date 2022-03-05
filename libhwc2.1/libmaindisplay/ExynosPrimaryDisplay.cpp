@@ -32,6 +32,7 @@
 #include "ExynosExternalDisplay.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
+#include "ExynosLayer.h"
 
 extern struct exynos_hwc_control exynosHWCControl;
 
@@ -75,7 +76,8 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
         mRefreshRateDelayNanos(0),
         mLastRefreshRateAppliedNanos(0),
         mAppliedActiveConfig(0),
-        mDisplayIdleTimerEnabled(false) {
+        mDisplayIdleTimerEnabled(false),
+        mDisplayNeedHandleIdleExit(false) {
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
 
@@ -115,6 +117,10 @@ ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
     if (mEarlyWakeupDispFd) {
         fclose(mEarlyWakeupDispFd);
         mEarlyWakeupDispFd = nullptr;
+    }
+
+    if (mDisplayNeedHandleIdleExitOfs.is_open()) {
+        mDisplayNeedHandleIdleExitOfs.close();
     }
 }
 
@@ -302,6 +308,7 @@ void ExynosPrimaryDisplay::firstPowerOn() {
     SetCurrentPanelGammaSource(DisplayType::DISPLAY_PRIMARY, PanelGammaSource::GAMMA_CALIBRATION);
     mFirstPowerOn = false;
     getDisplayIdleTimerEnabled(mDisplayIdleTimerEnabled);
+    initDisplayHandleIdleExit();
 }
 
 bool ExynosPrimaryDisplay::getHDRException(ExynosLayer* __unused layer)
@@ -524,6 +531,67 @@ int32_t ExynosPrimaryDisplay::setDisplayIdleTimerEnabled(const bool enabled) {
     return NO_ERROR;
 }
 
+void ExynosPrimaryDisplay::initDisplayHandleIdleExit() {
+    if (bool support; getDisplayIdleTimerSupport(support) || support == false) {
+        return;
+    }
+
+    const std::string path =
+            getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "panel_need_handle_idle_exit";
+    mDisplayNeedHandleIdleExitOfs.open(path, std::ofstream::out);
+    if (!mDisplayNeedHandleIdleExitOfs.is_open()) {
+        ALOGI("%s() '%s' doesn't exist(%s)", __func__, path.c_str(), strerror(errno));
+    }
+
+    setDisplayNeedHandleIdleExit(false, true);
+}
+
+void ExynosPrimaryDisplay::setDisplayNeedHandleIdleExit(const bool needed, const bool force) {
+    if (!mDisplayNeedHandleIdleExitOfs.is_open()) {
+        return;
+    }
+
+    if (needed == mDisplayNeedHandleIdleExit && !force) {
+        return;
+    }
+
+    mDisplayNeedHandleIdleExitOfs << needed;
+    if (mDisplayNeedHandleIdleExitOfs.fail()) {
+        ALOGW("%s() failed to write panel_need_handle_idle_exit(%d) to sysfs node %s", __func__,
+              needed, strerror(errno));
+        return;
+    }
+
+    mDisplayNeedHandleIdleExitOfs.flush();
+    if (mDisplayNeedHandleIdleExitOfs.fail()) {
+        ALOGW("%s() failed to flush panel_need_handle_idle_exit(%d) to sysfs node %s", __func__,
+              needed, strerror(errno));
+        return;
+    }
+
+    ALOGI("%s() writes panel_need_handle_idle_exit(%d) to sysfs node", __func__, needed);
+    mDisplayNeedHandleIdleExit = needed;
+}
+
+void ExynosPrimaryDisplay::handleDisplayIdleEnter(const uint32_t idleTeRefreshRate) {
+    Mutex::Autolock lock(mDisplayMutex);
+    uint32_t btsRefreshRate = getBtsRefreshRate();
+    if (idleTeRefreshRate <= btsRefreshRate) {
+        return;
+    }
+
+    bool needed = false;
+    for (size_t i = 0; i < mLayers.size(); i++) {
+        if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP == nullptr &&
+            !mLayers[i]->checkDownscaleCap(idleTeRefreshRate)) {
+            needed = true;
+            break;
+        }
+    }
+
+    setDisplayNeedHandleIdleExit(needed, false);
+}
+
 int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int fps) {
     mMinIdleRefreshRate = fps;
 
@@ -586,6 +654,8 @@ int ExynosPrimaryDisplay::setRefreshRateThrottleNanos(const int64_t delayNanos,
 
 void ExynosPrimaryDisplay::dump(String8 &result) {
     ExynosDisplay::dump(result);
+    result.appendFormat("Display idle timer: %s\n",
+                        (mDisplayIdleTimerEnabled) ? "enabled" : "disabled");
     result.appendFormat("Min idle refresh rate: %d\n", mMinIdleRefreshRate);
     result.appendFormat("Refresh rate delay: %" PRId64 " ns\n", mRefreshRateDelayNanos);
     for (uint32_t i = 0; i < toUnderlying(DispIdleTimerRequester::MAX); i++) {

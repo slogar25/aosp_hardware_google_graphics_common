@@ -133,6 +133,16 @@ void DrmEventListener::UnRegisterTUIHandler(DrmTUIEventHandler *handler) {
     tui_handler_ = NULL;
 }
 
+void DrmEventListener::RegisterPanelIdleHandler(DrmPanelIdleEventHandler *handler) {
+  assert(!panel_idle_handler_);
+  panel_idle_handler_.reset(handler);
+}
+
+void DrmEventListener::UnRegisterPanelIdleHandler(DrmPanelIdleEventHandler *handler) {
+  if (handler == panel_idle_handler_.get())
+    panel_idle_handler_ = NULL;
+}
+
 bool DrmEventListener::IsDrmInTUI() {
   char buffer[1024];
   int ret;
@@ -159,7 +169,7 @@ void DrmEventListener::FlipHandler(int /* fd */, unsigned int /* sequence */,
   if (!handler)
     return;
 
-  handler->HandleEvent((uint64_t)tv_sec * 1000 * 1000 + tv_usec);
+  handler->handleEvent((uint64_t)tv_sec * 1000 * 1000 + tv_usec);
   delete handler;
 }
 
@@ -177,7 +187,7 @@ void DrmEventListener::UEventHandler() {
 
   ret = read(uevent_fd_.get(), &buffer, sizeof(buffer));
   if (ret == 0) {
-      return;
+    return;
   } else if (ret < 0) {
     ALOGE("Got error reading uevent %d", ret);
     return;
@@ -186,8 +196,11 @@ void DrmEventListener::UEventHandler() {
   bool drm_event = false, hotplug_event = false;
   for (int i = 0; i < ret;) {
     char *event = buffer + i;
+
     if (!strcmp(event, "DEVTYPE=drm_minor")) {
       drm_event = true;
+    } else if (!strncmp(event, "PANEL_IDLE_ENTER=", strlen("PANEL_IDLE_ENTER="))) {
+      panel_idle_handler_->handleIdleEnterEvent(event);
     } else if (!strcmp(event, "HOTPLUG=1")) {
       hotplug_event = true;
     }
@@ -199,7 +212,7 @@ void DrmEventListener::UEventHandler() {
     if (!hotplug_handler_)
       return;
 
-    hotplug_handler_->HandleEvent(timestamp);
+    hotplug_handler_->handleEvent(timestamp);
   }
 }
 
@@ -222,7 +235,7 @@ void DrmEventListener::DRMEventHandler() {
             case EXYNOS_DRM_HISTOGRAM_EVENT:
                 if (histogram_handler_) {
                     histo = (struct exynos_drm_histogram_event *)e;
-                    histogram_handler_->HandleHistogramEvent((void *)&(histo->bins));
+                    histogram_handler_->handleHistogramEvent((void *)&(histo->bins));
                 }
                 break;
             case DRM_EVENT_FLIP_COMPLETE:
@@ -250,7 +263,7 @@ void DrmEventListener::TUIEventHandler() {
     return;
   }
 
-  tui_handler_->HandleTUIEvent();
+  tui_handler_->handleTUIEvent();
 }
 
 void DrmEventListener::Routine() {
