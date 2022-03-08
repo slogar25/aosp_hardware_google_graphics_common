@@ -47,6 +47,8 @@ public:
     ndk::ScopedAStatus setCompensationImageHandle(const NativeHandle &native_handle,
                                                   const std::string &imageName,
                                                   int *_aidl_return) override;
+    ndk::ScopedAStatus setMinIdleRefreshRate(int fps, int *_aidl_return) override;
+    ndk::ScopedAStatus setRefreshRateThrottle(int delayMs, int *_aidl_return) override;
 
 private:
     ExynosDevice *mDevice = nullptr;

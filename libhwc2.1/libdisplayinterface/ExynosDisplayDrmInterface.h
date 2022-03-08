@@ -429,6 +429,8 @@ class ExynosDisplayDrmInterface :
         void getBrightnessInterfaceSupport();
         void setupBrightnessConfig();
         void parseHbmModeEnums(const DrmProperty &property);
+        void checkHbmSvDimming();
+        void endHbmSvDimming();
         FILE *mHbmModeFd;
         FILE *mDimmingOnFd;
         bool mBrightntessIntfSupported = false;
@@ -491,9 +493,9 @@ class ExynosDisplayDrmInterface :
         // TODO: hbm in dual display is not supported. It should support it in
         //      the furture.
         static constexpr const char *kHbmModeFileNode =
-                "/sys/class/backlight/panel0-backlight/hbm_mode";
+                "/sys/class/backlight/panel%d-backlight/hbm_mode";
         static constexpr const char *kDimmingOnFileNode =
-                "/sys/class/backlight/panel0-backlight/dimming_on";
+                "/sys/class/backlight/panel%d-backlight/dimming_on";
 
         static constexpr int32_t kHbmDimmingTimeUs = 5000000;
 
@@ -514,7 +516,10 @@ class ExynosDisplayDrmInterface :
         BrightnessDimmingUsage mBrightnessDimmingUsage;
         bool mHbmSvDimming;
         int32_t mHbmDimmingTimeUs;
-        struct timeval mHbmDimmingStart;
+        std::thread mDimmingThread;
+        bool mHbmSvDimmingThreadRunning;
+        Condition mHbmSvDimmingCond;
+        Mutex mHbmSvDimmingMutex;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);

@@ -405,6 +405,11 @@ ExynosDisplayDrmInterface::~ExynosDisplayDrmInterface()
         mDrmDevice->DestroyPropertyBlob(mDesiredModeState.old_blob_id);
     if (mPartialRegionState.blob_id)
         mDrmDevice->DestroyPropertyBlob(mPartialRegionState.blob_id);
+    if (mHbmSvDimmingThreadRunning) {
+        mHbmSvDimmingThreadRunning = false;
+        mHbmSvDimmingCond.signal();
+        mDimmingThread.join();
+    }
 }
 
 void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
@@ -642,24 +647,21 @@ void ExynosDisplayDrmInterface::Callback(
     }
 
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
-    exynosDevice->compareVsyncPeriod();
-    if (exynosDevice->mVsyncDisplayId == mExynosDisplay->mDisplayId) {
-        auto vsync_2_4CallbackInfo =
-            exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
-        if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
-            ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
-                    vsync_2_4CallbackInfo.callbackData,
-                    mExynosDisplay->mDisplayId,
-                    timestamp, mExynosDisplay->mVsyncPeriod);
-            ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
-            return;
-        }
-
-        auto vsyncCallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
-        if (vsyncCallbackInfo.funcPointer && vsyncCallbackInfo.callbackData)
-            ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(vsyncCallbackInfo.callbackData,
-                                                            mExynosDisplay->mDisplayId, timestamp);
+    auto vsync_2_4CallbackInfo =
+        exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
+    if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
+        ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
+                vsync_2_4CallbackInfo.callbackData,
+                mExynosDisplay->mDisplayId,
+                timestamp, mExynosDisplay->mVsyncPeriod);
+        ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
+        return;
     }
+
+    auto vsyncCallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
+    if (vsyncCallbackInfo.funcPointer && vsyncCallbackInfo.callbackData)
+        ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(vsyncCallbackInfo.callbackData,
+                                                        mExynosDisplay->mDisplayId, timestamp);
 }
 
 bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
@@ -993,7 +995,8 @@ int32_t ExynosDisplayDrmInterface::setColorMode(int32_t mode)
 int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
         hwc2_config_t config, bool test)
 {
-    ALOGD("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
+    ALOGD("%s:: %s config(%d) test(%d)", __func__, mExynosDisplay->mDisplayName.string(), config,
+          test);
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
             [config](DrmMode const &m) { return m.id() == config;});
     if (mode == mDrmConnector->modes().end()) {
@@ -1092,6 +1095,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
         return HWC2_ERROR_BAD_CONFIG;
     }
 
+    mExynosDisplay->updateAppliedActiveConfig(config, systemTime(SYSTEM_TIME_MONOTONIC));
     if (!setActiveDrmMode(*mode)) {
         ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
     } else {
@@ -1214,6 +1218,9 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HDR10");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10);
+        if (mExynosDisplay->mDevice->mResourceManager->hasHDR10PlusMPP()) {
+            mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10_PLUS);
+        }
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.string(), HAL_HDR_HDR10);
     }
@@ -1654,6 +1661,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     if (mBrightnessCtrl.LhbmOn.is_dirty()) {
         auto dbv = mBrightnessLevel.get();
+        auto old_dbv = dbv;
         if (mBrightnessCtrl.LhbmOn.get()) {
             uint32_t dbv_adj = 0;
             if (mExynosDisplay->getColorAdjustedDbv(dbv_adj)) {
@@ -1668,7 +1676,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             }
         }
 
-        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+        if ((dbv != old_dbv) && (ret = drmReq.atomicAddProperty(mDrmConnector->id(),
                                             mDrmConnector->brightness_level(), dbv)) < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to set brightness_level property", __func__);
         }
@@ -1754,6 +1762,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             return ret;
         }
         drmReq.restorePset();
+        if (out_fences[mDrmCrtc->pipe()] >= 0) {
+            fence_close((int)out_fences[mDrmCrtc->pipe()], mExynosDisplay, FENCE_TYPE_RETIRE,
+                        FENCE_IP_DPP);
+        }
         if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
             HWC_LOGE(mExynosDisplay, "failed to update color settings, ret=%d", ret);
             return ret;
@@ -2319,6 +2331,43 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     return HWC2_ERROR_NONE;
 }
 
+void ExynosDisplayDrmInterface::checkHbmSvDimming() {
+    status_t ret = 0;
+    uint32_t wait = 0;
+
+    while (mHbmSvDimmingThreadRunning) {
+        if (wait == 0) {
+            Mutex::Autolock lock(mHbmSvDimmingMutex);
+            ret = mHbmSvDimmingCond.wait(mHbmSvDimmingMutex);
+        } else {
+            Mutex::Autolock lock(mHbmSvDimmingMutex);
+            ret = mHbmSvDimmingCond.waitRelative(mHbmSvDimmingMutex, us2ns(wait));
+        }
+        // When the time out, it turns dimming off(hbm sv dimming done).
+        // Then, it waits the next hbm sv dimming event.
+        if (ret == TIMED_OUT) {
+            ret = 0;
+            wait = 0;
+            ALOGI("checking the dimming status");
+            endHbmSvDimming();
+        } else {
+            wait = mHbmDimmingTimeUs;
+        }
+    }
+}
+
+void ExynosDisplayDrmInterface::endHbmSvDimming() {
+    Mutex::Autolock lock(mBrightnessUpdateMutex);
+    if (!mHbmSvDimming) return;
+    mHbmSvDimming = false;
+    mBrightnessCtrl.DimmingOn.store(false);
+
+    if (mDimmingOnFd && mBrightnessCtrl.DimmingOn.is_dirty()) {
+        writeFileNode(mDimmingOnFd, mBrightnessCtrl.DimmingOn.get());
+        mBrightnessCtrl.DimmingOn.clear_dirty();
+    }
+}
+
 void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     if (mDrmConnector->brightness_cap().id() == 0) {
         ALOGD("the brightness_cap is not supported");
@@ -2365,17 +2414,25 @@ void ExynosDisplayDrmInterface::getBrightnessInterfaceSupport() {
     mBrightnessState.reset();
     mBrightnessCtrl.reset();
 
-    mHbmModeFd = fopen(kHbmModeFileNode, "w+");
-    if (mHbmModeFd == NULL) ALOGE("%s open failed! %s", kHbmModeFileNode, strerror(errno));
+    String8 node_name;
+    node_name.appendFormat(kHbmModeFileNode, mExynosDisplay->mIndex);
+    mHbmModeFd = fopen(node_name.string(), "w+");
+    if (mHbmModeFd == NULL) ALOGE("%s open failed! %s", node_name.string(), strerror(errno));
 
-    mDimmingOnFd = fopen(kDimmingOnFileNode, "w+");
-    if (mDimmingOnFd == NULL) ALOGE("%s open failed! %s", kDimmingOnFileNode, strerror(errno));
+    node_name.clear();
+    node_name.appendFormat(kDimmingOnFileNode, mExynosDisplay->mIndex);
+    mDimmingOnFd = fopen(node_name.string(), "w+");
+    if (mDimmingOnFd == NULL) ALOGE("%s open failed! %s", node_name.string(), strerror(errno));
 
     if (mDimmingOnFd) {
         mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(
                 property_get_int32("vendor.display.brightness.dimming.usage", 0));
         mHbmDimmingTimeUs =
                 property_get_int32("vendor.display.brightness.dimming.hbm_time", kHbmDimmingTimeUs);
+        if (mBrightnessDimmingUsage == BrightnessDimmingUsage::HBM) {
+            mHbmSvDimmingThreadRunning = true;
+            mDimmingThread = std::thread(&ExynosDisplayDrmInterface::checkHbmSvDimming, this);
+        }
     }
 
     return;
@@ -2489,21 +2546,14 @@ void ExynosDisplayDrmInterface::setupBrightnessConfig() {
         case BrightnessDimmingUsage::HBM:
             if ((static_cast<uint32_t>(hbm_mode) > static_cast<uint32_t>(HbmMode::OFF)) !=
                 mBrightnessCtrl.HbmMode.get() > static_cast<uint32_t>(HbmMode::OFF)) {
-                gettimeofday(&mHbmDimmingStart, NULL);
                 if (brightness_state.hdr_full_screen != mBrightnessState.hdr_full_screen) {
                     mBrightnessState.hdr_full_screen = brightness_state.hdr_full_screen;
                 } else {
                     mHbmSvDimming = true;
+                    mHbmSvDimmingCond.signal();
                 }
             }
-
-            if (mHbmSvDimming) {
-                struct timeval curr_time;
-                gettimeofday(&curr_time, NULL);
-                curr_time.tv_usec += (curr_time.tv_sec - mHbmDimmingStart.tv_sec) * 1000000;
-                long duration = curr_time.tv_usec - mHbmDimmingStart.tv_usec;
-                if (duration > mHbmDimmingTimeUs) mHbmSvDimming = false;
-            }
+            if (mBrightnessLevel.get() == 0) mHbmSvDimming = false;
             dimming_on = dimming_on && (mHbmSvDimming);
             break;
         case BrightnessDimmingUsage::NONE:

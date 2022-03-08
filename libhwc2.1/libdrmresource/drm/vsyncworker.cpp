@@ -49,6 +49,7 @@ VSyncWorker::VSyncWorker()
 }
 
 VSyncWorker::~VSyncWorker() {
+    Exit();
 }
 
 int VSyncWorker::Init(DrmDevice *drm, int display) {
