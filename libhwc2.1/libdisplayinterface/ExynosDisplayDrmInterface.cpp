@@ -1124,7 +1124,6 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
         } else {
             ALOGD("%s: switching display resolution, clearing planes", __func__);
         }
-        flags |= DRM_MODE_ATOMIC_NONBLOCK;
         reconfig = true;
     }
 
