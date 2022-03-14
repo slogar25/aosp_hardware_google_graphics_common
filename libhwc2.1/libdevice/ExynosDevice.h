@@ -184,6 +184,8 @@ class ExynosDevice {
         /** TODO : Array size shuld be checked */
         exynos_callback_info_t mCallbackInfos[HWC2_CALLBACK_SEAMLESS_POSSIBLE + 1];
 
+        std::map<uint32_t, exynos_callback_info_t> mHwc3CallbackInfos;
+
         /**
          * Thread variables
          */
@@ -319,6 +321,10 @@ class ExynosDevice {
         uint32_t getSpecialPlaneNum(uint32_t displayId);
         uint32_t getSpecialPlaneId(uint32_t index);
         uint64_t getSpecialPlaneAttr(uint32_t index);
+
+        int32_t registerHwc3Callback(uint32_t descriptor, hwc2_callback_data_t callbackData,
+                                     hwc2_function_pointer_t point);
+        void onVsyncIdle(hwc2_display_t displayId);
 
     protected:
         void initDeviceInterface(uint32_t interfaceType);
