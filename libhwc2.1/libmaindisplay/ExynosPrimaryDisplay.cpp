@@ -109,7 +109,9 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     if (mEarlyWakeupDispFd == nullptr)
         ALOGE("open %s failed! %s", EARLY_WAKUP_NODE_0_BASE, strerror(errno));
     mBrightnessController =
-            std::make_unique<BrightnessController>(mIndex, [this]() { mDevice->invalidate(); });
+            std::make_unique<BrightnessController>(mIndex,
+                                     [this]() { mDevice->invalidate(); },
+                                     [this]() { updatePresentColorConversionInfo(); });
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
