@@ -423,7 +423,7 @@ void ExynosDisplay::PowerHalHintWorker::signalActualWorkDuration(nsecs_t actualD
           targetNs, actualNs - targetNs);
     if (sTraceHintSessionData) {
         ATRACE_INT64("Measured duration", actualNs);
-        ATRACE_INT64("Target error term", actualNs - targetNs);
+        ATRACE_INT64("Target error term", targetNs - actualNs);
     }
 
     WorkDuration work;
@@ -699,7 +699,7 @@ const bool ExynosDisplay::PowerHalHintWorker::sTraceHintSessionData =
         base::GetBoolProperty(std::string("debug.hwc.trace_hint_sessions"), false);
 
 const bool ExynosDisplay::PowerHalHintWorker::sNormalizeTarget =
-        base::GetBoolProperty(std::string("debug.hwc.normalize_hint_session_durations"), true);
+        base::GetBoolProperty(std::string("debug.hwc.normalize_hint_session_durations"), false);
 
 const bool ExynosDisplay::PowerHalHintWorker::sUseRateLimiter =
         base::GetBoolProperty(std::string("debug.hwc.use_rate_limiter"), true);
