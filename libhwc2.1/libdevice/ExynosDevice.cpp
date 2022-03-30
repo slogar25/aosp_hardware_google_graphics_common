@@ -764,18 +764,14 @@ bool ExynosDevice::canSkipValidate()
 bool ExynosDevice::validateFences(ExynosDisplay *display) {
 
     if (!validateFencePerFrame(display)) {
-        String8 errString;
-        errString.appendFormat("You should doubt fence leak!\n");
-        ALOGE("%s", errString.string());
+        ALOGE("You should doubt fence leak!");
         saveFenceTrace(display);
         return false;
     }
 
     if (fenceWarn(display, MAX_FENCE_THRESHOLD)) {
-        String8 errString;
-        errString.appendFormat("Fence leak!\n");
-        printLeakFds(display);
         ALOGE("Fence leak! --");
+        printLeakFds(display);
         saveFenceTrace(display);
         return false;
     }
