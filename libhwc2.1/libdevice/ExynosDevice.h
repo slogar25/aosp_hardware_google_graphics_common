@@ -32,6 +32,7 @@
 #include <utils/Vector.h>
 
 #include <atomic>
+#include <map>
 #include <thread>
 
 #include "ExynosHWC.h"
@@ -199,7 +200,7 @@ class ExynosDevice {
         uint32_t mDisplayMode;
 
         // Variable for fence tracer
-        hwc_fence_info mFenceInfo[MAX_FD_NUM];
+        std::map<int, hwc_fence_info_t> mFenceInfos;
 
         /**
          * This will be initialized with differnt class
