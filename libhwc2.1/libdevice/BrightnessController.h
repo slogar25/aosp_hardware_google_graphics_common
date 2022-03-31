@@ -76,7 +76,12 @@ public:
      */
     int processInstantHbm(bool on);
 
-    void updateFrameStates(HdrLayerState hdrState) { mHdrLayerState.store(hdrState); }
+    /**
+     * updateFrameStates
+     *  - hdrState: hdr layer size in this frame
+     *  - sdrDim: whether any dimmed sdr layer in this frame
+     */
+    void updateFrameStates(HdrLayerState hdrState, bool sdrDim);
 
     /**
      * Dim ratio to keep the sdr brightness unchange after an instant hbm on with peak brightness.
@@ -214,6 +219,8 @@ private:
     CtrlValue<HbmMode> mGhbm GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mDimming GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mLhbm GUARDED_BY(mBrightnessMutex);
+    CtrlValue<bool> mSdrDim GUARDED_BY(mBrightnessMutex);
+    CtrlValue<bool> mPrevSdrDim GUARDED_BY(mBrightnessMutex);
 
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
