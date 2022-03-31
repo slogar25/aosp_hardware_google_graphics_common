@@ -493,23 +493,23 @@ enum {
 };
 
 typedef struct fenceTrace {
-    hwc_fdebug_fence_type type;
-    hwc_fdebug_ip_type ip;
-    struct timeval time;
-    int32_t curFlag;
+    hwc_fdebug_fence_type type = FENCE_TYPE_UNDEFINED;
+    hwc_fdebug_ip_type ip = FENCE_IP_UNDEFINED;
+    struct timeval time = {0, 0};
+    int32_t curFlag = 0;
 } fenceTrace_t;
 
 typedef struct hwc_fence_info {
-    uint32_t displayId;
-    struct sync_fence_info_data* sync_data;
-    struct sync_pt_info* pt_info;
-    fenceTrace_t from;
-    fenceTrace_t to;
-    fenceTrace_t dup;
-    fenceTrace_t close;
-    int32_t usage;
-    int32_t curFlag;
-    uint32_t last_dir;
+    uint32_t displayId = HWC_DISPLAY_PRIMARY;
+    struct sync_fence_info_data *sync_data = nullptr;
+    struct sync_pt_info *pt_info = nullptr;
+    fenceTrace_t from = {};
+    fenceTrace_t to = {};
+    fenceTrace_t dup = {};
+    fenceTrace_t close = {};
+    int32_t usage = 0;
+    int32_t curFlag = 0;
+    uint32_t last_dir = 0;
     bool pendingAllowed = false;
     bool leaking = false;
 } hwc_fence_info_t;
@@ -529,10 +529,8 @@ void setFenceName(uint32_t fd, ExynosDisplay *display,
 void setFenceInfo(uint32_t fd, ExynosDisplay *display,
         hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip,
         uint32_t direction, bool pendingAllowed = false);
-void printFenceInfo(uint32_t fd, hwc_fence_info_t* info);
+void printLastFenceInfo(uint32_t fd, ExynosDisplay *display);
 void dumpFenceInfo(ExynosDisplay *display, int32_t __unused depth);
-bool fenceWarn(hwc_fence_info_t **info, uint32_t threshold);
-void resetFenceCurFlag(ExynosDisplay *display);
 bool fenceWarn(ExynosDisplay *display, uint32_t threshold);
 void printLeakFds(ExynosDisplay *display);
 bool validateFencePerFrame(ExynosDisplay *display);
