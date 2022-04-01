@@ -32,6 +32,8 @@ BrightnessController::BrightnessController(int32_t panelIndex, std::function<voi
         mGhbm(HbmMode::OFF),
         mDimming(false),
         mLhbm(false),
+        mSdrDim(false),
+        mPrevSdrDim(false),
         mFrameRefresh(refresh),
         mHdrLayerState(HdrLayerState::kHdrNone),
         mUpdateDcLhbm(updateDcLhbm) {
@@ -281,6 +283,20 @@ int BrightnessController::processLocalHbm(bool on) {
     return NO_ERROR;
 }
 
+void BrightnessController::updateFrameStates(HdrLayerState hdrState, bool sdrDim) {
+    mHdrLayerState.store(hdrState);
+    if (!mGhbmSupported) {
+        return;
+    }
+
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+    mPrevSdrDim.store(mSdrDim.get());
+    mSdrDim.store(sdrDim);
+    if (mSdrDim.is_dirty() || mPrevSdrDim.is_dirty()) {
+        updateStates();
+    }
+}
+
 int BrightnessController::processInstantHbm(bool on) {
     if (!mGhbmSupported) {
         return HWC2_ERROR_UNSUPPORTED;
@@ -503,7 +519,13 @@ int BrightnessController::updateStates() {
         mPendingGhbmStatus = mGhbm.get();
     }
 
-    bool dimming = !mInstantHbmReq.get();
+    // no dimming for instant hbm
+    // no dimming if current or previous frame is mixed composition
+    //  - frame N-1: no HDR, HBM off, no sdr dim
+    //  - frame N: HDR visible HBM on, sdr dim is enabled
+    //  - frame N+1, HDR gone, HBM off, no sdr dim.
+    //  We don't need panel dimming for HBM on at frame N and HBM off at frame N+1
+    bool dimming = !mInstantHbmReq.get() && !mSdrDim.get() && !mPrevSdrDim.get();
     switch (mBrightnessDimmingUsage) {
         case BrightnessDimmingUsage::HBM:
             // turn on dimming at HBM on/off
@@ -534,9 +556,14 @@ int BrightnessController::updateStates() {
     mLhbmReq.clear_dirty();
     mBrightnessFloatReq.clear_dirty();
     mInstantHbmReq.clear_dirty();
+    mSdrDim.clear_dirty();
+    mPrevSdrDim.clear_dirty();
 
-    ALOGI("level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d.", mBrightnessLevel.get(),
-          mDimming.get(), mGhbm.get(), mLhbm.get());
+    if (mBrightnessLevel.is_dirty() || mDimming.is_dirty() || mGhbm.is_dirty() ||
+        mLhbm.is_dirty()) {
+        ALOGI("level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d.", mBrightnessLevel.get(), mDimming.get(),
+              mGhbm.get(), mLhbm.get());
+    }
     return NO_ERROR;
 }
 
