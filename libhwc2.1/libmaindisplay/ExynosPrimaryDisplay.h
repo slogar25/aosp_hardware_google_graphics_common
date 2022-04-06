@@ -54,6 +54,10 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual void updateAppliedActiveConfig(const hwc2_config_t newConfig,
                                                const int64_t ts) override;
 
+        virtual int32_t setBootDisplayConfig(int32_t config) override;
+        virtual int32_t clearBootDisplayConfig() override;
+        virtual int32_t getPreferredDisplayConfigInternal(int32_t *outConfig) override;
+
     protected:
         /* setPowerMode(int32_t mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
