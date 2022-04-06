@@ -423,7 +423,7 @@ void ExynosDisplay::PowerHalHintWorker::signalActualWorkDuration(nsecs_t actualD
           targetNs, actualNs - targetNs);
     if (sTraceHintSessionData) {
         ATRACE_INT64("Measured duration", actualNs);
-        ATRACE_INT64("Target error term", actualNs - targetNs);
+        ATRACE_INT64("Target error term", targetNs - actualNs);
     }
 
     WorkDuration work;
@@ -699,7 +699,7 @@ const bool ExynosDisplay::PowerHalHintWorker::sTraceHintSessionData =
         base::GetBoolProperty(std::string("debug.hwc.trace_hint_sessions"), false);
 
 const bool ExynosDisplay::PowerHalHintWorker::sNormalizeTarget =
-        base::GetBoolProperty(std::string("debug.hwc.normalize_hint_session_durations"), true);
+        base::GetBoolProperty(std::string("debug.hwc.normalize_hint_session_durations"), false);
 
 const bool ExynosDisplay::PowerHalHintWorker::sUseRateLimiter =
         base::GetBoolProperty(std::string("debug.hwc.use_rate_limiter"), true);
@@ -3323,6 +3323,32 @@ int32_t ExynosDisplay::canSkipValidate() {
     return NO_ERROR;
 }
 
+bool ExynosDisplay::isFullScreenComposition() {
+    hwc_rect_t dispRect = { INT_MAX, INT_MAX, 0, 0 };
+    for (auto layer : mLayers) {
+        auto &r = layer->mDisplayFrame;
+
+        if (r.top < dispRect.top)
+            dispRect.top = r.top;
+        if (r.left < dispRect.left)
+            dispRect.left = r.left;
+        if (r.bottom > dispRect.bottom)
+            dispRect.bottom = r.bottom;
+        if (r.right > dispRect.right)
+            dispRect.right = r.right;
+    }
+
+    if ((dispRect.top != 0) || (dispRect.left != 0) ||
+            (dispRect.right != mXres) || (dispRect.bottom != mYres)) {
+        ALOGD("invalid displayFrame disp=[%d %d %d %d] expected=%dx%d",
+                dispRect.left, dispRect.top, dispRect.right, dispRect.bottom,
+                mXres, mYres);
+        return false;
+    }
+
+    return true;
+}
+
 int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
@@ -3365,10 +3391,18 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     Mutex::Autolock lock(mDisplayMutex);
 
-    if (mPauseDisplay || mDevice->isInTUI()) {
+    bool dropFrame = false;
+    if ((mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) &&
+            !isFullScreenComposition()) {
+        ALOGD("presentDisplay: drop invalid frame during resolution switch");
+        dropFrame = true;
+    }
+
+    if (dropFrame || mPauseDisplay || mDevice->isInTUI()) {
         closeFencesForSkipFrame(RENDERING_STATE_PRESENTED);
         *outRetireFence = -1;
         mRenderingState = RENDERING_STATE_PRESENTED;
+        applyExpectedPresentTime();
         return ret;
     }
 
@@ -3425,8 +3459,6 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         if (mDevice->canSkipValidate() == false)
             goto not_validated;
         else {
-            // Reset current frame flags for Fence Tracer
-            resetFenceCurFlag(this);
             for (size_t i=0; i < mLayers.size(); i++) {
                 // Layer's acquire fence from SF
                 mLayers[i]->setSrcAcquireFence();
@@ -3726,8 +3758,10 @@ int32_t ExynosDisplay::setActiveConfigInternal(hwc2_config_t config, bool force)
     }
 
     if ((mXres != mDisplayConfigs[config].width) ||
-        (mYres != mDisplayConfigs[config].height))
+        (mYres != mDisplayConfigs[config].height)) {
+        mRenderingState = RENDERING_STATE_NONE;
         setGeometryChanged(GEOMETRY_DISPLAY_RESOLUTION_CHANGED);
+    }
 
     updateInternalDisplayConfigVariables(config);
     return HWC2_ERROR_NONE;
@@ -4421,6 +4455,12 @@ int32_t ExynosDisplay::validateDisplay(
     if (mPauseDisplay)
         return HWC2_ERROR_NONE;
 
+    if ((mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) &&
+            !isFullScreenComposition()) {
+        ALOGD("validateDisplay: drop invalid frame during resolution switch");
+        return HWC2_ERROR_NONE;
+    }
+
     int ret = NO_ERROR;
     bool validateError = false;
     mUpdateEventCnt++;
@@ -4442,9 +4482,6 @@ int32_t ExynosDisplay::validateDisplay(
         DISPLAY_LOGI("%s:: validateDisplay layer size is 0", __func__);
     else
         mLayers.vector_sort();
-
-    // Reset current frame flags for Fence Tracer
-    resetFenceCurFlag(this);
 
     for (size_t i = 0; i < mLayers.size(); i++) mLayers[i]->setSrcAcquireFence();
 
@@ -5805,6 +5842,7 @@ void ExynosDisplay::updateBrightnessState() {
     static constexpr float kMaxCll = 10000.0;
     bool clientRgbHdr = false;
     bool instantHbm = false;
+    bool sdrDim = false;
     BrightnessController::HdrLayerState hdrState = BrightnessController::HdrLayerState::kHdrNone;
 
     for (size_t i = 0; i < mLayers.size(); i++) {
@@ -5831,10 +5869,15 @@ void ExynosDisplay::updateBrightnessState() {
                 hdrState = BrightnessController::HdrLayerState::kHdrSmall;
             } // else keep the state (kHdrLarge or kHdrSmall) unchanged.
         }
+        // SDR layers could be kept dimmed for a while after HDR is gone (DM
+        // will animate the display brightness from HDR brightess to SDR brightness).
+        if (mLayers[i]->mBrightness < 1.0) {
+            sdrDim = true;
+        }
     }
 
     if (mBrightnessController) {
-        mBrightnessController->updateFrameStates(hdrState);
+        mBrightnessController->updateFrameStates(hdrState, sdrDim);
         mBrightnessController->processInstantHbm(instantHbm && !clientRgbHdr);
     }
 }

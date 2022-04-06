@@ -54,7 +54,8 @@ public:
         BrightnessController* mBrightnessController;
     };
 
-    BrightnessController(int32_t panelIndex, std::function<void(void)> refresh);
+    BrightnessController(int32_t panelIndex, std::function<void(void)> refresh,
+                         std::function<void(void)> updateDcLhbm);
     ~BrightnessController();
 
     BrightnessController(int32_t panelIndex);
@@ -75,7 +76,12 @@ public:
      */
     int processInstantHbm(bool on);
 
-    void updateFrameStates(HdrLayerState hdrState) { mHdrLayerState.store(hdrState); }
+    /**
+     * updateFrameStates
+     *  - hdrState: hdr layer size in this frame
+     *  - sdrDim: whether any dimmed sdr layer in this frame
+     */
+    void updateFrameStates(HdrLayerState hdrState, bool sdrDim);
 
     /**
      * Dim ratio to keep the sdr brightness unchange after an instant hbm on with peak brightness.
@@ -97,22 +103,22 @@ public:
     bool isLhbmSupported() { return mLhbmSupported; }
 
     bool isGhbmOn() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mGhbm.get() != HbmMode::OFF;
     }
 
     bool isLhbmOn() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mLhbm.get();
     }
 
     uint32_t getBrightnessLevel() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mBrightnessLevel.get();
     }
 
     bool isDimSdr() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mInstantHbmReq.get();
     }
 
@@ -202,7 +208,7 @@ private:
     DrmEnumParser::MapHal2DrmEnum mHbmModeEnums;
 
     // brightness state
-    std::mutex mBrightnessMutex;
+    std::recursive_mutex mBrightnessMutex;
     // requests
     CtrlValue<bool> mEnhanceHbmReq GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mLhbmReq GUARDED_BY(mBrightnessMutex);
@@ -213,6 +219,8 @@ private:
     CtrlValue<HbmMode> mGhbm GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mDimming GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mLhbm GUARDED_BY(mBrightnessMutex);
+    CtrlValue<bool> mSdrDim GUARDED_BY(mBrightnessMutex);
+    CtrlValue<bool> mPrevSdrDim GUARDED_BY(mBrightnessMutex);
 
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
@@ -246,6 +254,8 @@ private:
 
     // Note IRC or dimming is not in consideration for now.
     float mDisplayWhitePointNits = 0;
+
+    std::function<void(void)> mUpdateDcLhbm;
 };
 
 #endif // _BRIGHTNESS_CONTROLLER_H_

@@ -1015,21 +1015,23 @@ void ExynosLayer::dump(String8& result)
                                                  mPreprocessedInfo.displayFrame.top,
                                                  mPreprocessedInfo.displayFrame.right,
                                                  mPreprocessedInfo.displayFrame.bottom}))
+                          .add("blockRect",
+                               std::vector<int>({mBlockingRect.left, mBlockingRect.top,
+                                                 mBlockingRect.right, mBlockingRect.bottom}))
                           .add("tr", mTransform, true)
                           .add("windowIndex", mWindowIndex)
                           .add("type", mCompositionType)
                           .add("exynosType", mExynosCompositionType)
                           .add("validateType", mValidateCompositionType)
                           .add("overlayInfo", mOverlayInfo, true)
-                          .add("supportedMPPFlag", mSupportedMPPFlag, true)
                           .build()
                           .c_str());
 
-    {
-        TableBuilder tb;
-        tb.add("dim ratio", mPreprocessedInfo.sdrDimRatio);
-        result.append(tb.build().c_str());
-    }
+    result.append(TableBuilder()
+                          .add("MPPFlag", mSupportedMPPFlag, true)
+                          .add("dim ratio", mPreprocessedInfo.sdrDimRatio)
+                          .build()
+                          .c_str());
 
     if ((mDisplay != NULL) && (mDisplay->mResourceManager != NULL)) {
         result.appendFormat("MPPFlags for otfMPP\n");

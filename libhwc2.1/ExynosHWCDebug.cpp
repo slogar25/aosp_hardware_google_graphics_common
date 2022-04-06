@@ -109,17 +109,14 @@ int32_t saveFenceTrace(ExynosDisplay *display) {
     struct timeval tv;
 
     ExynosDevice *device = display->mDevice;
-    hwc_fence_info_t* _info = device->mFenceInfo;
 
     if (device != NULL) {
-        for(int i=0; i<1024;i ++){
-
+        for (const auto &[i, info] : device->mFenceInfos) {
+#if 0
             bool sysFdOpen = false;
-            hwc_fence_info_t info = _info[i];
 
             // FIXME: sync_fence_info and sync_pt_info are deprecated
             //        HWC guys should fix this
-#if 0
             struct sync_pt_info* pt_info = NULL;
             info.sync_data = sync_fence_info(i);
             if (info.sync_data != NULL) {
@@ -137,9 +134,9 @@ int32_t saveFenceTrace(ExynosDisplay *display) {
                 sysFdOpen = true;
                 sync_fence_info_free(info.sync_data);
             }
-#endif
 
             if ((info.usage == 0) && !sysFdOpen) continue;
+#endif
 
             saveString.appendFormat("\n-- FD hwc : %d, usage %d\n", i, info.usage);
 

@@ -1212,6 +1212,7 @@ class ExynosDisplay {
         virtual int32_t setActiveConfigInternal(hwc2_config_t config, bool force);
 
         void updateRefreshRateHint();
+        bool isFullScreenComposition();
 
     public:
         /**

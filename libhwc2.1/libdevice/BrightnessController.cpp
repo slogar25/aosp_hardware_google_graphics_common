@@ -22,7 +22,8 @@
 #include "BrightnessController.h"
 #include "ExynosHWCModule.h"
 
-BrightnessController::BrightnessController(int32_t panelIndex, std::function<void(void)> refresh)
+BrightnessController::BrightnessController(int32_t panelIndex, std::function<void(void)> refresh,
+                                           std::function<void(void)> updateDcLhbm)
       : mPanelIndex(panelIndex),
         mEnhanceHbmReq(false),
         mLhbmReq(false),
@@ -31,8 +32,11 @@ BrightnessController::BrightnessController(int32_t panelIndex, std::function<voi
         mGhbm(HbmMode::OFF),
         mDimming(false),
         mLhbm(false),
+        mSdrDim(false),
+        mPrevSdrDim(false),
         mFrameRefresh(refresh),
-        mHdrLayerState(HdrLayerState::kHdrNone) {
+        mHdrLayerState(HdrLayerState::kHdrNone),
+        mUpdateDcLhbm(updateDcLhbm) {
     initBrightnessSysfs();
 }
 
@@ -139,7 +143,7 @@ int BrightnessController::processEnhancedHbm(bool on) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mEnhanceHbmReq.store(on);
     if (mEnhanceHbmReq.is_dirty()) {
         updateStates();
@@ -148,7 +152,7 @@ int BrightnessController::processEnhancedHbm(bool on) {
 }
 
 void BrightnessController::processDimmingOff() {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     if (mHbmDimming) {
         mHbmDimming = false;
         updateStates();
@@ -172,7 +176,7 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     }
 
     {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         mBrightnessFloatReq.store(brightness);
         if (!mBrightnessFloatReq.is_dirty()) {
             return NO_ERROR;
@@ -233,7 +237,7 @@ int BrightnessController::applyPendingChangeViaSysfs(const nsecs_t vsyncNs) {
     ATRACE_CALL();
     uint32_t level;
     {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
 
         if (!mBrightnessLevel.is_dirty()) {
             return NO_ERROR;
@@ -270,7 +274,7 @@ int BrightnessController::processLocalHbm(bool on) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mLhbmReq.store(on);
     if (mLhbmReq.is_dirty()) {
         updateStates();
@@ -279,12 +283,26 @@ int BrightnessController::processLocalHbm(bool on) {
     return NO_ERROR;
 }
 
+void BrightnessController::updateFrameStates(HdrLayerState hdrState, bool sdrDim) {
+    mHdrLayerState.store(hdrState);
+    if (!mGhbmSupported) {
+        return;
+    }
+
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+    mPrevSdrDim.store(mSdrDim.get());
+    mSdrDim.store(sdrDim);
+    if (mSdrDim.is_dirty() || mPrevSdrDim.is_dirty()) {
+        updateStates();
+    }
+}
+
 int BrightnessController::processInstantHbm(bool on) {
     if (!mGhbmSupported) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mInstantHbmReq.store(on);
     if (mInstantHbmReq.is_dirty()) {
         updateStates();
@@ -297,7 +315,7 @@ float BrightnessController::getSdrDimRatioForInstantHbm() {
         return 1.0f;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     if (!mInstantHbmReq.get()) {
         return 1.0f;
     }
@@ -323,7 +341,7 @@ float BrightnessController::getSdrDimRatioForInstantHbm() {
 }
 
 void BrightnessController::onClearDisplay() {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mEnhanceHbmReq.reset(false);
     mLhbmReq.reset(false);
     mBrightnessFloatReq.reset(-1);
@@ -352,7 +370,7 @@ int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
     blSync = false;
 
     ATRACE_CALL();
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
 
     if (mDimming.is_dirty()) {
         if ((ret = drmReq.atomicAddProperty(connector.id(), connector.dimming_on(),
@@ -373,6 +391,7 @@ int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
         auto dbv = mBrightnessLevel.get();
         auto old_dbv = dbv;
         if (mLhbm.get()) {
+            mUpdateDcLhbm();
             uint32_t dbv_adj = 0;
             if (display.getColorAdjustedDbv(dbv_adj)) {
                 ALOGW("failed to get adjusted dbv");
@@ -500,7 +519,13 @@ int BrightnessController::updateStates() {
         mPendingGhbmStatus = mGhbm.get();
     }
 
-    bool dimming = !mInstantHbmReq.get();
+    // no dimming for instant hbm
+    // no dimming if current or previous frame is mixed composition
+    //  - frame N-1: no HDR, HBM off, no sdr dim
+    //  - frame N: HDR visible HBM on, sdr dim is enabled
+    //  - frame N+1, HDR gone, HBM off, no sdr dim.
+    //  We don't need panel dimming for HBM on at frame N and HBM off at frame N+1
+    bool dimming = !mInstantHbmReq.get() && !mSdrDim.get() && !mPrevSdrDim.get();
     switch (mBrightnessDimmingUsage) {
         case BrightnessDimmingUsage::HBM:
             // turn on dimming at HBM on/off
@@ -531,9 +556,14 @@ int BrightnessController::updateStates() {
     mLhbmReq.clear_dirty();
     mBrightnessFloatReq.clear_dirty();
     mInstantHbmReq.clear_dirty();
+    mSdrDim.clear_dirty();
+    mPrevSdrDim.clear_dirty();
 
-    ALOGI("level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d.", mBrightnessLevel.get(),
-          mDimming.get(), mGhbm.get(), mLhbm.get());
+    if (mBrightnessLevel.is_dirty() || mDimming.is_dirty() || mGhbm.is_dirty() ||
+        mLhbm.is_dirty()) {
+        ALOGI("level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d.", mBrightnessLevel.get(), mDimming.get(),
+              mGhbm.get(), mLhbm.get());
+    }
     return NO_ERROR;
 }
 
@@ -673,7 +703,7 @@ int BrightnessController::applyBrightnessViaSysfs(uint32_t level) {
         }
 
         {
-            std::lock_guard<std::mutex> lock(mBrightnessMutex);
+            std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
             mBrightnessLevel.reset(level);
             ALOGI("level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d", level,
                   mDimming.get(), mGhbm.get(), mLhbm.get());
@@ -687,7 +717,7 @@ int BrightnessController::applyBrightnessViaSysfs(uint32_t level) {
 
 // brightness is normalized to current display brightness
 bool BrightnessController::validateLayerBrightness(float brightness) {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     if (!std::isfinite(brightness)) {
         ALOGW("%s layer brightness %f is not a valid floating value", __func__, brightness);
         return false;
@@ -716,7 +746,7 @@ void BrightnessController::parseHbmModeEnums(const DrmProperty& property) {
 }
 
 void BrightnessController::dump(String8& result) {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
 
     result.appendFormat("BrightnessController:\n");
     result.appendFormat("\tsysfs support %d, max %d, valid brightness table %d, "
