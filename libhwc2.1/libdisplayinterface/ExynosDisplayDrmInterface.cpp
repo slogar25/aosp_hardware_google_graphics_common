@@ -1706,8 +1706,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     for (size_t i = 0; i < mExynosDisplay->mDpuData.rcdConfigs.size(); ++i) {
         exynos_win_config_data &config = mExynosDisplay->mDpuData.rcdConfigs[i];
         if (config.state == config.WIN_STATE_RCD) {
-            const int channelId =
-                    mExynosDisplay->mDevice->getSpecialPlaneId(0); // TODO: get PlaneId by display
+            const int channelId = mExynosDisplay->mDevice->getSpecialPlaneId(
+                    mExynosDisplay->mIndex); // TODO: b/227584297
             auto &plane = mDrmDevice->planes().at(channelId);
             uint32_t fbId = 0;
             if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
