@@ -3360,10 +3360,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         // adds + removes the tid for adpf tracking
         mPowerHalHint.trackThisThread();
         mPresentStartTime = systemTime(SYSTEM_TIME_MONOTONIC);
-        if (mValidateStartTime.has_value()) {
-            // this includes the time between end of validation and start of present
-            mValidationDuration = mPresentStartTime - *mValidateStartTime;
-        } else {
+        if (!mValidateStartTime.has_value()) {
             mValidationDuration = std::nullopt;
             // load target time here if validation was skipped
             mExpectedPresentTime = getExpectedPresentTime(mPresentStartTime);
@@ -3677,8 +3674,11 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         nsecs_t now = systemTime() + kFlingerOffset.count();
 
         updateAverages(now);
-        mPowerHalHint.signalActualWorkDuration(now - mPresentStartTime +
-                                               mValidationDuration.value_or(0));
+        nsecs_t duration = now - mPresentStartTime;
+        if (mRetireFenceWaitTime.has_value() && mRetireFenceAcquireTime.has_value()) {
+            duration = now - *mRetireFenceAcquireTime + *mRetireFenceWaitTime - mPresentStartTime;
+        }
+        mPowerHalHint.signalActualWorkDuration(duration + mValidationDuration.value_or(0));
     }
 
     return ret;
@@ -4581,6 +4581,10 @@ int32_t ExynosDisplay::validateDisplay(
 
     if ((*outNumTypes == 0) && (*outNumRequests == 0))
         return HWC2_ERROR_NONE;
+
+    if (usePowerHintSession()) {
+        mValidationDuration = systemTime(SYSTEM_TIME_MONOTONIC) - *mValidateStartTime;
+    }
 
     return HWC2_ERROR_HAS_CHANGES;
 }
@@ -5977,7 +5981,6 @@ nsecs_t ExynosDisplay::getSignalTime(int32_t fd) const {
 }
 
 std::optional<nsecs_t> ExynosDisplay::getPredictedDuration(bool duringValidation) {
-    nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
     AveragesKey beforeFenceKey(mLayers.size(), duringValidation, true);
     AveragesKey afterFenceKey(mLayers.size(), duringValidation, false);
     if (mRollingAverages.count(beforeFenceKey) == 0 || mRollingAverages.count(afterFenceKey) == 0) {
@@ -5985,11 +5988,7 @@ std::optional<nsecs_t> ExynosDisplay::getPredictedDuration(bool duringValidation
     }
     nsecs_t beforeReleaseFence = mRollingAverages[beforeFenceKey].average;
     nsecs_t afterReleaseFence = mRollingAverages[afterFenceKey].average;
-    return std::make_optional(
-            afterReleaseFence +
-            (mLastExpectedPresentTime.has_value()
-                     ? std::max(beforeReleaseFence, *mLastExpectedPresentTime - now)
-                     : beforeReleaseFence));
+    return std::make_optional(afterReleaseFence + beforeReleaseFence);
 }
 
 void ExynosDisplay::updateAverages(nsecs_t endTime) {
