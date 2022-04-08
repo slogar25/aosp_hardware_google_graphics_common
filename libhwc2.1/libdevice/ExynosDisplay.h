@@ -953,7 +953,7 @@ class ExynosDisplay {
          *     HWC2_ERROR_BAD_CONFIG - when the configuration is invalid
          *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
          */
-        int32_t setBootDisplayConfig(int32_t config);
+        virtual int32_t setBootDisplayConfig(int32_t config);
 
         /**
          * clearBootDisplayConfig(...)
@@ -967,7 +967,7 @@ class ExynosDisplay {
          *     HWC2_ERROR_BAD_DISPLAY - when the display is invalid
          *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
          */
-        int32_t clearBootDisplayConfig();
+        virtual int32_t clearBootDisplayConfig();
 
         /**
          * getPreferredBootDisplayConfig(..., config*)
@@ -990,6 +990,8 @@ class ExynosDisplay {
          *     HWC2_ERROR_UNSUPPORTED - when the display does not support boot display config
          */
         int32_t getPreferredBootDisplayConfig(int32_t* outConfig);
+
+        virtual int32_t getPreferredDisplayConfigInternal(int32_t *outConfig);
 
         /* setAutoLowLatencyMode(displayToken, on)
          * Descriptor: HWC2_FUNCTION_SET_AUTO_LOW_LATENCY_MODE
@@ -1404,6 +1406,8 @@ class ExynosDisplay {
         };
 
         static const constexpr int kAveragesBufferSize = 3;
+        static const constexpr nsecs_t SIGNAL_TIME_PENDING = INT64_MAX;
+        static const constexpr nsecs_t SIGNAL_TIME_INVALID = -1;
         std::unordered_map<uint32_t, RollingAverage<kAveragesBufferSize>> mRollingAverages;
         PowerHalHintWorker mPowerHalHint;
 
@@ -1416,13 +1420,17 @@ class ExynosDisplay {
         std::optional<nsecs_t> mRetireFenceWaitTime;
         // tracks the time right after we finish waiting for the fence
         std::optional<nsecs_t> mRetireFenceAcquireTime;
+        // tracks the time when the retire fence previously signaled
+        std::optional<nsecs_t> mRetireFencePreviousSignalTime;
         // tracks the expected present time of the last frame
-        std::optional<nsecs_t> mLastTarget;
+        std::optional<nsecs_t> mLastExpectedPresentTime;
         // tracks the expected present time of the current frame
-        nsecs_t mCurrentTarget;
+        nsecs_t mExpectedPresentTime;
         // set once at the start of composition to ensure consistency
         bool mUsePowerHints = false;
-        nsecs_t getTarget();
+        nsecs_t getExpectedPresentTime(nsecs_t startTime);
+        nsecs_t getPredictedPresentTime(nsecs_t startTime);
+        nsecs_t getSignalTime(int32_t fd) const;
         void updateAverages(nsecs_t endTime);
         std::optional<nsecs_t> getPredictedDuration(bool duringValidation);
         atomic_bool mDebugRCDLayerEnabled = true;
