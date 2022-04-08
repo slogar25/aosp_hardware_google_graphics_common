@@ -831,7 +831,14 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
     if (err != HWC2_ERROR_NONE || !num_configs)
         return err;
 
-    hwc2_config_t config = mDrmConnector->get_preferred_mode_id();
+    hwc2_config_t config;
+    int32_t bootConfig;
+    err = mExynosDisplay->getPreferredDisplayConfigInternal(&bootConfig);
+    if (err == HWC2_ERROR_NONE) {
+        config = static_cast<hwc2_config_t>(bootConfig);
+    } else {
+        config = mDrmConnector->get_preferred_mode_id();
+    }
     ALOGI("Preferred mode id: %d, state: %d", config, mDrmConnector->state());
 
     if ((err = setActiveConfig(config)) < 0) {
@@ -1115,8 +1122,9 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
     bool reconfig = false;
 
-    if ((mode.h_display() != mActiveModeState.mode.h_display()) ||
-        (mode.v_display() != mActiveModeState.mode.v_display())) {
+    if ((mActiveModeState.blob_id != 0) &&
+        ((mode.h_display() != mActiveModeState.mode.h_display()) ||
+         (mode.v_display() != mActiveModeState.mode.v_display()))) {
         ret = clearDisplayPlanes(drmReq);
         if (ret != HWC2_ERROR_NONE) {
             HWC_LOGE(mExynosDisplay, "%s: Failed to clear planes due to resolution change",
@@ -1706,8 +1714,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     for (size_t i = 0; i < mExynosDisplay->mDpuData.rcdConfigs.size(); ++i) {
         exynos_win_config_data &config = mExynosDisplay->mDpuData.rcdConfigs[i];
         if (config.state == config.WIN_STATE_RCD) {
-            const int channelId =
-                    mExynosDisplay->mDevice->getSpecialPlaneId(0); // TODO: get PlaneId by display
+            const int channelId = mExynosDisplay->mDevice->getSpecialPlaneId(
+                    mExynosDisplay->mIndex); // TODO: b/227584297
             auto &plane = mDrmDevice->planes().at(channelId);
             uint32_t fbId = 0;
             if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
