@@ -126,6 +126,8 @@ void HalImpl::initCaps() {
         h2a::translate(hwcCap, cap);
         mCaps.insert(cap);
     }
+
+    mCaps.insert(Capability::BOOT_DISPLAY_CONFIG);
 }
 
 int32_t HalImpl::getHalDisplay(int64_t display, ExynosDisplay*& halDisplay) {

@@ -297,6 +297,7 @@ class ExynosDisplayDrmInterface :
 
         /* For HWC 3.0 APIs */
         virtual int32_t getDisplayIdleTimerSupport(bool &outSupport);
+        virtual int32_t getDefaultModeId(int32_t *modeId) override;
 
         virtual int32_t waitVBlank();
         float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
