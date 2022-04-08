@@ -415,6 +415,13 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdleTimerSupport(bool &outSupport) 
     return NO_ERROR;
 }
 
+int32_t ExynosDisplayDrmInterface::getDefaultModeId(int32_t *modeId) {
+    if (modeId == nullptr) return HWC2_ERROR_BAD_PARAMETER;
+
+    *modeId = mDrmConnector->get_preferred_mode_id();
+    return NO_ERROR;
+}
+
 ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
 {
     mType = INTERFACE_TYPE_DRM;

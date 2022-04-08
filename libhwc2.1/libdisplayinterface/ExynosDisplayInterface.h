@@ -76,6 +76,9 @@ class ExynosDisplayInterface {
             outSupport = false;
             return NO_ERROR;
         }
+        virtual int32_t getDefaultModeId(int32_t* __unused modeId) {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
 
         virtual int32_t waitVBlank() { return 0; };
     public:
