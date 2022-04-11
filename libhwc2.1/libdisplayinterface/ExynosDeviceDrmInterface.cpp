@@ -272,7 +272,7 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleTUIEvent() {
 
 constexpr size_t IDLE_ENTER_EVENT_DATA_SIZE = 3;
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleIdleEnterEvent(char const *event) {
-    /* PANEL_IDLE_ENTER=<display id>,<vrefresh>,<idle te vrefresh> */
+    /* PANEL_IDLE_ENTER=<display index>,<vrefresh>,<idle te vrefresh> */
     std::string_view idle_event_str(event);
     auto prefix_shift_pos = idle_event_str.find("=");
     if (prefix_shift_pos == std::string::npos) {
@@ -280,7 +280,9 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleIdleEnterEvent(char 
     }
 
     int count = 0;
-    int value[IDLE_ENTER_EVENT_DATA_SIZE] = {0}; /* display id, vrefresh, idle_te_vrefresh */
+    int value[IDLE_ENTER_EVENT_DATA_SIZE] = {0};
+    const auto &[displayIndex, vrefresh, idleTeVrefresh] = value;
+
     auto start_pos = prefix_shift_pos + 1;
     auto end_pos = idle_event_str.find(",", start_pos);
     while (end_pos != std::string::npos && count < IDLE_ENTER_EVENT_DATA_SIZE) {
@@ -300,12 +302,14 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleIdleEnterEvent(char 
         return;
     }
 
-    /* TODO: b/194068871 sending vsyncIdle callback */
-    // if (value[1] != value[2])
-
     ExynosDisplay *primaryDisplay =
-            mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, value[0]));
+            mExynosDevice->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, displayIndex));
     if (primaryDisplay) {
-        primaryDisplay->handleDisplayIdleEnter(value[2]);
+        /* sending vsyncIdle callback */
+        if (vrefresh != idleTeVrefresh) {
+            mExynosDevice->onVsyncIdle(primaryDisplay->getId());
+        }
+
+        primaryDisplay->handleDisplayIdleEnter(idleTeVrefresh);
     }
 }
