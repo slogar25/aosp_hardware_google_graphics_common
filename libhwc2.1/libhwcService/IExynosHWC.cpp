@@ -65,6 +65,7 @@ enum {
     SET_MIN_IDLE_REFRESH_RATE = 1005,
     SET_REFRESH_RATE_THROTTLE = 1006,
     SET_DISPLAY_RCDLAYER_ENABLED = 1007,
+    TRIGGER_DISPLAY_IDLE_ENTER = 1008,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -437,14 +438,25 @@ public:
         return result;
     }
 
-    int32_t setDisplayRCDLayerEnabled(uint32_t displayId, bool enable) override {
+    int32_t setDisplayRCDLayerEnabled(uint32_t displayIndex, bool enable) override {
         Parcel data, reply;
         data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
-        data.writeUint32(displayId);
+        data.writeUint32(displayIndex);
         data.writeInt32(enable);
 
         auto result = remote()->transact(SET_DISPLAY_RCDLAYER_ENABLED, data, &reply);
         ALOGE_IF(result != NO_ERROR, "SET_DISPLAY_RCDLAYER_ENABLED transact error(%d)", result);
+        return result;
+    }
+
+    int32_t triggerDisplayIdleEnter(uint32_t displayIndex, uint32_t idleTeRefreshRate) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(displayIndex);
+        data.writeUint32(idleTeRefreshRate);
+
+        auto result = remote()->transact(SET_DISPLAY_RCDLAYER_ENABLED, data, &reply);
+        ALOGE_IF(result != NO_ERROR, "TRIGGER_DISPLAY_IDLE_ENTER transact error(%d)", result);
         return result;
     }
 };
@@ -717,13 +729,20 @@ status_t BnExynosHWCService::onTransact(
 
         case SET_DISPLAY_RCDLAYER_ENABLED: {
             CHECK_INTERFACE(IExynosHWCService, data, reply);
-            uint32_t displayId = data.readUint32();
+            uint32_t displayIndex = data.readUint32();
             bool enable = data.readInt32();
-            return setDisplayRCDLayerEnabled(displayId, enable);
+            return setDisplayRCDLayerEnabled(displayIndex, enable);
+        } break;
+
+        case TRIGGER_DISPLAY_IDLE_ENTER: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t displayIndex = data.readUint32();
+            uint32_t idleTeRefreshRate = data.readUint32();
+            return triggerDisplayIdleEnter(displayIndex, idleTeRefreshRate);
         } break;
 
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }
 }
-}
+} // namespace android
