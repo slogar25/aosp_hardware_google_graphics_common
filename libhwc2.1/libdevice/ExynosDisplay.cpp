@@ -39,6 +39,7 @@
 #include "ExynosLayer.h"
 #include "VendorGraphicBuffer.h"
 #include "exynos_format.h"
+#include "utils/Timers.h"
 
 /**
  * ExynosDisplay implementation
@@ -417,25 +418,35 @@ void ExynosDisplay::PowerHalHintWorker::signalActualWorkDuration(nsecs_t actualD
         return;
     }
     Lock();
-    // convert to long long so "%lld" works correctly
-    long long actualNs = actualDurationNanos, targetNs = mTargetWorkDuration;
-    ALOGV("Sending actual work duration of: %lld on target: %lld with error: %lld", actualNs,
-          targetNs, actualNs - targetNs);
-    if (sTraceHintSessionData) {
-        ATRACE_INT64("Measured duration", actualNs);
-        ATRACE_INT64("Target error term", targetNs - actualNs);
-    }
-
-    WorkDuration work;
-    work.timeStampNanos = systemTime();
-    work.durationNanos = actualDurationNanos;
+    nsecs_t reportedDurationNs = actualDurationNanos;
     if (sNormalizeTarget) {
-        work.durationNanos += mLastTargetDurationReported - mTargetWorkDuration;
+        reportedDurationNs += mLastTargetDurationReported - mTargetWorkDuration;
+    } else {
+        if (mLastTargetDurationReported != kDefaultTarget.count() && mTargetWorkDuration != 0) {
+            reportedDurationNs =
+                    static_cast<int64_t>(static_cast<long double>(mLastTargetDurationReported) /
+                                         mTargetWorkDuration * actualDurationNanos);
+        }
     }
 
-    mPowerHintQueue.push_back(work);
-    // store the non-normalized last value here
-    mActualWorkDuration = actualDurationNanos;
+    mActualWorkDuration = reportedDurationNs;
+    WorkDuration duration = {.durationNanos = reportedDurationNs, .timeStampNanos = systemTime()};
+
+    if (sTraceHintSessionData) {
+        ATRACE_INT64("Measured duration", actualDurationNanos);
+        ATRACE_INT64("Target error term", mTargetWorkDuration - actualDurationNanos);
+
+        ATRACE_INT64("Reported duration", reportedDurationNs);
+        ATRACE_INT64("Reported target", mLastTargetDurationReported);
+        ATRACE_INT64("Reported target error term",
+                     mLastTargetDurationReported - reportedDurationNs);
+    }
+    ALOGV("Sending actual work duration of: %" PRId64 " on reported target: %" PRId64
+          " with error: %" PRId64,
+          reportedDurationNs, mLastTargetDurationReported,
+          mLastTargetDurationReported - reportedDurationNs);
+
+    mPowerHintQueue.push_back(duration);
 
     bool shouldSignal = needSendActualWorkDurationLocked();
     Unlock();
