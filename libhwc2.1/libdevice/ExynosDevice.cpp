@@ -14,24 +14,28 @@
  * limitations under the License.
  */
 
-#include "BrightnessController.h"
 #include "ExynosDevice.h"
+
+#include <aidl/android/hardware/graphics/composer3/IComposerCallback.h>
+#include <sync/sync.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+#include "BrightnessController.h"
+#include "ExynosDeviceDrmInterface.h"
 #include "ExynosDisplay.h"
+#include "ExynosExternalDisplayModule.h"
+#include "ExynosHWCDebug.h"
+#include "ExynosHWCHelper.h"
 #include "ExynosLayer.h"
 #include "ExynosPrimaryDisplayModule.h"
 #include "ExynosResourceManagerModule.h"
-#include "ExynosExternalDisplayModule.h"
 #include "ExynosVirtualDisplayModule.h"
-#include "ExynosHWCDebug.h"
-#include "ExynosHWCHelper.h"
-#include "ExynosDeviceDrmInterface.h"
-#include <unistd.h>
-#include <sync/sync.h>
-#include <sys/mman.h>
 #include "VendorGraphicBuffer.h"
 
 using namespace vendor::graphics;
 using namespace SOC_VERSION;
+using aidl::android::hardware::graphics::composer3::IComposerCallback;
 
 /**
  * ExynosDevice implementation
@@ -39,8 +43,6 @@ using namespace SOC_VERSION;
 
 class ExynosDevice;
 
-extern void vsync_callback(hwc2_callback_data_t callbackData,
-        hwc2_display_t displayId, int64_t timestamp);
 extern uint32_t mFenceLogSize;
 extern void PixelDisplayInit(ExynosDevice *device);
 
@@ -1123,4 +1125,26 @@ int ExynosDevice::setRefreshRateThrottle(const int delayMs) {
                                               DispIdleTimerRequester::PIXEL_DISP);
     }
     return BAD_VALUE;
+}
+
+int32_t ExynosDevice::registerHwc3Callback(uint32_t descriptor, hwc2_callback_data_t callbackData,
+                                           hwc2_function_pointer_t point) {
+    mHwc3CallbackInfos[descriptor].callbackData = callbackData;
+    mHwc3CallbackInfos[descriptor].funcPointer = point;
+
+    return HWC2_ERROR_NONE;
+}
+
+void ExynosDevice::onVsyncIdle(hwc2_display_t displayId) {
+    const auto &idleCallback = mHwc3CallbackInfos.find(IComposerCallback::TRANSACTION_onVsyncIdle);
+
+    if (idleCallback == mHwc3CallbackInfos.end()) return;
+
+    const auto &callbackInfo = idleCallback->second;
+    if (callbackInfo.funcPointer == nullptr || callbackInfo.callbackData == nullptr) return;
+
+    auto callbackFunc =
+            reinterpret_cast<void (*)(hwc2_callback_data_t callbackData,
+                                      hwc2_display_t hwcDisplay)>(callbackInfo.funcPointer);
+    callbackFunc(callbackInfo.callbackData, displayId);
 }
