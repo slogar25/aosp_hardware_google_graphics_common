@@ -88,16 +88,34 @@ uint32_t FramebufferManager::getBufHandleFromFd(int fd)
     return gem_handle;
 }
 
-int FramebufferManager::addFB2WithModifiers(uint32_t width, uint32_t height, uint32_t pixel_format,
-                                            const BufHandles handles, const uint32_t pitches[4],
-                                            const uint32_t offsets[4], const uint64_t modifier[4],
-                                            uint32_t *buf_id, uint32_t flags)
-{
-    int ret = drmModeAddFB2WithModifiers(mDrmFd, width, height, pixel_format, handles.data(),
-                                         pitches, offsets, modifier, buf_id, flags);
+int FramebufferManager::addFB2WithModifiers(uint32_t state, uint32_t width, uint32_t height,
+                                            uint32_t drmFormat, const DrmArray<uint32_t> &handles,
+                                            const DrmArray<uint32_t> &pitches,
+                                            const DrmArray<uint32_t> &offsets,
+                                            const DrmArray<uint64_t> &modifier, uint32_t *buf_id,
+                                            uint32_t flags) {
+    if (CC_UNLIKELY(!validateLayerInfo(state, drmFormat, handles, modifier))) {
+        return -EINVAL;
+    }
+
+    int ret = drmModeAddFB2WithModifiers(mDrmFd, width, height, drmFormat, handles.data(),
+                                         pitches.data(), offsets.data(), modifier.data(), buf_id,
+                                         flags);
     if (ret) ALOGE("Failed to add fb error %d\n", ret);
 
     return ret;
+}
+
+bool FramebufferManager::validateLayerInfo(uint32_t state, uint32_t drmFormat,
+                                           const DrmArray<uint32_t> &handles,
+                                           const DrmArray<uint64_t> &modifier) {
+    switch (state) {
+        case exynos_win_config_data::WIN_STATE_RCD:
+            return drmFormat == DRM_FORMAT_C8 && handles[0] != 0 && handles[1] == 0 &&
+                    modifier[0] == 0;
+    }
+
+    return true;
 }
 
 bool FramebufferManager::checkShrink() {
@@ -139,16 +157,16 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     int ret = NO_ERROR;
     int drmFormat = DRM_FORMAT_UNDEFINED;
     uint32_t bpp = 0;
-    uint32_t pitches[HWC_DRM_BO_MAX_PLANES] = {0};
-    uint32_t offsets[HWC_DRM_BO_MAX_PLANES] = {0};
-    uint64_t modifiers[HWC_DRM_BO_MAX_PLANES] = {0};
     uint32_t bufferNum, planeNum = 0;
-    BufHandles handles = {0};
     uint32_t bufWidth, bufHeight = 0;
+    DrmArray<uint32_t> pitches = {0};
+    DrmArray<uint32_t> offsets = {0};
+    DrmArray<uint64_t> modifiers = {0};
+    DrmArray<uint32_t> handles = {0};
 
     if (config.protection) modifiers[0] |= DRM_FORMAT_MOD_PROTECTION;
 
-    if (config.state == config.WIN_STATE_BUFFER) {
+    if (config.state == config.WIN_STATE_BUFFER || config.state == config.WIN_STATE_RCD) {
         bufWidth = config.src.f_w;
         bufHeight = config.src.f_h;
         uint32_t compressType = 0;
@@ -245,28 +263,13 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         if (fbId != 0) {
             return NO_ERROR;
         }
-    } else if (config.state == config.WIN_STATE_RCD) {
-        bufWidth = config.src.f_w;
-        bufHeight = config.src.f_h;
-        drmFormat = DRM_FORMAT_C8;
-        bufferNum = 1;
-        handles[0] = getBufHandleFromFd(config.fd_idma[0]);
-        bpp = 1;
-        pitches[0] = config.src.f_w * bpp;
-        fbId = findCachedFbId(config.layer,
-                              [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat,
-                                                                    config.protection}](
-                                      auto &buffer) { return buffer->bufferDesc == bufferDesc; });
-        if (fbId != 0) {
-            return NO_ERROR;
-        }
     } else {
         ALOGE("%s:: unknown config state(%d)", __func__, config.state);
         return -EINVAL;
     }
 
-    ret = addFB2WithModifiers(bufWidth, bufHeight, drmFormat, handles, pitches, offsets, modifiers,
-                              &fbId, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
+    ret = addFB2WithModifiers(config.state, bufWidth, bufHeight, drmFormat, handles, pitches,
+                              offsets, modifiers, &fbId, modifiers[0] ? DRM_MODE_FB_MODIFIERS : 0);
 
     for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {
         freeBufHandle(handles[bufferIndex]);
