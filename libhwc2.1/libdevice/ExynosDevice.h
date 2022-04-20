@@ -202,7 +202,7 @@ class ExynosDevice {
         uint32_t mDisplayMode;
 
         // Variable for fence tracer
-        std::map<int, hwc_fence_info_t> mFenceInfos;
+        std::map<int, HwcFenceInfo> mFenceInfos;
 
         /**
          * This will be initialized with differnt class
