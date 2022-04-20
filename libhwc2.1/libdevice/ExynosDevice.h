@@ -332,6 +332,7 @@ class ExynosDevice {
         int32_t registerHwc3Callback(uint32_t descriptor, hwc2_callback_data_t callbackData,
                                      hwc2_function_pointer_t point);
         void onVsyncIdle(hwc2_display_t displayId);
+        bool isDispOffAsyncSupported() { return mDisplayOffAsync; };
 
     protected:
         void initDeviceInterface(uint32_t interfaceType);
@@ -351,6 +352,7 @@ class ExynosDevice {
 
     private:
         bool mIsInTUI;
+        bool mDisplayOffAsync;
 };
 
 #endif //_EXYNOSDEVICE_H

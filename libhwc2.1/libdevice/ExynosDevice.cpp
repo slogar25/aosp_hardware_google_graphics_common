@@ -187,6 +187,8 @@ ExynosDevice::ExynosDevice()
             }
         }
     }
+
+    mDisplayOffAsync = property_get_bool("vendor.display.async_off.supported", false);
 }
 
 void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
