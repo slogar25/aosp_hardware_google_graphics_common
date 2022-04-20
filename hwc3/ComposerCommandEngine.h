@@ -16,10 +16,11 @@
 
 #pragma once
 
-#include <memory>
+#include <android/hardware/graphics/composer3/ComposerServiceWriter.h>
 #include <utils/Mutex.h>
 
-#include "ComposerServiceWriter.h"
+#include <memory>
+
 #include "include/IComposerHal.h"
 #include "include/IResourceManager.h"
 
