@@ -90,6 +90,11 @@ ExynosLayer::~ExynosLayer() {
         mMetaParcelFd = -1;
     }
 
+    if (mAcquireFence >= 0) {
+        mAcquireFence =
+                fence_close(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_UNDEFINED);
+    }
+
     if (mPrevAcquireFence != -1)
         mPrevAcquireFence = fence_close(mPrevAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE,
                                         FENCE_IP_UNDEFINED);

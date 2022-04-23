@@ -853,11 +853,21 @@ void ExynosCompositionInfo::setTargetBuffer(ExynosDisplay *display, buffer_handl
 {
     mTargetBuffer = handle;
     if (mType == COMPOSITION_CLIENT) {
-        if (display != NULL)
+        if (display != NULL) {
+            if (mAcquireFence >= 0) {
+                mAcquireFence =
+                        fence_close(mAcquireFence, display, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_FB);
+            }
             mAcquireFence = hwcCheckFenceDebug(display, FENCE_TYPE_DST_ACQUIRE, FENCE_IP_FB, acquireFence);
+        }
     } else {
-        if (display != NULL)
+        if (display != NULL) {
+            if (mAcquireFence >= 0) {
+                mAcquireFence =
+                        fence_close(mAcquireFence, display, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_G2D);
+            }
             mAcquireFence = hwcCheckFenceDebug(display, FENCE_TYPE_DST_ACQUIRE, FENCE_IP_G2D, acquireFence);
+        }
     }
     if ((display != NULL) && (mDataSpace != dataspace))
         display->setGeometryChanged(GEOMETRY_DISPLAY_DATASPACE_CHANGED);
@@ -1904,6 +1914,9 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     cfg.assignedMPP = otfMPP;
 
     if (layer.isDimLayer()) {
+        if (fence_fd >= 0) {
+            fence_fd = fence_close(fence_fd, this, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_ALL);
+        }
         cfg.state = cfg.WIN_STATE_COLOR;
         hwc_color_t color = layer.mColor;
         cfg.color = (color.a << 24) | (color.r << 16) | (color.g << 8) | color.b;
