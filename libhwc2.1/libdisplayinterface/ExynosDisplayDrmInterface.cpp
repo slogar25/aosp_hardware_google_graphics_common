@@ -1620,6 +1620,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     android::String8 result;
     bool hasSecureFrameBuffer = false;
 
+    mFrameCounter++;
     funcReturnCallback retCallback([&]() {
         if ((ret == NO_ERROR) && !drmReq.getError()) {
             mFBManager.flip(hasSecureFrameBuffer);
