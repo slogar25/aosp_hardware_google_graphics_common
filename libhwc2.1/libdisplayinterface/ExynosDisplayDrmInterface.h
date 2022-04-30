@@ -298,7 +298,8 @@ class ExynosDisplayDrmInterface :
         virtual int32_t setPlaneColorSetting(
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq,
                 const std::unique_ptr<DrmPlane> &plane,
-                const exynos_win_config_data& config)
+                const exynos_win_config_data& config,
+                uint32_t &solidColor)
         { return NO_ERROR;};
         virtual void destroyLayer(ExynosLayer *layer) override;
 
