@@ -4072,9 +4072,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
         }
 
         outTimeline->newVsyncAppliedTimeNanos = vsyncPeriodChangeConstraints->desiredTimeNanos;
-
-        // when switching between display group setActiveConfig directly
-        return setActiveConfigInternal(config, false);
+        outTimeline->refreshRequired = true;
     }
 
     if (needNotChangeConfig(config)) {
@@ -4083,7 +4081,15 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
         return HWC2_ERROR_NONE;
     }
 
-    if (vsyncPeriodChangeConstraints->seamlessRequired) {
+    if ((mXres != mDisplayConfigs[config].width) || (mYres != mDisplayConfigs[config].height)) {
+        if ((mDisplayInterface->setActiveConfigWithConstraints(config, true)) != NO_ERROR) {
+            ALOGW("Mode change not possible");
+            return HWC2_ERROR_BAD_CONFIG;
+        }
+        mRenderingState = RENDERING_STATE_NONE;
+        setGeometryChanged(GEOMETRY_DISPLAY_RESOLUTION_CHANGED);
+        updateInternalDisplayConfigVariables(config, false);
+    } else if (vsyncPeriodChangeConstraints->seamlessRequired) {
         if ((mDisplayInterface->setActiveConfigWithConstraints(config, true)) != NO_ERROR) {
             DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not possible");
             return HWC2_ERROR_SEAMLESS_NOT_POSSIBLE;
