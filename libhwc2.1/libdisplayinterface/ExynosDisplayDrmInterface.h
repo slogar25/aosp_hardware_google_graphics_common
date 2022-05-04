@@ -325,12 +325,24 @@ class ExynosDisplayDrmInterface :
         };
 
         struct ModeState {
-            bool needs_modeset = false;
+            enum ModeStateType {
+                MODE_STATE_NONE = 0U,
+                MODE_STATE_REFRESH_RATE = 1U << 0,
+                MODE_STATE_RESOLUTION = 1U << 1,
+                MODE_STATE_FORCE_MODE_SET = 1U << 2,
+            };
             DrmMode mode;
             uint32_t blob_id = 0;
             uint32_t old_blob_id = 0;
             void setMode(const DrmMode newMode, const uint32_t modeBlob,
                     DrmModeAtomicReq &drmReq) {
+                if (newMode.v_refresh() != mode.v_refresh()) {
+                    mModeState |= ModeStateType::MODE_STATE_REFRESH_RATE;
+                }
+                if (isFullModeSwitch(newMode)) {
+                    mModeState |= ModeStateType::MODE_STATE_RESOLUTION;
+                }
+
                 drmReq.addOldBlob(old_blob_id);
                 mode = newMode;
                 old_blob_id = blob_id;
@@ -344,6 +356,18 @@ class ExynosDisplayDrmInterface :
                 drmReq.addOldBlob(old_blob_id);
                 reset();
             };
+
+            int32_t mModeState = ModeStateType::MODE_STATE_NONE;
+            void forceModeSet() { mModeState |= ModeStateType::MODE_STATE_FORCE_MODE_SET; }
+            void clearPendingModeState() { mModeState = ModeStateType::MODE_STATE_NONE; }
+            bool needsModeSet() const { return mModeState != ModeStateType::MODE_STATE_NONE; }
+            bool isSeamless() const { return !(mModeState & ModeStateType::MODE_STATE_RESOLUTION); }
+            bool isFullModeSwitch(const DrmMode &newMode) {
+                if ((mode.h_display() != newMode.h_display()) ||
+                    (mode.v_display() != newMode.v_display()))
+                    return true;
+                return false;
+            }
         };
         int32_t createModeBlob(const DrmMode &mode, uint32_t &modeBlob);
         int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
