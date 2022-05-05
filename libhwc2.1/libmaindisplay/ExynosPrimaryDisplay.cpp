@@ -91,6 +91,8 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mType = HWC_DISPLAY_PRIMARY;
     mIndex = index;
     mDisplayId = getDisplayId(mType, mIndex);
+    mFramesToReachLhbmPeakBrightness =
+            property_get_int32("vendor.primarydisplay.lhbm.frames_to_reach_peak_brightness", 3);
 
     // Prepare multi resolution
     // Will be exynosHWCControl.multiResoultion
@@ -505,8 +507,14 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         ALOGI("setLhbmState =%d timeout !", enabled);
         return TIMED_OUT;
     } else {
-        if (enabled)
+        if (enabled) {
             mDisplayInterface->waitVBlank();
+            ATRACE_NAME("frames to reach LHBM peak brightness");
+            for (int32_t i = mFramesToReachLhbmPeakBrightness; i > 0; i--) {
+                mDevice->invalidate();
+                mDisplayInterface->waitVBlank();
+            }
+        }
         return NO_ERROR;
     }
 }
