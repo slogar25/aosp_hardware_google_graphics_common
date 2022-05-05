@@ -100,6 +100,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         FILE* mLhbmFd;
         bool mLhbmOn;
         bool mLhbmChanged;
+        int32_t mFramesToReachLhbmPeakBrightness;
 
         std::mutex lhbm_mutex_;
         std::condition_variable lhbm_cond_;
