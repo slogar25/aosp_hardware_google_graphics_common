@@ -1073,7 +1073,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
         return HWC2_ERROR_NONE;
     }
 
-    if (mDesiredModeState.needs_modeset) {
+    if (mDesiredModeState.needsModeSet()) {
         ALOGD("Previous mode change request is not applied");
     }
 
@@ -1087,34 +1087,38 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
             return HWC2_ERROR_BAD_CONFIG;
         }
     }
-    if (test) {
-        if ((ret = setDisplayMode(drmReq, modeBlob? modeBlob : mDesiredModeState.blob_id)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
-                    __func__);
-            return ret;
-        }
-        ret = drmReq.commit(DRM_MODE_ATOMIC_TEST_ONLY, true);
-        if (ret) {
-            drmReq.addOldBlob(modeBlob);
-            HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n",
-                    __func__, ret);
-            return ret;
-        }
-    } else {
-        mDesiredModeState.needs_modeset = true;
-    }
+    const auto isResSwitch =
+            (mActiveModeState.blob_id != 0) && mActiveModeState.isFullModeSwitch(*mode);
 
-    if (modeBlob != 0) {
+    if (!test) {
         mDesiredModeState.setMode(*mode, modeBlob, drmReq);
+    } else {
+        if (!isResSwitch) {
+            ret = setDisplayMode(drmReq, modeBlob ? modeBlob : mDesiredModeState.blob_id);
+            if (ret < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode", __func__);
+                return ret;
+            }
+            ret = drmReq.commit(DRM_MODE_ATOMIC_TEST_ONLY, true);
+            if (ret) {
+                drmReq.addOldBlob(modeBlob);
+                HWC_LOGE(mExynosDisplay,
+                         "%s:: Failed to commit pset ret=%d in applyDisplayMode()\n", __func__,
+                         ret);
+                return ret;
+            }
+        }
+
+        if (modeBlob) {
+            mDrmDevice->DestroyPropertyBlob(modeBlob);
+        }
     }
     return HWC2_ERROR_NONE;
 }
 int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     /* Don't skip when power was off */
-    if (!(mExynosDisplay->mSkipFrame) &&
-        (mActiveModeState.blob_id != 0) &&
-        (mActiveModeState.mode.id() == mode.id()) &&
-        (mActiveModeState.needs_modeset == false)) {
+    if (!(mExynosDisplay->mSkipFrame) && (mActiveModeState.blob_id != 0) &&
+        (mActiveModeState.mode.id() == mode.id()) && !mActiveModeState.needsModeSet()) {
         ALOGD("%s:: same mode %d", __func__, mode.id());
         return HWC2_ERROR_NONE;
     }
@@ -1135,13 +1139,6 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     if ((mActiveModeState.blob_id != 0) &&
         ((mode.h_display() != mActiveModeState.mode.h_display()) ||
          (mode.v_display() != mActiveModeState.mode.v_display()))) {
-        ret = clearDisplayPlanes(drmReq);
-        if (ret != HWC2_ERROR_NONE) {
-            HWC_LOGE(mExynosDisplay, "%s: Failed to clear planes due to resolution change",
-                     __func__);
-        } else {
-            ALOGD("%s: switching display resolution, clearing planes", __func__);
-        }
         reconfig = true;
     }
 
@@ -1161,7 +1158,7 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
 
     mDrmConnector->set_active_mode(mode);
     mActiveModeState.setMode(mode, modeBlob, drmReq);
-    mActiveModeState.needs_modeset = false;
+    mActiveModeState.clearPendingModeState();
 
     if (reconfig) {
         mDrmConnector->ResetLpMode();
@@ -1653,7 +1650,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     uint64_t mipi_sync_type = 0;
-    if (mDesiredModeState.needs_modeset) {
+    if (mDesiredModeState.needsModeSet()) {
         if (mExynosDisplay->checkRrCompensationEnabled()) {
             mipi_sync_type |=
                 1 << mMipiSyncEnums[toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_REFRESH_RATE)];
@@ -1782,7 +1779,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     uint32_t flags = DRM_MODE_ATOMIC_NONBLOCK;
-    if (needModesetForReadback)
+    if (needModesetForReadback || !mDesiredModeState.isSeamless())
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
     /* For Histogram */
@@ -1836,8 +1833,12 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         }
     }
 
-    if (mDesiredModeState.needs_modeset) {
+    if (mDesiredModeState.needsModeSet()) {
         mDesiredModeState.apply(mActiveModeState, drmReq);
+        if (!mActiveModeState.isSeamless()) {
+            mDrmConnector->ResetLpMode();
+            getLowPowerDrmModeModeInfo();
+        }
         mVsyncCallback.setDesiredVsyncPeriod(
                 nsecsPerSec/mActiveModeState.mode.v_refresh());
         /* Enable vsync to check vsync period */
@@ -1936,8 +1937,7 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
         return ret;
     }
 
-    if (needModeClear)
-        mActiveModeState.needs_modeset = true;
+    if (needModeClear) mActiveModeState.forceModeSet();
 
     return NO_ERROR;
 }
