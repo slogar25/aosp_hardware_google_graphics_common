@@ -1602,9 +1602,13 @@ int32_t ExynosDisplayDrmInterface::updateColorSettings(DrmModeAtomicReq &drmReq,
             }
 
             auto &plane = mDrmDevice->planes().at(channelId);
-            if ((ret = setPlaneColorSetting(drmReq, plane, config)) != 0) {
+            uint32_t solidColor = config.color;
+            if ((ret = setPlaneColorSetting(drmReq, plane, config, solidColor)) != 0) {
                 HWC_LOGE(mExynosDisplay, "Failed to set plane color setting, config[%zu]", i);
                 return ret;
+            }
+            if (config.state == config.WIN_STATE_COLOR && solidColor != config.color) {
+                config.color = solidColor;
             }
         }
     }
@@ -1687,6 +1691,13 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                     mDrmCrtc->dqe_enabled_property(), dqeEnable)) < 0) {
         HWC_LOGE(mExynosDisplay, "%s: Fail to dqe_enable setting",
                 __func__);
+        return ret;
+    }
+
+    // Update of color settings could change layer's solid color. So it should
+    // be called before use of layer's solid color.
+    if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
+        HWC_LOGE(mExynosDisplay, "failed to update color settings (%d)", ret);
         return ret;
     }
 
@@ -1785,11 +1796,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     /* For Histogram */
     if (dqeEnable && (ret = setDisplayHistogramSetting(drmReq)) != 0) {
         HWC_LOGE(mExynosDisplay, "Failed to set display histogram setting (%d)", ret);
-        return ret;
-    }
-
-    if ((ret = updateColorSettings(drmReq, dqeEnable)) != 0) {
-        HWC_LOGE(mExynosDisplay, "failed to update color settings (%d)", ret);
         return ret;
     }
 
