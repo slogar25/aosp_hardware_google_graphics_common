@@ -814,3 +814,35 @@ void ExynosPrimaryDisplay::updateAppliedActiveConfig(const hwc2_config_t newConf
 
     mAppliedActiveConfig = newConfig;
 }
+
+void ExynosPrimaryDisplay::checkBtsReassignResource(const uint32_t vsyncPeriod,
+                                                    const uint32_t btsVsyncPeriod) {
+    ATRACE_CALL();
+    uint32_t refreshRate = static_cast<uint32_t>(round(nsecsPerSec / vsyncPeriod * 0.1f) * 10);
+
+    if (vsyncPeriod < btsVsyncPeriod) {
+        for (size_t i = 0; i < mLayers.size(); i++) {
+            if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP == nullptr &&
+                !mLayers[i]->checkDownscaleCap(refreshRate)) {
+                mLayers[i]->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+                break;
+            }
+        }
+    } else if (vsyncPeriod > btsVsyncPeriod) {
+        for (size_t i = 0; i < mLayers.size(); i++) {
+            if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP) {
+                float srcWidth = mLayers[i]->mSourceCrop.right - mLayers[i]->mSourceCrop.left;
+                float srcHeight = mLayers[i]->mSourceCrop.bottom - mLayers[i]->mSourceCrop.top;
+                float resolution = srcWidth * srcHeight * refreshRate / 1000;
+                float ratioVertical = static_cast<float>(mLayers[i]->mDisplayFrame.bottom -
+                                                         mLayers[i]->mDisplayFrame.top) /
+                        mYres;
+
+                if (mLayers[i]->mOtfMPP->checkDownscaleCap(resolution, ratioVertical)) {
+                    mLayers[i]->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
+                    break;
+                }
+            }
+        }
+    }
+}
