@@ -1111,8 +1111,10 @@ class ExynosDisplay {
         int32_t getConfigAppliedTime(const uint64_t desiredTime,
                 const uint64_t actualChangeTime,
                 int64_t &appliedTime, int64_t &refreshTime);
-        void updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool forceUpdate = false);
+        void updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool configApplied = false);
         uint32_t getBtsRefreshRate() const;
+        virtual void checkBtsReassignResource(const uint32_t __unused vsyncPeriod,
+                                              const uint32_t __unused btsVsyncPeriod) {}
 
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
