@@ -34,6 +34,7 @@ using android::hardware::graphics::common::V1_2::PixelFormat;
 /**
  * hwc/displaycolor interface history
  *
+ * 6.1.0.2022-05-18 Get calibrated serial number.
  * 6.0.0.2022-02-22 Get whether dimming in linear.
  * 5.0.0.2022-02-17 Add layer dim ratio.
  * 4.0.0.2021-12-20 Get pixel format and dataspace of blending stage.
@@ -60,7 +61,7 @@ constexpr struct DisplayColorIntfVer {
 
 } kInterfaceVersion {
     6,
-    0,
+    1,
     0,
 };
 
@@ -382,6 +383,13 @@ class IDisplayColorGeneric {
                                     hwc::PixelFormat &pixel_format,
                                     hwc::Dataspace &dataspace,
                                     bool &dimming_linear) const = 0;
+
+    /**
+     * @brief Get the serial number for the panel used during calibration.
+     * @param display to get the calibrated serial number.
+     * @return The calibrated serial number.
+     */
+    virtual const std::string& GetCalibratedSerialNumber(DisplayType display) const = 0;
 };
 
 extern "C" {
