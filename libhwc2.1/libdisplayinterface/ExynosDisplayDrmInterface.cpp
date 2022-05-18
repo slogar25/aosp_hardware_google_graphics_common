@@ -36,7 +36,6 @@ using namespace std::chrono_literals;
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
 constexpr float DISPLAY_LUMINANCE_UNIT = 10000;
-constexpr auto nsecsPerMs = std::chrono::nanoseconds(1ms).count();
 constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr auto vsyncPeriodTag = "VsyncPeriod";
 
@@ -753,9 +752,10 @@ bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
 
     /*
      * mDesiredVsyncPeriod is nanoseconds
-     * Compare with milliseconds
+     * Compare with 20% margin
      */
-    if (mDesiredVsyncPeriod / nsecsPerMs == mVsyncPeriod / nsecsPerMs) return true;
+    if (abs(static_cast<int32_t>(mDesiredVsyncPeriod - mVsyncPeriod)) < (mDesiredVsyncPeriod / 5))
+        return true;
 
     return false;
 }
@@ -1810,11 +1810,16 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     auto expectedPresentTime = mExynosDisplay->getPendingExpectedPresentTime();
     if (expectedPresentTime != 0) {
-        if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-                                            mDrmCrtc->expected_present_time_property(),
-                                            expectedPresentTime)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set expected_present_time property (%d)",
-                     __func__, ret);
+        /* TODO: don't pass expected present time before we can provide accurate time that desire
+         * refresh rate take effect (b/202346402)
+         */
+        if (!mVsyncCallback.getDesiredVsyncPeriod()) {
+            if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                                                mDrmCrtc->expected_present_time_property(),
+                                                expectedPresentTime)) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Fail to set expected_present_time property (%d)",
+                         __func__, ret);
+            }
         }
         mExynosDisplay->applyExpectedPresentTime();
     }
