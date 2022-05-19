@@ -1136,9 +1136,7 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
     uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
     bool reconfig = false;
 
-    if ((mActiveModeState.blob_id != 0) &&
-        ((mode.h_display() != mActiveModeState.mode.h_display()) ||
-         (mode.v_display() != mActiveModeState.mode.v_display()))) {
+    if (mActiveModeState.isFullModeSwitch(mode)) {
         reconfig = true;
     }
 
