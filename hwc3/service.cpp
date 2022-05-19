@@ -30,7 +30,7 @@ using android::base::StderrLogger;
 using android::sp;
 
 int main(int /*argc*/, char* argv[]) {
-    InitLogging(argv, StderrLogger);
+    InitLogging(argv, android::base::LogdLogger(android::base::SYSTEM));
     LOG(INFO) << "hwc3 starting up";
 
     // same as SF main thread
