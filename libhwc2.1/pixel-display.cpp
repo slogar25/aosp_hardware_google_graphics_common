@@ -222,8 +222,8 @@ ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &we
         ALOGE("histogram error, BAD_PRIORITY(%d)\n", (int)pri);
         return ndk::ScopedAStatus::ok();
     }
-
-    runMediator(roi, weight, pos, histogrambuffer);
+    RoiRect roiCaled = mMediator.calRoi(roi); // fit roi coordinates to RRS
+    runMediator(roiCaled, weight, pos, histogrambuffer);
     if (mMediator.isSecureContentPresenting() == true) {
         memset(histogrambuffer, 0, histogram::HISTOGRAM_BINS_SIZE * sizeof(histogrambuffer[0]));
         *_aidl_return = HistogramErrorCode::DRM_PLAYING; // panel is playing DRM content
