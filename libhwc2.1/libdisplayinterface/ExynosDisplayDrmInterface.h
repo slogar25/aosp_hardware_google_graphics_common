@@ -31,6 +31,7 @@
 #include "ExynosMPP.h"
 #include "drmconnector.h"
 #include "drmcrtc.h"
+#include "histogram/histogram.h"
 #include "vsyncworker.h"
 
 /* Max plane number of buffer object */
@@ -293,8 +294,9 @@ class ExynosDisplayDrmInterface :
                 hwc2_config_t config, bool test = false);
 
         virtual int32_t setDisplayColorSetting(
-                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq)
-        { return NO_ERROR;};
+                ExynosDisplayDrmInterface::DrmModeAtomicReq __unused &drmReq) {
+            return NO_ERROR;
+        }
         virtual int32_t setPlaneColorSetting(
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq,
                 const std::unique_ptr<DrmPlane> &plane,
@@ -315,7 +317,9 @@ class ExynosDisplayDrmInterface :
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
             return NO_ERROR;
         }
-        virtual int32_t setHistogramData(void *__unused bin) { return NO_ERROR; }
+        virtual void registerHistogramInfo(IDLHistogram *info) { return; }
+        virtual int32_t setHistogramControl(hidl_histogram_control_t enabled) { return NO_ERROR; }
+        virtual int32_t setHistogramData(void *bin) { return NO_ERROR; }
 
     protected:
         enum class HalMipiSyncType : uint32_t {
