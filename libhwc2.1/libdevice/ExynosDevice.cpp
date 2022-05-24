@@ -846,16 +846,14 @@ bool ExynosDevice::validateFences(ExynosDisplay *display) {
     }
 
     if (fenceWarn(display, MAX_FENCE_THRESHOLD)) {
-        ALOGE("Fence leak! --");
         printLeakFds(display);
         saveFenceTrace(display);
         return false;
     }
 
     if (exynosHWCControl.doFenceFileDump) {
-        ALOGE("Fence file dump !");
-        if (mFenceLogSize != 0)
-            ALOGE("Fence file not empty!");
+        ALOGD("Fence file dump !");
+        if (mFenceLogSize != 0) ALOGD("Fence file not empty!");
         saveFenceTrace(display);
         exynosHWCControl.doFenceFileDump = false;
     }
