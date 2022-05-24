@@ -252,7 +252,7 @@ void ExynosHWCService::enableMPP(uint32_t physicalType, uint32_t physicalIndex, 
             __func__, physicalType, physicalIndex, logicalIndex, enable);
     ExynosResourceManager::enableMPP(physicalType, physicalIndex, logicalIndex, enable);
     mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
-    mHWCCtx->device->invalidate();
+    mHWCCtx->device->onRefresh();
 }
 
 void ExynosHWCService::setScaleDownRatio(uint32_t physicalType,
@@ -262,7 +262,7 @@ void ExynosHWCService::setScaleDownRatio(uint32_t physicalType,
             __func__, physicalType, physicalIndex, logicalIndex, scaleDownRatio);
     ExynosResourceManager::setScaleDownRatio(physicalType, physicalIndex, logicalIndex, scaleDownRatio);
     mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
-    mHWCCtx->device->invalidate();
+    mHWCCtx->device->onRefresh();
 }
 
 void ExynosHWCService::setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) {
@@ -482,7 +482,7 @@ int32_t ExynosHWCService::setDisplayRCDLayerEnabled(uint32_t displayIndex, bool 
     auto ret = primaryDisplay->setDebugRCDLayerEnabled(enable);
 
     mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
-    mHWCCtx->device->invalidate();
+    mHWCCtx->device->onRefresh();
 
     return ret;
 }

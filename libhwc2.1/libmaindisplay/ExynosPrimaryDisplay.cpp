@@ -116,10 +116,9 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mEarlyWakeupDispFd = fopen(EARLY_WAKUP_NODE_0_BASE, "w");
     if (mEarlyWakeupDispFd == nullptr)
         ALOGE("open %s failed! %s", EARLY_WAKUP_NODE_0_BASE, strerror(errno));
-    mBrightnessController =
-            std::make_unique<BrightnessController>(mIndex,
-                                     [this]() { mDevice->invalidate(); },
-                                     [this]() { updatePresentColorConversionInfo(); });
+    mBrightnessController = std::make_unique<BrightnessController>(
+            mIndex, [this]() { mDevice->onRefresh(); },
+            [this]() { updatePresentColorConversionInfo(); });
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
@@ -511,7 +510,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
             mDisplayInterface->waitVBlank();
             ATRACE_NAME("frames to reach LHBM peak brightness");
             for (int32_t i = mFramesToReachLhbmPeakBrightness; i > 0; i--) {
-                mDevice->invalidate();
+                mDevice->onRefresh();
                 mDisplayInterface->waitVBlank();
             }
         }

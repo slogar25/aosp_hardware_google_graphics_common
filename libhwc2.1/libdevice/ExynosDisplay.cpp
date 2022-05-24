@@ -1581,7 +1581,7 @@ bool ExynosDisplay::skipStaticLayerChanged(ExynosCompositionInfo& compositionInf
 }
 
 void ExynosDisplay::requestLhbm(bool on) {
-    mDevice->invalidate();
+    mDevice->onRefresh();
     if (mBrightnessController) {
         mBrightnessController->processLocalHbm(on);
     }
@@ -3460,7 +3460,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             ret = HWC2_ERROR_NOT_VALIDATED;
         }
         mRenderingState = RENDERING_STATE_PRESENTED;
-        mDevice->invalidate();
+        mDevice->onRefresh();
         return ret;
     }
 
@@ -4270,14 +4270,6 @@ int32_t ExynosDisplay::updateConfigRequestAppliedTime()
 int32_t ExynosDisplay::updateVsyncAppliedTimeLine(int64_t actualChangeTime)
 {
     ExynosDevice *dev = mDevice;
-    hwc2_callback_data_t vsync_callbackData = nullptr;
-    HWC2_PFN_VSYNC_PERIOD_TIMING_CHANGED vsync_callbackFunc = nullptr;
-    if (dev->mCallbackInfos[HWC2_CALLBACK_VSYNC_PERIOD_TIMING_CHANGED].funcPointer != NULL) {
-        vsync_callbackData =
-            dev->mCallbackInfos[HWC2_CALLBACK_VSYNC_PERIOD_TIMING_CHANGED].callbackData;
-        vsync_callbackFunc =
-            (HWC2_PFN_VSYNC_PERIOD_TIMING_CHANGED)dev->mCallbackInfos[HWC2_CALLBACK_VSYNC_PERIOD_TIMING_CHANGED].funcPointer;
-    }
 
     DISPLAY_LOGD(eDebugDisplayConfig,"Vsync applied time is changed (%" PRId64 "-> %" PRId64 ")",
             mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos,
@@ -4297,12 +4289,7 @@ int32_t ExynosDisplay::updateVsyncAppliedTimeLine(int64_t actualChangeTime)
             mVsyncAppliedTimeLine.refreshRequired,
             mVsyncAppliedTimeLine.newVsyncAppliedTimeNanos);
 
-    if (vsync_callbackFunc != nullptr)
-        vsync_callbackFunc(vsync_callbackData, getId(),
-                &mVsyncAppliedTimeLine);
-    else {
-        ALOGD("callback function is null");
-    }
+    dev->onVsyncPeriodTimingChanged(getId(), &mVsyncAppliedTimeLine);
 
     return NO_ERROR;
 }
