@@ -24,6 +24,7 @@
 #include <utils/Errors.h>
 
 #include "ExynosDisplay.h"
+#include "ExynosPrimaryDisplay.h"
 
 extern int32_t load_png_image(const char *filepath, buffer_handle_t buffer);
 
@@ -162,6 +163,78 @@ ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_retur
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
+bool Display::runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
+                            std::vector<char16_t> *histogrambuffer) {
+    if (mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
+        ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
+        return false;
+    }
+    if (mMediator.enableHist() == HistogramErrorCode::ENABLE_HIST_ERROR) {
+        ALOGE("histogram error, ENABLE_HIST ERROR\n");
+        return false;
+    }
+
+    if (mMediator.collectRoiLuma(histogrambuffer) != HistogramErrorCode::NONE) {
+        ALOGE("histogram error, COLLECT_ROI_LUMA ERROR\n");
+        mMediator.disableHist();
+        return false;
+    }
+
+    if (mMediator.disableHist() == HistogramErrorCode::DISABLE_HIST_ERROR) { // disable histogram
+        ALOGE("histogram error, DISABLE_HIST ERROR\n");
+        return false;
+    }
+    return true;
+}
+ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &weight,
+                                            HistogramPos pos, Priority pri,
+                                            std::vector<char16_t> *histogrambuffer,
+                                            HistogramErrorCode *_aidl_return) {
+    if (!mDevice) {
+        ALOGI("mDevice is NULL \n");
+        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    }
+    if (mMediator.isDisplayPowerOff() == true) {
+        *_aidl_return = HistogramErrorCode::DISPLAY_POWEROFF; // panel is off
+        return ndk::ScopedAStatus::ok();
+    }
+    if (mMediator.isSecureContentPresenting() == true) {
+        *_aidl_return = HistogramErrorCode::DRM_PLAYING; // panel is playing DRM content
+        return ndk::ScopedAStatus::ok();
+    }
+    if ((roi.left < 0) || (roi.top < 0) || ((roi.right - roi.left) <= 0) ||
+        ((roi.bottom - roi.top) <= 0)) {
+        *_aidl_return = HistogramErrorCode::BAD_ROI;
+        ALOGE("histogram error, BAD_ROI (%d, %d, %d, %d) \n", roi.left, roi.top, roi.right,
+              roi.bottom);
+        return ndk::ScopedAStatus::ok();
+    }
+    if ((weight.weightR + weight.weightG + weight.weightB) != (histogram::WEIGHT_SUM)) {
+        *_aidl_return = HistogramErrorCode::BAD_WEIGHT;
+        ALOGE("histogram error, BAD_WEIGHT(%d, %d, %d)\n", weight.weightR, weight.weightG,
+              weight.weightB);
+        return ndk::ScopedAStatus::ok();
+    }
+    if (pos != HistogramPos::POST && pos != HistogramPos::PRE) {
+        *_aidl_return = HistogramErrorCode::BAD_POSITION;
+        ALOGE("histogram error, BAD_POSITION(%d)\n", (int)pos);
+        return ndk::ScopedAStatus::ok();
+    }
+    if (pri != Priority::NORMAL && pri != Priority::PRIORITY) {
+        *_aidl_return = HistogramErrorCode::BAD_PRIORITY;
+        ALOGE("histogram error, BAD_PRIORITY(%d)\n", (int)pri);
+        return ndk::ScopedAStatus::ok();
+    }
+    runMediator(roi, weight, pos, histogrambuffer);
+    if (mMediator.isSecureContentPresenting() == true) {
+        memset(histogrambuffer, 0, histogram::HISTOGRAM_BINS_SIZE * sizeof(histogrambuffer[0]));
+        *_aidl_return = HistogramErrorCode::DRM_PLAYING; // panel is playing DRM content
+        return ndk::ScopedAStatus::ok();
+    }
+    *_aidl_return = HistogramErrorCode::NONE;
+    return ndk::ScopedAStatus::ok();
+}
+
 } // namespace display
 } // namespace pixel
 } // namespace hardware
