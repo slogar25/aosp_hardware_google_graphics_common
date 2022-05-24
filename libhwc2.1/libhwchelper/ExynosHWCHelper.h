@@ -21,6 +21,7 @@
 #include <utils/String8.h>
 
 #include <fstream>
+#include <list>
 #include <optional>
 #include <sstream>
 #include <string>
@@ -258,7 +259,7 @@ const format_description_t exynos_format_desc[] = {
 
 constexpr size_t FORMAT_MAX_CNT = sizeof(exynos_format_desc) / sizeof(format_description);
 
-typedef enum hwc_fdebug_fence_type_t {
+enum HwcFdebugFenceType {
     FENCE_TYPE_SRC_RELEASE = 1,
     FENCE_TYPE_SRC_ACQUIRE = 2,
     FENCE_TYPE_DST_RELEASE = 3,
@@ -271,9 +272,9 @@ typedef enum hwc_fdebug_fence_type_t {
     FENCE_TYPE_READBACK_RELEASE = 10,
     FENCE_TYPE_ALL = 11,
     FENCE_TYPE_UNDEFINED = 100
-} hwc_fdebug_fence_type;
+};
 
-typedef enum hwc_fdebug_ip_type_t {
+enum HwcFdebugIpType {
     FENCE_IP_DPP = 0,
     FENCE_IP_MSC = 1,
     FENCE_IP_G2D = 2,
@@ -281,30 +282,30 @@ typedef enum hwc_fdebug_ip_type_t {
     FENCE_IP_LAYER = 4,
     FENCE_IP_ALL = 5,
     FENCE_IP_UNDEFINED = 100
-} hwc_fdebug_ip_type;
+};
 
-typedef enum hwc_fence_type_t {
-    FENCE_LAYER_RELEASE_DPP     = 0,
-    FENCE_LAYER_RELEASE_MPP     = 1,
-    FENCE_LAYER_RELEASE_MSC     = 2,
-    FENCE_LAYER_RELEASE_G2D     = 3,
-    FENCE_DPP_HW_STATE          = 4,
-    FENCE_MSC_HW_STATE          = 5,
-    FENCE_G2D_HW_STATE          = 6,
-    FENCE_MSC_SRC_LAYER         = 7,
-    FENCE_G2D_SRC_LAYER         = 8,
-    FENCE_MPP_DST_DPP           = 9,
-    FENCE_MSC_DST_DPP           = 10,
-    FENCE_G2D_DST_DPP           = 11,
-    FENCE_DPP_SRC_MPP           = 12,
-    FENCE_DPP_SRC_MSC           = 13,
-    FENCE_DPP_SRC_G2D           = 14,
-    FENCE_DPP_SRC_LAYER         = 15,
-    FENCE_MPP_FREE_BUF_ACQUIRE  = 16,
-    FENCE_MPP_FREE_BUF_RELEASE  = 17,
-    FENCE_RETIRE                = 18,
+enum HwcFenceType {
+    FENCE_LAYER_RELEASE_DPP = 0,
+    FENCE_LAYER_RELEASE_MPP = 1,
+    FENCE_LAYER_RELEASE_MSC = 2,
+    FENCE_LAYER_RELEASE_G2D = 3,
+    FENCE_DPP_HW_STATE = 4,
+    FENCE_MSC_HW_STATE = 5,
+    FENCE_G2D_HW_STATE = 6,
+    FENCE_MSC_SRC_LAYER = 7,
+    FENCE_G2D_SRC_LAYER = 8,
+    FENCE_MPP_DST_DPP = 9,
+    FENCE_MSC_DST_DPP = 10,
+    FENCE_G2D_DST_DPP = 11,
+    FENCE_DPP_SRC_MPP = 12,
+    FENCE_DPP_SRC_MSC = 13,
+    FENCE_DPP_SRC_G2D = 14,
+    FENCE_DPP_SRC_LAYER = 15,
+    FENCE_MPP_FREE_BUF_ACQUIRE = 16,
+    FENCE_MPP_FREE_BUF_RELEASE = 17,
+    FENCE_RETIRE = 18,
     FENCE_MAX
-} hwc_fence_type;
+};
 
 enum {
     EXYNOS_ERROR_NONE       = 0,
@@ -446,12 +447,11 @@ uint32_t getBufferNumOfFormat(int format, uint32_t compressType);
 uint32_t getPlaneNumOfFormat(int format, uint32_t compressType);
 uint32_t getBytePerPixelOfPrimaryPlane(int format);
 
-int fence_close(int fence, ExynosDisplay* display,
-        hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip);
+int fence_close(int fence, ExynosDisplay *display, HwcFdebugFenceType type, HwcFdebugIpType ip);
 bool fence_valid(int fence);
 
 int hwcFdClose(int fd);
-int hwc_dup(int fd, ExynosDisplay *display, hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip,
+int hwc_dup(int fd, ExynosDisplay *display, HwcFdebugFenceType type, HwcFdebugIpType ip,
             bool pendingAllowed = false);
 int hwc_print_stack();
 
@@ -482,37 +482,29 @@ inline T pixel_align(const T x, const uint32_t a) {
 uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format);
 int getBufLength(buffer_handle_t handle, uint32_t planer_num, size_t *length, int format, uint32_t width, uint32_t height);
 
-//class hwc_fence_info(sync_fence_info_data* data, sync_pt_info* info) {
-struct tm* getHwcFenceTime();
-
-enum {
-    FENCE_FROM = 0,
-    FENCE_TO,
-    FENCE_DUP,
-    FENCE_CLOSE,
+enum class HwcFenceDirection {
+    FROM = 0,
+    TO,
+    DUP,
+    CLOSE,
+    UPDATE,
 };
 
-typedef struct fenceTrace {
-    hwc_fdebug_fence_type type = FENCE_TYPE_UNDEFINED;
-    hwc_fdebug_ip_type ip = FENCE_IP_UNDEFINED;
+struct HwcFenceTrace {
+    HwcFenceDirection direction = HwcFenceDirection::FROM;
+    HwcFdebugFenceType type = FENCE_TYPE_UNDEFINED;
+    HwcFdebugIpType ip = FENCE_IP_UNDEFINED;
     struct timeval time = {0, 0};
-    int32_t curFlag = 0;
-} fenceTrace_t;
+};
 
-typedef struct hwc_fence_info {
+struct HwcFenceInfo {
     uint32_t displayId = HWC_DISPLAY_PRIMARY;
-    struct sync_fence_info_data *sync_data = nullptr;
-    struct sync_pt_info *pt_info = nullptr;
-    fenceTrace_t from = {};
-    fenceTrace_t to = {};
-    fenceTrace_t dup = {};
-    fenceTrace_t close = {};
     int32_t usage = 0;
-    int32_t curFlag = 0;
-    uint32_t last_dir = 0;
+    int32_t dupFrom = -1;
     bool pendingAllowed = false;
     bool leaking = false;
-} hwc_fence_info_t;
+    std::list<HwcFenceTrace> traces = {};
+};
 
 class funcReturnCallback {
     public:
@@ -522,15 +514,13 @@ class funcReturnCallback {
         const std::function<void(void)> mCb;
 };
 
-void setFenceName(int fenceFd, hwc_fence_type fenceType);
-void setFenceName(uint32_t fd, ExynosDisplay *display,
-        hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip,
-        uint32_t direction, bool pendingAllowed = false);
-void setFenceInfo(uint32_t fd, ExynosDisplay *display,
-        hwc_fdebug_fence_type type, hwc_fdebug_ip_type ip,
-        uint32_t direction, bool pendingAllowed = false);
+String8 getLocalTimeStr(struct timeval tv);
+
+void setFenceName(int fenceFd, HwcFenceType fenceType);
+void setFenceInfo(uint32_t fd, ExynosDisplay *display, HwcFdebugFenceType type, HwcFdebugIpType ip,
+                  HwcFenceDirection direction, bool pendingAllowed = false, int32_t dupFrom = -1);
 void printLastFenceInfo(uint32_t fd, ExynosDisplay *display);
-void dumpFenceInfo(ExynosDisplay *display, int32_t __unused depth);
+void dumpFenceInfo(ExynosDisplay *display, int32_t count);
 bool fenceWarn(ExynosDisplay *display, uint32_t threshold);
 void printLeakFds(ExynosDisplay *display);
 bool validateFencePerFrame(ExynosDisplay *display);

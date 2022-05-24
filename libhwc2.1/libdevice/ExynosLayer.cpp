@@ -967,7 +967,8 @@ void ExynosLayer::setSrcAcquireFence() {
                                            hwc_dup(mPrevAcquireFence, mDisplay,
                                                    FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER));
     } else if (mAcquireFence != -1) {
-        setFenceInfo(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER, FENCE_FROM);
+        setFenceInfo(mAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER,
+                     HwcFenceDirection::FROM);
     }
 }
 
