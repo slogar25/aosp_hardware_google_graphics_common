@@ -217,24 +217,16 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::init(ExynosDevice *exynosD
 }
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleEvent(uint64_t timestamp_us) {
-    hwc2_callback_data_t callbackData =
-        mExynosDevice->mCallbackInfos[HWC2_CALLBACK_HOTPLUG].callbackData;
-    HWC2_PFN_HOTPLUG callbackFunc =
-        (HWC2_PFN_HOTPLUG)mExynosDevice->mCallbackInfos[HWC2_CALLBACK_HOTPLUG].funcPointer;
-
-    if (callbackData == NULL || callbackFunc == NULL)
-    {
-        ALOGE("%s:: callback info is NULL", __func__);
+    if (!mExynosDevice->isCallbackAvailable(HWC2_CALLBACK_HOTPLUG)) {
         return;
     }
 
     for (auto it : mExynosDevice->mDisplays) {
         /* Call UpdateModes to get plug status */
         uint32_t numConfigs;
-        it->getDisplayConfigs(&numConfigs, NULL);
 
-        callbackFunc(callbackData, getDisplayId(it->mType, it->mIndex),
-                it->mPlugState ? HWC2_CONNECTION_CONNECTED : HWC2_CONNECTION_DISCONNECTED);
+        it->getDisplayConfigs(&numConfigs, NULL);
+        mExynosDevice->onHotPlug(getDisplayId(it->mType, it->mIndex), it->mPlugState);
     }
 
     /* TODO: Check plug status hear or ExynosExternalDisplay::handleHotplugEvent() */
@@ -263,7 +255,7 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleTUIEvent() {
     } else {
         /* Received TUI Exit event */
         if (mExynosDevice->isInTUI()) {
-            mExynosDevice->invalidate();
+            mExynosDevice->onRefresh();
             mExynosDevice->exitFromTUI();
             ALOGV("%s:: DRM device out TUI", __func__);
         }
