@@ -838,7 +838,7 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
     hwc2_config_t config;
     int32_t bootConfig;
     err = mExynosDisplay->getPreferredDisplayConfigInternal(&bootConfig);
-    if (err == HWC2_ERROR_NONE) {
+    if (err == HWC2_ERROR_NONE && property_get_bool("sys.boot_completed", false) == true) {
         config = static_cast<hwc2_config_t>(bootConfig);
     } else {
         config = mDrmConnector->get_preferred_mode_id();
