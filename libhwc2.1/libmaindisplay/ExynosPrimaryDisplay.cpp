@@ -44,9 +44,7 @@ static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
          {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}};
 
-static constexpr const char* PROPERTY_BOOT_MODE = "persist.vendor.display.primary.boot_config";
-static constexpr const char *PROPERTY_DEFAULT_BOOT_MODE =
-        "vendor.display.primary.default_boot_config";
+static constexpr const char *PROPERTY_BOOT_MODE = "persist.vendor.display.primary.boot_config";
 
 static std::string loadPanelGammaCalibration(const std::string &file) {
     std::ifstream ifs(file);
@@ -239,9 +237,8 @@ int32_t ExynosPrimaryDisplay::clearBootDisplayConfig() {
 }
 
 int32_t ExynosPrimaryDisplay::getPreferredDisplayConfigInternal(int32_t *outConfig) {
-    char modeStr[PROPERTY_VALUE_MAX], defaultModeStr[PROPERTY_VALUE_MAX];
-    property_get(PROPERTY_DEFAULT_BOOT_MODE, defaultModeStr, "");
-    auto ret = property_get(PROPERTY_BOOT_MODE, modeStr, defaultModeStr);
+    char modeStr[PROPERTY_VALUE_MAX];
+    auto ret = property_get(PROPERTY_BOOT_MODE, modeStr, "");
 
     if (ret <= 0) {
         return mDisplayInterface->getDefaultModeId(outConfig);
