@@ -991,7 +991,7 @@ class ExynosDisplay {
          */
         int32_t getPreferredBootDisplayConfig(int32_t* outConfig);
 
-        virtual int32_t getPreferredDisplayConfigInternal(int32_t *outConfig);
+        virtual int32_t getPreferredDisplayConfigInternal(int32_t* outConfig);
 
         /* setAutoLowLatencyMode(displayToken, on)
          * Descriptor: HWC2_FUNCTION_SET_AUTO_LOW_LATENCY_MODE
