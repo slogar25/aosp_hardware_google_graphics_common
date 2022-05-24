@@ -185,6 +185,7 @@ class ExynosDevice {
         exynos_callback_info_t mCallbackInfos[HWC2_CALLBACK_SEAMLESS_POSSIBLE + 1];
 
         std::map<uint32_t, exynos_callback_info_t> mHwc3CallbackInfos;
+        Mutex mDeviceCallbackMutex;
 
         /**
          * Thread variables
@@ -274,8 +275,13 @@ class ExynosDevice {
          */
         int32_t registerCallback (
                 int32_t descriptor, hwc2_callback_data_t callbackData, hwc2_function_pointer_t point);
-
-        void invalidate();
+        bool isCallbackAvailable(int32_t descriptor);
+        void onHotPlug(uint32_t displayId, bool status);
+        void onRefresh();
+        void onVsync(uint32_t displayId, int64_t timestamp);
+        bool onVsync_2_4(uint32_t displayId, int64_t timestamp, uint32_t vsyncPeriod);
+        void onVsyncPeriodTimingChanged(uint32_t displayId,
+                                        hwc_vsync_period_change_timeline_t *timeline);
 
         void setHWCDebug(unsigned int debug);
         uint32_t getHWCDebug();
@@ -335,6 +341,7 @@ class ExynosDevice {
         Condition mCaptureCondition;
         std::atomic<bool> mIsWaitingReadbackReqDone = false;
         void setVBlankOffDelay(int vblankOffDelay);
+        bool isCallbackRegisteredLocked(int32_t descriptor);
 
     public:
         bool isLbeSupported();
