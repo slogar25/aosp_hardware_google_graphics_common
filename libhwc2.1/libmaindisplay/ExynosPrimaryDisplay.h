@@ -20,6 +20,8 @@
 
 #include "../libdevice/ExynosDisplay.h"
 
+using namespace displaycolor;
+
 class ExynosPrimaryDisplay : public ExynosDisplay {
     public:
         /* Methods */
@@ -73,6 +75,11 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual bool getHDRException(ExynosLayer* __unused layer);
         virtual int32_t setActiveConfigInternal(hwc2_config_t config, bool force) override;
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig) override;
+        DisplayType getDisplayTypeFromIndex(uint32_t index) {
+            return (index >= DisplayType::DISPLAY_MAX) ? DisplayType::DISPLAY_PRIMARY
+                                                       : DisplayType(mIndex);
+        };
+
     public:
         // Prepare multi resolution
         ResolutionInfo mResolutionInfo;
