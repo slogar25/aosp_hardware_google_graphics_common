@@ -44,9 +44,7 @@ static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
          {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}};
 
-static constexpr const char* PROPERTY_BOOT_MODE = "persist.vendor.display.primary.boot_config";
-static constexpr const char *PROPERTY_DEFAULT_BOOT_MODE =
-        "vendor.display.primary.default_boot_config";
+static constexpr const char *PROPERTY_BOOT_MODE = "persist.vendor.display.primary.boot_config";
 
 static std::string loadPanelGammaCalibration(const std::string &file) {
     std::ifstream ifs(file);
@@ -116,10 +114,9 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mEarlyWakeupDispFd = fopen(EARLY_WAKUP_NODE_0_BASE, "w");
     if (mEarlyWakeupDispFd == nullptr)
         ALOGE("open %s failed! %s", EARLY_WAKUP_NODE_0_BASE, strerror(errno));
-    mBrightnessController =
-            std::make_unique<BrightnessController>(mIndex,
-                                     [this]() { mDevice->invalidate(); },
-                                     [this]() { updatePresentColorConversionInfo(); });
+    mBrightnessController = std::make_unique<BrightnessController>(
+            mIndex, [this]() { mDevice->onRefresh(); },
+            [this]() { updatePresentColorConversionInfo(); });
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
@@ -240,9 +237,8 @@ int32_t ExynosPrimaryDisplay::clearBootDisplayConfig() {
 }
 
 int32_t ExynosPrimaryDisplay::getPreferredDisplayConfigInternal(int32_t *outConfig) {
-    char modeStr[PROPERTY_VALUE_MAX], defaultModeStr[PROPERTY_VALUE_MAX];
-    property_get(PROPERTY_DEFAULT_BOOT_MODE, defaultModeStr, "");
-    auto ret = property_get(PROPERTY_BOOT_MODE, modeStr, defaultModeStr);
+    char modeStr[PROPERTY_VALUE_MAX];
+    auto ret = property_get(PROPERTY_BOOT_MODE, modeStr, "");
 
     if (ret <= 0) {
         return mDisplayInterface->getDefaultModeId(outConfig);
@@ -511,7 +507,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
             mDisplayInterface->waitVBlank();
             ATRACE_NAME("frames to reach LHBM peak brightness");
             for (int32_t i = mFramesToReachLhbmPeakBrightness; i > 0; i--) {
-                mDevice->invalidate();
+                mDevice->onRefresh();
                 mDisplayInterface->waitVBlank();
             }
         }
