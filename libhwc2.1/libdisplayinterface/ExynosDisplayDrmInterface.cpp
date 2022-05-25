@@ -690,47 +690,42 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 void ExynosDisplayDrmInterface::Callback(
         int display, int64_t timestamp)
 {
-    Mutex::Autolock lock(mExynosDisplay->getDisplayMutex());
-    bool configApplied = mVsyncCallback.Callback(display, timestamp);
+    {
+        Mutex::Autolock lock(mExynosDisplay->getDisplayMutex());
+        bool configApplied = mVsyncCallback.Callback(display, timestamp);
 
-    if (configApplied) {
-        if (mVsyncCallback.getDesiredVsyncPeriod()) {
-            mExynosDisplay->resetConfigRequestStateLocked();
-            mDrmConnector->set_active_mode(mActiveModeState.mode);
-            mVsyncCallback.resetDesiredVsyncPeriod();
+        if (configApplied) {
+            if (mVsyncCallback.getDesiredVsyncPeriod()) {
+                mExynosDisplay->resetConfigRequestStateLocked();
+                mDrmConnector->set_active_mode(mActiveModeState.mode);
+                mVsyncCallback.resetDesiredVsyncPeriod();
+            }
+
+            /*
+             * Disable vsync if vsync config change is done
+             */
+            if (!mVsyncCallback.getVSyncEnabled()) {
+                mDrmVSyncWorker.VSyncControl(false);
+                mVsyncCallback.resetVsyncTimeStamp();
+            }
+        } else {
+            mExynosDisplay->updateConfigRequestAppliedTime();
         }
 
-        /*
-         * Disable vsync if vsync config change is done
-         */
-        if (!mVsyncCallback.getVSyncEnabled()) {
-            mDrmVSyncWorker.VSyncControl(false);
-            mVsyncCallback.resetVsyncTimeStamp();
+        if (!mExynosDisplay->mPlugState || !mVsyncCallback.getVSyncEnabled()) {
+            return;
         }
-    } else {
-        mExynosDisplay->updateConfigRequestAppliedTime();
-    }
-
-    if (!mExynosDisplay->mPlugState || !mVsyncCallback.getVSyncEnabled()) {
-        return;
     }
 
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
-    auto vsync_2_4CallbackInfo =
-        exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
-    if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
-        ((HWC2_PFN_VSYNC_2_4)vsync_2_4CallbackInfo.funcPointer)(
-                vsync_2_4CallbackInfo.callbackData,
-                mExynosDisplay->mDisplayId,
-                timestamp, mExynosDisplay->mVsyncPeriod);
+
+    if (exynosDevice->onVsync_2_4(mExynosDisplay->mDisplayId, timestamp,
+                                  mExynosDisplay->mVsyncPeriod)) {
         ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
         return;
     }
 
-    auto vsyncCallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC];
-    if (vsyncCallbackInfo.funcPointer && vsyncCallbackInfo.callbackData)
-        ((HWC2_PFN_VSYNC)vsyncCallbackInfo.funcPointer)(vsyncCallbackInfo.callbackData,
-                                                        mExynosDisplay->mDisplayId, timestamp);
+    exynosDevice->onVsync(mExynosDisplay->mDisplayId, timestamp);
 }
 
 bool ExynosDisplayDrmInterface::ExynosVsyncCallback::Callback(
@@ -826,8 +821,7 @@ int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
     mVsyncCallback.enableVSync(HWC2_VSYNC_ENABLE == enabled);
 
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
-    auto vsync_2_4CallbackInfo = exynosDevice->mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4];
-    if (vsync_2_4CallbackInfo.funcPointer && vsync_2_4CallbackInfo.callbackData) {
+    if (exynosDevice->isCallbackAvailable(HWC2_CALLBACK_VSYNC_2_4)) {
         ATRACE_INT(vsyncPeriodTag, 0);
     }
 
@@ -844,7 +838,7 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
     hwc2_config_t config;
     int32_t bootConfig;
     err = mExynosDisplay->getPreferredDisplayConfigInternal(&bootConfig);
-    if (err == HWC2_ERROR_NONE) {
+    if (err == HWC2_ERROR_NONE && property_get_bool("sys.boot_completed", false) == true) {
         config = static_cast<hwc2_config_t>(bootConfig);
     } else {
         config = mDrmConnector->get_preferred_mode_id();

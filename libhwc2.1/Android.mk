@@ -68,7 +68,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk
 
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V1-ndk \
-                          com.google.hardware.pixel.display-V4-ndk \
+                          com.google.hardware.pixel.display-V5-ndk \
                           libbinder_ndk \
                           libbase \
                           libpng \
@@ -102,8 +102,8 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
-	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include
-
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include \
+        $(TOP)/hardware/google/graphics/$(soc_ver)
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
 	ExynosHWCDebug.cpp \
@@ -120,7 +120,8 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
-	pixel-display.cpp
+	pixel-display.cpp \
+	histogram_mediator.cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm libui libvendorgraphicbuffer
 
@@ -155,7 +156,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0
 
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V4-ndk \
+LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V5-ndk \
                           libbinder_ndk \
                           libbase
 
@@ -216,7 +217,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 	libui
 
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V1-ndk \
-                          com.google.hardware.pixel.display-V4-ndk \
+                          com.google.hardware.pixel.display-V5-ndk \
                           libbinder_ndk \
                           libbase
 
