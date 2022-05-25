@@ -1199,6 +1199,10 @@ class ExynosDisplay {
         }
         virtual void handleDisplayIdleEnter(const uint32_t __unused idleTeRefreshRate) {}
 
+        virtual PanelCalibrationStatus getPanelCalibrationStatus() {
+            return PanelCalibrationStatus::UNCALIBRATED;
+        }
+
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
         inline uint32_t getDisplayPreAssignBit() {
