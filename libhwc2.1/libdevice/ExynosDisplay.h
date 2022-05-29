@@ -1239,6 +1239,13 @@ class ExynosDisplay {
         // is the hint session both enabled and supported
         bool usePowerHintSession();
 
+        void setMinDisplayVsyncPeriod(uint32_t period) { mMinDisplayVsyncPeriod = period; }
+
+        bool isCurrentPeakRefreshRate(void) {
+            return ((mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_NONE) &&
+                    (mVsyncPeriod == mMinDisplayVsyncPeriod));
+        }
+
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
 
@@ -1252,6 +1259,9 @@ class ExynosDisplay {
         //exceeds this threshold.
         static constexpr float kHdrFullScreen = 0.5;
         uint32_t mHdrFullScrenAreaThreshold;
+
+        // vsync period of peak refresh rate
+        uint32_t mMinDisplayVsyncPeriod;
 
         /* Display hint to notify power hal */
         class PowerHalHintWorker : public Worker {
