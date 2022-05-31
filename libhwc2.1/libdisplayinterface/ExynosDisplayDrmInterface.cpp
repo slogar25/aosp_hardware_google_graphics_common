@@ -696,7 +696,7 @@ void ExynosDisplayDrmInterface::Callback(
 
         if (configApplied) {
             if (mVsyncCallback.getDesiredVsyncPeriod()) {
-                mExynosDisplay->resetConfigRequestStateLocked();
+                mExynosDisplay->resetConfigRequestStateLocked(mActiveModeState.mode.id());
                 mDrmConnector->set_active_mode(mActiveModeState.mode);
                 mVsyncCallback.resetDesiredVsyncPeriod();
             }
@@ -1064,6 +1064,9 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
     if ((mActiveModeState.blob_id != 0) &&
         (mActiveModeState.mode.id() == config)) {
         ALOGD("%s:: same mode %d", __func__, config);
+        /* trigger resetConfigRequestStateLocked() */
+        mVsyncCallback.setDesiredVsyncPeriod(nsecsPerSec / mActiveModeState.mode.v_refresh());
+        mDrmVSyncWorker.VSyncControl(true);
         return HWC2_ERROR_NONE;
     }
 
