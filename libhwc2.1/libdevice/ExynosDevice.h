@@ -345,28 +345,11 @@ class ExynosDevice {
         bool isCallbackRegisteredLocked(int32_t descriptor);
 
     public:
-        bool isLbeSupported();
-        void setLbeState(LbeState state);
-        void setLbeAmbientLight(int value);
-        LbeState getLbeState();
-
-        bool isLhbmSupported();
-        int32_t setLhbmState(bool enabled);
-        bool getLhbmState();
-        int setMinIdleRefreshRate(const int fps);
-        int setRefreshRateThrottle(const int delayMs);
-
-        bool isColorCalibratedByDevice();
-
-        PanelCalibrationStatus getPanelCalibrationStatus();
-
-    public:
         void enterToTUI() { mIsInTUI = true; };
         void exitFromTUI() { mIsInTUI = false; };
         bool isInTUI() { return mIsInTUI; };
 
     private:
-        bool mLbeSupported;
         bool mIsInTUI;
 };
 
