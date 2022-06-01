@@ -163,6 +163,7 @@ ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_retur
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
+
 bool Display::runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
                             std::vector<char16_t> *histogrambuffer) {
     if (mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
@@ -186,6 +187,7 @@ bool Display::runMediator(const RoiRect roi, const Weight weight, const Histogra
     }
     return true;
 }
+
 ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &weight,
                                             HistogramPos pos, Priority pri,
                                             std::vector<char16_t> *histogrambuffer,
@@ -235,6 +237,13 @@ ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &we
     return ndk::ScopedAStatus::ok();
 }
 
+ndk::ScopedAStatus Display::getPanelCalibrationStatus(PanelCalibrationStatus *_aidl_return){
+    if (mDevice) {
+        *_aidl_return = mDevice->getPanelCalibrationStatus();
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
 } // namespace display
 } // namespace pixel
 } // namespace hardware
