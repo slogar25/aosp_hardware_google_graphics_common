@@ -59,6 +59,7 @@
 
 using HbmState = ::aidl::com::google::hardware::pixel::display::HbmState;
 using LbeState = ::aidl::com::google::hardware::pixel::display::LbeState;
+using PanelCalibrationStatus = ::aidl::com::google::hardware::pixel::display::PanelCalibrationStatus;
 
 using namespace android;
 
@@ -356,6 +357,8 @@ class ExynosDevice {
         int setRefreshRateThrottle(const int delayMs);
 
         bool isColorCalibratedByDevice();
+
+        PanelCalibrationStatus getPanelCalibrationStatus();
 
     public:
         void enterToTUI() { mIsInTUI = true; };
