@@ -492,6 +492,22 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
 
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     ATRACE_CALL();
+    if (enabled) {
+        ATRACE_NAME("wait for peak refresh rate");
+        for (int32_t i = 0; i <= kLhbmWaitForPeakRefreshRate; i++) {
+            if (!isCurrentPeakRefreshRate()) {
+                if (i == kLhbmWaitForPeakRefreshRate) {
+                    ALOGW("setLhbmState(on) wait for peak refresh rate timeout !");
+                    return TIMED_OUT;
+                }
+                usleep(mVsyncPeriod / 1000 + 1);
+            } else {
+                ALOGI_IF(i, "waited %d vsync to reach peak refresh rate", i);
+                break;
+            }
+        }
+    }
+
     requestLhbm(enabled);
     ALOGI("setLhbmState =%d", enabled);
 
