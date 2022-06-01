@@ -1139,6 +1139,11 @@ bool ExynosDevice::getLhbmState() {
     return false;
 }
 
+PanelCalibrationStatus ExynosDevice::getPanelCalibrationStatus() {
+    auto display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+    return display->getPanelCalibrationStatus();
+}
+
 uint32_t ExynosDevice::getWindowPlaneNum()
 {
     /*

@@ -59,6 +59,7 @@ public:
     ndk::ScopedAStatus histogramSample(const RoiRect &roi, const Weight &weight, HistogramPos pos,
                                        Priority pri, std::vector<char16_t> *histogrambuffer,
                                        HistogramErrorCode *_aidl_return) override;
+    ndk::ScopedAStatus getPanelCalibrationStatus(PanelCalibrationStatus *_aidl_return) override;
 
 private:
     bool runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
