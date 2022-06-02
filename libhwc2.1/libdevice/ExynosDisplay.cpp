@@ -3355,8 +3355,7 @@ bool ExynosDisplay::isFullScreenComposition() {
             dispRect.right = r.right;
     }
 
-    if ((dispRect.top != 0) || (dispRect.left != 0) ||
-            (dispRect.right != mXres) || (dispRect.bottom != mYres)) {
+    if ((dispRect.right != mXres) || (dispRect.bottom != mYres)) {
         ALOGD("invalid displayFrame disp=[%d %d %d %d] expected=%dx%d",
                 dispRect.left, dispRect.top, dispRect.right, dispRect.bottom,
                 mXres, mYres);
