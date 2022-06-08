@@ -64,6 +64,7 @@ public:
     HistogramErrorCode collectRoiLuma(std::vector<char16_t> *buf);
     HistogramErrorCode setRoiWeightThreshold(const RoiRect roi, const Weight weight,
                                              const HistogramPos pos);
+    RoiRect calRoi(RoiRect roi);
     struct HistogramReceiver : public IDLHistogram {
         HistogramReceiver() : mHistData() {}
         void callbackHistogram(char16_t *bin) override;
