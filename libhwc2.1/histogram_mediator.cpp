@@ -21,6 +21,7 @@ histogram::HistogramMediator::HistogramMediator(ExynosDisplay *display) {
             static_cast<ExynosDisplayDrmInterface *>(display->mDisplayInterface.get());
 
     moduleDisplayInterface->registerHistogramInfo(static_cast<IDLHistogram *>(&mIDLHistogram));
+    moduleDisplayInterface->getPanelResolution();
 }
 uint32_t histogram::HistogramMediator::getFrameCount() {
     ExynosDisplayDrmInterface *moduleDisplayInterface =
@@ -109,4 +110,19 @@ histogram::HistogramErrorCode histogram::HistogramMediator::collectRoiLuma(
     buf->assign(mIDLHistogram.mHistData, mIDLHistogram.mHistData + HISTOGRAM_BINS_SIZE);
 
     return histogram::HistogramErrorCode::NONE;
+}
+
+histogram::RoiRect histogram::HistogramMediator::calRoi(RoiRect roi) {
+    RoiRect roi_return = {-1, -1, -1, -1};
+    ExynosDisplayDrmInterface *moduleDisplayInterface =
+            static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
+    roi_return.left = roi.left * moduleDisplayInterface->getActiveModeHDisplay() /
+            moduleDisplayInterface->panelHsize();
+    roi_return.top = roi.top * moduleDisplayInterface->getActiveModeVDisplay() /
+            moduleDisplayInterface->panelVsize();
+    roi_return.right = roi.right * moduleDisplayInterface->getActiveModeHDisplay() /
+            moduleDisplayInterface->panelHsize();
+    roi_return.bottom = roi.bottom * moduleDisplayInterface->getActiveModeVDisplay() /
+            moduleDisplayInterface->panelVsize();
+    return roi_return;
 }
