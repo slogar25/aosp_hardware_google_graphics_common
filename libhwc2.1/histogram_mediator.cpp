@@ -22,6 +22,11 @@ histogram::HistogramMediator::HistogramMediator(ExynosDisplay *display) {
 
     moduleDisplayInterface->registerHistogramInfo(static_cast<IDLHistogram *>(&mIDLHistogram));
 }
+uint32_t histogram::HistogramMediator::getFrameCount() {
+    ExynosDisplayDrmInterface *moduleDisplayInterface =
+            static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
+    return moduleDisplayInterface->getFrameCount();
+}
 
 bool histogram::HistogramMediator::isDisplayPowerOff() {
     if ((mDisplay->mPowerModeState == HWC2_POWER_MODE_OFF) ||
@@ -40,7 +45,7 @@ bool histogram::HistogramMediator::isSecureContentPresenting() {
     }
     return false;
 }
-histogram::HistogramErrorCode histogram::HistogramMediator::enableHist() {
+histogram::HistogramErrorCode histogram::HistogramMediator::requestHist() {
     if (isSecureContentPresenting()) { /* there is some DRM layer */
         return histogram::HistogramErrorCode::DRM_PLAYING;
     }
@@ -51,10 +56,11 @@ histogram::HistogramErrorCode histogram::HistogramMediator::enableHist() {
                 hidl_histogram_control_t::HISTOGRAM_CONTROL_REQUEST) != NO_ERROR) {
         return histogram::HistogramErrorCode::ENABLE_HIST_ERROR;
     }
+    mIDLHistogram.mHistData_available = false;
     return histogram::HistogramErrorCode::NONE;
 }
 
-histogram::HistogramErrorCode histogram::HistogramMediator::disableHist() {
+histogram::HistogramErrorCode histogram::HistogramMediator::cancelHistRequest() {
     ExynosDisplayDrmInterface *moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
 
@@ -66,8 +72,10 @@ histogram::HistogramErrorCode histogram::HistogramMediator::disableHist() {
 }
 
 void histogram::HistogramMediator::HistogramReceiver::callbackHistogram(char16_t *bin) {
-    std::memcpy(mHistData, bin, HISTOGRAM_BINS_SIZE * sizeof(char16_t));
-    mHistData_available = true;
+    if (mHistData_available == false) { // data buffer available
+        std::memcpy(mHistData, bin, HISTOGRAM_BINS_SIZE * sizeof(char16_t));
+        mHistData_available = true;
+    }
     mHistData_cv.notify_all();
 }
 
@@ -97,8 +105,8 @@ histogram::HistogramErrorCode histogram::HistogramMediator::collectRoiLuma(
     mIDLHistogram.mHistData_cv.wait_for(lk, std::chrono::milliseconds(50), [this]() {
         return (!isDisplayPowerOff() && mIDLHistogram.mHistData_available);
     });
+    if (mIDLHistogram.mHistData_available == true) setSampleFrameCounter(getFrameCount());
     buf->assign(mIDLHistogram.mHistData, mIDLHistogram.mHistData + HISTOGRAM_BINS_SIZE);
-    mIDLHistogram.mHistData_available = false;
 
     return histogram::HistogramErrorCode::NONE;
 }
