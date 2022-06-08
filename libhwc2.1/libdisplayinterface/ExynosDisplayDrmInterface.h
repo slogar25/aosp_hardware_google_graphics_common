@@ -317,6 +317,7 @@ class ExynosDisplayDrmInterface :
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
             return NO_ERROR;
         }
+        int32_t getFrameCount() { return mFrameCounter; }
         virtual void registerHistogramInfo(IDLHistogram *info) { return; }
         virtual int32_t setHistogramControl(hidl_histogram_control_t enabled) { return NO_ERROR; }
         virtual int32_t setHistogramData(void *bin) { return NO_ERROR; }
@@ -488,6 +489,7 @@ class ExynosDisplayDrmInterface :
 
         DrmMode mDozeDrmMode;
         uint32_t mMaxWindowNum = 0;
+        int32_t mFrameCounter = 0;
 };
 
 #endif
