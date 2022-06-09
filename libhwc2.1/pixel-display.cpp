@@ -170,19 +170,14 @@ bool Display::runMediator(const RoiRect roi, const Weight weight, const Histogra
         ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
         return false;
     }
-    if (mMediator.enableHist() == HistogramErrorCode::ENABLE_HIST_ERROR) {
+    if (mMediator.requestHist() == HistogramErrorCode::ENABLE_HIST_ERROR) {
         ALOGE("histogram error, ENABLE_HIST ERROR\n");
-        return false;
     }
-
+    if (mMediator.getFrameCount() != mMediator.getSampleFrameCounter()) {
+        mDevice->onRefresh(); // DRM not busy & sampled frame changed
+    }
     if (mMediator.collectRoiLuma(histogrambuffer) != HistogramErrorCode::NONE) {
         ALOGE("histogram error, COLLECT_ROI_LUMA ERROR\n");
-        mMediator.disableHist();
-        return false;
-    }
-
-    if (mMediator.disableHist() == HistogramErrorCode::DISABLE_HIST_ERROR) { // disable histogram
-        ALOGE("histogram error, DISABLE_HIST ERROR\n");
         return false;
     }
     return true;
@@ -227,12 +222,14 @@ ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &we
         ALOGE("histogram error, BAD_PRIORITY(%d)\n", (int)pri);
         return ndk::ScopedAStatus::ok();
     }
-    runMediator(roi, weight, pos, histogrambuffer);
+    RoiRect roiCaled = mMediator.calRoi(roi); // fit roi coordinates to RRS
+    runMediator(roiCaled, weight, pos, histogrambuffer);
     if (mMediator.isSecureContentPresenting() == true) {
         memset(histogrambuffer, 0, histogram::HISTOGRAM_BINS_SIZE * sizeof(histogrambuffer[0]));
         *_aidl_return = HistogramErrorCode::DRM_PLAYING; // panel is playing DRM content
         return ndk::ScopedAStatus::ok();
     }
+
     *_aidl_return = HistogramErrorCode::NONE;
     return ndk::ScopedAStatus::ok();
 }

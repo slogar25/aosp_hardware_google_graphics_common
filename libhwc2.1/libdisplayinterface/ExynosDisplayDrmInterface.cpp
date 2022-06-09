@@ -1178,6 +1178,16 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
     return 0;
 }
 
+int32_t ExynosDisplayDrmInterface::getPanelResolution() {
+    for (auto it = mDrmConnector->modes().begin(); it != mDrmConnector->modes().end(); it++) {
+        if (it->h_display() * it->v_display() > mPanelResolutionHsize * mPanelResolutionVsize) {
+            mPanelResolutionHsize = it->h_display();
+            mPanelResolutionVsize = it->v_display();
+        }
+    }
+    return 0;
+}
+
 int32_t ExynosDisplayDrmInterface::createModeBlob(const DrmMode &mode,
         uint32_t &modeBlob)
 {
@@ -1616,6 +1626,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     android::String8 result;
     bool hasSecureFrameBuffer = false;
 
+    mFrameCounter++;
     funcReturnCallback retCallback([&]() {
         if ((ret == NO_ERROR) && !drmReq.getError()) {
             mFBManager.flip(hasSecureFrameBuffer);

@@ -317,9 +317,15 @@ class ExynosDisplayDrmInterface :
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
             return NO_ERROR;
         }
+        int32_t getFrameCount() { return mFrameCounter; }
         virtual void registerHistogramInfo(IDLHistogram *info) { return; }
         virtual int32_t setHistogramControl(hidl_histogram_control_t enabled) { return NO_ERROR; }
         virtual int32_t setHistogramData(void *bin) { return NO_ERROR; }
+        int32_t getActiveModeHDisplay() { return mActiveModeState.mode.h_display(); }
+        int32_t getActiveModeVDisplay() { return mActiveModeState.mode.v_display(); }
+        int32_t panelHsize() { return mPanelResolutionHsize; }
+        int32_t panelVsize() { return mPanelResolutionVsize; }
+        int32_t getPanelResolution();
 
     protected:
         enum class HalMipiSyncType : uint32_t {
@@ -488,6 +494,9 @@ class ExynosDisplayDrmInterface :
 
         DrmMode mDozeDrmMode;
         uint32_t mMaxWindowNum = 0;
+        int32_t mFrameCounter = 0;
+        int32_t mPanelResolutionHsize = 0;
+        int32_t mPanelResolutionVsize = 0;
 };
 
 #endif
