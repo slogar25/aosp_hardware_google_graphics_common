@@ -4086,7 +4086,8 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
             mXres, mYres, mVsyncPeriod, mXdpi, mYdpi);
 
     if (mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
-        DISPLAY_LOGI("%s, previous request config is processing", __func__);
+        DISPLAY_LOGI("%s, previous request config is processing (mDesiredConfig: %d)", __func__,
+                     mDesiredConfig);
     }
     /* Config would be requested on present time */
     mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_PENDING;
@@ -4193,8 +4194,7 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     getDisplayAttribute(mActiveConfig, HWC2_ATTRIBUTE_DPI_Y, (int32_t*)&mYdpi);
     mHdrFullScrenAreaThreshold = mXres * mYres * kHdrFullScreen;
     if (updateVsync) {
-        mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
-        updateBtsVsyncPeriod(mVsyncPeriod, true);
+        resetConfigRequestStateLocked(config);
     }
 
     return NO_ERROR;
@@ -4218,11 +4218,12 @@ void ExynosDisplay::updateRefreshRateHint() {
 }
 
 /* This function must be called within a mDisplayMutex protection */
-int32_t ExynosDisplay::resetConfigRequestStateLocked() {
-    mVsyncPeriod = getDisplayVsyncPeriodFromConfig(mActiveConfig);
+int32_t ExynosDisplay::resetConfigRequestStateLocked(hwc2_config_t config) {
+    ATRACE_CALL();
+
+    mVsyncPeriod = getDisplayVsyncPeriodFromConfig(config);
     updateBtsVsyncPeriod(mVsyncPeriod, true);
-    DISPLAY_LOGD(eDebugDisplayConfig, "Update mVsyncPeriod %d by mActiveConfig(%d)", mVsyncPeriod,
-                 mActiveConfig);
+    DISPLAY_LOGD(eDebugDisplayConfig, "Update mVsyncPeriod %d by config(%d)", mVsyncPeriod, config);
 
     updateRefreshRateHint();
 
@@ -4240,8 +4241,11 @@ int32_t ExynosDisplay::resetConfigRequestStateLocked() {
 
 int32_t ExynosDisplay::updateConfigRequestAppliedTime()
 {
-    if (mConfigRequestState != hwc_request_state_t::SET_CONFIG_STATE_REQUESTED)
+    if (mConfigRequestState != hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
+        DISPLAY_LOGI("%s: mConfigRequestState (%d) is not REQUESTED", __func__,
+                     mConfigRequestState);
         return NO_ERROR;
+    }
 
     /*
      * config change was requested but
@@ -4316,7 +4320,8 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
         needSetActiveConfig = true;
         ATRACE_INT("Pending ActiveConfig", 0);
     } else {
-        DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending");
+        DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending (mDesiredConfig %d)",
+                     mDesiredConfig);
         ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
     }
 
