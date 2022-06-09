@@ -59,11 +59,12 @@ public:
 
     bool isDisplayPowerOff();
     bool isSecureContentPresenting();
-    HistogramErrorCode enableHist();
-    HistogramErrorCode disableHist();
+    HistogramErrorCode requestHist();
+    HistogramErrorCode cancelHistRequest();
     HistogramErrorCode collectRoiLuma(std::vector<char16_t> *buf);
     HistogramErrorCode setRoiWeightThreshold(const RoiRect roi, const Weight weight,
                                              const HistogramPos pos);
+    RoiRect calRoi(RoiRect roi);
     struct HistogramReceiver : public IDLHistogram {
         HistogramReceiver() : mHistData() {}
         void callbackHistogram(char16_t *bin) override;
@@ -71,11 +72,15 @@ public:
         std::condition_variable mHistData_cv;    // for pullback data sync ctrl
         bool mHistData_available = false;
     };
+    uint32_t getFrameCount();
+    void setSampleFrameCounter(int32_t id) { mSampledFrameCounter = id; }
+    uint32_t getSampleFrameCounter() { return mSampledFrameCounter; }
 
 private:
     int calculateThreshold(const RoiRect &roi);
     HistogramReceiver mIDLHistogram;
     ExynosDisplay *mDisplay = nullptr;
+    uint32_t mSampledFrameCounter = 0;
 };
 
 } // namespace histogram
