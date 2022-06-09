@@ -103,6 +103,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         bool mLhbmOn;
         bool mLhbmChanged;
         int32_t mFramesToReachLhbmPeakBrightness;
+        // wait num of vsync periods for peak refresh rate
+        static constexpr uint32_t kLhbmWaitForPeakRefreshRate = 10;
 
         std::mutex lhbm_mutex_;
         std::condition_variable lhbm_cond_;
