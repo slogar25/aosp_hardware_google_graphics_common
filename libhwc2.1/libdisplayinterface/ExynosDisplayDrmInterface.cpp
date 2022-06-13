@@ -1779,8 +1779,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     if (mExynosDisplay->mBrightnessController) {
         bool ghbmSync, lhbmSync, blSync;
+        bool mixedComposition = mExynosDisplay->isMixedComposition()
+                                || mExynosDisplay->isPriorFrameMixedCompostion();
         ret = mExynosDisplay->mBrightnessController->prepareFrameCommit(*mExynosDisplay,
-                                        *mDrmConnector, drmReq, ghbmSync, lhbmSync, blSync);
+                                        *mDrmConnector, drmReq, mixedComposition,
+                                        ghbmSync, lhbmSync, blSync);
         if (ret < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to config brightness", __func__);
         } else {
