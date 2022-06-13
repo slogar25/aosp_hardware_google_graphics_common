@@ -1250,6 +1250,10 @@ class ExynosDisplay {
                     (mVsyncPeriod == mMinDisplayVsyncPeriod));
         }
 
+        // check if there are any dimmed layers
+        bool isMixedComposition();
+        bool isPriorFrameMixedCompostion() { return mPriorFrameMixedComposition; }
+
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
 
@@ -1266,6 +1270,10 @@ class ExynosDisplay {
 
         // vsync period of peak refresh rate
         uint32_t mMinDisplayVsyncPeriod;
+
+        // track if the last frame is a mixed composition, to detect mixed
+        // composition to non-mixed composition transition.
+        bool mPriorFrameMixedComposition;
 
         /* Display hint to notify power hal */
         class PowerHalHintWorker : public Worker {
