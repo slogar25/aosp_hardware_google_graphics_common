@@ -3369,6 +3369,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
 
+    const bool mixedComposition = isMixedComposition();
     // store this once here for the whole frame so it's consistent
     mUsePowerHints = usePowerHintSession();
     if (mUsePowerHints) {
@@ -3692,6 +3693,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         }
         mPowerHalHint.signalActualWorkDuration(duration + mValidationDuration.value_or(0));
     }
+
+    mPriorFrameMixedComposition = mixedComposition;
 
     return ret;
 err:
@@ -6015,4 +6018,13 @@ int32_t ExynosDisplay::setDebugRCDLayerEnabled(bool enable) {
 
 int32_t ExynosDisplay::getDisplayIdleTimerSupport(bool &outSupport) {
     return mDisplayInterface->getDisplayIdleTimerSupport(outSupport);
+}
+
+bool ExynosDisplay::isMixedComposition() {
+    for (size_t i = 0; i < mLayers.size(); i++) {
+        if (mLayers[i]->mBrightness < 1.0) {
+            return true;
+        }
+    }
+    return false;
 }
