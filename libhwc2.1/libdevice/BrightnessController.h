@@ -111,6 +111,8 @@ public:
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mLhbm.get();
     }
+    int checkSysfsStatus(const char *file, const std::string &expectedValue,
+                         const nsecs_t timeoutNs);
 
     uint32_t getBrightnessLevel() {
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
@@ -176,19 +178,17 @@ public:
         NONE,
     };
 
+    static constexpr const char *kLocalHbmModeFileNode =
+                "/sys/class/backlight/panel%d-backlight/local_hbm_mode";
 private:
     // Worst case for panel with brightness range 2 nits to 1000 nits.
     static constexpr float kGhbmMinDimRatio = 0.002;
     static constexpr int32_t kHbmDimmingTimeUs = 5000000;
-    static constexpr const char *kLocalHbmModeFileNode =
-                "/sys/class/backlight/panel%d-backlight/local_hbm_mode";
     static constexpr const char *kGlobalHbmModeFileNode =
                 "/sys/class/backlight/panel%d-backlight/hbm_mode";
 
     int queryBrightness(float brightness, bool* ghbm = nullptr, uint32_t* level = nullptr,
                         float *nits = nullptr);
-    int checkSysfsStatus(const char *file, const std::string &expectedValue,
-                         const nsecs_t timeoutNs);
     void initBrightnessTable(const DrmDevice& device, const DrmConnector& connector);
     void initBrightnessSysfs();
     void initDimmingUsage();
