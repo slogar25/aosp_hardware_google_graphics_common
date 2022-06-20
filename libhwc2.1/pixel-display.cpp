@@ -191,6 +191,11 @@ ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &we
         ALOGI("mDevice is NULL \n");
         return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
     }
+    if (histogrambuffer == nullptr) {
+        ALOGE("histogrambuffer is null");
+        *_aidl_return = HistogramErrorCode::BAD_HIST_DATA;
+        return ndk::ScopedAStatus::ok();
+    }
     if (mMediator.isDisplayPowerOff() == true) {
         *_aidl_return = HistogramErrorCode::DISPLAY_POWEROFF; // panel is off
         return ndk::ScopedAStatus::ok();
@@ -225,7 +230,9 @@ ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &we
     RoiRect roiCaled = mMediator.calRoi(roi); // fit roi coordinates to RRS
     runMediator(roiCaled, weight, pos, histogrambuffer);
     if (mMediator.isSecureContentPresenting() == true) {
-        memset(histogrambuffer, 0, histogram::HISTOGRAM_BINS_SIZE * sizeof(histogrambuffer[0]));
+        /* clear data to avoid leakage */
+        std::fill(histogrambuffer->begin(), histogrambuffer->end(), 0);
+        histogrambuffer->clear();
         *_aidl_return = HistogramErrorCode::DRM_PLAYING; // panel is playing DRM content
         return ndk::ScopedAStatus::ok();
     }
