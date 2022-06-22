@@ -36,7 +36,6 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual int32_t setLhbmState(bool enabled);
 
         virtual bool getLhbmState();
-        virtual void notifyLhbmState(bool enabled);
         virtual void setEarlyWakeupDisplay();
         virtual void setExpectedPresentTime(uint64_t timestamp);
         virtual uint64_t getPendingExpectedPresentTime();
@@ -100,14 +99,10 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         // LHBM
         FILE* mLhbmFd;
-        bool mLhbmOn;
-        bool mLhbmChanged;
+        std::atomic<bool> mLhbmOn;
         int32_t mFramesToReachLhbmPeakBrightness;
         // wait num of vsync periods for peak refresh rate
         static constexpr uint32_t kLhbmWaitForPeakRefreshRate = 10;
-
-        std::mutex lhbm_mutex_;
-        std::condition_variable lhbm_cond_;
 
         FILE* mEarlyWakeupDispFd;
         static constexpr const char* kWakeupDispFilePath =
