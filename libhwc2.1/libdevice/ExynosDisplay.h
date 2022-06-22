@@ -1188,7 +1188,6 @@ class ExynosDisplay {
 
         virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; }
         virtual bool getLhbmState() { return false; };
-        virtual void notifyLhbmState(bool __unused enabled) {}
         virtual void setEarlyWakeupDisplay() {}
         virtual void setExpectedPresentTime(uint64_t __unused timestamp) {}
         virtual uint64_t getPendingExpectedPresentTime() { return 0; }
