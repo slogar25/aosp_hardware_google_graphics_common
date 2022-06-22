@@ -803,9 +803,6 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
         HWC_LOGE(mExynosDisplay, "setPower mode ret (%d)", ret);
     }
 
-    if (mode == HWC_POWER_MODE_OFF) {
-        mExynosDisplay->notifyLhbmState(false);
-    }
     return ret;
 }
 
@@ -1867,13 +1864,6 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 nsecsPerSec/mActiveModeState.mode.v_refresh());
         /* Enable vsync to check vsync period */
         mDrmVSyncWorker.VSyncControl(true);
-    }
-
-    if (mipi_sync_type &
-            (1 << mMipiSyncEnums[toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_LHBM)])) {
-        // Notify that lhbm request is handled.
-        // still need one more vblank to complete
-        mExynosDisplay->notifyLhbmState(mExynosDisplay->mBrightnessController->isLhbmOn());
     }
 
     return NO_ERROR;
