@@ -1810,11 +1810,15 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     if (mDrmConnector->mipi_sync().id() && (mipi_sync_type != 0)) {
-        ATRACE_NAME("mipi_sync"); // mark this commit
-        if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
-                                            mDrmConnector->mipi_sync(),
-                                            mipi_sync_type)) < 0) {
-            HWC_LOGE(mExynosDisplay, "%s: Fail to set mipi_sync property (%d)", __func__, ret);
+        // skip mipi sync in Doze mode
+        bool inDoze = isDozeModeAvailable() && mDozeDrmMode.id() == mActiveModeState.mode.id();
+        if (!inDoze) {
+            ATRACE_NAME("mipi_sync"); // mark this commit
+            if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
+                                                mDrmConnector->mipi_sync(),
+                                                mipi_sync_type)) < 0) {
+                HWC_LOGE(mExynosDisplay, "%s: Fail to set mipi_sync property (%d)", __func__, ret);
+            }
         }
     }
 
