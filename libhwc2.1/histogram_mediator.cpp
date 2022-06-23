@@ -38,9 +38,10 @@ bool histogram::HistogramMediator::isDisplayPowerOff() {
 }
 
 bool histogram::HistogramMediator::isSecureContentPresenting() {
+    Mutex::Autolock lock(mDisplay->mDRMutex);
     for (uint32_t i = 0; i < mDisplay->mLayers.size(); i++) {
         ExynosLayer *layer = mDisplay->mLayers[i];
-        if (layer->isDrm()) { /* there is some DRM layer */
+        if (layer != NULL && layer->isDrm()) { /* there is some DRM layer */
             return true;
         }
     }
