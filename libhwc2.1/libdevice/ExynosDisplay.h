@@ -35,6 +35,7 @@
 #include "ExynosMPP.h"
 #include "ExynosResourceManager.h"
 #include "worker.h"
+#include "DeconHeader.h"
 
 #define HWC_CLEARDISPLAY_WITH_COLORMAP
 #define HWC_PRINT_FRAME_NUM     10

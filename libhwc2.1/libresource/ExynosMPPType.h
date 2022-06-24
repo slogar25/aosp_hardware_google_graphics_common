@@ -28,16 +28,15 @@
 typedef enum {
     MPP_DPP_G = 0,
     MPP_DPP_GF,
+    MPP_DPP_GFS,
     MPP_DPP_VG,
     MPP_DPP_VGS,
     MPP_DPP_VGF,
     MPP_DPP_VGFS,
     MPP_DPP_VGRFS,
-    /* DPP count */
-    /* If you add DPP, You should increase this value */
-    MPP_DPP_NUM = 7,
+    MPP_DPP_NUM,
 
-    MPP_MSC = 7,
+    MPP_MSC,
     MPP_G2D,
     MPP_P_TYPE_MAX
 } mpp_phycal_type_t;
@@ -46,6 +45,7 @@ typedef enum {
 typedef enum {
     MPP_LOGICAL_DPP_G = 0x01,
     MPP_LOGICAL_DPP_GF = 0x02,
+    MPP_LOGICAL_DPP_GFS = 0x03,
     MPP_LOGICAL_DPP_VG = 0x04,
     MPP_LOGICAL_DPP_VGS = 0x08,
     MPP_LOGICAL_DPP_VGF = 0x10,
@@ -60,7 +60,7 @@ typedef enum {
      * Increase MPP_LOGICAL_TYPE_NUM
      * if type is added
      */
-    MPP_LOGICAL_TYPE_NUM = 12
+    MPP_LOGICAL_TYPE_NUM = 13
 } mpp_logical_type_t;
 
 enum {
