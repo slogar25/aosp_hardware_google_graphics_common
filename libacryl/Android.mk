@@ -47,6 +47,7 @@ LOCAL_HEADER_LIBRARIES += libgralloc_headers
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/local_include
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/include
+LOCAL_C_INCLUDES += $(TOP)/hardware/google/graphics/$(TARGET_BOARD_PLATFORM)/libcap
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
 
