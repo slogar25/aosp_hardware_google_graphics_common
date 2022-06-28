@@ -58,7 +58,10 @@ histogram::HistogramErrorCode histogram::HistogramMediator::requestHist() {
                 hidl_histogram_control_t::HISTOGRAM_CONTROL_REQUEST) != NO_ERROR) {
         return histogram::HistogramErrorCode::ENABLE_HIST_ERROR;
     }
-    mIDLHistogram.mHistData_available = false;
+    {
+        std::unique_lock<std::mutex> lk(mIDLHistogram.mDataCollectingMutex);
+        mIDLHistogram.mHistReq_pending = true;
+    }
     return histogram::HistogramErrorCode::NONE;
 }
 
@@ -66,17 +69,18 @@ histogram::HistogramErrorCode histogram::HistogramMediator::cancelHistRequest() 
     ExynosDisplayDrmInterface *moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
 
-    if ((moduleDisplayInterface->setHistogramControl(
-                 hidl_histogram_control_t::HISTOGRAM_CONTROL_CANCEL) != NO_ERROR)) {
+    if (moduleDisplayInterface->setHistogramControl(
+                hidl_histogram_control_t::HISTOGRAM_CONTROL_CANCEL) != NO_ERROR) {
         return histogram::HistogramErrorCode::DISABLE_HIST_ERROR;
     }
     return histogram::HistogramErrorCode::NONE;
 }
 
 void histogram::HistogramMediator::HistogramReceiver::callbackHistogram(char16_t *bin) {
-    if (mHistData_available == false) { // data buffer available
+    std::unique_lock<std::mutex> lk(mDataCollectingMutex);
+    if (mHistReq_pending == true) {
         std::memcpy(mHistData, bin, HISTOGRAM_BINS_SIZE * sizeof(char16_t));
-        mHistData_available = true;
+        mHistReq_pending = false;
     }
     mHistData_cv.notify_all();
 }
@@ -101,13 +105,12 @@ histogram::HistogramErrorCode histogram::HistogramMediator::setRoiWeightThreshol
 
 histogram::HistogramErrorCode histogram::HistogramMediator::collectRoiLuma(
         std::vector<char16_t> *buf) {
-    std::mutex mDataCollectingMutex; // for data collecting operations
-    std::unique_lock<std::mutex> lk(mDataCollectingMutex);
+    std::unique_lock<std::mutex> lk(mIDLHistogram.mDataCollectingMutex);
 
     mIDLHistogram.mHistData_cv.wait_for(lk, std::chrono::milliseconds(50), [this]() {
-        return (!isDisplayPowerOff() && mIDLHistogram.mHistData_available);
+        return (!isDisplayPowerOff() && !mIDLHistogram.mHistReq_pending);
     });
-    if (mIDLHistogram.mHistData_available == true) setSampleFrameCounter(getFrameCount());
+    if (mIDLHistogram.mHistReq_pending == false) setSampleFrameCounter(getFrameCount());
     buf->assign(mIDLHistogram.mHistData, mIDLHistogram.mHistData + HISTOGRAM_BINS_SIZE);
 
     return histogram::HistogramErrorCode::NONE;
