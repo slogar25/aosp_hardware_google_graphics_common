@@ -5924,7 +5924,6 @@ nsecs_t ExynosDisplay::getExpectedPresentTime(nsecs_t startTime) {
             return out;
         }
     }
-    ALOGE("Could not get hint session time target from primary display");
     return getPredictedPresentTime(startTime);
 }
 
