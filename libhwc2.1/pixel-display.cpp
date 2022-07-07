@@ -170,7 +170,8 @@ bool Display::runMediator(const RoiRect roi, const Weight weight, const Histogra
         ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
         return false;
     }
-    if (mMediator.requestHist() == HistogramErrorCode::ENABLE_HIST_ERROR) {
+    if (!mMediator.histRequested() &&
+        mMediator.requestHist() == HistogramErrorCode::ENABLE_HIST_ERROR) {
         ALOGE("histogram error, ENABLE_HIST ERROR\n");
     }
     if (mMediator.getFrameCount() != mMediator.getSampleFrameCounter()) {
