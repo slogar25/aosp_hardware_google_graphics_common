@@ -70,11 +70,13 @@ public:
         void callbackHistogram(char16_t *bin) override;
         uint16_t mHistData[HISTOGRAM_BINS_SIZE]; // luma buffer
         std::condition_variable mHistData_cv;    // for pullback data sync ctrl
-        bool mHistData_available = false;
+        bool mHistReq_pending = false;
+        std::mutex mDataCollectingMutex; // for data collecting operations
     };
     uint32_t getFrameCount();
     void setSampleFrameCounter(int32_t id) { mSampledFrameCounter = id; }
     uint32_t getSampleFrameCounter() { return mSampledFrameCounter; }
+    bool histRequested() { return mIDLHistogram.mHistReq_pending; }
 
 private:
     int calculateThreshold(const RoiRect &roi);
