@@ -48,7 +48,6 @@ ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice* devic
     mSkipStartFrame = 0;
     mSkipFrameCount = -1;
     mIsSkipFrame = false;
-    mActiveConfigIndex = 0;
     mVirtualDisplayState = 0;
 
     //TODO : Hard coded currently
@@ -80,7 +79,6 @@ int ExynosExternalDisplay::openExternalDisplay()
 
     mSkipFrameCount = SKIP_FRAME_COUNT;
     mSkipStartFrame = 0;
-    mActiveConfigIndex = 0;
     mPlugState = true;
 
     if (mLayers.size() != 0) {
@@ -127,9 +125,27 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
 {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
-    if (!mHpdStatus)
-        return -1;
-    return mDisplayInterface->getDisplayConfigs(outNumConfigs, outConfigs);
+    int32_t ret = mDisplayInterface->getDisplayConfigs(outNumConfigs, outConfigs);
+    if (ret)
+        DISPLAY_LOGE("%s:: failed to getDisplayConfigs, ret(%d)", __func__, ret);
+
+    if (outConfigs) {
+        mActiveConfig = outConfigs[0];
+        displayConfigs_t displayConfig = mDisplayConfigs[mActiveConfig];
+        mXres = displayConfig.width;
+        mYres = displayConfig.height;
+        mVsyncPeriod = displayConfig.vsyncPeriod;
+
+        if (mDisplayInterface->mType == INTERFACE_TYPE_DRM) {
+            ret = mDisplayInterface->setActiveConfig(mActiveConfig);
+            if (ret) {
+                DISPLAY_LOGE("%s:: failed to setActiveConfigs, ret(%d)", __func__, ret);
+                return ret;
+            }
+        }
+    }
+
+    return ret;
 }
 
 int32_t ExynosExternalDisplay::getActiveConfig(hwc2_config_t* outConfig) {
@@ -138,15 +154,9 @@ int32_t ExynosExternalDisplay::getActiveConfig(hwc2_config_t* outConfig) {
     if (!mHpdStatus)
         return -1;
 
-    *outConfig = mActiveConfigIndex;
+    *outConfig = mActiveConfig;
 
     return HWC2_ERROR_NONE;
-}
-
-void ExynosExternalDisplay::hotplug(){
-    DISPLAY_LOGD(eDebugExternalDisplay, "");
-
-    mDevice->onHotPlug(mDisplayId, mHpdStatus);
 }
 
 bool ExynosExternalDisplay::handleRotate()
@@ -502,51 +512,23 @@ bool ExynosExternalDisplay::getHDRException(ExynosLayer* __unused layer)
     return ret;
 }
 
-void ExynosExternalDisplay::handleHotplugEvent()
+void ExynosExternalDisplay::handleHotplugEvent(bool hpdStatus)
 {
-    bool hpd_temp = 0;
+    Mutex::Autolock lock(mDisplayMutex);
 
-    if (!mDevice->isCallbackAvailable(HWC2_CALLBACK_HOTPLUG)) return;
-
-    char cablestate_name[MAX_DEV_NAME + 1];
-    cablestate_name[MAX_DEV_NAME] = '\0';
-    sprintf(cablestate_name, DP_CABLE_STATE_NAME, DP_LINK_NAME);
-
-    int sw_fd = open(cablestate_name, O_RDONLY);
-    char val;
-
-    if (sw_fd >= 0) {
-        if (read(sw_fd, &val, 1) == 1) {
-            if (val == '1')
-                hpd_temp = true;
-            else if (val == '0')
-                hpd_temp = false;
+    mHpdStatus = hpdStatus;
+    if (mHpdStatus) {
+        if (openExternalDisplay() < 0) {
+            ALOGE("Failed to openExternalDisplay");
+            mHpdStatus = false;
+            return;
         }
-        hwcFdClose(sw_fd);
+    } else {
+        disable();
+        closeExternalDisplay();
     }
 
-    {
-        Mutex::Autolock lock(mExternalMutex);
-        {
-            Mutex::Autolock lock(mDisplayMutex);
-            mHpdStatus = hpd_temp;
-            if (mHpdStatus) {
-                if (openExternalDisplay() < 0) {
-                    ALOGE("Failed to openExternalDisplay");
-                    mHpdStatus = false;
-                    return;
-                }
-            }
-            else {
-                disable();
-                closeExternalDisplay();
-            }
-            hotplug();
-            mDevice->onRefresh(mDisplayId);
-        }
-    }
-
-    ALOGI("HPD status changed to %s", mHpdStatus ? "enabled" : "disabled");
+    ALOGI("HPD status changed to %s, mDisplayId %d, mDisplayFd %d", mHpdStatus ? "enabled" : "disabled", mDisplayId, mDisplayInterface->getDisplayFd());
 }
 
 void ExynosExternalDisplay::initDisplayInterface(uint32_t interfaceType)

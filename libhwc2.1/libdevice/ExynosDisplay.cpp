@@ -1063,6 +1063,8 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device
     mPowerHalHint.Init();
 
     mUseDpu = true;
+    mHpdStatus = false;
+
     return;
 }
 
@@ -6150,4 +6152,27 @@ bool ExynosDisplay::RotatingLogFileWriter::chooseOpenedFile() {
         mLastFileIndex = (mLastFileIndex + 1) % mMaxFileCount;
     }
     return false;
+}
+
+void ExynosDisplay::invalidate() {
+    mDevice->onRefresh(mDisplayId);
+}
+
+bool ExynosDisplay::checkHotplugEventUpdated(bool &hpdStatus) {
+    hpdStatus = mDisplayInterface->readHotplugStatus();
+
+    DISPLAY_LOGI("[%s] mDisplayId(%d), mIndex(%d), HPD Status(previous :%d, current : %d)",
+                                       __func__, mDisplayId, mIndex, mHpdStatus, hpdStatus);
+
+    return (mHpdStatus != hpdStatus);
+}
+
+void ExynosDisplay::handleHotplugEvent(bool hpdStatus) {
+    mHpdStatus = hpdStatus;
+}
+
+void ExynosDisplay::hotplug() {
+    mDevice->onHotPlug(mDisplayId, mHpdStatus);
+    ALOGI("HPD callback(%s, mDisplayId %d) was called",
+                            mHpdStatus ? "connection" : "disconnection", mDisplayId);
 }

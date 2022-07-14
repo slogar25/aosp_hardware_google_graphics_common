@@ -905,9 +905,18 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
         }
-        if (mDrmConnector->state() == DRM_MODE_CONNECTED)
+
+        if (mDrmConnector->state() == DRM_MODE_CONNECTED) {
+            /*
+             * EDID property for External Display is created during initialization,
+             * but it is not complete. It will be completed after Hot Plug Detection
+             * & DRM Mode update.
+             */
+            if (mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL)
+                mDrmConnector->UpdateEdidProperty();
+
             mExynosDisplay->mPlugState = true;
-        else
+        } else
             mExynosDisplay->mPlugState = false;
 
         dumpDisplayConfigs();
@@ -2499,4 +2508,15 @@ int32_t ExynosDisplayDrmInterface::getSpecialChannelId(uint32_t planeId) {
     ALOGE("%s: Failed to get RCD planeId.", __func__);
 
     return -EINVAL;
+}
+
+bool ExynosDisplayDrmInterface::readHotplugStatus() {
+    if (mDrmConnector == nullptr) {
+        return false;
+    }
+
+    uint32_t numConfigs;
+    getDisplayConfigs(&numConfigs, NULL);
+
+    return (mDrmConnector->state() == DRM_MODE_CONNECTED);
 }

@@ -501,6 +501,9 @@ class ExynosDisplayDrmInterface :
         int32_t mFrameCounter = 0;
         int32_t mPanelResolutionHsize = 0;
         int32_t mPanelResolutionVsize = 0;
+
+    public:
+        virtual bool readHotplugStatus();
 };
 
 #endif
