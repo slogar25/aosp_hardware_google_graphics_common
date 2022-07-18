@@ -1252,7 +1252,7 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
 
         const float otfSrcWidth = float(srcWidth / m2mMppRatio);
         const float scaleRatio_H = otfSrcWidth / float(dst_img.w);
-        const float otfSrcHeight = float(srcWidth / m2mMppRatio);
+        const float otfSrcHeight = float(srcHeight / m2mMppRatio);
         const float scaleRatio_V = otfSrcHeight / float(dst_img.h);
         const float displayRatio_V = float(dst_img.h) / float(display->mYres);
         const float resolution = otfSrcWidth * otfSrcHeight * display->getBtsRefreshRate() / 1000;
