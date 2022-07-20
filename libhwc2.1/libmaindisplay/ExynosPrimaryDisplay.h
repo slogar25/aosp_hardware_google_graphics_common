@@ -83,6 +83,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         enum PanelGammaSource currentPanelGammaSource = PanelGammaSource::GAMMA_DEFAULT;
 
         bool checkLhbmMode(bool status, nsecs_t timoutNs);
+        void setLHBMRefreshRateThrottle(const uint32_t delayMs);
 
         hwc2_config_t mPendActiveConfig = UINT_MAX;
         bool mFirstPowerOn = true;
@@ -103,6 +104,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t mFramesToReachLhbmPeakBrightness;
         // wait num of vsync periods for peak refresh rate
         static constexpr uint32_t kLhbmWaitForPeakRefreshRate = 10;
+        static constexpr uint32_t kLhbmRefreshRateThrottleMs = 1000;
 
         FILE* mEarlyWakeupDispFd;
         static constexpr const char* kWakeupDispFilePath =
