@@ -1180,12 +1180,14 @@ class ExynosDisplay {
             return PanelGammaSource::GAMMA_DEFAULT;
         }
         virtual void initLbe(){};
+        virtual bool isLbeSupported() { return false; }
         virtual void setLbeState(LbeState __unused state) {}
         virtual void setLbeAmbientLight(int __unused value) {}
         virtual LbeState getLbeState() { return LbeState::OFF; }
 
         int32_t checkPowerHalExtHintSupport(const std::string& mode);
 
+        virtual bool isLhbmSupported() { return false; }
         virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; }
         virtual bool getLhbmState() { return false; };
         virtual void setEarlyWakeupDisplay() {}
