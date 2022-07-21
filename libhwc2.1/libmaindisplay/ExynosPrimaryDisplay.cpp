@@ -493,6 +493,10 @@ int32_t ExynosPrimaryDisplay::SetCurrentPanelGammaSource(const DisplayType type,
     return HWC2_ERROR_NONE;
 }
 
+bool ExynosPrimaryDisplay::isLhbmSupported() {
+    return mBrightnessController->isLhbmSupported();
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     // NOTE: mLhbmOn could be set to false at any time by setPowerOff in another
     // thread. Make sure no side effect if that happens. Or add lock if we have
