@@ -1102,10 +1102,6 @@ int32_t writeIntToFile(const char* file, uint32_t value) {
     return 0;
 }
 
-uint32_t getDisplayId(int32_t displayType, int32_t displayIndex) {
-    return (displayType << DISPLAYID_MASK_LEN) | displayIndex;
-}
-
 int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
     png_structp png_ptr;
     png_infop info_ptr;
