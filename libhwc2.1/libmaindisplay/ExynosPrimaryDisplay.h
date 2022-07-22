@@ -35,6 +35,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
             return currentPanelGammaSource;
         }
 
+        virtual bool isLhbmSupported();
         virtual int32_t setLhbmState(bool enabled);
 
         virtual bool getLhbmState();
