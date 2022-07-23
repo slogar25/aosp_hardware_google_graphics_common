@@ -66,6 +66,7 @@ LOCAL_C_INCLUDES := \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/include \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1 \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libcolormanager \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libmaindisplay \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource
