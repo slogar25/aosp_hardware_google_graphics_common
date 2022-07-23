@@ -43,13 +43,11 @@
 
 using namespace android;
 using namespace vendor::graphics;
+using namespace SOC_VERSION;
 
 int ExynosMPP::mainDisplayWidth = 0;
 int ExynosMPP::mainDisplayHeight = 0;
 extern struct exynos_hwc_control exynosHWCControl;
-#ifndef USE_MODULE_ATTR
-extern feature_support_t feature_table[];
-#endif
 
 void dumpExynosMPPImgInfo(uint32_t type, exynos_mpp_img_info &imgInfo)
 {
