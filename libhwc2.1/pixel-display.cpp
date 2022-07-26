@@ -169,7 +169,7 @@ ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_retur
                                                               std::chrono::nanoseconds>(
                                                               std::chrono::milliseconds(delayMs))
                                                               .count(),
-                                                      DispIdleTimerRequester::PIXEL_DISP);
+                                                      VrrThrottleRequester::PIXEL_DISP);
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);

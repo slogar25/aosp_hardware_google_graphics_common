@@ -146,11 +146,16 @@ enum class hwc_request_state_t {
     SET_CONFIG_STATE_REQUESTED,
 };
 
-enum class DispIdleTimerRequester : uint32_t {
-    SF = 0,
-    PIXEL_DISP,
+enum class VrrThrottleRequester : uint32_t {
+    PIXEL_DISP = 0,
     TEST,
     LHBM,
+    MAX,
+};
+
+enum class DispIdleTimerRequester : uint32_t {
+    SF = 0,
+    VRR_THROTTLE,
     MAX,
 };
 
@@ -1235,7 +1240,7 @@ class ExynosDisplay {
 
         virtual int setMinIdleRefreshRate(const int __unused fps) { return NO_ERROR; }
         virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos,
-                                                const DispIdleTimerRequester __unused requester) {
+                                                const VrrThrottleRequester __unused requester) {
             return NO_ERROR;
         }
 
