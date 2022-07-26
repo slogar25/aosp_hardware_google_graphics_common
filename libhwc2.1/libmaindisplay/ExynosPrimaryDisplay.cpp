@@ -518,6 +518,10 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         }
     }
 
+    if (enabled) {
+        setLHBMRefreshRateThrottle(kLhbmRefreshRateThrottleMs);
+    }
+
     requestLhbm(enabled);
     constexpr uint32_t kSysfsCheckTimeoutMs = 500;
     ALOGI("setLhbmState =%d", enabled);
@@ -527,7 +531,14 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
                                     ms2ns(kSysfsCheckTimeoutMs));
     if (!succeed) {
         ALOGE("failed to update lhbm mode");
+        if (enabled) {
+            setLHBMRefreshRateThrottle(0);
+        }
         return -ENODEV;
+    }
+
+    if (!enabled) {
+        setLHBMRefreshRateThrottle(0);
     }
 
     {
@@ -561,6 +572,20 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
 
 bool ExynosPrimaryDisplay::getLhbmState() {
     return mLhbmOn;
+}
+
+void ExynosPrimaryDisplay::setLHBMRefreshRateThrottle(const uint32_t delayMs) {
+    ATRACE_CALL();
+
+    if (delayMs) {
+        // make new throttle take effect
+        mLastRefreshRateAppliedNanos = systemTime(SYSTEM_TIME_MONOTONIC);
+    }
+
+    setRefreshRateThrottleNanos(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                        std::chrono::milliseconds(delayMs))
+                                        .count(),
+                                DispIdleTimerRequester::LHBM);
 }
 
 void ExynosPrimaryDisplay::setEarlyWakeupDisplay() {
