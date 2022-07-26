@@ -151,6 +151,7 @@ enum class DispIdleTimerRequester : uint32_t {
     SF = 0,
     PIXEL_DISP,
     TEST,
+    LHBM,
     MAX,
 };
 
