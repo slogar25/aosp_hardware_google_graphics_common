@@ -38,51 +38,6 @@
 using namespace std::chrono_literals;
 constexpr float msecsPerSec = std::chrono::milliseconds(1s).count();
 
-#ifndef USE_MODULE_ATTR
-/* Basic supported features */
-feature_support_t feature_table[] =
-{
-    {MPP_DPP_G,
-        MPP_ATTR_BLOCK_MODE | MPP_ATTR_WINDOW_UPDATE | MPP_ATTR_DIM
-    },
-
-    {MPP_DPP_GF,
-        MPP_ATTR_AFBC | MPP_ATTR_BLOCK_MODE | MPP_ATTR_WINDOW_UPDATE | MPP_ATTR_DIM
-    },
-
-    {MPP_DPP_VG,
-        MPP_ATTR_BLOCK_MODE | MPP_ATTR_WINDOW_UPDATE | MPP_ATTR_DIM
-    },
-
-    {MPP_DPP_VGS,
-        MPP_ATTR_BLOCK_MODE | MPP_ATTR_WINDOW_UPDATE | MPP_ATTR_SCALE | MPP_ATTR_DIM
-    },
-
-    {MPP_DPP_VGF,
-        MPP_ATTR_AFBC | MPP_ATTR_BLOCK_MODE | MPP_ATTR_WINDOW_UPDATE | MPP_ATTR_DIM
-    },
-
-    {MPP_DPP_VGFS,
-        MPP_ATTR_AFBC | MPP_ATTR_BLOCK_MODE | MPP_ATTR_WINDOW_UPDATE | MPP_ATTR_SCALE | MPP_ATTR_DIM
-    },
-
-    {MPP_DPP_VGRFS,
-        MPP_ATTR_AFBC | MPP_ATTR_BLOCK_MODE | MPP_ATTR_WINDOW_UPDATE | MPP_ATTR_SCALE |
-        MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V | MPP_ATTR_ROT_90 |
-        MPP_ATTR_DIM | MPP_ATTR_HDR10
-    },
-
-    {MPP_MSC,
-        MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V | MPP_ATTR_ROT_90
-    },
-
-    {MPP_G2D,
-        MPP_ATTR_AFBC | MPP_ATTR_FLIP_H | MPP_ATTR_FLIP_V | MPP_ATTR_ROT_90 |
-        MPP_ATTR_HDR10 | MPP_ATTR_USE_CAPA
-    }
-};
-#endif
-
 using namespace android;
 using namespace vendor::graphics;
 using namespace SOC_VERSION;
@@ -155,9 +110,9 @@ ExynosResourceManager::ExynosResourceManager(ExynosDevice *device)
     memset(mFormatRestrictions, 0, sizeof(mFormatRestrictions));
     memset(mSizeRestrictions, 0, sizeof(mSizeRestrictions));
 
-    size_t num_mpp_units = sizeof(AVAILABLE_OTF_MPP_UNITS)/sizeof(exynos_mpp_t);
+    size_t num_mpp_units = sizeof(available_otf_mpp_units)/sizeof(exynos_mpp_t);
     for (size_t i = 0; i < num_mpp_units; i++) {
-        exynos_mpp_t exynos_mpp = AVAILABLE_OTF_MPP_UNITS[i];
+        exynos_mpp_t exynos_mpp = available_otf_mpp_units[i];
         ALOGI("otfMPP type(%d, %d), physical_index(%d), logical_index(%d)",
                 exynos_mpp.physicalType, exynos_mpp.logicalType,
                 exynos_mpp.physical_index, exynos_mpp.logical_index);
@@ -2488,8 +2443,8 @@ void ExynosResourceManager::makeAcrylRestrictions(mpp_phycal_type_t type){
 mpp_phycal_type_t ExynosResourceManager::getPhysicalType(int ch) const {
 
     for (int i=0; i < MAX_DECON_DMA_TYPE; i++){
-        if(IDMA_CHANNEL_MAP[i].channel == ch)
-            return IDMA_CHANNEL_MAP[i].type;
+        if(idma_channel_map[i].channel == ch)
+            return idma_channel_map[i].type;
     }
 
     return MPP_P_TYPE_MAX;
@@ -2500,8 +2455,8 @@ ExynosMPP* ExynosResourceManager::getOtfMPPWithChannel(int ch)
     ExynosMPP *otfMPP = NULL;
 
     for (int i=0; i < MAX_DECON_DMA_TYPE; i++){
-        if(IDMA_CHANNEL_MAP[i].channel == ch) {
-            otfMPP = getExynosMPP(IDMA_CHANNEL_MAP[i].type, IDMA_CHANNEL_MAP[i].index);
+        if(idma_channel_map[i].channel == ch) {
+            otfMPP = getExynosMPP(idma_channel_map[i].type, idma_channel_map[i].index);
             break;
         }
     }

@@ -32,6 +32,7 @@
 #include "ExynosHWCHelper.h"
 
 using namespace std::chrono_literals;
+using namespace SOC_VERSION;
 
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
@@ -1338,11 +1339,11 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
 
 int ExynosDisplayDrmInterface::getDeconChannel(ExynosMPP *otfMPP)
 {
-    int32_t channelNum = sizeof(IDMA_CHANNEL_MAP)/sizeof(dpp_channel_map_t);
+    int32_t channelNum = sizeof(idma_channel_map)/sizeof(dpp_channel_map_t);
     for (int i = 0; i < channelNum; i++) {
-        if((IDMA_CHANNEL_MAP[i].type == otfMPP->mPhysicalType) &&
-           (IDMA_CHANNEL_MAP[i].index == otfMPP->mPhysicalIndex))
-            return IDMA_CHANNEL_MAP[i].channel;
+        if((idma_channel_map[i].type == otfMPP->mPhysicalType) &&
+           (idma_channel_map[i].index == otfMPP->mPhysicalIndex))
+            return idma_channel_map[i].channel;
     }
     return -EINVAL;
 }
