@@ -155,16 +155,26 @@ public:
 
     const BrightnessTable *getBrightnessTable() { return mBrightnessTable; }
 
+    /*
+     * WARNING: This enum is parsed by Battery Historian. Add new values, but
+     *  do not modify/remove existing ones. Alternatively, consult with the
+     *  Battery Historian team (b/239640926).
+     */
     enum class BrightnessRange : uint32_t {
         NORMAL = 0,
-        HBM,
+        HBM = 1,
         MAX,
     };
 
+    /*
+     * WARNING: This enum is parsed by Battery Historian. Add new values, but
+     *  do not modify/remove existing ones. Alternatively, consult with the
+     *  Battery Historian team (b/239640926).
+     */
     enum class HbmMode {
         OFF = 0,
-        ON_IRC_ON,
-        ON_IRC_OFF,
+        ON_IRC_ON = 1,
+        ON_IRC_OFF = 2,
     };
 
     /*
@@ -172,10 +182,14 @@ public:
      * NORMAL- enable dimming
      * HBM-    enable dimming only for hbm transition
      * NONE-   disable dimming
+     *
+     * WARNING: This enum is parsed by Battery Historian. Add new values, but
+     *  do not modify/remove existing ones. Alternatively, consult with the
+     *  Battery Historian team (b/239640926).
      */
     enum class BrightnessDimmingUsage {
         NORMAL = 0,
-        HBM,
+        HBM = 1,
         NONE,
     };
 
@@ -205,6 +219,8 @@ private:
     void processDimmingOff();
 
     void parseHbmModeEnums(const DrmProperty& property);
+
+    void printBrightnessStates(const char* path)  REQUIRES(mBrightnessMutex);
 
     bool mLhbmSupported = false;
     bool mGhbmSupported = false;
