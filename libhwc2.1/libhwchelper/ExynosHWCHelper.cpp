@@ -36,6 +36,7 @@
 using vendor::graphics::BufferUsage;
 using vendor::graphics::VendorGraphicBufferUsage;
 using vendor::graphics::VendorGraphicBufferMeta;
+using namespace SOC_VERSION;
 
 #define AFBC_MAGIC  0xafbc
 
@@ -991,10 +992,10 @@ bool validateFencePerFrame(ExynosDisplay* display) {
 
 String8 getMPPStr(int typeId) {
     if (typeId < MPP_DPP_NUM){
-        int cnt = sizeof(AVAILABLE_OTF_MPP_UNITS)/sizeof(exynos_mpp_t);
+        int cnt = sizeof(available_otf_mpp_units)/sizeof(exynos_mpp_t);
         for (int i = 0; i < cnt; i++){
-            if (AVAILABLE_OTF_MPP_UNITS[i].physicalType == typeId)
-                return String8(AVAILABLE_OTF_MPP_UNITS[i].name);
+            if (available_otf_mpp_units[i].physicalType == typeId)
+                return String8(available_otf_mpp_units[i].name);
         }
     } else {
         int cnt = sizeof(AVAILABLE_M2M_MPP_UNITS)/sizeof(exynos_mpp_t);
