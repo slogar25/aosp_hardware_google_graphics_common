@@ -111,9 +111,15 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mResolutionInfo.nDSCXSliceSize[2] = 720;
     mResolutionInfo.nPanelType[2] = PANEL_LEGACY;
 
-    mEarlyWakeupDispFd = fopen(early_wakeup_node_0_base, "w");
+    char value[PROPERTY_VALUE_MAX];
+    const char *earlyWakeupNodeBase = early_wakeup_node_0_base;
+    if (getDisplayTypeFromIndex(mIndex) == DisplayType::DISPLAY_SECONDARY &&
+        property_get("vendor.display.secondary_early_wakeup_node", value, "") > 0) {
+        earlyWakeupNodeBase = value;
+    }
+    mEarlyWakeupDispFd = fopen(earlyWakeupNodeBase, "w");
     if (mEarlyWakeupDispFd == nullptr)
-        ALOGE("open %s failed! %s", early_wakeup_node_0_base, strerror(errno));
+        ALOGE("open %s failed! %s", earlyWakeupNodeBase, strerror(errno));
     mBrightnessController = std::make_unique<BrightnessController>(
             mIndex, [this]() { mDevice->onRefresh(); },
             [this]() { updatePresentColorConversionInfo(); });
