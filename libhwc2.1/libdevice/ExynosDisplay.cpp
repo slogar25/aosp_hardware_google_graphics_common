@@ -69,6 +69,7 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mIdleHintIsSupported(false),
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
+        mConnectRetryCount(0),
         mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
         mPowerHalExtAidl(nullptr),
         mPowerHalAidl(nullptr),
@@ -99,7 +100,8 @@ int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHal() {
     mPowerHalAidl = IPower::fromBinder(pwBinder);
 
     if (!mPowerHalAidl) {
-        ALOGE("failed to connect power HAL");
+        ALOGE("failed to connect power HAL (retry %u)", mConnectRetryCount);
+        mConnectRetryCount++;
         return -EINVAL;
     }
 
@@ -110,10 +112,12 @@ int32_t ExynosDisplay::PowerHalHintWorker::connectPowerHal() {
 
     if (!mPowerHalExtAidl) {
         mPowerHalAidl = nullptr;
-        ALOGE("failed to connect power HAL extension");
+        ALOGE("failed to connect power HAL extension (retry %u)", mConnectRetryCount);
+        mConnectRetryCount++;
         return -EINVAL;
     }
 
+    mConnectRetryCount = 0;
     AIBinder_linkToDeath(pwExtBinder.get(), mDeathRecipient.get(), reinterpret_cast<void *>(this));
     // ensure the hint session is recreated every time powerhal is recreated
     mPowerHintSession = nullptr;
@@ -179,6 +183,10 @@ int32_t ExynosDisplay::PowerHalHintWorker::sendPowerHalExtHint(const std::string
 
 int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refreshRate) {
     int32_t ret = NO_ERROR;
+
+    if (!isPowerHalExist()) {
+        return -EOPNOTSUPP;
+    }
     const auto its = mRefreshRateHintSupportMap.find(refreshRate);
     if (its == mRefreshRateHintSupportMap.end()) {
         /* check new hint */
@@ -250,6 +258,11 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateRefreshRateHintInternal(
 
 int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
     int32_t ret = NO_ERROR;
+
+    if (!isPowerHalExist()) {
+        return -EOPNOTSUPP;
+    }
+
     Lock();
     if (mIdleHintSupportIsChecked) {
         ret = mIdleHintIsSupported ? NO_ERROR : -EOPNOTSUPP;
@@ -279,6 +292,10 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkPowerHintSessionSupport() {
     if (sSharedDisplayData.hintSessionSupported.has_value()) {
         mHintSessionSupportChecked = true;
         return *(sSharedDisplayData.hintSessionSupported);
+    }
+
+    if (!isPowerHalExist()) {
+        return -EOPNOTSUPP;
     }
 
     if (connectPowerHal() != NO_ERROR) {
