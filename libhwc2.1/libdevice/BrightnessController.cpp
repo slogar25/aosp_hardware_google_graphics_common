@@ -348,7 +348,10 @@ void BrightnessController::onClearDisplay() {
     mBrightnessFloatReq.reset(-1);
     mInstantHbmReq.reset(false);
 
-    mBrightnessLevel.reset(0);
+    mBrightnessLevel.store(0);
+    if (mBrightnessLevel.is_dirty()) {
+        applyBrightnessViaSysfs(mBrightnessLevel.get());
+    }
     mDisplayWhitePointNits = 0;
     mPrevDisplayWhitePointNits = 0;
     mGhbm.reset(HbmMode::OFF);

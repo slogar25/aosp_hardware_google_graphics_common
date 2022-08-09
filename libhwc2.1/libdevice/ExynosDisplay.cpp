@@ -4347,6 +4347,11 @@ int32_t ExynosDisplay::setOutputBuffer( buffer_handle_t __unused buffer, int32_t
 
 int ExynosDisplay::clearDisplay(bool needModeClear) {
 
+    /* clear brightness state */
+    if (mBrightnessController) {
+        mBrightnessController->onClearDisplay();
+    }
+
     const int ret = mDisplayInterface->clearDisplay(needModeClear);
     if (ret)
         DISPLAY_LOGE("fail to clear display");
@@ -4359,9 +4364,6 @@ int ExynosDisplay::clearDisplay(bool needModeClear) {
     /* Update last retire fence */
     mLastRetireFence = fence_close(mLastRetireFence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
 
-    if (mBrightnessController) {
-        mBrightnessController->onClearDisplay();
-    }
     return ret;
 }
 
