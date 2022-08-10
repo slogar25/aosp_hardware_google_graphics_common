@@ -1357,6 +1357,9 @@ class ExynosDisplay {
             hwc2_power_mode_t mPowerModeState;
             uint32_t mVsyncPeriod;
 
+            uint32_t mConnectRetryCount;
+            bool isPowerHalExist() { return mConnectRetryCount < 10; }
+
             ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 
             // for power HAL extension hints
