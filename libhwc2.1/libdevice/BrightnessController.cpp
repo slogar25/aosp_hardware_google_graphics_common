@@ -578,8 +578,7 @@ int BrightnessController::updateStates() {
 
     if (mBrightnessLevel.is_dirty() || mDimming.is_dirty() || mGhbm.is_dirty() ||
         mLhbm.is_dirty()) {
-        ALOGI("level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d.", mBrightnessLevel.get(), mDimming.get(),
-              mGhbm.get(), mLhbm.get());
+        printBrightnessStates("drm");
     }
     return NO_ERROR;
 }
@@ -723,8 +722,7 @@ int BrightnessController::applyBrightnessViaSysfs(uint32_t level) {
             std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
             mBrightnessLevel.reset(level);
             mPrevDisplayWhitePointNits = mDisplayWhitePointNits;
-            ALOGI("level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d", level,
-                  mDimming.get(), mGhbm.get(), mLhbm.get());
+            printBrightnessStates("sysfs");
         }
 
         return NO_ERROR;
@@ -761,6 +759,15 @@ void BrightnessController::parseHbmModeEnums(const DrmProperty& property) {
         ALOGD("hbm mode [hal: %d, drm: %" PRId64 ", %s]", e.first, e.second,
               modeEnums[e.first].second);
     }
+}
+
+/*
+ * WARNING: This print is parsed by Battery Historian. Consult with the Battery
+ *   Historian team before modifying (b/239640926).
+ */
+void BrightnessController::printBrightnessStates(const char* path) {
+    ALOGI("path=%s, level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d", path ?: "unknown",
+        mBrightnessLevel.get(), mDimming.get(), mGhbm.get(), mLhbm.get());
 }
 
 void BrightnessController::dump(String8& result) {
