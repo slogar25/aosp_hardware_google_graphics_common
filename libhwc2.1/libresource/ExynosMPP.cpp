@@ -51,24 +51,6 @@ extern struct exynos_hwc_control exynosHWCControl;
 extern feature_support_t feature_table[];
 #endif
 
-/* This function is used to restrict case that current DPU clock calculation formual can't cover
- * it. Once formula can cover it, the restriction need to be removed.
- */
-bool checkSpecificRestriction(const struct exynos_image &src, const uint32_t refresh_rate) {
-    if (refresh_rate < 120 || src.bufferHandle == nullptr) {
-        return false;
-    }
-
-    // case: 4k video layer and only height crop 1280 ~ 512 at 120hz
-    VendorGraphicBufferMeta gmeta(src.bufferHandle);
-    if (src.fullWidth == 3840 && src.w == 3840 && src.fullHeight == 2176 && src.h <= 1280 &&
-        src.h >= 512 && isFormatYUV(gmeta.format)) {
-        return true;
-    }
-
-    return false;
-}
-
 void dumpExynosMPPImgInfo(uint32_t type, exynos_mpp_img_info &imgInfo)
 {
     HDEBUGLOGD(type, "\tbuffer: %p, bufferType: %d",
@@ -542,10 +524,6 @@ uint32_t ExynosMPP::getMaxDownscale(const ExynosDisplay &display, const struct e
     if (mPhysicalType < MPP_DPP_NUM) {
         float resolution = float(src.w) * float(src.h) * display.getBtsRefreshRate() / 1000;
         if (!checkDownscaleCap(resolution, float(dst.h) / float(display.mYres))) {
-            return 1;
-        }
-
-        if (checkSpecificRestriction(src, display.getBtsRefreshRate())) {
             return 1;
         }
     }
@@ -1261,12 +1239,12 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
 
     if (mPhysicalType == MPP_G2D) {
         setFenceName(srcImgInfo->acrylicAcquireFenceFd, FENCE_G2D_SRC_LAYER);
-        setFenceInfo(srcImgInfo->acrylicAcquireFenceFd, mAssignedDisplay,
-                FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_G2D, FENCE_TO);
+        setFenceInfo(srcImgInfo->acrylicAcquireFenceFd, mAssignedDisplay, FENCE_TYPE_SRC_ACQUIRE,
+                     FENCE_IP_G2D, HwcFenceDirection::TO);
     } else if (mPhysicalType == MPP_MSC) {
         setFenceName(srcImgInfo->acrylicAcquireFenceFd, FENCE_MSC_SRC_LAYER);
-        setFenceInfo(srcImgInfo->acrylicAcquireFenceFd, mAssignedDisplay,
-                FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_MSC, FENCE_TO);
+        setFenceInfo(srcImgInfo->acrylicAcquireFenceFd, mAssignedDisplay, FENCE_TYPE_SRC_ACQUIRE,
+                     FENCE_IP_MSC, HwcFenceDirection::TO);
     } else {
         MPP_LOGE("%s:: invalid mPhysicalType(%d)", __func__, mPhysicalType);
     }
@@ -1389,13 +1367,13 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
     if (mPhysicalType == MPP_G2D) {
         setFenceName(dstImgInfo->acrylicAcquireFenceFd, FENCE_G2D_DST_DPP);
         /* Might be closed next frame */
-        setFenceInfo(dstImgInfo->acrylicAcquireFenceFd, mAssignedDisplay,
-                FENCE_TYPE_DST_ACQUIRE, FENCE_IP_G2D, FENCE_TO);
+        setFenceInfo(dstImgInfo->acrylicAcquireFenceFd, mAssignedDisplay, FENCE_TYPE_DST_ACQUIRE,
+                     FENCE_IP_G2D, HwcFenceDirection::TO);
     } else if (mPhysicalType == MPP_MSC) {
         setFenceName(dstImgInfo->acrylicAcquireFenceFd, FENCE_MSC_DST_DPP);
         /* Might be closed next frame */
-        setFenceInfo(dstImgInfo->acrylicAcquireFenceFd, mAssignedDisplay,
-                FENCE_TYPE_DST_ACQUIRE, FENCE_IP_MSC, FENCE_TO);
+        setFenceInfo(dstImgInfo->acrylicAcquireFenceFd, mAssignedDisplay, FENCE_TYPE_DST_ACQUIRE,
+                     FENCE_IP_MSC, HwcFenceDirection::TO);
     } else {
         MPP_LOGE("%s:: invalid mPhysicalType(%d)", __func__, mPhysicalType);
     }
@@ -1534,23 +1512,23 @@ int32_t ExynosMPP::doPostProcessingInternal()
 
         // set fence informations from acryl
         if (mPhysicalType == MPP_G2D) {
-            setFenceInfo(releaseFences[dstBufIdx], mAssignedDisplay,
-                    FENCE_TYPE_DST_ACQUIRE, FENCE_IP_G2D, FENCE_FROM);
+            setFenceInfo(releaseFences[dstBufIdx], mAssignedDisplay, FENCE_TYPE_DST_ACQUIRE,
+                         FENCE_IP_G2D, HwcFenceDirection::FROM);
             if (usingFenceCnt > 1) {
                 for(size_t i = 0; i < sourceNum; i++) {
                     // TODO DPU release fence is tranferred to m2mMPP's source layer fence
-                    setFenceInfo(releaseFences[i], mAssignedDisplay,
-                            FENCE_TYPE_SRC_RELEASE, FENCE_IP_G2D, FENCE_FROM);
+                    setFenceInfo(releaseFences[i], mAssignedDisplay, FENCE_TYPE_SRC_RELEASE,
+                                 FENCE_IP_G2D, HwcFenceDirection::FROM);
                 }
             }
         } else if (mPhysicalType == MPP_MSC) {
-            setFenceInfo(releaseFences[dstBufIdx], mAssignedDisplay,
-                    FENCE_TYPE_DST_ACQUIRE, FENCE_IP_MSC, FENCE_FROM);
+            setFenceInfo(releaseFences[dstBufIdx], mAssignedDisplay, FENCE_TYPE_DST_ACQUIRE,
+                         FENCE_IP_MSC, HwcFenceDirection::FROM);
             if (usingFenceCnt > 1) {
                 for(size_t i = 0; i < sourceNum; i++) {
                     // TODO DPU release fence is tranferred to m2mMPP's source layer fence
-                    setFenceInfo(releaseFences[i], mAssignedDisplay,
-                            FENCE_TYPE_SRC_RELEASE, FENCE_IP_MSC, FENCE_FROM);
+                    setFenceInfo(releaseFences[i], mAssignedDisplay, FENCE_TYPE_SRC_RELEASE,
+                                 FENCE_IP_MSC, HwcFenceDirection::FROM);
                 }
             }
         } else {
