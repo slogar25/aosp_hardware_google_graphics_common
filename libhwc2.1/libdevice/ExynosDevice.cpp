@@ -853,6 +853,7 @@ bool ExynosDevice::canSkipValidate()
 }
 
 bool ExynosDevice::validateFences(ExynosDisplay *display) {
+    std::scoped_lock lock(display->mDevice->mFenceMutex);
 
     if (!validateFencePerFrame(display)) {
         ALOGE("You should doubt fence leak!");

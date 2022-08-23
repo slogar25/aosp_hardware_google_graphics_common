@@ -825,6 +825,8 @@ void setFenceInfo(uint32_t fd, ExynosDisplay* display, HwcFdebugFenceType type, 
     if (!fence_valid(fd) || display == NULL) return;
 
     ExynosDevice* device = display->mDevice;
+
+    std::scoped_lock lock(device->mFenceMutex);
     HwcFenceInfo& info = device->mFenceInfos[fd];
     info.displayId = display->mDisplayId;
 
