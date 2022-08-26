@@ -5890,6 +5890,7 @@ void ExynosDisplay::updateBrightnessState() {
     if (mBrightnessController) {
         mBrightnessController->updateFrameStates(hdrState, sdrDim);
         mBrightnessController->processInstantHbm(instantHbm && !clientRgbHdr);
+        mBrightnessController->updateCabcMode();
     }
 }
 
