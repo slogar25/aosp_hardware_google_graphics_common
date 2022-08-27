@@ -964,6 +964,7 @@ void  ExynosDevice::captureReadbackClass::saveToFile(const String8 &fileName)
         } else {
             ALOGE("Fail to mmap");
         }
+        fclose(fp);
     } else {
         ALOGE("Fail to open %s", filePath);
     }
