@@ -197,6 +197,10 @@ private:
     static constexpr int32_t kHbmDimmingTimeUs = 5000000;
     static constexpr const char *kGlobalHbmModeFileNode =
                 "/sys/class/backlight/panel%d-backlight/hbm_mode";
+    static constexpr const char* kDimmingUsagePropName =
+            "vendor.display.%d.brightness.dimming.usage";
+    static constexpr const char* kDimmingHbmTimePropName =
+            "vendor.display.%d.brightness.dimming.hbm_time";
 
     int queryBrightness(float brightness, bool* ghbm = nullptr, uint32_t* level = nullptr,
                         float *nits = nullptr);
