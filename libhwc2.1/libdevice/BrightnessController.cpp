@@ -63,10 +63,14 @@ int BrightnessController::initDrm(const DrmDevice& drmDevice,
 }
 
 void BrightnessController::initDimmingUsage() {
-    mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(
-            property_get_int32("vendor.display.brightness.dimming.usage", 0));
-    mHbmDimmingTimeUs =
-            property_get_int32("vendor.display.brightness.dimming.hbm_time", kHbmDimmingTimeUs);
+    String8 propName;
+    propName.appendFormat(kDimmingUsagePropName, mPanelIndex);
+
+    mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(property_get_int32(propName, 0));
+
+    propName.clear();
+    propName.appendFormat(kDimmingHbmTimePropName, mPanelIndex);
+    mHbmDimmingTimeUs = property_get_int32(propName, kHbmDimmingTimeUs);
 
     if (mBrightnessDimmingUsage == BrightnessDimmingUsage::NORMAL) {
         mDimming.store(true);
