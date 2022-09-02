@@ -739,10 +739,10 @@ int BrightnessController::updateCabcMode() {
 
     if (mCabcMode.is_dirty()) {
         applyCabcModeViaSysfs(mode);
+        ALOGD("%s, isHdrLayerOn: %d, mOutdoorVisibility: %d.", __func__, isHdrLayerOn(),
+              mOutdoorVisibility);
         mCabcMode.clear_dirty();
     }
-    ALOGD("%s, isHdrLayerOn: %d, mOutdoorVisibility: %d.", __func__, isHdrLayerOn(),
-          mOutdoorVisibility);
     return NO_ERROR;
 }
 
