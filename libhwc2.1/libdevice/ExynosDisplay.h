@@ -1209,6 +1209,8 @@ class ExynosDisplay {
         virtual PanelCalibrationStatus getPanelCalibrationStatus() {
             return PanelCalibrationStatus::UNCALIBRATED;
         }
+        virtual bool isDbmSupported() { return false; }
+        virtual int32_t setDbmState(bool __unused enabled) { return NO_ERROR; }
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
