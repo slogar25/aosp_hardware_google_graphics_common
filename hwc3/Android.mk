@@ -35,7 +35,7 @@ LOCAL_SHARED_LIBRARIES := android.hardware.graphics.composer3-V2-ndk \
 	android.hardware.graphics.composer@2.1-resources \
         android.hardware.graphics.composer@2.2-resources \
 	android.hardware.graphics.composer@2.4 \
-	com.google.hardware.pixel.display-V7-ndk \
+	com.google.hardware.pixel.display-V8-ndk \
 	libbase \
 	libbinder \
 	libbinder_ndk \

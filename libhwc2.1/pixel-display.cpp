@@ -137,6 +137,30 @@ ndk::ScopedAStatus Display::getLhbmState(bool *_aidl_return) {
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
+ndk::ScopedAStatus Display::setPeakRefreshRate(int rate) {
+    if (mDisplay && mDisplay->mOperationRateManager) {
+        mDisplay->mOperationRateManager->onPeakRefreshRate(rate);
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::setLowPowerMode(bool enabled) {
+    if (mDisplay && mDisplay->mOperationRateManager) {
+        mDisplay->mOperationRateManager->onLowPowerMode(enabled);
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::isOperationRateSupported(bool *_aidl_return) {
+    if (mDisplay) {
+        *_aidl_return = mDisplay->isOperationRateSupported();
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
 ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &native_handle,
                                                        const std::string &imageName,
                                                        int *_aidl_return) {
