@@ -352,6 +352,9 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     } else if (mode == static_cast<int32_t>(ext_hwc2_power_mode_t::RESUME)) {
         mode = HWC2_POWER_MODE_ON;
         mPauseDisplay = false;
+    } else if (mPauseDisplay) {
+        ALOGI("Skip power mode transition due to pause display.");
+        return HWC2_ERROR_NONE;
     }
 
     if (mode == static_cast<int32_t>(mPowerModeState)) {
