@@ -163,7 +163,7 @@ int ExynosPrimaryDisplay::getDDIScalerMode(int width, int height) {
 }
 
 int32_t ExynosPrimaryDisplay::doDisplayConfigInternal(hwc2_config_t config) {
-    if (mPowerModeState != HWC2_POWER_MODE_ON) {
+    if (!mPowerModeState.has_value() || (*mPowerModeState != HWC2_POWER_MODE_ON)) {
         mPendActiveConfig = config;
         mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
         DISPLAY_LOGI("%s:: Pending desired Config: %d", __func__, config);
@@ -188,7 +188,7 @@ int32_t ExynosPrimaryDisplay::setActiveConfigInternal(hwc2_config_t config, bool
         ALOGI("%s:: Same display config is set", __func__);
         return HWC2_ERROR_NONE;
     }
-    if (mPowerModeState != HWC2_POWER_MODE_ON) {
+    if (!mPowerModeState.has_value() || (*mPowerModeState != HWC2_POWER_MODE_ON)) {
         mPendActiveConfig = config;
         return HWC2_ERROR_NONE;
     }
@@ -279,7 +279,7 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
     updateAppliedActiveConfig(0, 0);
     int ret = applyPendingConfig();
 
-    if (mPowerModeState == HWC2_POWER_MODE_OFF) {
+    if (!mPowerModeState.has_value() || (*mPowerModeState == HWC2_POWER_MODE_OFF)) {
         // check the dynamic recomposition thread by following display
         mDevice->checkDynamicRecompositionThread();
         if (ret) {
@@ -329,7 +329,8 @@ int32_t ExynosPrimaryDisplay::setPowerDoze(hwc2_power_mode_t mode) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    if ((mPowerModeState == HWC2_POWER_MODE_OFF) || (mPowerModeState == HWC2_POWER_MODE_ON)) {
+    if (mPowerModeState.has_value() &&
+        ((*mPowerModeState == HWC2_POWER_MODE_OFF) || (*mPowerModeState == HWC2_POWER_MODE_ON))) {
         if (mDisplayInterface->setLowPowerMode()) {
             ALOGI("Not support LP mode.");
             return HWC2_ERROR_UNSUPPORTED;
@@ -357,7 +358,7 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
         return HWC2_ERROR_NONE;
     }
 
-    if (mode == static_cast<int32_t>(mPowerModeState)) {
+    if (mPowerModeState.has_value() && (mode == static_cast<int32_t>(mPowerModeState.value()))) {
         ALOGI("Skip power mode transition due to the same power state.");
         return HWC2_ERROR_NONE;
     }
@@ -571,7 +572,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     }
 
     mLhbmOn = enabled;
-    if (mPowerModeState == HWC2_POWER_MODE_OFF && mLhbmOn) {
+    if (!mPowerModeState.has_value() || (*mPowerModeState == HWC2_POWER_MODE_OFF && mLhbmOn)) {
         mLhbmOn = false;
         ALOGE("%s power off during request lhbm on", __func__);
         return -EINVAL;
