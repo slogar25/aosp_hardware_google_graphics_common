@@ -394,7 +394,7 @@ class ExynosDisplay {
 
         /** State variables */
         bool mPlugState;
-        hwc2_power_mode_t mPowerModeState;
+        std::optional<hwc2_power_mode_t> mPowerModeState;
         hwc2_vsync_t mVsyncState;
         bool mHasSingleBuffer;
         bool mPauseDisplay = false;
