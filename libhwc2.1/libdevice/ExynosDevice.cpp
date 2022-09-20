@@ -231,7 +231,8 @@ bool ExynosDevice::isFirstValidate()
 {
     for (uint32_t i = 0; i < mDisplays.size(); i++) {
         if ((mDisplays[i]->mType != HWC_DISPLAY_VIRTUAL) &&
-            (mDisplays[i]->mPowerModeState == (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
+            (!mDisplays[i]->mPowerModeState.has_value() ||
+             (mDisplays[i]->mPowerModeState.value() == (hwc2_power_mode_t)HWC_POWER_MODE_OFF)))
             continue;
         if ((mDisplays[i]->mPlugState == true) &&
             ((mDisplays[i]->mRenderingState != RENDERING_STATE_NONE) &&
@@ -248,7 +249,8 @@ bool ExynosDevice::isLastValidate(ExynosDisplay *display)
         if (mDisplays[i] == display)
             continue;
         if ((mDisplays[i]->mType != HWC_DISPLAY_VIRTUAL) &&
-            (mDisplays[i]->mPowerModeState == (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
+            (!mDisplays[i]->mPowerModeState.has_value() ||
+             (mDisplays[i]->mPowerModeState.value() == (hwc2_power_mode_t)HWC_POWER_MODE_OFF)))
             continue;
         if ((mDisplays[i]->mPlugState == true) &&
             (mDisplays[i]->mRenderingState != RENDERING_STATE_VALIDATED) &&
@@ -853,6 +855,7 @@ bool ExynosDevice::canSkipValidate()
 }
 
 bool ExynosDevice::validateFences(ExynosDisplay *display) {
+    std::scoped_lock lock(display->mDevice->mFenceMutex);
 
     if (!validateFencePerFrame(display)) {
         ALOGE("You should doubt fence leak!");
@@ -883,14 +886,17 @@ void ExynosDevice::compareVsyncPeriod() {
     mVsyncDisplayId = getDisplayId(HWC_DISPLAY_PRIMARY, 0);
 
     if ((external_display == nullptr) ||
-        (external_display->mPowerModeState == HWC2_POWER_MODE_OFF)) {
+        (!external_display->mPowerModeState.has_value() ||
+         (external_display->mPowerModeState.value() == HWC2_POWER_MODE_OFF))) {
         return;
-    } else if (primary_display->mPowerModeState == HWC2_POWER_MODE_OFF) {
+    } else if (!primary_display->mPowerModeState.has_value() ||
+               (primary_display->mPowerModeState.value() == HWC2_POWER_MODE_OFF)) {
         mVsyncDisplayId = getDisplayId(HWC_DISPLAY_EXTERNAL, 0);
         return;
-    } else if (((primary_display->mPowerModeState == HWC2_POWER_MODE_DOZE) ||
-            (primary_display->mPowerModeState == HWC2_POWER_MODE_DOZE_SUSPEND)) &&
-            (external_display->mVsyncPeriod >= DOZE_VSYNC_PERIOD)) { /*30fps*/
+    } else if (primary_display->mPowerModeState.has_value() &&
+               ((primary_display->mPowerModeState.value() == HWC2_POWER_MODE_DOZE) ||
+                (primary_display->mPowerModeState.value() == HWC2_POWER_MODE_DOZE_SUSPEND)) &&
+               (external_display->mVsyncPeriod >= DOZE_VSYNC_PERIOD)) { /*30fps*/
         mVsyncDisplayId = getDisplayId(HWC_DISPLAY_EXTERNAL, 0);
         return;
     } else if (primary_display->mVsyncPeriod <= external_display->mVsyncPeriod) {
