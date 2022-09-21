@@ -1019,7 +1019,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
 
     mDisplayConfigs.clear();
 
-    mPowerModeState = HWC2_POWER_MODE_OFF;
+    mPowerModeState = std::nullopt;
+
     mVsyncState = HWC2_VSYNC_DISABLE;
 
     /* TODO : Exception handling here */
@@ -4233,7 +4234,8 @@ uint32_t ExynosDisplay::getBtsRefreshRate() const {
 
 void ExynosDisplay::updateRefreshRateHint() {
     if (mVsyncPeriod) {
-        mPowerHalHint.signalRefreshRate(mPowerModeState, mVsyncPeriod);
+        mPowerHalHint.signalRefreshRate(mPowerModeState.value_or(HWC2_POWER_MODE_OFF),
+                                        mVsyncPeriod);
     }
 }
 
