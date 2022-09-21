@@ -517,9 +517,14 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
                     ALOGW("setLhbmState(on) wait for peak refresh rate timeout !");
                     return TIMED_OUT;
                 }
-                usleep(mVsyncPeriod / 1000 + 1);
+
+                ATRACE_NAME("wait for one vblank");
+                if (mDisplayInterface->waitVBlank()) {
+                    ALOGE("%s failed to wait vblank for peak refresh rate, %d", __func__, i);
+                    return -ENODEV;
+                }
             } else {
-                ALOGI_IF(i, "waited %d vsync to reach peak refresh rate", i);
+                ALOGI_IF(i, "waited %d vblank to reach peak refresh rate", i);
                 break;
             }
         }
@@ -552,7 +557,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         // lhbm takes effect at next vblank
         ATRACE_NAME("lhbm_wait_apply");
         if (mDisplayInterface->waitVBlank()) {
-            ALOGE("%s failed to wait vblank", __func__);
+            ALOGE("%s failed to wait vblank for taking effect", __func__);
             return -ENODEV;
         }
     }
@@ -560,9 +565,8 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     if (enabled) {
         for (int32_t i = mFramesToReachLhbmPeakBrightness; i > 0; i--) {
             ATRACE_NAME("lhbm_wait_peak_brightness");
-            mDevice->onRefresh();
             if (mDisplayInterface->waitVBlank()) {
-                ALOGE("%s failed to wait vblank, %d", __func__, i);
+                ALOGE("%s failed to wait vblank for peak brightness, %d", __func__, i);
                 return -ENODEV;
             }
         }
