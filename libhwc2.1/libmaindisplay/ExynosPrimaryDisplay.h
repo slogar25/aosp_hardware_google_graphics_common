@@ -95,6 +95,9 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         hwc2_config_t mPendActiveConfig = UINT_MAX;
         bool mFirstPowerOn = true;
+        bool mNotifyPowerOn = false;
+        std::mutex mPowerModeMutex;
+        std::condition_variable mPowerOnCondition;
 
         int32_t applyPendingConfig();
         int32_t setPowerOn();

@@ -288,7 +288,14 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
         setGeometryChanged(GEOMETRY_DISPLAY_POWER_ON);
     }
 
-    mPowerModeState = HWC2_POWER_MODE_ON;
+    {
+        std::lock_guard<std::mutex> lock(mPowerModeMutex);
+        mPowerModeState = HWC2_POWER_MODE_ON;
+        if (mNotifyPowerOn) {
+            mPowerOnCondition.notify_one();
+            mNotifyPowerOn = false;
+        }
+    }
 
     if (mFirstPowerOn) {
         firstPowerOn();
@@ -306,7 +313,11 @@ int32_t ExynosPrimaryDisplay::setPowerOff() {
     mDevice->checkDynamicRecompositionThread();
 
     mDisplayInterface->setPowerMode(HWC2_POWER_MODE_OFF);
-    mPowerModeState = HWC2_POWER_MODE_OFF;
+
+    {
+        std::lock_guard<std::mutex> lock(mPowerModeMutex);
+        mPowerModeState = HWC2_POWER_MODE_OFF;
+    }
 
     /* It should be called from validate() when the screen is on */
     mSkipFrame = true;
@@ -337,7 +348,10 @@ int32_t ExynosPrimaryDisplay::setPowerDoze(hwc2_power_mode_t mode) {
         }
     }
 
-    mPowerModeState = mode;
+    {
+        std::lock_guard<std::mutex> lock(mPowerModeMutex);
+        mPowerModeState = mode;
+    }
 
     ExynosDisplay::updateRefreshRateHint();
 
@@ -504,11 +518,27 @@ bool ExynosPrimaryDisplay::isLhbmSupported() {
     return mBrightnessController->isLhbmSupported();
 }
 
+// This function should be called by other threads (e.g. sensor HAL).
+// HWCService can call this function but it should be for test purpose only.
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     // NOTE: mLhbmOn could be set to false at any time by setPowerOff in another
     // thread. Make sure no side effect if that happens. Or add lock if we have
     // to when new code is added.
     ATRACE_CALL();
+    {
+        ATRACE_NAME("wait for power mode on");
+        std::unique_lock<std::mutex> lock(mPowerModeMutex);
+        if (mPowerModeState != HWC2_POWER_MODE_ON) {
+            mNotifyPowerOn = true;
+            if (!mPowerOnCondition.wait_for(lock, std::chrono::milliseconds(2000), [this]() {
+                    return (mPowerModeState == HWC2_POWER_MODE_ON);
+                })) {
+                ALOGW("%s(%d) wait for power mode on timeout !", __func__, enabled);
+                return TIMED_OUT;
+            }
+        }
+    }
+
     if (enabled) {
         ATRACE_NAME("wait for peak refresh rate");
         for (int32_t i = 0; i <= kLhbmWaitForPeakRefreshRate; i++) {
