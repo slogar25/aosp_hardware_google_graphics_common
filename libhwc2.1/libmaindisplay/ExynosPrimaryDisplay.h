@@ -51,7 +51,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         virtual int setMinIdleRefreshRate(const int fps) override;
         virtual int setRefreshRateThrottleNanos(const int64_t delayNs,
-                                                const DispIdleTimerRequester requester) override;
+                                                const VrrThrottleRequester requester) override;
         virtual void dump(String8& result) override;
         virtual void updateAppliedActiveConfig(const hwc2_config_t newConfig,
                                                const int64_t ts) override;
@@ -95,6 +95,9 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         hwc2_config_t mPendActiveConfig = UINT_MAX;
         bool mFirstPowerOn = true;
+        bool mNotifyPowerOn = false;
+        std::mutex mPowerModeMutex;
+        std::condition_variable mPowerOnCondition;
 
         int32_t applyPendingConfig();
         int32_t setPowerOn();
@@ -104,6 +107,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t setDisplayIdleTimerEnabled(const bool enabled);
         int32_t getDisplayIdleTimerEnabled(bool& enabled);
         void setDisplayNeedHandleIdleExit(const bool needed, const bool force);
+        int32_t setDisplayIdleDelayNanos(int32_t delayNanos,
+                                         const DispIdleTimerRequester requester);
         void initDisplayHandleIdleExit();
 
         // LHBM
@@ -125,13 +130,16 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
                                hwc_vsync_period_change_timeline_t* outTimeline) override;
         std::mutex mIdleRefreshRateThrottleMutex;
         int mMinIdleRefreshRate;
+        int64_t mVrrThrottleNanos[toUnderlying(VrrThrottleRequester::MAX)];
         int64_t mRefreshRateDelayNanos;
         int64_t mLastRefreshRateAppliedNanos;
         hwc2_config_t mAppliedActiveConfig;
 
+        std::mutex mDisplayIdleDelayMutex;
         bool mDisplayIdleTimerEnabled;
         int64_t mDisplayIdleTimerNanos[toUnderlying(DispIdleTimerRequester::MAX)];
         std::ofstream mDisplayNeedHandleIdleExitOfs;
+        int64_t mDisplayIdleDelayNanos;
         bool mDisplayNeedHandleIdleExit;
 };
 

@@ -58,7 +58,7 @@ extern struct update_time_info updateTimeInfo;
 constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr int64_t nsecsIdleHintTimeout = std::chrono::nanoseconds(100ms).count();
 
-ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
+ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId)
       : Worker("DisplayHints", HAL_PRIORITY_URGENT_DISPLAY),
         mNeedUpdateRefreshRateHint(false),
         mLastRefreshRateHint(0),
@@ -73,7 +73,16 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
         mPowerHalExtAidl(nullptr),
         mPowerHalAidl(nullptr),
-        mPowerHintSession(nullptr) {}
+        mPowerHintSession(nullptr) {
+    if (property_get_bool("vendor.display.powerhal_hint_per_display", false)) {
+        std::string displayIdStr = std::to_string(displayId);
+        mIdleHintStr = "DISPLAY_" + displayIdStr + "_IDLE";
+        mRefreshRateHintPrefixStr = "DISPLAY_" + displayIdStr + "_";
+    } else {
+        mIdleHintStr = "DISPLAY_IDLE";
+        mRefreshRateHintPrefixStr = "REFRESH_";
+    }
+}
 
 ExynosDisplay::PowerHalHintWorker::~PowerHalHintWorker() {
     Exit();
@@ -190,7 +199,8 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refre
     const auto its = mRefreshRateHintSupportMap.find(refreshRate);
     if (its == mRefreshRateHintSupportMap.end()) {
         /* check new hint */
-        std::string refreshRateHintStr = "REFRESH_" + std::to_string(refreshRate) + "FPS";
+        std::string refreshRateHintStr =
+                mRefreshRateHintPrefixStr + std::to_string(refreshRate) + "FPS";
         ret = checkPowerHalExtHintSupport(refreshRateHintStr);
         if (ret == NO_ERROR || ret == -EOPNOTSUPP) {
             mRefreshRateHintSupportMap[refreshRate] = (ret == NO_ERROR);
@@ -208,7 +218,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refre
 }
 
 int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(int refreshRate, bool enabled) {
-    std::string hintStr = "REFRESH_" + std::to_string(refreshRate) + "FPS";
+    std::string hintStr = mRefreshRateHintPrefixStr + std::to_string(refreshRate) + "FPS";
     int32_t ret = sendPowerHalExtHint(hintStr, enabled);
     if (ret == -ENOTCONN) {
         /* Reset the hints when binder failure occurs */
@@ -271,7 +281,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
     }
     Unlock();
 
-    ret = checkPowerHalExtHintSupport("DISPLAY_IDLE");
+    ret = checkPowerHalExtHintSupport(mIdleHintStr);
     Lock();
     if (ret == NO_ERROR) {
         mIdleHintIsSupported = true;
@@ -335,7 +345,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, 
     ATRACE_INT("HWCIdleHintTimer:", enableIdleHint);
 
     if (mIdleHintIsEnabled != enableIdleHint || forceUpdate) {
-        ret = sendPowerHalExtHint("DISPLAY_IDLE", enableIdleHint);
+        ret = sendPowerHalExtHint(mIdleHintStr, enableIdleHint);
         if (ret == NO_ERROR) {
             mIdleHintIsEnabled = enableIdleHint;
         }
@@ -1007,7 +1017,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mSkipFrame(false),
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
-        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE) {
+        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
+        mPowerHalHint(getDisplayId(mDisplayId, mIndex)) {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
