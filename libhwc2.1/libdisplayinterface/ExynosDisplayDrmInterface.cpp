@@ -1762,11 +1762,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         dqeEnable = 0;
     }
 
-    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-                    mDrmCrtc->dqe_enabled_property(), dqeEnable)) < 0) {
-        HWC_LOGE(mExynosDisplay, "%s: Fail to dqe_enable setting",
-                __func__);
-        return ret;
+    if ((mDrmCrtc->dqe_enabled_property().id()) &&
+        ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                                         mDrmCrtc->dqe_enabled_property(), dqeEnable)) < 0)) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to dqe_enable setting", __func__);
+            return ret;
     }
 
     // Update of color settings could change layer's solid color. So it should
