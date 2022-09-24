@@ -616,9 +616,15 @@ void ExynosDisplayDrmInterface::parseRCDId(const DrmProperty &property) {
         static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId = rcd_id;
 }
 
-uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
+int ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
 {
-    return type+index;
+    for (auto &conn: mDrmDevice->connectors()) {
+        if ((((type == HWC_DISPLAY_PRIMARY) && conn->internal()) && (index == conn->display())) ||
+             ((type == HWC_DISPLAY_EXTERNAL) && conn->external()))
+            return conn->display();
+    }
+
+    return -1;
 }
 
 int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
@@ -634,18 +640,33 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     mFBManager.init(mDrmDevice->fd());
 
-    uint32_t drmDisplayId = getDrmDisplayId(mExynosDisplay->mType, mExynosDisplay->mIndex);
+    int drmDisplayId = getDrmDisplayId(mExynosDisplay->mType, mExynosDisplay->mIndex);
+    if (drmDisplayId < 0) {
+        ALOGE("getDrmDisplayId is failed");
+        return -EINVAL;
+    }
 
-    mReadbackInfo.init(mDrmDevice, drmDisplayId);
+    if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL)
+        mReadbackInfo.init(mDrmDevice, drmDisplayId);
+
     if ((mDrmCrtc = mDrmDevice->GetCrtcForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetCrtcForDisplay is NULL (id: %d)",
                 mExynosDisplay->mDisplayName.string(), drmDisplayId);
         return -EINVAL;
     }
+
     if ((mDrmConnector = mDrmDevice->GetConnectorForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetConnectorForDisplay is NULL (id: %d)",
                 mExynosDisplay->mDisplayName.string(), drmDisplayId);
         return -EINVAL;
+    }
+
+    /* Check CRTC and Connector are matched with Display Type */
+    if (((mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) && mDrmConnector->external()) ||
+         ((mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL) && mDrmConnector->internal())) {
+         ALOGE("%s:: Display(id: %u) is not matched with Connector(id: %u)",
+                 mExynosDisplay->mDisplayName.string(), drmDisplayId, mDrmConnector->id());
+         return -EINVAL;
     }
 
     ALOGD("%s:: display type: %d, index: %d, drmDisplayId: %d, "
