@@ -113,6 +113,11 @@ class ExynosResourceManager;
 #ifndef MPP_G2D_CAPACITY
 #define MPP_G2D_CAPACITY    8
 #endif
+// G2D or MSC additional margin capacity when HDR layer is passed.
+#ifndef MPP_HDR_MARGIN
+#define MPP_HDR_MARGIN 1.2
+#endif
+
 #ifndef MPP_MSC_CAPACITY
 #define MPP_MSC_CAPACITY    8
 #endif
@@ -167,6 +172,7 @@ enum {
     eMPPUnsupportedDRM            =     1ULL << 31,
     eMPPUnsupportedDynamicMeta    =     1ULL << 32,
     eMPPSatisfiedRestriction      =     1ULL << 33,
+    eMPPExeedHWResource           =     1ULL << 34,
 };
 
 enum {
@@ -454,7 +460,22 @@ class ExynosMPPSource {
 
         ExynosMPP *mOtfMPP;
         ExynosMPP *mM2mMPP;
+
+        /**
+         * SRAM/HW resource info
+         */
+        std::unordered_map<tdm_attr_t, int32_t> mHWResourceAmount;
+        uint32_t getHWResourceAmount(tdm_attr_t attr) { return mHWResourceAmount[attr]; }
+
+        uint32_t setHWResourceAmount(tdm_attr_t attr, uint32_t amount) {
+            mHWResourceAmount[attr] = amount;
+            return 0;
+        }
+
+        /* return 1 if it's needed */
+        uint32_t needHWResource(tdm_attr_t attr);
 };
+
 bool exynosMPPSourceComp(const ExynosMPPSource* l, const ExynosMPPSource* r);
 void dump(const restriction_size_t &restrictionSize, String8 &result);
 
@@ -547,6 +568,10 @@ public:
     /* MPP's attribute bit (supported feature bit) */
     uint64_t    mAttr;
 
+    uint32_t mAssignOrder;
+    uint32_t mAXIPortId;
+    uint32_t mHWBlockId;
+
     bool mNeedSolidColorLayer;
 
     ExynosMPP(ExynosResourceManager* resourceManager,
@@ -634,11 +659,12 @@ public:
     int32_t reserveMPP(int32_t displayType = -1);
 
     bool isAssignableState(ExynosDisplay *display, struct exynos_image &src, struct exynos_image &dst);
-    bool isAssignable(ExynosDisplay *display,
-            struct exynos_image &src, struct exynos_image &dst);
+    bool isAssignable(ExynosDisplay *display, struct exynos_image &src, struct exynos_image &dst,
+                      float totalUsedCapacity);
     int32_t assignMPP(ExynosDisplay *display, ExynosMPPSource* mppSource);
 
-    bool hasEnoughCapa(ExynosDisplay *display, struct exynos_image &src, struct exynos_image &dst);
+    bool hasEnoughCapa(ExynosDisplay *display, struct exynos_image &src, struct exynos_image &dst,
+                       float totalUsedCapa);
     float getRequiredCapacity(ExynosDisplay *display, struct exynos_image &src, struct exynos_image &dst);
     int32_t updateUsedCapacity();
     void resetUsedCapacity();
@@ -665,6 +691,13 @@ public:
 
     void setPPC(float ppc) { mPPC = ppc; };
     void setClockKhz(uint32_t clock) { mClockKhz = clock; };
+
+    virtual void initTDMInfo(uint32_t hwBlockIndex, uint32_t axiPortIndex) {
+        mHWBlockId = hwBlockIndex;
+        mAXIPortId = axiPortIndex;
+    }
+    virtual uint32_t getHWBlockId() { return mHWBlockId; }
+    virtual uint32_t getAXIPortId() { return mAXIPortId; }
 
 protected:
     uint32_t getBufferType(uint64_t usage);
@@ -705,6 +738,12 @@ protected:
      * This function checks additional restriction for color space conversion
      */
     virtual bool checkCSCRestriction(struct exynos_image &src, struct exynos_image &dst);
+
+    /*
+     * Check additional conditions those have a capacity exception.
+     */
+    virtual bool isCapacityExceptionCondition(float totalUsedCapacity, float requiredCapacity,
+                                              struct exynos_image &src);
 
     uint32_t mClockKhz = 0;
     float mPPC = 0;

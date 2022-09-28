@@ -5027,9 +5027,7 @@ int32_t ExynosDisplay::removeClientCompositionLayer(uint32_t layerIndex)
     return ret;
 }
 
-
-int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex)
-{
+int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex, float totalUsedCapa) {
     bool invalidFlag = false;
     int32_t changeFlag = NO_ERROR;
     int ret = 0;
@@ -5108,7 +5106,7 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex)
         layer->setExynosMidImage(dst_img);
         bool isAssignable = false;
         if ((layer->mSupportedMPPFlag & m2mMPP->mLogicalType) != 0)
-            isAssignable = m2mMPP->isAssignable(this, src_img, dst_img);
+            isAssignable = m2mMPP->isAssignable(this, src_img, dst_img, totalUsedCapa);
 
         if (layer->mValidateCompositionType == HWC2_COMPOSITION_CLIENT)
         {

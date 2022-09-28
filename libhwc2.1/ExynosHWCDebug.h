@@ -43,6 +43,8 @@ enum {
     eDebugColorManagement         =   0x00080000,
     eDebugAttrSetting             =   0x00100000,
     eDebugDisplayConfig           =   0x00400000,
+    eDebugTDM                     =   0x00800000,
+    eDebugLoadBalancing           =   0x01000000,
 };
 
 class ExynosDisplay;
