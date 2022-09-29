@@ -405,6 +405,7 @@ class ExynosDisplayDrmInterface :
         void parseColorModeEnums(const DrmProperty &property);
         void parseMipiSyncEnums(const DrmProperty &property);
         void updateMountOrientation();
+        void parseRCDId(const DrmProperty &property);
 
         int32_t setupWritebackCommit(DrmModeAtomicReq &drmReq);
         int32_t clearWritebackCommit(DrmModeAtomicReq &drmReq);
@@ -414,6 +415,7 @@ class ExynosDisplayDrmInterface :
         int32_t getLowPowerDrmModeModeInfo();
         int32_t setActiveDrmMode(DrmMode const &mode);
         void setMaxWindowNum(uint32_t num) { mMaxWindowNum = num; };
+        int32_t getSpecialChannelId(uint32_t planeId);
 
     protected:
         struct PartialRegionState {
