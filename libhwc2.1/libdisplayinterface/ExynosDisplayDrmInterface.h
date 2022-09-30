@@ -326,7 +326,6 @@ class ExynosDisplayDrmInterface :
         int32_t panelHsize() { return mPanelResolutionHsize; }
         int32_t panelVsize() { return mPanelResolutionVsize; }
         int32_t getPanelResolution();
-        uint32_t getCrtcId() { return mDrmCrtc->id(); }
 
     protected:
         enum class HalMipiSyncType : uint32_t {
