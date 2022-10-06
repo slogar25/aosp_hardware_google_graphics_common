@@ -24,19 +24,20 @@
 #include <utils/Errors.h>
 
 #include "ExynosDisplay.h"
+#include "ExynosPrimaryDisplay.h"
 
 extern int32_t load_png_image(const char *filepath, buffer_handle_t buffer);
 
 using ::aidl::com::google::hardware::pixel::display::Display;
 
-void PixelDisplayInit(ExynosDevice *device) {
+void PixelDisplayInit(ExynosDisplay *exynos_display, const std::string_view instance_str) {
     ABinderProcess_setThreadPoolMaxThreadCount(0);
 
-    std::shared_ptr<Display> display = ndk::SharedRefBase::make<Display>(device);
-    LOG(INFO) << "pixel display service start...";
-    const std::string instance = std::string() + Display::descriptor + "/default";
+    std::shared_ptr<Display> display = ndk::SharedRefBase::make<Display>(exynos_display);
+    const std::string instance = std::string() + Display::descriptor + "/" + std::string(instance_str).c_str();
     binder_status_t status =
             AServiceManager_addService(display->asBinder().get(), instance.c_str());
+    LOG(INFO) << instance.c_str() << " service start...";
     CHECK(status == STATUS_OK);
 
     ABinderProcess_startThreadPool();
@@ -77,8 +78,8 @@ ndk::ScopedAStatus Display::getHbmState(HbmState *_aidl_return) {
 }
 
 ndk::ScopedAStatus Display::isLbeSupported(bool *_aidl_return) {
-    if (mDevice) {
-        *_aidl_return = mDevice->isLbeSupported();
+    if (mDisplay) {
+        *_aidl_return = mDisplay->isLbeSupported();
         return ndk::ScopedAStatus::ok();
     }
     *_aidl_return = false;
@@ -86,40 +87,40 @@ ndk::ScopedAStatus Display::isLbeSupported(bool *_aidl_return) {
 }
 
 ndk::ScopedAStatus Display::setLbeState(LbeState state) {
-    if (mDevice) {
-        mDevice->setLbeState(state);
+    if (mDisplay) {
+        mDisplay->setLbeState(state);
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
 ndk::ScopedAStatus Display::setLbeAmbientLight(int ambientLux) {
-    if (mDevice) {
-        mDevice->setLbeAmbientLight(ambientLux);
+    if (mDisplay) {
+        mDisplay->setLbeAmbientLight(ambientLux);
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
 ndk::ScopedAStatus Display::getLbeState(LbeState *_aidl_return) {
-    if (mDevice) {
-        *_aidl_return = mDevice->getLbeState();
+    if (mDisplay) {
+        *_aidl_return = mDisplay->getLbeState();
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
 ndk::ScopedAStatus Display::isLhbmSupported(bool *_aidl_return) {
-    if (mDevice) {
-        *_aidl_return = mDevice->isLhbmSupported();
+    if (mDisplay) {
+        *_aidl_return = mDisplay->isLhbmSupported();
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
 ndk::ScopedAStatus Display::setLhbmState(bool enabled) {
-    if (mDevice && mDevice->isLhbmSupported()) {
-        int32_t ret = mDevice->setLhbmState(enabled);
+    if (mDisplay && mDisplay->isLhbmSupported()) {
+        int32_t ret = mDisplay->setLhbmState(enabled);
         if (!ret)
             return ndk::ScopedAStatus::ok();
         else if (ret == TIMED_OUT)
@@ -129,8 +130,8 @@ ndk::ScopedAStatus Display::setLhbmState(bool enabled) {
 }
 
 ndk::ScopedAStatus Display::getLhbmState(bool *_aidl_return) {
-    if (mDevice && mDevice->isLhbmSupported()) {
-        *_aidl_return = mDevice->getLhbmState();
+    if (mDisplay && mDisplay->isLhbmSupported()) {
+        *_aidl_return = mDisplay->getLhbmState();
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
@@ -139,7 +140,7 @@ ndk::ScopedAStatus Display::getLhbmState(bool *_aidl_return) {
 ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &native_handle,
                                                        const std::string &imageName,
                                                        int *_aidl_return) {
-    if (mDevice && mDevice->isColorCalibratedByDevice()) {
+    if (mDisplay && mDisplay->isColorCalibratedByDevice()) {
         *_aidl_return = readCompensationImage(native_handle, imageName);
     } else {
         *_aidl_return = -1;
@@ -148,31 +149,113 @@ ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &nativ
 }
 
 ndk::ScopedAStatus Display::setMinIdleRefreshRate(int fps, int *_aidl_return) {
-    if (mDevice) {
-        *_aidl_return = mDevice->setMinIdleRefreshRate(fps);
+    if (mDisplay) {
+        *_aidl_return = mDisplay->setMinIdleRefreshRate(fps);
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
 ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_return) {
-    if (mDevice) {
-        *_aidl_return = mDevice->setRefreshRateThrottle(delayMs);
+    if (mDisplay) {
+        if (delayMs < 0) {
+            *_aidl_return = BAD_VALUE;
+            ALOGW("%s fail: delayMs(%d) is less than 0", __func__, delayMs);
+            return ndk::ScopedAStatus::ok();
+        }
+
+        *_aidl_return =
+                mDisplay->setRefreshRateThrottleNanos(std::chrono::duration_cast<
+                                                              std::chrono::nanoseconds>(
+                                                              std::chrono::milliseconds(delayMs))
+                                                              .count(),
+                                                      VrrThrottleRequester::PIXEL_DISP);
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+bool Display::runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
+                            std::vector<char16_t> *histogrambuffer) {
+    if (mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
+        ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
+        return false;
+    }
+    if (!mMediator.histRequested() &&
+        mMediator.requestHist() == HistogramErrorCode::ENABLE_HIST_ERROR) {
+        ALOGE("histogram error, ENABLE_HIST ERROR\n");
+    }
+    if (mMediator.getFrameCount() != mMediator.getSampleFrameCounter()) {
+        mDisplay->mDevice->onRefresh(); // DRM not busy & sampled frame changed
+    }
+    if (mMediator.collectRoiLuma(histogrambuffer) != HistogramErrorCode::NONE) {
+        ALOGE("histogram error, COLLECT_ROI_LUMA ERROR\n");
+        return false;
+    }
+    return true;
 }
 
 ndk::ScopedAStatus Display::histogramSample(const RoiRect &roi, const Weight &weight,
                                             HistogramPos pos, Priority pri,
                                             std::vector<char16_t> *histogrambuffer,
                                             HistogramErrorCode *_aidl_return) {
-    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    if (!mDisplay) {
+        ALOGI("mDisplay is NULL \n");
+        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    }
+    if (histogrambuffer == nullptr) {
+        ALOGE("histogrambuffer is null");
+        *_aidl_return = HistogramErrorCode::BAD_HIST_DATA;
+        return ndk::ScopedAStatus::ok();
+    }
+    if (mMediator.isDisplayPowerOff() == true) {
+        *_aidl_return = HistogramErrorCode::DISPLAY_POWEROFF; // panel is off
+        return ndk::ScopedAStatus::ok();
+    }
+    if (mMediator.isSecureContentPresenting() == true) {
+        *_aidl_return = HistogramErrorCode::DRM_PLAYING; // panel is playing DRM content
+        return ndk::ScopedAStatus::ok();
+    }
+    if ((roi.left < 0) || (roi.top < 0) || ((roi.right - roi.left) <= 0) ||
+        ((roi.bottom - roi.top) <= 0)) {
+        *_aidl_return = HistogramErrorCode::BAD_ROI;
+        ALOGE("histogram error, BAD_ROI (%d, %d, %d, %d) \n", roi.left, roi.top, roi.right,
+              roi.bottom);
+        return ndk::ScopedAStatus::ok();
+    }
+    if ((weight.weightR + weight.weightG + weight.weightB) != (histogram::WEIGHT_SUM)) {
+        *_aidl_return = HistogramErrorCode::BAD_WEIGHT;
+        ALOGE("histogram error, BAD_WEIGHT(%d, %d, %d)\n", weight.weightR, weight.weightG,
+              weight.weightB);
+        return ndk::ScopedAStatus::ok();
+    }
+    if (pos != HistogramPos::POST && pos != HistogramPos::PRE) {
+        *_aidl_return = HistogramErrorCode::BAD_POSITION;
+        ALOGE("histogram error, BAD_POSITION(%d)\n", (int)pos);
+        return ndk::ScopedAStatus::ok();
+    }
+    if (pri != Priority::NORMAL && pri != Priority::PRIORITY) {
+        *_aidl_return = HistogramErrorCode::BAD_PRIORITY;
+        ALOGE("histogram error, BAD_PRIORITY(%d)\n", (int)pri);
+        return ndk::ScopedAStatus::ok();
+    }
+    RoiRect roiCaled = mMediator.calRoi(roi); // fit roi coordinates to RRS
+    runMediator(roiCaled, weight, pos, histogrambuffer);
+    if (mMediator.isSecureContentPresenting() == true) {
+        /* clear data to avoid leakage */
+        std::fill(histogrambuffer->begin(), histogrambuffer->end(), 0);
+        histogrambuffer->clear();
+        *_aidl_return = HistogramErrorCode::DRM_PLAYING; // panel is playing DRM content
+        return ndk::ScopedAStatus::ok();
+    }
+
+    *_aidl_return = HistogramErrorCode::NONE;
+    return ndk::ScopedAStatus::ok();
 }
 
 ndk::ScopedAStatus Display::getPanelCalibrationStatus(PanelCalibrationStatus *_aidl_return){
-    if (mDevice) {
-        *_aidl_return = mDevice->getPanelCalibrationStatus();
+    if (mDisplay) {
+        *_aidl_return = mDisplay->getPanelCalibrationStatus();
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);

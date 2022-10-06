@@ -1133,7 +1133,7 @@ int32_t ExynosResourceManager::validateLayer(uint32_t index, ExynosDisplay *disp
 }
 
 int32_t ExynosResourceManager::validateRCDLayer(const ExynosDisplay &display,
-                                                const ExynosLayer &layer,
+                                                const ExynosLayer &layer, const uint32_t layerIndex,
                                                 const exynos_image &srcImg,
                                                 const exynos_image &dstImg) {
     if (CC_UNLIKELY(srcImg.bufferHandle == NULL || srcImg.format != HAL_PIXEL_FORMAT_GOOGLE_R_8)) {
@@ -1151,6 +1151,11 @@ int32_t ExynosResourceManager::validateRCDLayer(const ExynosDisplay &display,
 
     // no scale
     if (srcImg.w != dstImg.w || srcImg.h != dstImg.h) {
+        return eMPPUnsupported;
+    }
+
+    // only support RCD Layers on the top
+    if (layerIndex != display.mLayers.size() - 1) {
         return eMPPUnsupported;
     }
 
@@ -1247,7 +1252,7 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
 
         const float otfSrcWidth = float(srcWidth / m2mMppRatio);
         const float scaleRatio_H = otfSrcWidth / float(dst_img.w);
-        const float otfSrcHeight = float(srcWidth / m2mMppRatio);
+        const float otfSrcHeight = float(srcHeight / m2mMppRatio);
         const float scaleRatio_V = otfSrcHeight / float(dst_img.h);
         const float displayRatio_V = float(dst_img.h) / float(display->mYres);
         const float resolution = otfSrcWidth * otfSrcHeight * display->getBtsRefreshRate() / 1000;
@@ -1642,7 +1647,7 @@ int32_t ExynosResourceManager::assignLayers(ExynosDisplay * display, uint32_t pr
 
         // TODO: call validate function for RCD layer
         if (layer->mCompositionType == HWC2_COMPOSITION_DISPLAY_DECORATION &&
-            validateRCDLayer(*display, *layer, src_img, dst_img) == NO_ERROR) {
+            validateRCDLayer(*display, *layer, i, src_img, dst_img) == NO_ERROR) {
             layer->mValidateCompositionType = HWC2_COMPOSITION_DISPLAY_DECORATION;
             continue;
         }
@@ -1941,7 +1946,8 @@ int32_t ExynosResourceManager::preAssignResources()
                     if (display->mDisplayControl.forceReserveMPP ||
                         (display->mPlugState &&
                          ((display->mType != HWC_DISPLAY_PRIMARY) ||
-                          (display->mPowerModeState != HWC2_POWER_MODE_OFF)))) {
+                          (display->mPowerModeState.has_value() &&
+                           (display->mPowerModeState.value() != HWC2_POWER_MODE_OFF))))) {
                         HDEBUGLOGD(eDebugResourceManager, "\t\treserve to display %d", display->mDisplayId);
                         mOtfMPPs[i]->reserveMPP(display->mDisplayId);
                         break;

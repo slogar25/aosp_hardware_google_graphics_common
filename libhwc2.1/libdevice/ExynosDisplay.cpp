@@ -58,7 +58,7 @@ extern struct update_time_info updateTimeInfo;
 constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr int64_t nsecsIdleHintTimeout = std::chrono::nanoseconds(100ms).count();
 
-ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
+ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId)
       : Worker("DisplayHints", HAL_PRIORITY_URGENT_DISPLAY),
         mNeedUpdateRefreshRateHint(false),
         mLastRefreshRateHint(0),
@@ -72,7 +72,16 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker()
         mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
         mPowerHalExtAidl(nullptr),
         mPowerHalAidl(nullptr),
-        mPowerHintSession(nullptr) {}
+        mPowerHintSession(nullptr) {
+    if (property_get_bool("vendor.display.powerhal_hint_per_display", false)) {
+        std::string displayIdStr = std::to_string(displayId);
+        mIdleHintStr = "DISPLAY_" + displayIdStr + "_IDLE";
+        mRefreshRateHintPrefixStr = "DISPLAY_" + displayIdStr + "_";
+    } else {
+        mIdleHintStr = "DISPLAY_IDLE";
+        mRefreshRateHintPrefixStr = "REFRESH_";
+    }
+}
 
 ExynosDisplay::PowerHalHintWorker::~PowerHalHintWorker() {
     Exit();
@@ -182,7 +191,8 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refre
     const auto its = mRefreshRateHintSupportMap.find(refreshRate);
     if (its == mRefreshRateHintSupportMap.end()) {
         /* check new hint */
-        std::string refreshRateHintStr = "REFRESH_" + std::to_string(refreshRate) + "FPS";
+        std::string refreshRateHintStr =
+                mRefreshRateHintPrefixStr + std::to_string(refreshRate) + "FPS";
         ret = checkPowerHalExtHintSupport(refreshRateHintStr);
         if (ret == NO_ERROR || ret == -EOPNOTSUPP) {
             mRefreshRateHintSupportMap[refreshRate] = (ret == NO_ERROR);
@@ -200,7 +210,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refre
 }
 
 int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(int refreshRate, bool enabled) {
-    std::string hintStr = "REFRESH_" + std::to_string(refreshRate) + "FPS";
+    std::string hintStr = mRefreshRateHintPrefixStr + std::to_string(refreshRate) + "FPS";
     int32_t ret = sendPowerHalExtHint(hintStr, enabled);
     if (ret == -ENOTCONN) {
         /* Reset the hints when binder failure occurs */
@@ -258,7 +268,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkIdleHintSupport(void) {
     }
     Unlock();
 
-    ret = checkPowerHalExtHintSupport("DISPLAY_IDLE");
+    ret = checkPowerHalExtHintSupport(mIdleHintStr);
     Lock();
     if (ret == NO_ERROR) {
         mIdleHintIsSupported = true;
@@ -318,7 +328,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, 
     ATRACE_INT("HWCIdleHintTimer:", enableIdleHint);
 
     if (mIdleHintIsEnabled != enableIdleHint || forceUpdate) {
-        ret = sendPowerHalExtHint("DISPLAY_IDLE", enableIdleHint);
+        ret = sendPowerHalExtHint(mIdleHintStr, enableIdleHint);
         if (ret == NO_ERROR) {
             mIdleHintIsEnabled = enableIdleHint;
         }
@@ -990,7 +1000,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mSkipFrame(false),
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
-        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE) {
+        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
+        mPowerHalHint(getDisplayId(mDisplayId, mIndex)) {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
@@ -1002,7 +1013,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
 
     mDisplayConfigs.clear();
 
-    mPowerModeState = HWC2_POWER_MODE_OFF;
+    mPowerModeState = std::nullopt;
+
     mVsyncState = HWC2_VSYNC_DISABLE;
 
     /* TODO : Exception handling here */
@@ -3355,8 +3367,7 @@ bool ExynosDisplay::isFullScreenComposition() {
             dispRect.right = r.right;
     }
 
-    if ((dispRect.top != 0) || (dispRect.left != 0) ||
-            (dispRect.right != mXres) || (dispRect.bottom != mYres)) {
+    if ((dispRect.right != mXres) || (dispRect.bottom != mYres)) {
         ALOGD("invalid displayFrame disp=[%d %d %d %d] expected=%dx%d",
                 dispRect.left, dispRect.top, dispRect.right, dispRect.bottom,
                 mXres, mYres);
@@ -3370,6 +3381,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
 
+    const bool mixedComposition = isMixedComposition();
     // store this once here for the whole frame so it's consistent
     mUsePowerHints = usePowerHintSession();
     if (mUsePowerHints) {
@@ -3693,6 +3705,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         }
         mPowerHalHint.signalActualWorkDuration(duration + mValidationDuration.value_or(0));
     }
+
+    mPriorFrameMixedComposition = mixedComposition;
 
     return ret;
 err:
@@ -4059,9 +4073,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
         }
 
         outTimeline->newVsyncAppliedTimeNanos = vsyncPeriodChangeConstraints->desiredTimeNanos;
-
-        // when switching between display group setActiveConfig directly
-        return setActiveConfigInternal(config, false);
+        outTimeline->refreshRequired = true;
     }
 
     if (needNotChangeConfig(config)) {
@@ -4070,7 +4082,15 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
         return HWC2_ERROR_NONE;
     }
 
-    if (vsyncPeriodChangeConstraints->seamlessRequired) {
+    if ((mXres != mDisplayConfigs[config].width) || (mYres != mDisplayConfigs[config].height)) {
+        if ((mDisplayInterface->setActiveConfigWithConstraints(config, true)) != NO_ERROR) {
+            ALOGW("Mode change not possible");
+            return HWC2_ERROR_BAD_CONFIG;
+        }
+        mRenderingState = RENDERING_STATE_NONE;
+        setGeometryChanged(GEOMETRY_DISPLAY_RESOLUTION_CHANGED);
+        updateInternalDisplayConfigVariables(config, false);
+    } else if (vsyncPeriodChangeConstraints->seamlessRequired) {
         if ((mDisplayInterface->setActiveConfigWithConstraints(config, true)) != NO_ERROR) {
             DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not possible");
             return HWC2_ERROR_SEAMLESS_NOT_POSSIBLE;
@@ -4208,7 +4228,8 @@ uint32_t ExynosDisplay::getBtsRefreshRate() const {
 
 void ExynosDisplay::updateRefreshRateHint() {
     if (mVsyncPeriod) {
-        mPowerHalHint.signalRefreshRate(mPowerModeState, mVsyncPeriod);
+        mPowerHalHint.signalRefreshRate(mPowerModeState.value_or(HWC2_POWER_MODE_OFF),
+                                        mVsyncPeriod);
     }
 }
 
@@ -5880,6 +5901,7 @@ void ExynosDisplay::updateBrightnessState() {
     if (mBrightnessController) {
         mBrightnessController->updateFrameStates(hdrState, sdrDim);
         mBrightnessController->processInstantHbm(instantHbm && !clientRgbHdr);
+        mBrightnessController->updateCabcMode();
     }
 }
 
@@ -5916,7 +5938,6 @@ nsecs_t ExynosDisplay::getExpectedPresentTime(nsecs_t startTime) {
             return out;
         }
     }
-    ALOGE("Could not get hint session time target from primary display");
     return getPredictedPresentTime(startTime);
 }
 
@@ -6010,4 +6031,13 @@ int32_t ExynosDisplay::setDebugRCDLayerEnabled(bool enable) {
 
 int32_t ExynosDisplay::getDisplayIdleTimerSupport(bool &outSupport) {
     return mDisplayInterface->getDisplayIdleTimerSupport(outSupport);
+}
+
+bool ExynosDisplay::isMixedComposition() {
+    for (size_t i = 0; i < mLayers.size(); i++) {
+        if (mLayers[i]->mBrightness < 1.0) {
+            return true;
+        }
+    }
+    return false;
 }
