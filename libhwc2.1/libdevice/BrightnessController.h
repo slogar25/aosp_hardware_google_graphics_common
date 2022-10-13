@@ -65,6 +65,8 @@ public:
     int processEnhancedHbm(bool on);
     int processDisplayBrightness(float bl, const nsecs_t vsyncNs, bool waitPresent = false);
     int processLocalHbm(bool on);
+    int processDimBrightness(bool on);
+    bool isDbmSupported() { return mDbmSupported; }
     int applyPendingChangeViaSysfs(const nsecs_t vsyncNs);
     bool validateLayerBrightness(float brightness);
 
@@ -185,6 +187,9 @@ public:
 
     static constexpr const char *kLocalHbmModeFileNode =
                 "/sys/class/backlight/panel%d-backlight/local_hbm_mode";
+    static constexpr const char* kDimBrightnessFileNode =
+            "/sys/class/backlight/panel%d-backlight/dim_brightness";
+
 private:
     // sync brightness change for mixed composition when there is more than 50% luminance change.
     // The percentage is calculated as:
@@ -218,6 +223,7 @@ private:
 
     bool mLhbmSupported = false;
     bool mGhbmSupported = false;
+    bool mDbmSupported = false;
     bool mBrightnessIntfSupported = false;
     BrightnessTable mBrightnessTable[toUnderlying(BrightnessRange::MAX)];
 
@@ -238,6 +244,7 @@ private:
     CtrlValue<bool> mLhbm GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mSdrDim GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mPrevSdrDim GUARDED_BY(mBrightnessMutex);
+    CtrlValue<bool> mDimBrightnessReq GUARDED_BY(mBrightnessMutex);
 
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
@@ -269,6 +276,7 @@ private:
     std::ofstream mBrightnessOfs;
     uint32_t mMaxBrightness = 0; // read from sysfs
     std::ofstream mCabcModeOfs;
+    uint32_t mDimBrightness = 0;
 
     // Note IRC or dimming is not in consideration for now.
     float mDisplayWhitePointNits = 0;
