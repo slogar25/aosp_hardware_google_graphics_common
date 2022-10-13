@@ -968,3 +968,12 @@ void ExynosPrimaryDisplay::checkBtsReassignResource(const uint32_t vsyncPeriod,
         }
     }
 }
+
+bool ExynosPrimaryDisplay::isDbmSupported() {
+    return mBrightnessController->isDbmSupported();
+}
+
+int32_t ExynosPrimaryDisplay::setDbmState(bool enabled) {
+    mBrightnessController->processDimBrightness(enabled);
+    return NO_ERROR;
+}

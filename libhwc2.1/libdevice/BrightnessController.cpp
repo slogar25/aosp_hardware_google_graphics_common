@@ -34,6 +34,7 @@ BrightnessController::BrightnessController(int32_t panelIndex, std::function<voi
         mLhbm(false),
         mSdrDim(false),
         mPrevSdrDim(false),
+        mDimBrightnessReq(false),
         mFrameRefresh(refresh),
         mHdrLayerState(HdrLayerState::kHdrNone),
         mUpdateDcLhbm(updateDcLhbm) {
@@ -153,6 +154,21 @@ void BrightnessController::initBrightnessTable(const DrmDevice& drmDevice,
     mBrightnessIntfSupported = true;
 
     drmModeFreePropertyBlob(blob);
+
+    String8 nodeName;
+    nodeName.appendFormat(kDimBrightnessFileNode, mPanelIndex);
+
+    std::ifstream ifsDimBrightness(nodeName.string());
+    if (ifsDimBrightness.fail()) {
+        ALOGW("%s fail to open %s", __func__, nodeName.string());
+    } else {
+        ifsDimBrightness >> mDimBrightness;
+        ifsDimBrightness.close();
+        if (mDimBrightness >= mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mBklStart)
+            mDimBrightness = 0;
+    }
+    mDbmSupported = !!mDimBrightness;
+    ALOGI("%s mDimBrightness=%d, mDbmSupported=%d", __func__, mDimBrightness, mDbmSupported);
 }
 
 int BrightnessController::processEnhancedHbm(bool on) {
@@ -202,20 +218,14 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
         // check if it will go drm path for below cases.
         // case 1: hbm state will change
         // case 2: for hwc3, brightness command could apply at next present if possible
-        if (mGhbmSupported || waitPresent) {
+        if (queryBrightness(brightness, &ghbm, &level) == NO_ERROR) {
             // ghbm on/off always go drm path
-            if (mGhbmSupported) {
-                if (queryBrightness(brightness, &ghbm, &level)) {
-                    ALOGE("%s failed to convert brightness %f", __func__, brightness);
-                    return -EINVAL;
-                }
-                // check if this will cause a hbm transition
-                if ((mGhbm.get() != HbmMode::OFF) != ghbm) {
-                    // this brightness change will go drm path
-                    updateStates();
-                    mFrameRefresh(); // force next frame to update brightness
-                    return NO_ERROR;
-                }
+            // check if this will cause a hbm transition
+            if (mGhbmSupported && (mGhbm.get() != HbmMode::OFF) != ghbm) {
+                // this brightness change will go drm path
+                updateStates();
+                mFrameRefresh(); // force next frame to update brightness
+                return NO_ERROR;
             }
             // there will be a Present to apply this brightness change
             if (waitPresent) {
@@ -323,6 +333,16 @@ int BrightnessController::processInstantHbm(bool on) {
     mInstantHbmReq.store(on);
     if (mInstantHbmReq.is_dirty()) {
         updateStates();
+    }
+    return NO_ERROR;
+}
+
+int BrightnessController::processDimBrightness(bool on) {
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+    mDimBrightnessReq.store(on);
+    if (mDimBrightnessReq.is_dirty()) {
+        updateStates();
+        ALOGI("%s request = %d", __func__, mDimBrightnessReq.get());
     }
     return NO_ERROR;
 }
@@ -594,6 +614,7 @@ int BrightnessController::updateStates() {
     mInstantHbmReq.clear_dirty();
     mSdrDim.clear_dirty();
     mPrevSdrDim.clear_dirty();
+    mDimBrightnessReq.clear_dirty();
 
     if (mBrightnessLevel.is_dirty() || mDimming.is_dirty() || mGhbm.is_dirty() ||
         mLhbm.is_dirty()) {
@@ -606,6 +627,15 @@ int BrightnessController::updateStates() {
 int BrightnessController::queryBrightness(float brightness, bool *ghbm, uint32_t *level,
                                                float *nits) {
     if (!mBrightnessIntfSupported) {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+
+    if (mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mBklStart == 0 &&
+        mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mBklEnd == 0 &&
+        mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mBriStart == 0 &&
+        mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mBriEnd == 0 &&
+        mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mNitsStart == 0 &&
+        mBrightnessTable[toUnderlying(BrightnessRange::NORMAL)].mNitsEnd == 0) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
@@ -644,7 +674,10 @@ int BrightnessController::queryBrightness(float brightness, bool *ghbm, uint32_t
                     *nits = norm * nSpan + mBrightnessTable[i].mNitsStart;
                 }
             }
-
+            if ((i == toUnderlying(BrightnessRange::NORMAL)) && mDbmSupported &&
+                (mDimBrightnessReq.get() == true) && (*level == mBrightnessTable[i].mBklStart)) {
+                *level = mDimBrightness;
+            }
             return NO_ERROR;
         }
     }
@@ -827,9 +860,9 @@ void BrightnessController::dump(String8& result) {
                         "lhbm supported %d, ghbm supported %d\n", mBrightnessOfs.is_open(),
                         mMaxBrightness, mBrightnessIntfSupported, mLhbmSupported, mGhbmSupported);
     result.appendFormat("\trequests: enhance hbm %d, lhbm %d, "
-                        "brightness %f, instant hbm %d\n",
+                        "brightness %f, instant hbm %d, DimBrightness %d\n",
                         mEnhanceHbmReq.get(), mLhbmReq.get(), mBrightnessFloatReq.get(),
-                        mInstantHbmReq.get());
+                        mInstantHbmReq.get(), mDimBrightnessReq.get());
     result.appendFormat("\tstates: brighntess level %d, ghbm %d, dimming %d, lhbm %d",
                         mBrightnessLevel.get(), mGhbm.get(), mDimming.get(), mLhbm.get());
     result.appendFormat("\thdr layer state %d, unchecked lhbm request %d(%d), "
