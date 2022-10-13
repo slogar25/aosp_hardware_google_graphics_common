@@ -98,6 +98,8 @@ ExynosMPPSource::ExynosMPPSource()
     memset(&mMidImg, 0, sizeof(mMidImg));
     mMidImg.acquireFenceFd = -1;
     mMidImg.releaseFenceFd = -1;
+
+    mHWResourceAmount.clear();
 }
 
 ExynosMPPSource::ExynosMPPSource(uint32_t sourceType, void *source)
@@ -126,6 +128,40 @@ void ExynosMPPSource::setExynosImage(exynos_image src_img, exynos_image dst_img)
 void ExynosMPPSource::setExynosMidImage(exynos_image mid_img)
 {
     mMidImg = mid_img;
+}
+
+uint32_t ExynosMPPSource::needHWResource(tdm_attr_t attr) {
+    uint32_t ret = 0;
+
+    switch (attr) {
+        case TDM_ATTR_SBWC:
+            ret = (isFormatSBWC(mSrcImg.format)) ? 1 : 0;
+            break;
+        case TDM_ATTR_AFBC:
+            ret = (mSrcImg.compressed == 1) ? 1 : 0;
+            break;
+        case TDM_ATTR_ITP: // CSC
+            ret = (isFormatYUV(mSrcImg.format)) ? 1 : 0;
+            break;
+        case TDM_ATTR_ROT_90:
+            ret = ((mSrcImg.transform & HAL_TRANSFORM_ROT_90) == 0) ? 0 : 1;
+            break;
+        case TDM_ATTR_SCALE:
+            {
+                bool isPerpendicular = !!(mSrcImg.transform & HAL_TRANSFORM_ROT_90);
+                if (isPerpendicular) {
+                    ret = ((mSrcImg.w != mDstImg.h) || (mSrcImg.h != mDstImg.w)) ? 1 : 0;
+                } else {
+                    ret = ((mSrcImg.w != mDstImg.w) || (mSrcImg.h != mDstImg.h)) ? 1 : 0;
+                }
+            }
+            break;
+        default:
+            ret = 0;
+            break;
+    }
+
+    return ret;
 }
 
 ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
@@ -160,6 +196,9 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
     mDstAllocatedSize(DST_SIZE_UNKNOWN),
     mUseM2MSrcFence(false),
     mAttr(0),
+    mAssignOrder(0),
+    mAXIPortId(0),
+    mHWBlockId(0),
     mNeedSolidColorLayer(false)
 {
     if (mPhysicalType < MPP_DPP_NUM) {
@@ -2318,39 +2357,48 @@ bool ExynosMPP::isAssignableState(ExynosDisplay *display, struct exynos_image &s
             isAssignable, mAssignedSources.size(), getSrcMaxBlendingNum(src, dst));
     return isAssignable;
 }
-bool ExynosMPP::isAssignable(ExynosDisplay *display,
-        struct exynos_image &src, struct exynos_image &dst)
+
+bool ExynosMPP::isAssignable(ExynosDisplay *display, struct exynos_image &src,
+                             struct exynos_image &dst, float totalUsedCapacity)
 {
     bool isAssignable = isAssignableState(display, src, dst);
-    return (isAssignable && hasEnoughCapa(display, src, dst));
+    return (isAssignable && hasEnoughCapa(display, src, dst, totalUsedCapacity));
 }
 
-bool ExynosMPP::hasEnoughCapa(ExynosDisplay *display, struct exynos_image &src, struct exynos_image &dst)
+bool ExynosMPP::hasEnoughCapa(ExynosDisplay *display, struct exynos_image &src,
+                              struct exynos_image &dst, float totalUsedCapacity)
 {
     if (mCapacity == -1)
         return true;
 
-    float totalUsedCapacity = ExynosResourceManager::getResourceUsedCapa(*this);
-    MPP_LOGD(eDebugCapacity|eDebugMPP, "totalUsedCapacity(%f), mUsedCapacity(%f)",
-            totalUsedCapacity, mUsedCapacity);
+    MPP_LOGD(eDebugCapacity | eDebugMPP, "totalUsedCapacity(%f), mUsedCapacity(%f)",
+             totalUsedCapacity, mUsedCapacity);
 
     /* mUsedCapacity should be re-calculated including src, dst passed as parameters*/
     totalUsedCapacity -= mUsedCapacity;
 
     float requiredCapacity = getRequiredCapacity(display, src, dst);
 
-    MPP_LOGD(eDebugCapacity|eDebugMPP, "mCapacity(%f), usedCapacity(%f), RequiredCapacity(%f)",
-            mCapacity, totalUsedCapacity, requiredCapacity);
+    MPP_LOGD(eDebugCapacity | eDebugMPP, "mCapacity(%f), usedCapacity(%f), RequiredCapacity(%f)",
+             mCapacity, totalUsedCapacity, requiredCapacity);
 
     if (mCapacity >= (totalUsedCapacity + requiredCapacity))
         return true;
-    else if ((hasHdrInfo(src)) &&
-             (totalUsedCapacity == 0) && (requiredCapacity < (mCapacity * 1.2))) {
-        /* HDR video will be excepted from G2D capa calculation */
-        /* if DRM has assigned before, totalUsedCapacity will be non-zero */
+    else if (isCapacityExceptionCondition(totalUsedCapacity, requiredCapacity, src))
         return true;
-    } else
+    else
         return false;
+}
+
+bool ExynosMPP::isCapacityExceptionCondition(float totalUsedCapacity, float requiredCapacity,
+                                             struct exynos_image &src)
+{
+    if ((hasHdrInfo(src) && (totalUsedCapacity == 0) &&
+         (requiredCapacity < (mCapacity * MPP_HDR_MARGIN)))) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void ExynosMPP::getPPCIndex(const struct exynos_image &src,
