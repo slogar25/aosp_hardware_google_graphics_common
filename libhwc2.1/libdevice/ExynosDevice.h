@@ -153,6 +153,7 @@ class ExynosDevice {
          * Display list that managed by Device.
          */
         android::Vector< ExynosDisplay* > mDisplays;
+        std::map<uint32_t, ExynosDisplay *> mDisplayMap;
 
         int mNumVirtualDisplay;
 
@@ -233,7 +234,7 @@ class ExynosDevice {
         /**
          * @param display
          */
-        ExynosDisplay* getDisplay(uint32_t display);
+        ExynosDisplay* getDisplay(uint32_t display) { return mDisplayMap[display]; }
 
         /**
          * Device Functions for HWC 2.0

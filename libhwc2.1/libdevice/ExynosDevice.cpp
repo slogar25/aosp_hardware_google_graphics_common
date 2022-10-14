@@ -94,9 +94,18 @@ ExynosDevice::ExynosDevice()
     exynosHWCControl.sysFenceLogging = false;
     exynosHWCControl.useDynamicRecomp = false;
 
-    mInterfaceType = getDeviceInterfaceType();
+    hwcDebug = 0;
 
+    mInterfaceType = getDeviceInterfaceType();
     ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
+
+    /*
+     * This order should not be changed
+     * new ExynosResourceManager ->
+     * create displays and add them to the list ->
+     * initDeviceInterface() ->
+     * ExynosResourceManager::updateRestrictions()
+     */
     mResourceManager = new ExynosResourceManagerModule(this);
 
     for (size_t i = 0; i < AVAILABLE_DISPLAY_UNITS.size(); i++) {
@@ -132,6 +141,7 @@ ExynosDevice::ExynosDevice()
         exynos_display->mDeconNodeName.appendFormat("%s", display_t.decon_node_name.c_str());
         exynos_display->mDisplayName.appendFormat("%s", display_t.display_name.c_str());
         mDisplays.add(exynos_display);
+        mDisplayMap.insert(std::make_pair(exynos_display->mDisplayId, exynos_display));
 
 #ifndef FORCE_DISABLE_DR
         if (exynos_display->mDREnable)
@@ -143,7 +153,6 @@ ExynosDevice::ExynosDevice()
 
     dynamicRecompositionThreadCreate();
 
-    hwcDebug = 0;
     for (uint32_t i = 0; i < FENCE_IP_ALL; i++)
         hwcFenceDebug[i] = 0;
 
@@ -157,15 +166,12 @@ ExynosDevice::ExynosDevice()
     uint32_t errFileSize = saveErrorLog(saveString);
     ALOGI("Initial errlog size: %d bytes\n", errFileSize);
 
-    /*
-     * This order should not be changed
-     * new ExynosResourceManager ->
-     * create displays and add them to the list ->
-     * initDeviceInterface() ->
-     * ExynosResourceManager::updateRestrictions()
-     */
     initDeviceInterface(mInterfaceType);
+
+    // registerRestrictions();
     mResourceManager->updateRestrictions();
+    mResourceManager->initDisplays(mDisplays, mDisplayMap);
+    mResourceManager->initDisplaysTDMInfo();
 
     if (mInterfaceType == INTERFACE_TYPE_DRM) {
         /* disable vblank immediately after updates */
@@ -332,24 +338,6 @@ void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
     }
 
     android_atomic_dec(&(dev->mDRThreadStatus));
-
-    return NULL;
-}
-/**
- * @param display
- * @return ExynosDisplay
- */
-ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
-    if (mDisplays.isEmpty()) {
-        ALOGE("mDisplays.size(%zu), requested display(%d)",
-                mDisplays.size(), display);
-        return NULL;
-    }
-
-    for (size_t i = 0;i < mDisplays.size(); i++) {
-        if (mDisplays[i]->mDisplayId == display)
-            return (ExynosDisplay*)mDisplays[i];
-    }
 
     return NULL;
 }

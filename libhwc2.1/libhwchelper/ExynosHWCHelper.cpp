@@ -272,6 +272,30 @@ bool isFormatP010(int format)
     return false;
 }
 
+bool isFormat10Bit(int format) {
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++) {
+        if (exynos_format_desc[i].halFormat == format) {
+            if ((exynos_format_desc[i].type & BIT_MASK) == BIT10)
+                return true;
+            else
+                return false;
+        }
+    }
+    return false;
+}
+
+bool isFormat8Bit(int format) {
+    for (unsigned int i = 0; i < FORMAT_MAX_CNT; i++) {
+        if (exynos_format_desc[i].halFormat == format) {
+            if ((exynos_format_desc[i].type & BIT_MASK) == BIT8)
+                return true;
+            else
+                return false;
+        }
+    }
+    return false;
+}
+
 bool isFormatYCrCb(int format)
 {
     return format == HAL_PIXEL_FORMAT_EXYNOS_YV12_M;

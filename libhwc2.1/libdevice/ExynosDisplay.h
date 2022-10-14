@@ -286,6 +286,22 @@ class ExynosSortedLayer : public Vector <ExynosLayer*>
         static int compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs);
 };
 
+class displayTDMInfo {
+    public:
+        /* Could be extended */
+        typedef struct resourceAmount {
+            uint32_t totalAmount;
+        } resourceAmount_t;
+        std::map<tdm_attr_t, resourceAmount_t> mAmount;
+
+        uint32_t initTDMInfo(resourceAmount_t amount, tdm_attr_t attr) {
+            mAmount[attr] = amount;
+            return 0;
+        }
+
+        resourceAmount_t getAvailableAmount(tdm_attr_t attr) { return mAmount[attr]; }
+};
+
 class ExynosCompositionInfo : public ExynosMPPSource {
     public:
         ExynosCompositionInfo():ExynosCompositionInfo(COMPOSITION_NONE){};
@@ -544,7 +560,7 @@ class ExynosDisplay {
         int32_t initializeValidateInfos();
         int32_t addClientCompositionLayer(uint32_t layerIndex);
         int32_t removeClientCompositionLayer(uint32_t layerIndex);
-        int32_t addExynosCompositionLayer(uint32_t layerIndex);
+        int32_t addExynosCompositionLayer(uint32_t layerIndex, float totalUsedCapa);
 
         /**
          * Dynamic AFBC Control solution : To get the prepared information is applied to current or not.
@@ -1210,6 +1226,8 @@ class ExynosDisplay {
         virtual PanelCalibrationStatus getPanelCalibrationStatus() {
             return PanelCalibrationStatus::UNCALIBRATED;
         }
+        virtual bool isDbmSupported() { return false; }
+        virtual int32_t setDbmState(bool __unused enabled) { return NO_ERROR; }
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
@@ -1488,6 +1506,15 @@ class ExynosDisplay {
                 hwc2_config_t config,
                 hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
                 hwc_vsync_period_change_timeline_t* outTimeline);
+
+    public:
+        /* Override for each display's meaning of 'enabled state'
+         * Primary : Power on, this function overrided in primary display module
+         * Exteranal : Plug-in, default */
+        virtual bool isEnabled() { return mPlugState; }
+
+        // Resource TDM (Time-Division Multiplexing)
+        std::map<uint32_t, displayTDMInfo> mDisplayTDMInfo;
 };
 
 #endif //_EXYNOSDISPLAY_H
