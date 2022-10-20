@@ -2232,7 +2232,7 @@ int32_t ExynosResourceManager::deliverPerformanceInfo()
                             mppSource->mSrcImg.w, mppSource->mSrcImg.h,
                             mppSource->mSrcImg.format);
 
-                    if (mppSource->mSrcImg.compressed == 1)
+                    if (mppSource->mSrcImg.compressionInfo.type != COMP_TYPE_NONE)
                         frame->setAttribute(j, AcrylicCanvas::ATTR_COMPRESSED);
 
                     hwc_rect_t src_area;
@@ -2451,7 +2451,8 @@ void ExynosResourceManager::makeFormatRestrictions(restriction_key_t table) {
     HDEBUGLOGD(eDebugDefault, "MPP : %s, %d, %s, %d",
                getMPPStr(mFormatRestrictions[mFormatRestrictionCnt].hwType).string(),
                mFormatRestrictions[mFormatRestrictionCnt].nodeType,
-               getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format, COMP_ANY).string(),
+               getFormatStr(mFormatRestrictions[mFormatRestrictionCnt].format, COMP_TYPE_MASK)
+                       .string(),
                mFormatRestrictions[mFormatRestrictionCnt].reserved);
     mFormatRestrictionCnt++;
 }
@@ -2725,10 +2726,10 @@ uint32_t ExynosResourceManager::needHWResource(ExynosDisplay *display, exynos_im
 
     switch (attr) {
         case TDM_ATTR_SBWC:
-            ret = (isFormatSBWC(srcImg.format)) ? 1 : 0;
+            ret = (srcImg.compressionInfo.type == COMP_TYPE_SBWC) ? 1 : 0;
             break;
         case TDM_ATTR_AFBC:
-            ret = (srcImg.compressed) ? 1 : 0;
+            ret = (srcImg.compressionInfo.type == COMP_TYPE_AFBC) ? 1 : 0;
             break;
         case TDM_ATTR_ITP:
             ret = (isFormatYUV(srcImg.format)) ? 1 : 0;

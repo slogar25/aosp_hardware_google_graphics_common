@@ -819,7 +819,7 @@ ExynosCompositionInfo::ExynosCompositionInfo(uint32_t type)
     mWindowIndex(-1)
 {
     /* If AFBC compression of mTargetBuffer is changed, */
-    /* mCompressed should be set properly before resource assigning */
+    /* mCompressionInfo should be set properly before resource assigning */
 
     char value[256];
     int afbc_prop;
@@ -827,9 +827,9 @@ ExynosCompositionInfo::ExynosCompositionInfo(uint32_t type)
     afbc_prop = atoi(value);
 
     if (afbc_prop == 0)
-        mCompressed = false;
+        mCompressionInfo.type = COMP_TYPE_NONE;
     else
-        mCompressed = true;
+        mCompressionInfo.type = COMP_TYPE_AFBC;
 
     memset(&mSkipSrcInfo, 0, sizeof(mSkipSrcInfo));
     for (int i = 0; i < NUM_SKIP_STATIC_LAYER; i++) {
@@ -904,14 +904,8 @@ void ExynosCompositionInfo::setTargetBuffer(ExynosDisplay *display, buffer_handl
     mDataSpace = dataspace;
 }
 
-void ExynosCompositionInfo::setCompressed(bool compressed)
-{
-    mCompressed = compressed;
-}
-
-bool ExynosCompositionInfo::getCompressed()
-{
-    return mCompressed;
+void ExynosCompositionInfo::setCompressionType(uint32_t compressionType) {
+    mCompressionInfo.type = compressionType;
 }
 
 void ExynosCompositionInfo::dump(String8& result)
@@ -919,8 +913,10 @@ void ExynosCompositionInfo::dump(String8& result)
     result.appendFormat("CompositionInfo (%d)\n", mType);
     result.appendFormat("mHasCompositionLayer(%d)\n", mHasCompositionLayer);
     if (mHasCompositionLayer) {
-        result.appendFormat("\tfirstIndex: %d, lastIndex: %d, dataSpace: 0x%8x, compressed: %d, windowIndex: %d\n",
-                mFirstIndex, mLastIndex, mDataSpace, mCompressed, mWindowIndex);
+        result.appendFormat("\tfirstIndex: %d, lastIndex: %d, dataSpace: 0x%8x, compression: %s, "
+                            "windowIndex: %d\n",
+                            mFirstIndex, mLastIndex, mDataSpace,
+                            getCompressionStr(mCompressionInfo).c_str(), mWindowIndex);
         result.appendFormat("\thandle: %p, acquireFence: %d, releaseFence: %d, skipFlag: %d",
                 mTargetBuffer, mAcquireFence, mReleaseFence, mSkipFlag);
         if ((mOtfMPP == NULL) && (mM2mMPP == NULL))
@@ -1879,8 +1875,8 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
     otfMPP = layer.mOtfMPP;
     m2mMPP = layer.mM2mMPP;
 
-    cfg.compression = layer.mCompressed;
-    if (layer.mCompressed) {
+    cfg.compressionInfo = layer.mCompressionInfo;
+    if (layer.mCompressionInfo.type == COMP_TYPE_AFBC) {
         cfg.comp_src = DPP_COMP_SRC_GPU;
     }
     if (otfMPP == nullptr && layer.mExynosCompositionType != HWC2_COMPOSITION_DISPLAY_DECORATION) {
@@ -1989,7 +1985,7 @@ int32_t ExynosDisplay::configureHandle(ExynosLayer &layer, int fence_fd, exynos_
         exynos_image mpp_dst_img;
         if (m2mMPP->getDstImageInfo(&mpp_dst_img) == NO_ERROR) {
             dumpExynosImage(eDebugWinConfig, mpp_dst_img);
-            cfg.compression = mpp_dst_img.compressed;
+            cfg.compressionInfo = mpp_dst_img.compressionInfo;
             cfg.src.f_w = mpp_dst_img.fullWidth;
             cfg.src.f_h = mpp_dst_img.fullHeight;
             cfg.src.x = mpp_dst_img.x;
@@ -2230,8 +2226,8 @@ int32_t ExynosDisplay::configureOverlay(ExynosCompositionInfo &compositionInfo)
         config.src.f_w = gmeta.stride;
         config.src.f_h = gmeta.vstride;
     }
-    config.compression = compositionInfo.mCompressed;
-    if (compositionInfo.mCompressed) {
+    config.compressionInfo = compositionInfo.mCompressionInfo;
+    if (compositionInfo.mCompressionInfo.type == COMP_TYPE_AFBC) {
         if (compositionInfo.mType == COMPOSITION_EXYNOS)
             config.comp_src = DPP_COMP_SRC_G2D;
         else if (compositionInfo.mType == COMPOSITION_CLIENT)
@@ -3859,7 +3855,8 @@ int32_t ExynosDisplay::setClientTarget(
     setFenceInfo(acquireFence, this, FENCE_TYPE_SRC_RELEASE, FENCE_IP_FB, HwcFenceDirection::FROM);
 
     if (handle) {
-        mClientCompositionInfo.mCompressed = isAFBCCompressed(handle);
+        mClientCompositionInfo.mCompressionInfo = getCompressionInfo(handle);
+        mExynosCompositionInfo.mCompressionInfo = getCompressionInfo(handle);
     }
 
     return 0;
@@ -4688,14 +4685,14 @@ void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
                 "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
-                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
+                "protection = %u, compression = %s, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
                 "block(x:%d, y:%d, w:%u, h:%u), opaque(x:%d, y:%d, w:%u, h:%u)",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
                 c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
                 c.dst.f_w, c.dst.f_h, c.dst.x, c.dst.y, c.dst.w, c.dst.h,
                 c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable,
-                c.blending, c.protection, c.compression, c.comp_src,
+                c.blending, c.protection, getCompressionStr(c.compressionInfo).c_str(), c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
                 c.block_area.x, c.block_area.y, c.block_area.w, c.block_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
@@ -4745,14 +4742,14 @@ void ExynosDisplay::dumpConfig(String8 &result, const exynos_win_config_data &c)
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
                 "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
-                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
+                "protection = %u, compression = %s, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
                 "block(x:%d, y:%d, w:%u, h:%u), opaque(x:%d, y:%d, w:%u, h:%u)\n",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
                 c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
                 c.dst.f_w, c.dst.f_h, c.dst.x, c.dst.y, c.dst.w, c.dst.h,
                 c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable, c.blending, c.protection,
-                c.compression, c.comp_src,
+                getCompressionStr(c.compressionInfo).c_str(), c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
                 c.block_area.x, c.block_area.y, c.block_area.w, c.block_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
@@ -4770,14 +4767,14 @@ void ExynosDisplay::printConfig(exynos_win_config_data &c)
                 "src_f_w = %u, src_f_h = %u, src_x = %d, src_y = %d, src_w = %u, src_h = %u, "
                 "dst_f_w = %u, dst_f_h = %u, dst_x = %d, dst_y = %d, dst_w = %u, dst_h = %u, "
                 "format = %u, pa = %f, transform = %d, dataspace = 0x%8x, hdr_enable = %d, blending = %u, "
-                "protection = %u, compression = %d, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
+                "protection = %u, compression = %s, compression_src = %d, transparent(x:%d, y:%d, w:%u, h:%u), "
                 "block(x:%d, y:%d, w:%u, h:%u), opaque(x:%d, y:%d, w:%u, h:%u)",
                 c.fd_idma[0], c.fd_idma[1], c.fd_idma[2],
                 c.acq_fence, c.rel_fence,
                 c.src.f_w, c.src.f_h, c.src.x, c.src.y, c.src.w, c.src.h,
                 c.dst.f_w, c.dst.f_h, c.dst.x, c.dst.y, c.dst.w, c.dst.h,
                 c.format, c.plane_alpha, c.transform, c.dataspace, c.hdr_enable, c.blending, c.protection,
-                c.compression, c.comp_src,
+                getCompressionStr(c.compressionInfo).c_str(), c.comp_src,
                 c.transparent_area.x, c.transparent_area.y, c.transparent_area.w, c.transparent_area.h,
                 c.block_area.x, c.block_area.y, c.block_area.w, c.block_area.h,
                 c.opaque_area.x, c.opaque_area.y, c.opaque_area.w, c.opaque_area.h);
@@ -4822,7 +4819,7 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
     src_img->dataSpace = compositionInfo->mDataSpace;
     src_img->blending = HWC2_BLEND_MODE_PREMULTIPLIED;
     src_img->transform = 0;
-    src_img->compressed = compositionInfo->mCompressed;
+    src_img->compressionInfo = compositionInfo->mCompressionInfo;
     src_img->planeAlpha = 1;
     src_img->zOrder = 0;
     if ((targetType == COMPOSITION_CLIENT) && (mType == HWC_DISPLAY_VIRTUAL)) {
@@ -4853,7 +4850,7 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
         dst_img->dataSpace = colorModeToDataspace(mColorMode);
     dst_img->blending = HWC2_BLEND_MODE_NONE;
     dst_img->transform = 0;
-    dst_img->compressed = compositionInfo->mCompressed;
+    dst_img->compressionInfo = compositionInfo->mCompressionInfo;
     dst_img->planeAlpha = 1;
     dst_img->zOrder = src_img->zOrder;
 
