@@ -3214,7 +3214,7 @@ int32_t ExynosDisplay::getDisplayRequests(
 
         for (int32_t i = mClientCompositionInfo.mFirstIndex; i < mClientCompositionInfo.mLastIndex; i++) {
             ExynosLayer *layer = mLayers[i];
-            if (layer->mOverlayPriority >= ePriorityHigh) {
+            if (layer->needClearClientTarget()) {
                 if ((outLayers != NULL) && (outLayerRequests != NULL)) {
                     if (requestNum >= *outNumElements)
                         return -1;
@@ -4902,8 +4902,10 @@ int32_t ExynosDisplay::addClientCompositionLayer(uint32_t layerIndex)
     /* handle sandwiched layers */
     for (uint32_t i = (uint32_t)mClientCompositionInfo.mFirstIndex + 1; i < (uint32_t)mClientCompositionInfo.mLastIndex; i++) {
         ExynosLayer *layer = mLayers[i];
-        if (layer->mOverlayPriority >= ePriorityHigh) {
-            DISPLAY_LOGD(eDebugResourceManager, "\t[%d] layer has high or max priority (%d)", i, layer->mOverlayPriority);
+        if (layer->needClearClientTarget()) {
+            DISPLAY_LOGD(eDebugResourceManager,
+                         "\t[%d] layer is opaque and has high or max priority (%d)", i,
+                         layer->mOverlayPriority);
             continue;
         }
         if (layer->mValidateCompositionType != HWC2_COMPOSITION_CLIENT)
