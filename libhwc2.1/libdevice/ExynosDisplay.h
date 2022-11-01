@@ -1262,6 +1262,10 @@ class ExynosDisplay {
         // check if there are any dimmed layers
         bool isMixedComposition();
         bool isPriorFrameMixedCompostion() { return mPriorFrameMixedComposition; }
+        int lookupDisplayConfigs(const int32_t& width,
+                                 const int32_t& height,
+                                 const int32_t& fps,
+                                 int32_t* outConfig);
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
