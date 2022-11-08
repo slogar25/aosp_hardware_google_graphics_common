@@ -1018,7 +1018,10 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
         mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
-        mPowerHalHint(getDisplayId(mDisplayId, mIndex)) {
+        mPowerHalHint(getDisplayId(mDisplayId, mIndex)),
+        mErrLogFileWriter(2, ERR_LOG_SIZE),
+        mDebugDumpFileWriter(10, 1, ".dump"),
+        mFenceFileWriter(2, FENCE_ERR_LOG_SIZE) {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
@@ -2407,31 +2410,15 @@ int ExynosDisplay::setWinConfigData() {
     return 0;
 }
 
-void ExynosDisplay::printDebugInfos(String8 &reason)
-{
-    FILE *pFile = NULL;
+void ExynosDisplay::printDebugInfos(String8 &reason) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     reason.appendFormat("errFrameNumber: %" PRId64 " time:%s\n", mErrorFrameCount,
                         getLocalTimeStr(tv).string());
     ALOGD("%s", reason.string());
 
-    if (mErrorFrameCount < HWC_PRINT_FRAME_NUM) {
-        char filePath[128];
-        sprintf(filePath, "%s/%s_hwc_debug%d.dump", ERROR_LOG_PATH0, mDisplayName.string(), (int)mErrorFrameCount);
-        pFile = fopen(filePath, "wb");
-        if (pFile == NULL) {
-            ALOGE("Fail to open file %s, error: %s", filePath, strerror(errno));
-            sprintf(filePath, "%s/%s_hwc_debug%d.dump", ERROR_LOG_PATH1, mDisplayName.string(), (int)mErrorFrameCount);
-            pFile = fopen(filePath, "wb");
-        }
-        if (pFile == NULL) {
-            ALOGE("Fail to open file %s, error: %s", filePath, strerror(errno));
-        } else {
-            ALOGI("%s was created", filePath);
-            fwrite(reason.string(), 1, reason.size(), pFile);
-        }
-    }
+    bool fileOpened = mDebugDumpFileWriter.chooseOpenedFile();
+    mDebugDumpFileWriter.write(reason);
     mErrorFrameCount++;
 
     android::String8 result;
@@ -2443,24 +2430,20 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
     clientCompInfo.dump(result);
     exynosCompInfo.dump(result);
     ALOGD("%s", result.string());
-    if (pFile != NULL) {
-        fwrite(result.string(), 1, result.size(), pFile);
-    }
+    mDebugDumpFileWriter.write(result);
     result.clear();
 
     result.appendFormat("=======================  dump exynos layers (%zu)  ================================\n",
             mLayers.size());
     ALOGD("%s", result.string());
-    if (pFile != NULL) {
-        fwrite(result.string(), 1, result.size(), pFile);
-    }
+    mDebugDumpFileWriter.write(result);
     result.clear();
     for (uint32_t i = 0; i < mLayers.size(); i++) {
         ExynosLayer *layer = mLayers[i];
         layer->printLayer();
-        if (pFile != NULL) {
+        if (fileOpened) {
             layer->dump(result);
-            fwrite(result.string(), 1, result.size(), pFile);
+            mDebugDumpFileWriter.write(result);
             result.clear();
         }
     }
@@ -2469,16 +2452,14 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
         result.appendFormat("=======================  dump ignore layers (%zu)  ================================\n",
                             mIgnoreLayers.size());
         ALOGD("%s", result.string());
-        if (pFile != NULL) {
-            fwrite(result.string(), 1, result.size(), pFile);
-        }
+        mDebugDumpFileWriter.write(result);
         result.clear();
         for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
             ExynosLayer *layer = mIgnoreLayers[i];
             layer->printLayer();
-            if (pFile != NULL) {
+            if (fileOpened) {
                 layer->dump(result);
-                fwrite(result.string(), 1, result.size(), pFile);
+                mDebugDumpFileWriter.write(result);
                 result.clear();
             }
         }
@@ -2486,23 +2467,19 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
 
     result.appendFormat("=============================  dump win configs  ===================================\n");
     ALOGD("%s", result.string());
-    if (pFile != NULL) {
-        fwrite(result.string(), 1, result.size(), pFile);
-    }
+    mDebugDumpFileWriter.write(result);
     result.clear();
     for (size_t i = 0; i < mDpuData.configs.size(); i++) {
         ALOGD("config[%zu]", i);
         printConfig(mDpuData.configs[i]);
-        if (pFile != NULL) {
+        if (fileOpened) {
             result.appendFormat("config[%zu]\n", i);
             dumpConfig(result, mDpuData.configs[i]);
-            fwrite(result.string(), 1, result.size(), pFile);
+            mDebugDumpFileWriter.write(result);
             result.clear();
         }
     }
-    if (pFile != NULL) {
-        fclose(pFile);
-    }
+    mDebugDumpFileWriter.flush();
 }
 
 int32_t ExynosDisplay::validateWinConfigData()
@@ -6081,4 +6058,77 @@ int ExynosDisplay::lookupDisplayConfigs(const int32_t &width,
         }
     }
     return HWC2_ERROR_BAD_CONFIG;
+}
+
+FILE *ExynosDisplay::RotatingLogFileWriter::openLogFile(const std::string &filename,
+                                                        const std::string &mode) {
+    FILE *file = nullptr;
+    auto fullpath = std::string(ERROR_LOG_PATH0) + "/" + filename;
+    file = fopen(fullpath.c_str(), mode.c_str());
+    if (file != nullptr) {
+        return file;
+    }
+    ALOGE("Fail to open file %s, error: %s", fullpath.c_str(), strerror(errno));
+    fullpath = std::string(ERROR_LOG_PATH1) + "/" + filename;
+    file = fopen(fullpath.c_str(), mode.c_str());
+    if (file == nullptr) {
+        ALOGE("Fail to open file %s, error: %s", fullpath.c_str(), strerror(errno));
+    }
+    return file;
+}
+
+std::optional<nsecs_t> ExynosDisplay::RotatingLogFileWriter::getLastModifiedTimestamp(
+        const std::string &filename) {
+    struct stat fileStat;
+    auto fullpath = std::string(ERROR_LOG_PATH0) + "/" + filename;
+    if (stat(fullpath.c_str(), &fileStat) == 0) {
+        return fileStat.st_mtim.tv_sec * nsecsPerSec + fileStat.st_mtim.tv_nsec;
+    }
+    fullpath = std::string(ERROR_LOG_PATH1) + "/" + filename;
+    if (stat(fullpath.c_str(), &fileStat) == 0) {
+        return fileStat.st_mtim.tv_sec * nsecsPerSec + fileStat.st_mtim.tv_nsec;
+    }
+    return std::nullopt;
+}
+
+bool ExynosDisplay::RotatingLogFileWriter::chooseOpenedFile() {
+    if (mLastFileIndex < 0) {
+        // HWC could be restarted, so choose to open new file or continue the last modified file
+        int chosenIndex = 0;
+        nsecs_t lastModifTimestamp = 0;
+        for (int i = 0; i < mMaxFileCount; ++i) {
+            auto timestamp = getLastModifiedTimestamp(mPrefixName + std::to_string(i) + mExtension);
+            if (!timestamp.has_value()) {
+                chosenIndex = i;
+                break;
+            }
+            if (i == 0 || lastModifTimestamp < *timestamp) {
+                chosenIndex = i;
+                lastModifTimestamp = *timestamp;
+            }
+        }
+        auto filename = mPrefixName + std::to_string(chosenIndex) + mExtension;
+        mFile = openLogFile(filename, "ab");
+        if (mFile == nullptr) {
+            ALOGE("Unable to open log file for %s", filename.c_str());
+            return false;
+        }
+        mLastFileIndex = chosenIndex;
+    }
+
+    // Choose to use the same last file or move on to the next file
+    for (int i = 0; i < 2; ++i) {
+        if (mFile == nullptr) {
+            mFile = openLogFile(mPrefixName + std::to_string(mLastFileIndex) + mExtension,
+                                (i == 0) ? "ab" : "wb");
+        }
+        if (mFile != nullptr) {
+            auto fileSize = ftell(mFile);
+            if (fileSize < mThresholdSizePerFile) return true;
+            fclose(mFile);
+            mFile = nullptr;
+        }
+        mLastFileIndex = (mLastFileIndex + 1) % mMaxFileCount;
+    }
+    return false;
 }

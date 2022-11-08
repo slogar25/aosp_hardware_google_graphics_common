@@ -1519,6 +1519,51 @@ class ExynosDisplay {
 
         // Resource TDM (Time-Division Multiplexing)
         std::map<uint32_t, displayTDMInfo> mDisplayTDMInfo;
+
+        class RotatingLogFileWriter {
+        public:
+            RotatingLogFileWriter(uint32_t maxFileCount, uint32_t thresholdSizePerFile,
+                                  std::string extension = ".txt")
+                  : mMaxFileCount(maxFileCount),
+                    mThresholdSizePerFile(thresholdSizePerFile),
+                    mPrefixName(""),
+                    mExtension(extension),
+                    mLastFileIndex(-1),
+                    mFile(nullptr) {}
+
+            ~RotatingLogFileWriter() {
+                if (mFile) {
+                    fclose(mFile);
+                }
+            }
+
+            bool chooseOpenedFile();
+            void write(const String8& content) {
+                if (mFile) {
+                    fwrite(content.string(), 1, content.size(), mFile);
+                }
+            }
+            void flush() {
+                if (mFile) {
+                    fflush(mFile);
+                }
+            }
+            void setPrefixName(const std::string& prefixName) { mPrefixName = prefixName; }
+
+        private:
+            FILE* openLogFile(const std::string& filename, const std::string& mode);
+            std::optional<nsecs_t> getLastModifiedTimestamp(const std::string& filename);
+
+            uint32_t mMaxFileCount;
+            uint32_t mThresholdSizePerFile;
+            std::string mPrefixName;
+            std::string mExtension;
+            int32_t mLastFileIndex;
+            FILE* mFile;
+        };
+        RotatingLogFileWriter mErrLogFileWriter;
+        RotatingLogFileWriter mDebugDumpFileWriter;
+        RotatingLogFileWriter mFenceFileWriter;
 };
 
 #endif //_EXYNOSDISPLAY_H
