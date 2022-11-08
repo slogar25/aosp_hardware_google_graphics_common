@@ -114,7 +114,7 @@ public:
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mLhbm.get();
     }
-    int checkSysfsStatus(const char *file, const std::string &expectedValue,
+    int checkSysfsStatus(const char *file, const std::vector<std::string>& expectedValue,
                          const nsecs_t timeoutNs);
 
     uint32_t getBrightnessLevel() {
@@ -171,6 +171,19 @@ public:
         OFF = 0,
         ON_IRC_ON,
         ON_IRC_OFF,
+    };
+
+    /*
+     * LHBM command need take a couple of frames to become effective
+     * DISABLED - finish sending disabling command to panel
+     * ENABLED - panel finishes boosting brightness to the peak value
+     * ENABLING - finish sending enabling command to panel (panel begins boosting brightness)
+     * Note: the definition should be consistent with kernel driver
+     */
+    enum class LhbmMode {
+        DISABLED = 0,
+        ENABLED = 1,
+        ENABLING = 2,
     };
 
     /*
