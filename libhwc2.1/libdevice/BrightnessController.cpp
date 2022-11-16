@@ -244,13 +244,13 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     if (mUncheckedGbhmRequest) {
         ATRACE_NAME("check_ghbm_mode");
         checkSysfsStatus(kGlobalHbmModeFileNode,
-                         std::to_string(toUnderlying(mPendingGhbmStatus.load())), vsyncNs * 5);
+                         {std::to_string(toUnderlying(mPendingGhbmStatus.load()))}, vsyncNs * 5);
         mUncheckedGbhmRequest = false;
     }
 
     if (mUncheckedLhbmRequest) {
         ATRACE_NAME("check_lhbm_mode");
-        checkSysfsStatus(kLocalHbmModeFileNode, std::to_string(mPendingLhbmStatus), vsyncNs * 5);
+        checkSysfsStatus(kLocalHbmModeFileNode, {std::to_string(mPendingLhbmStatus)}, vsyncNs * 5);
         mUncheckedLhbmRequest = false;
     }
 
@@ -289,7 +289,7 @@ int BrightnessController::applyPendingChangeViaSysfs(const nsecs_t vsyncNs) {
 
     if (mUncheckedBlRequest) {
         ATRACE_NAME("check_bl_value");
-        checkSysfsStatus(BRIGHTNESS_SYSFS_NODE, std::to_string(mPendingBl), vsyncNs * 5);
+        checkSysfsStatus(BRIGHTNESS_SYSFS_NODE, {std::to_string(mPendingBl)}, vsyncNs * 5);
         mUncheckedBlRequest = false;
     }
 
@@ -686,9 +686,13 @@ int BrightnessController::queryBrightness(float brightness, bool *ghbm, uint32_t
 }
 
 // Return immediately if it's already in the status. Otherwise poll the status
-int BrightnessController::checkSysfsStatus(const char* file, const std::string& expectedValue,
+int BrightnessController::checkSysfsStatus(const char* file,
+                                           const std::vector<std::string>& expectedValue,
                                            const nsecs_t timeoutNs) {
     ATRACE_CALL();
+
+    if (expectedValue.size() == 0) return false;
+
     char buf[16];
     String8 nodeName;
     nodeName.appendFormat(file, mPanelIndex);
@@ -701,8 +705,11 @@ int BrightnessController::checkSysfsStatus(const char* file, const std::string& 
     }
 
     // '- 1' to remove trailing '\n'
-    if (std::string_view(buf, size - 1) == expectedValue) {
+    std::string val = std::string(buf, size - 1);
+    if (std::find(expectedValue.begin(), expectedValue.end(), val) != expectedValue.end()) {
         return true;
+    } else if (timeoutNs == 0) {
+        return false;
     }
 
     struct pollfd pfd;
@@ -732,12 +739,20 @@ int BrightnessController::checkSysfsStatus(const char* file, const std::string& 
             lseek(fd.get(), 0, SEEK_SET);
             size = read(fd.get(), buf, sizeof(buf));
             if (size > 0) {
-                if (std::string_view(buf, size - 1) == expectedValue) {
+                val = std::string(buf, size - 1);
+                if (std::find(expectedValue.begin(), expectedValue.end(), val) !=
+                    expectedValue.end()) {
                     ret = 0;
                 } else {
-                    buf[size - 1] = 0;
-                    ALOGE("%s read %s expected %s after notified", __func__, buf,
-                          expectedValue.c_str());
+                    std::string values;
+                    for (auto& s : expectedValue) {
+                        values += s + std::string(" ");
+                    }
+                    if (values.size() > 0) {
+                        values.resize(values.size() - 1);
+                    }
+                    ALOGE("%s read %s expected %s after notified", __func__, val.c_str(),
+                          values.c_str());
                     ret = EINVAL;
                 }
             } else {
