@@ -564,13 +564,35 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         setLHBMRefreshRateThrottle(kLhbmRefreshRateThrottleMs);
     }
 
+    bool wasDisabled =
+            mBrightnessController
+                    ->checkSysfsStatus(BrightnessController::kLocalHbmModeFileNode,
+                                       {std::to_string(static_cast<int>(
+                                               BrightnessController::LhbmMode::DISABLED))},
+                                       0);
+    if (!enabled && wasDisabled) {
+        ALOGW("lhbm is at DISABLED state, skip disabling");
+        return NO_ERROR;
+    } else if (enabled && !wasDisabled) {
+        requestLhbm(true);
+        ALOGI("lhbm is at ENABLING or ENABLED state, re-enable to reset timeout timer");
+        return NO_ERROR;
+    }
+
+    int64_t lhbmEnablingNanos;
+    std::vector<std::string> checkingValue = {
+            std::to_string(static_cast<int>(BrightnessController::LhbmMode::DISABLED))};
+    if (enabled) {
+        checkingValue = {std::to_string(static_cast<int>(BrightnessController::LhbmMode::ENABLING)),
+                         std::to_string(static_cast<int>(BrightnessController::LhbmMode::ENABLED))};
+        lhbmEnablingNanos = systemTime(SYSTEM_TIME_MONOTONIC);
+    }
     requestLhbm(enabled);
     constexpr uint32_t kSysfsCheckTimeoutMs = 500;
     ALOGI("setLhbmState =%d", enabled);
-    bool succeed = mBrightnessController->checkSysfsStatus(
-                                    BrightnessController::kLocalHbmModeFileNode,
-                                    std::to_string(enabled ? 1 : 0),
-                                    ms2ns(kSysfsCheckTimeoutMs));
+    bool succeed =
+            mBrightnessController->checkSysfsStatus(BrightnessController::kLocalHbmModeFileNode,
+                                                    checkingValue, ms2ns(kSysfsCheckTimeoutMs));
     if (!succeed) {
         ALOGE("failed to update lhbm mode");
         if (enabled) {
@@ -579,26 +601,45 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         return -ENODEV;
     }
 
-    if (!enabled) {
+    if (enabled) {
+        int64_t lhbmEnablingDoneNanos = systemTime(SYSTEM_TIME_MONOTONIC);
+        bool enablingStateSupported = !mFramesToReachLhbmPeakBrightness;
+        if (enablingStateSupported) {
+            ATRACE_NAME("lhbm_wait_peak_brightness");
+            if (!mBrightnessController
+                         ->checkSysfsStatus(BrightnessController::kLocalHbmModeFileNode,
+                                            {std::to_string(static_cast<int>(
+                                                    BrightnessController::LhbmMode::ENABLED))},
+                                            ms2ns(kSysfsCheckTimeoutMs))) {
+                ALOGE("failed to wait for lhbm becoming effective");
+                return -EIO;
+            }
+        } else {
+            // lhbm takes effect at next vblank
+            ATRACE_NAME("lhbm_wait_apply");
+            if (mDisplayInterface->waitVBlank()) {
+                ALOGE("%s failed to wait vblank for taking effect", __func__);
+                return -ENODEV;
+            }
+            ATRACE_NAME("lhbm_wait_peak_brightness");
+            for (int32_t i = mFramesToReachLhbmPeakBrightness; i > 0; i--) {
+                if (mDisplayInterface->waitVBlank()) {
+                    ALOGE("%s failed to wait vblank for peak brightness, %d", __func__, i);
+                    return -ENODEV;
+                }
+            }
+        }
+        ALOGI("lhbm delay mode: %s, latency(ms): total: %d cmd: %d\n",
+              enablingStateSupported ? "poll" : "fixed",
+              static_cast<int>((systemTime(SYSTEM_TIME_MONOTONIC) - lhbmEnablingNanos) / 1000000),
+              static_cast<int>((lhbmEnablingDoneNanos - lhbmEnablingNanos) / 1000000));
+    } else {
         setLHBMRefreshRateThrottle(0);
-    }
-
-    {
         // lhbm takes effect at next vblank
         ATRACE_NAME("lhbm_wait_apply");
         if (mDisplayInterface->waitVBlank()) {
             ALOGE("%s failed to wait vblank for taking effect", __func__);
             return -ENODEV;
-        }
-    }
-
-    if (enabled) {
-        for (int32_t i = mFramesToReachLhbmPeakBrightness; i > 0; i--) {
-            ATRACE_NAME("lhbm_wait_peak_brightness");
-            if (mDisplayInterface->waitVBlank()) {
-                ALOGE("%s failed to wait vblank for peak brightness, %d", __func__, i);
-                return -ENODEV;
-            }
         }
     }
 
