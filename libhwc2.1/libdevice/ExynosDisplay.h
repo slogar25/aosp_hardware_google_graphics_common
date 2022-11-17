@@ -388,9 +388,9 @@ struct DisplayControl {
 
 class ExynosDisplay {
     public:
-        uint32_t mDisplayId;
-        uint32_t mType;
-        uint32_t mIndex;
+        const uint32_t mDisplayId;
+        const uint32_t mType;
+        const uint32_t mIndex;
         String8 mDeconNodeName;
         uint32_t mXres;
         uint32_t mYres;
@@ -403,13 +403,14 @@ class ExynosDisplay {
         int                     mPsrMode;
 
         /* Constructor */
-        ExynosDisplay(uint32_t index, ExynosDevice *device);
+        ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device,
+                      const std::string& displayName);
         /* Destructor */
         virtual ~ExynosDisplay();
 
         ExynosDevice *mDevice;
 
-        String8 mDisplayName;
+        const String8 mDisplayName;
         HwcMountOrientation mMountOrientation = HwcMountOrientation::ROT_0;
         Mutex mDisplayMutex;
 
@@ -1469,9 +1470,8 @@ class ExynosDisplay {
         static const constexpr nsecs_t SIGNAL_TIME_PENDING = INT64_MAX;
         static const constexpr nsecs_t SIGNAL_TIME_INVALID = -1;
         std::unordered_map<uint32_t, RollingAverage<kAveragesBufferSize>> mRollingAverages;
-        // mPowerHalHint should be declared only after mDisplayId and mIndex have been declared
-        // since the result of getDisplayId(mDisplayId, mIndex) is needed as the parameter of
-        // PowerHalHintWorker's constructor
+        // mPowerHalHint should be declared only after mDisplayId have been declared since
+        // mDisplayId is needed as the parameter of PowerHalHintWorker's constructor
         PowerHalHintWorker mPowerHalHint;
 
         std::optional<nsecs_t> mValidateStartTime;

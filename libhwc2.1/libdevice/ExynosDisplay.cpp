@@ -965,9 +965,10 @@ String8 ExynosCompositionInfo::getTypeStr()
     }
 }
 
-ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
-      : mDisplayId(HWC_DISPLAY_PRIMARY),
-        mType(HWC_NUM_DISPLAY_TYPES),
+ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device,
+                             const std::string &displayName)
+      : mDisplayId(getDisplayId(type, index)),
+        mType(type),
         mIndex(index),
         mDeconNodeName(""),
         mXres(1440),
@@ -977,7 +978,7 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mVsyncPeriod(16666666),
         mBtsVsyncPeriod(16666666),
         mDevice(device),
-        mDisplayName(""),
+        mDisplayName(displayName.c_str()),
         mPlugState(false),
         mHasSingleBuffer(false),
         mResourceManager(NULL),
@@ -1018,7 +1019,7 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
         mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
-        mPowerHalHint(getDisplayId(mDisplayId, mIndex)),
+        mPowerHalHint(mDisplayId),
         mErrLogFileWriter(2, ERR_LOG_SIZE),
         mDebugDumpFileWriter(10, 1, ".dump"),
         mFenceFileWriter(2, FENCE_ERR_LOG_SIZE) {

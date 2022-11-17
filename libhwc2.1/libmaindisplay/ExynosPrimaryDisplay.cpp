@@ -73,8 +73,9 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
     return gamma;
 }
 
-ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
-      : ExynosDisplay(index, device),
+ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
+                                           const std::string &displayName)
+      : ExynosDisplay(HWC_DISPLAY_PRIMARY, index, device, displayName),
         mMinIdleRefreshRate(0),
         mRefreshRateDelayNanos(0),
         mLastRefreshRateAppliedNanos(0),
@@ -85,9 +86,6 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mNumMaxPriorityAllowed = 5;
 
     /* Initialization */
-    mType = HWC_DISPLAY_PRIMARY;
-    mIndex = index;
-    mDisplayId = getDisplayId(mType, mIndex);
     mFramesToReachLhbmPeakBrightness =
             property_get_int32("vendor.primarydisplay.lhbm.frames_to_reach_peak_brightness", 3);
 
