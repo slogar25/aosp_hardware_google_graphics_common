@@ -832,15 +832,20 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
     if (err != HWC2_ERROR_NONE || !num_configs)
         return err;
 
-    hwc2_config_t config;
-    int32_t bootConfig;
-    err = mExynosDisplay->getPreferredDisplayConfigInternal(&bootConfig);
-    if (err == HWC2_ERROR_NONE && property_get_bool("sys.boot_completed", false) == true) {
-        config = static_cast<hwc2_config_t>(bootConfig);
+    int32_t config = -1;
+    char modeStr[PROPERTY_VALUE_MAX] = "\0";
+    int32_t width = 0, height = 0, fps = 0;
+    if (property_get("vendor.display.preferred_mode", modeStr, "") > 0 &&
+        sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
+        err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, &config);
     } else {
+        err = HWC2_ERROR_BAD_CONFIG;
+    }
+
+    if (err != HWC2_ERROR_NONE) {
         config = mDrmConnector->get_preferred_mode_id();
     }
-    ALOGI("Preferred mode id: %d, state: %d", config, mDrmConnector->state());
+    ALOGI("Preferred mode id: %d(%s), state: %d", config, modeStr, mDrmConnector->state());
 
     if ((err = setActiveConfig(config)) < 0) {
         ALOGE("failed to set default config, err %d", err);

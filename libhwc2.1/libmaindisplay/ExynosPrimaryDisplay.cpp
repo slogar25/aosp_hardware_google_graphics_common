@@ -38,7 +38,6 @@ extern struct exynos_hwc_control exynosHWCControl;
 
 using namespace SOC_VERSION;
 constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
-constexpr auto nsecsPerMs = std::chrono::nanoseconds(1ms).count();
 
 static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
@@ -259,19 +258,7 @@ int32_t ExynosPrimaryDisplay::getPreferredDisplayConfigInternal(int32_t *outConf
         return HWC2_ERROR_BAD_CONFIG;
     }
 
-    const auto vsyncPeriod = nsecsPerSec / fps;
-
-    for (auto const& [config, mode] : mDisplayConfigs) {
-        long delta = abs(vsyncPeriod - mode.vsyncPeriod);
-        if ((width == mode.width) && (height == mode.height) &&
-            (delta < nsecsPerMs)) {
-            ALOGD("%s: found preferred display config for mode: %s=%d",
-                  __func__, modeStr, config);
-            *outConfig = config;
-            return HWC2_ERROR_NONE;
-        }
-    }
-    return HWC2_ERROR_BAD_CONFIG;
+    return lookupDisplayConfigs(width, height, fps, outConfig);
 }
 
 int32_t ExynosPrimaryDisplay::setPowerOn() {
