@@ -6043,3 +6043,27 @@ bool ExynosDisplay::isMixedComposition() {
     }
     return false;
 }
+
+int ExynosDisplay::lookupDisplayConfigs(const int32_t &width,
+                                        const int32_t &height,
+                                        const int32_t &fps,
+                                        int32_t *outConfig) {
+    if (!fps)
+        return HWC2_ERROR_BAD_CONFIG;
+
+    constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
+    constexpr auto nsecsPerMs = std::chrono::nanoseconds(1ms).count();
+
+    const auto vsyncPeriod = nsecsPerSec / fps;
+
+    for (auto const& [config, mode] : mDisplayConfigs) {
+        long delta = abs(vsyncPeriod - mode.vsyncPeriod);
+        if ((width == mode.width) && (height == mode.height) && (delta < nsecsPerMs)) {
+            ALOGD("%s: found display config for mode: %dx%d@%d=%d",
+                 __func__, width, height, fps, config);
+            *outConfig = config;
+            return HWC2_ERROR_NONE;
+        }
+    }
+    return HWC2_ERROR_BAD_CONFIG;
+}
