@@ -24,6 +24,9 @@ cc_library_shared {
         "libhardware_headers",
         "libsystem_headers",
     ],
+    export_header_lib_headers: [
+        "google_hal_headers",
+    ],
     shared_libs: [
         "liblog",
         "libutils",
