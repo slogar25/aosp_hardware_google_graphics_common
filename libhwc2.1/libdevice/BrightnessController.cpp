@@ -107,11 +107,15 @@ void BrightnessController::initBrightnessSysfs() {
 }
 
 void BrightnessController::initCabcSysfs() {
+    mCabcSupport = property_get_bool("vendor.display.cabc.supported", false);
+    if (!mCabcSupport) return;
+
     String8 nodeName;
     nodeName.appendFormat(kLocalCabcModeFileNode, mPanelIndex);
+
     mCabcModeOfs.open(nodeName.string(), std::ofstream::out);
     if (mCabcModeOfs.fail()) {
-        ALOGW("%s %s fail to open", __func__, nodeName.string());
+        ALOGE("%s %s fail to open", __func__, nodeName.string());
         mCabcModeOfs.close();
         return;
     }
@@ -780,7 +784,7 @@ void BrightnessController::setOutdoorVisibility(LbeState state) {
 }
 
 int BrightnessController::updateCabcMode() {
-    if (mCabcModeOfs.fail()) return HWC2_ERROR_UNSUPPORTED;
+    if (!mCabcSupport || mCabcModeOfs.fail()) return HWC2_ERROR_UNSUPPORTED;
 
     std::lock_guard<std::recursive_mutex> lock(mCabcModeMutex);
     bool mode = (!(isHdrLayerOn() || mOutdoorVisibility));
