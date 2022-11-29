@@ -305,6 +305,7 @@ private:
     std::ofstream mBrightnessOfs;
     uint32_t mMaxBrightness = 0; // read from sysfs
     std::ofstream mCabcModeOfs;
+    bool mCabcSupport = false;
     uint32_t mDimBrightness = 0;
 
     // Note IRC or dimming is not in consideration for now.
