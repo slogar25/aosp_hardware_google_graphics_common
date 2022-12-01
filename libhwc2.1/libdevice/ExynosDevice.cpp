@@ -168,8 +168,7 @@ ExynosDevice::ExynosDevice()
     mResourceManager->updateRestrictions();
 
     if (mInterfaceType == INTERFACE_TYPE_DRM) {
-        /* disable vblank immediately after updates */
-        setVBlankOffDelay(-1);
+        setVBlankOffDelay(1);
     }
 
     char value[PROPERTY_VALUE_MAX];
