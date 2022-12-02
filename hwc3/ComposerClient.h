@@ -136,7 +136,6 @@ private:
 
     IComposerHal* mHal;
     std::unique_ptr<IResourceManager> mResources;
-    std::unique_ptr<ComposerCommandEngine> mCommandEngine;
     std::function<void()> mOnClientDestroyed;
     std::unique_ptr<HalEventCallback> mHalEventCallback;
 };
