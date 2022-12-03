@@ -307,6 +307,13 @@ int BrightnessController::processLocalHbm(bool on) {
 
     std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mLhbmReq.store(on);
+    // As kernel timeout timer might disable LHBM without letting HWC know, enforce mLhbmReq and
+    // mLhbm dirty to ensure the enabling request can be passed through kernel unconditionally.
+    // TODO-b/260915350: move LHBM timeout mechanism from kernel to HWC for easier control and sync.
+    if (on) {
+        mLhbmReq.set_dirty();
+        mLhbm.set_dirty();
+    }
     if (mLhbmReq.is_dirty()) {
         updateStates();
     }
