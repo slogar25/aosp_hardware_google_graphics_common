@@ -881,8 +881,8 @@ void BrightnessController::parseHbmModeEnums(const DrmProperty& property) {
  *   Historian team before modifying (b/239640926).
  */
 void BrightnessController::printBrightnessStates(const char* path) {
-    ALOGI("path=%s, level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d", path ?: "unknown",
-        mBrightnessLevel.get(), mDimming.get(), mGhbm.get(), mLhbm.get());
+    ALOGI("path=%s, id=%d, level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d", path ?: "unknown",
+          mPanelIndex, mBrightnessLevel.get(), mDimming.get(), mGhbm.get(), mLhbm.get());
 }
 
 void BrightnessController::dump(String8& result) {
