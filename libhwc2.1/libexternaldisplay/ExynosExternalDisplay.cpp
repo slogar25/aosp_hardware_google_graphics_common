@@ -255,15 +255,18 @@ int32_t ExynosExternalDisplay::validateDisplay(
     if (mSkipStartFrame < SKIP_EXTERNAL_FRAME) {
         initDisplay();
         mRenderingState = RENDERING_STATE_VALIDATED;
+        uint32_t changed_count = 0;
         for (size_t i = 0; i < mLayers.size(); i++) {
             ExynosLayer *layer = mLayers[i];
             if (layer && (layer->mValidateCompositionType == HWC2_COMPOSITION_DEVICE ||
                 layer->mValidateCompositionType == HWC2_COMPOSITION_EXYNOS)) {
                 layer->mValidateCompositionType = HWC2_COMPOSITION_CLIENT;
                 layer->mReleaseFence = layer->mAcquireFence;
+                changed_count++;
             }
         }
         mSkipStartFrame++;
+        *outNumTypes += changed_count;
 
         ALOGI("[ExternalDisplay] %s : Skip start frame [%d/%d]", __func__, mSkipStartFrame, SKIP_EXTERNAL_FRAME);
     }
