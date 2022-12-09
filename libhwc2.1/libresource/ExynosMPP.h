@@ -688,6 +688,7 @@ public:
 
     virtual bool checkRotationCondition(struct exynos_image &src);
     void updateAttr();
+    void updatePreassignedDisplay(uint32_t fromDisplayBit, uint32_t toDisplayBit);
     dstMetaInfo getDstMetaInfo(android_dataspace_t dstDataspace);
     float getAssignedCapacity();
 
