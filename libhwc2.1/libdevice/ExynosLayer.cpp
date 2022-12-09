@@ -529,6 +529,11 @@ int32_t ExynosLayer::setLayerDataspace(int32_t /*android_dataspace_t*/ dataspace
 
     if (currentDataSpace != mDataSpace) {
         setGeometryChanged(GEOMETRY_LAYER_DATASPACE_CHANGED);
+        // invalidate metadata if dataspace is changed. need metadata update
+        // to be after dataspace update.
+        if (mMetaParcel != nullptr) {
+            mMetaParcel->eType = VIDEO_INFO_TYPE_INVALID;
+        }
     }
     mDataSpace = currentDataSpace;
 
@@ -548,9 +553,10 @@ int32_t ExynosLayer::setLayerDisplayFrame(hwc_rect_t frame) {
 }
 
 int32_t ExynosLayer::setLayerPlaneAlpha(float alpha) {
-
-    if (alpha < 0.0)
-        return HWC2_ERROR_BAD_LAYER;
+    if (alpha < 0.0f || alpha > 1.0f) {
+        ALOGE("%s: invalid alpha %f", __func__, alpha);
+        return HWC2_ERROR_BAD_PARAMETER;
+    }
 
     if ((mPlaneAlpha != alpha) && ((mPlaneAlpha == 0.0) || (alpha == 0.0)))
         setGeometryChanged(GEOMETRY_LAYER_IGNORE_CHANGED);

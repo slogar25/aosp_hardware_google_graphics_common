@@ -97,6 +97,7 @@ public:
     int prepareFrameCommit(ExynosDisplay& display,
                            const DrmConnector& connector,
                            ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
+                           const bool mixedComposition,
                            bool& ghbmSync, bool& lhbmSync, bool& blSync);
 
     bool isGhbmSupported() { return mGhbmSupported; }
@@ -134,6 +135,10 @@ public:
     }
 
     void dump(String8 &result);
+
+    void setOutdoorVisibility(LbeState state);
+
+    int updateCabcMode();
 
     struct BrightnessTable {
         float mBriStart;
@@ -181,18 +186,30 @@ public:
     static constexpr const char *kLocalHbmModeFileNode =
                 "/sys/class/backlight/panel%d-backlight/local_hbm_mode";
 private:
+    // sync brightness change for mixed composition when there is more than 50% luminance change.
+    // The percentage is calculated as:
+    //        (big_lumi - small_lumi) / small_lumi
+    // For mixed composition, if remove brightness animations, the minimum brightness jump is
+    // between nbm peak and hbm peak. 50% will cover known panels
+    static constexpr float kBrightnessSyncThreshold = 0.5f;
     // Worst case for panel with brightness range 2 nits to 1000 nits.
     static constexpr float kGhbmMinDimRatio = 0.002;
     static constexpr int32_t kHbmDimmingTimeUs = 5000000;
     static constexpr const char *kGlobalHbmModeFileNode =
                 "/sys/class/backlight/panel%d-backlight/hbm_mode";
+    static constexpr const char* kDimmingUsagePropName =
+            "vendor.display.%d.brightness.dimming.usage";
+    static constexpr const char* kDimmingHbmTimePropName =
+            "vendor.display.%d.brightness.dimming.hbm_time";
 
     int queryBrightness(float brightness, bool* ghbm = nullptr, uint32_t* level = nullptr,
                         float *nits = nullptr);
     void initBrightnessTable(const DrmDevice& device, const DrmConnector& connector);
     void initBrightnessSysfs();
+    void initCabcSysfs();
     void initDimmingUsage();
     int applyBrightnessViaSysfs(uint32_t level);
+    int applyCabcModeViaSysfs(uint8_t mode);
     int updateStates() REQUIRES(mBrightnessMutex);
     void dimmingThread();
     void processDimmingOff();
@@ -251,11 +268,21 @@ private:
     // sysfs path
     std::ofstream mBrightnessOfs;
     uint32_t mMaxBrightness = 0; // read from sysfs
+    std::ofstream mCabcModeOfs;
 
     // Note IRC or dimming is not in consideration for now.
     float mDisplayWhitePointNits = 0;
+    float mPrevDisplayWhitePointNits = 0;
 
     std::function<void(void)> mUpdateDcLhbm;
+
+    // state for control CABC state
+    static constexpr const char* kLocalCabcModeFileNode =
+            "/sys/class/backlight/panel%d-backlight/cabc_mode";
+    std::recursive_mutex mCabcModeMutex;
+    bool mOutdoorVisibility GUARDED_BY(mCabcModeMutex) = false;
+    bool isHdrLayerOn() { return mHdrLayerState.get() != HdrLayerState::kHdrNone; }
+    CtrlValue<bool> mCabcMode GUARDED_BY(mCabcModeMutex);
 };
 
 #endif // _BRIGHTNESS_CONTROLLER_H_
