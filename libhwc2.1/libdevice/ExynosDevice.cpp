@@ -43,7 +43,6 @@ using aidl::android::hardware::graphics::composer3::IComposerCallback;
 
 class ExynosDevice;
 
-extern uint32_t mFenceLogSize;
 extern void PixelDisplayInit(ExynosDisplay *exynos_display, const std::string_view instance_str);
 
 static const std::map<const uint32_t, const std::string_view> pixelDisplayIntfName =
@@ -161,10 +160,15 @@ ExynosDevice::ExynosDevice()
         sprintf(fence_names[i], "_%2dh", i);
     }
 
-    String8 saveString;
-    saveString.appendFormat("ExynosDevice is initialized");
-    uint32_t errFileSize = saveErrorLog(saveString);
-    ALOGI("Initial errlog size: %d bytes\n", errFileSize);
+    for (auto it : mDisplays) {
+        std::string displayName = std::string(it->mDisplayName.string());
+        it->mErrLogFileWriter.setPrefixName(displayName + "_hwc_error_log");
+        it->mDebugDumpFileWriter.setPrefixName(displayName + "_hwc_debug");
+        it->mFenceFileWriter.setPrefixName(displayName + "_hwc_fence_state");
+        String8 saveString;
+        saveString.appendFormat("ExynosDisplay %s is initialized", it->mDisplayName.string());
+        saveErrorLog(saveString, it);
+    }
 
     initDeviceInterface(mInterfaceType);
 
@@ -859,7 +863,6 @@ bool ExynosDevice::validateFences(ExynosDisplay *display) {
 
     if (exynosHWCControl.doFenceFileDump) {
         ALOGD("Fence file dump !");
-        if (mFenceLogSize != 0) ALOGD("Fence file not empty!");
         saveFenceTrace(display);
         exynosHWCControl.doFenceFileDump = false;
     }
