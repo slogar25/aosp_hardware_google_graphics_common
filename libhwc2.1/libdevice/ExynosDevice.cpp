@@ -113,7 +113,9 @@ ExynosDevice::ExynosDevice()
         ALOGD("Create display[%zu] type: %d, index: %d", i, display_t.type, display_t.index);
         switch(display_t.type) {
             case HWC_DISPLAY_PRIMARY:
-                exynos_display = (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this,
+                                                                         display_t.display_name));
                 if(display_t.index == 0) {
                     exynos_display->mPlugState = true;
                     ExynosMPP::mainDisplayWidth = exynos_display->mXres;
@@ -127,10 +129,14 @@ ExynosDevice::ExynosDevice()
                 }
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                exynos_display = (ExynosDisplay *)(new ExynosExternalDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosExternalDisplayModule(display_t.index, this,
+                                                                          display_t.display_name));
                 break;
             case HWC_DISPLAY_VIRTUAL:
-                exynos_display = (ExynosDisplay *)(new ExynosVirtualDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosVirtualDisplayModule(display_t.index, this,
+                                                                         display_t.display_name));
                 mNumVirtualDisplay = 0;
                 break;
             default:
@@ -138,7 +144,6 @@ ExynosDevice::ExynosDevice()
                 break;
         }
         exynos_display->mDeconNodeName.appendFormat("%s", display_t.decon_node_name.c_str());
-        exynos_display->mDisplayName.appendFormat("%s", display_t.display_name.c_str());
         mDisplays.add(exynos_display);
         mDisplayMap.insert(std::make_pair(exynos_display->mDisplayId, exynos_display));
 

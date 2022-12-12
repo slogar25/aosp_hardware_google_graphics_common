@@ -30,14 +30,10 @@ extern struct exynos_hwc_control exynosHWCControl;
 
 using namespace SOC_VERSION;
 
-ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice *device)
-    :   ExynosDisplay(index, device)
-{
+ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice* device,
+                                             const std::string& displayName)
+      : ExynosDisplay(HWC_DISPLAY_EXTERNAL, index, device, displayName) {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
-
-    mType = HWC_DISPLAY_EXTERNAL;
-    mIndex = index;
-    mDisplayId = getDisplayId(mType, mIndex);
 
     mDisplayControl.cursorSupport = true;
 
