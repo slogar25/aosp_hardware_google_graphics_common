@@ -73,8 +73,9 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
     return gamma;
 }
 
-ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
-      : ExynosDisplay(index, device),
+ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
+                                           const std::string &displayName)
+      : ExynosDisplay(HWC_DISPLAY_PRIMARY, index, device, displayName),
         mMinIdleRefreshRate(0),
         mRefreshRateDelayNanos(0),
         mLastRefreshRateAppliedNanos(0),
@@ -85,9 +86,6 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device)
     mNumMaxPriorityAllowed = 5;
 
     /* Initialization */
-    mType = HWC_DISPLAY_PRIMARY;
-    mIndex = index;
-    mDisplayId = getDisplayId(mType, mIndex);
     mFramesToReachLhbmPeakBrightness =
             property_get_int32("vendor.primarydisplay.lhbm.frames_to_reach_peak_brightness", 3);
 
@@ -514,7 +512,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     // NOTE: mLhbmOn could be set to false at any time by setPowerOff in another
     // thread. Make sure no side effect if that happens. Or add lock if we have
     // to when new code is added.
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     {
         ATRACE_NAME("wait for power mode on");
         std::unique_lock<std::mutex> lock(mPowerModeMutex);

@@ -493,6 +493,7 @@ class ExynosDisplayDrmInterface :
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
 
+        String8 mDisplayTraceName;
         DrmMode mDozeDrmMode;
         uint32_t mMaxWindowNum = 0;
         int32_t mFrameCounter = 0;
