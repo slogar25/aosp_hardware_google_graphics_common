@@ -58,7 +58,8 @@ extern struct update_time_info updateTimeInfo;
 constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr int64_t nsecsIdleHintTimeout = std::chrono::nanoseconds(100ms).count();
 
-ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId)
+ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId,
+                                                      const String8 &displayTraceName)
       : Worker("DisplayHints", HAL_PRIORITY_URGENT_DISPLAY),
         mNeedUpdateRefreshRateHint(false),
         mLastRefreshRateHint(0),
@@ -67,6 +68,7 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId)
         mIdleHintDeadlineTime(0),
         mIdleHintSupportIsChecked(false),
         mIdleHintIsSupported(false),
+        mDisplayTraceName(displayTraceName),
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
         mConnectRetryCount(0),
@@ -342,7 +344,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, 
 
     bool enableIdleHint =
             (deadlineTime < systemTime(SYSTEM_TIME_MONOTONIC) && CC_LIKELY(deadlineTime > 0));
-    ATRACE_INT("HWCIdleHintTimer:", enableIdleHint);
+    DISPLAY_ATRACE_INT("HWCIdleHintTimer", enableIdleHint);
 
     if (mIdleHintIsEnabled != enableIdleHint || forceUpdate) {
         ret = sendPowerHalExtHint(mIdleHintStr, enableIdleHint);
@@ -460,13 +462,13 @@ void ExynosDisplay::PowerHalHintWorker::signalActualWorkDuration(nsecs_t actualD
     WorkDuration duration = {.durationNanos = reportedDurationNs, .timeStampNanos = systemTime()};
 
     if (sTraceHintSessionData) {
-        ATRACE_INT64("Measured duration", actualDurationNanos);
-        ATRACE_INT64("Target error term", mTargetWorkDuration - actualDurationNanos);
+        DISPLAY_ATRACE_INT64("Measured duration", actualDurationNanos);
+        DISPLAY_ATRACE_INT64("Target error term", mTargetWorkDuration - actualDurationNanos);
 
-        ATRACE_INT64("Reported duration", reportedDurationNs);
-        ATRACE_INT64("Reported target", mLastTargetDurationReported);
-        ATRACE_INT64("Reported target error term",
-                     mLastTargetDurationReported - reportedDurationNs);
+        DISPLAY_ATRACE_INT64("Reported duration", reportedDurationNs);
+        DISPLAY_ATRACE_INT64("Reported target", mLastTargetDurationReported);
+        DISPLAY_ATRACE_INT64("Reported target error term",
+                             mLastTargetDurationReported - reportedDurationNs);
     }
     ALOGV("Sending actual work duration of: %" PRId64 " on reported target: %" PRId64
           " with error: %" PRId64,
@@ -490,12 +492,12 @@ void ExynosDisplay::PowerHalHintWorker::signalTargetWorkDuration(nsecs_t targetD
     Lock();
     mTargetWorkDuration = targetDurationNanos - kTargetSafetyMargin.count();
 
-    if (sTraceHintSessionData) ATRACE_INT64("Time target", mTargetWorkDuration);
+    if (sTraceHintSessionData) DISPLAY_ATRACE_INT64("Time target", mTargetWorkDuration);
     bool shouldSignal = false;
     if (!sNormalizeTarget) {
         shouldSignal = needUpdateTargetWorkDurationLocked();
         if (shouldSignal && mActualWorkDuration.has_value() && sTraceHintSessionData) {
-            ATRACE_INT64("Target error term", *mActualWorkDuration - mTargetWorkDuration);
+            DISPLAY_ATRACE_INT64("Target error term", *mActualWorkDuration - mTargetWorkDuration);
         }
     }
     Unlock();
@@ -979,6 +981,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device
         mBtsVsyncPeriod(16666666),
         mDevice(device),
         mDisplayName(displayName.c_str()),
+        mDisplayTraceName(String8::format("%s(%d)", displayName.c_str(), mDisplayId)),
         mPlugState(false),
         mHasSingleBuffer(false),
         mResourceManager(NULL),
@@ -1019,7 +1022,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
         mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
-        mPowerHalHint(mDisplayId),
+        mPowerHalHint(mDisplayId, mDisplayTraceName),
         mErrLogFileWriter(2, ERR_LOG_SIZE),
         mDebugDumpFileWriter(10, 1, ".dump"),
         mFenceFileWriter(2, FENCE_ERR_LOG_SIZE) {
@@ -3373,7 +3376,7 @@ bool ExynosDisplay::isFullScreenComposition() {
 }
 
 int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
 
     const bool mixedComposition = isMixedComposition();
@@ -4050,7 +4053,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
         hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
         hwc_vsync_period_change_timeline_t* outTimeline)
 {
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     Mutex::Autolock lock(mDisplayMutex);
 
     DISPLAY_LOGD(eDebugDisplayConfig,
@@ -4329,11 +4332,11 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
     if (actualChangeTime >= mVsyncPeriodChangeConstraints.desiredTimeNanos) {
         DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig");
         needSetActiveConfig = true;
-        ATRACE_INT("Pending ActiveConfig", 0);
+        DISPLAY_ATRACE_INT("Pending ActiveConfig", 0);
     } else {
         DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending (mDesiredConfig %d)",
                      mDesiredConfig);
-        ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
+        DISPLAY_ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
     }
 
     if (needSetActiveConfig) {
@@ -4459,8 +4462,7 @@ int32_t ExynosDisplay::setVsyncEnabledInternal(
 
 int32_t ExynosDisplay::validateDisplay(
         uint32_t* outNumTypes, uint32_t* outNumRequests) {
-
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastValidateTime, NULL);
     Mutex::Autolock lock(mDisplayMutex);
 
@@ -5846,13 +5848,13 @@ void ExynosDisplay::traceLayerTypes() {
                 break;
         }
     }
-    ATRACE_INT("HWComposer: DPU Layer", dpu_count);
-    ATRACE_INT("HWComposer: G2D Layer", g2d_count);
-    ATRACE_INT("HWComposer: GPU Layer", gpu_count);
-    ATRACE_INT("HWComposer: RCD Layer", rcd_count);
-    ATRACE_INT("HWComposer: DPU Cached Layer", skip_count);
-    ATRACE_INT("HWComposer: SF Cached Layer", mIgnoreLayers.size());
-    ATRACE_INT("HWComposer: Total Layer", mLayers.size() + mIgnoreLayers.size());
+    DISPLAY_ATRACE_INT("HWComposer: DPU Layer", dpu_count);
+    DISPLAY_ATRACE_INT("HWComposer: G2D Layer", g2d_count);
+    DISPLAY_ATRACE_INT("HWComposer: GPU Layer", gpu_count);
+    DISPLAY_ATRACE_INT("HWComposer: RCD Layer", rcd_count);
+    DISPLAY_ATRACE_INT("HWComposer: DPU Cached Layer", skip_count);
+    DISPLAY_ATRACE_INT("HWComposer: SF Cached Layer", mIgnoreLayers.size());
+    DISPLAY_ATRACE_INT("HWComposer: Total Layer", mLayers.size() + mIgnoreLayers.size());
 }
 
 void ExynosDisplay::updateBrightnessState() {

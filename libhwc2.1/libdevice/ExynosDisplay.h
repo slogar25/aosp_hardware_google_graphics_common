@@ -411,6 +411,7 @@ class ExynosDisplay {
         ExynosDevice *mDevice;
 
         const String8 mDisplayName;
+        const String8 mDisplayTraceName;
         HwcMountOrientation mMountOrientation = HwcMountOrientation::ROT_0;
         Mutex mDisplayMutex;
 
@@ -1309,7 +1310,7 @@ class ExynosDisplay {
         /* Display hint to notify power hal */
         class PowerHalHintWorker : public Worker {
         public:
-            PowerHalHintWorker(uint32_t displayId);
+            PowerHalHintWorker(uint32_t displayId, const String8& displayTraceName);
             virtual ~PowerHalHintWorker();
             int Init();
 
@@ -1382,6 +1383,7 @@ class ExynosDisplay {
             // whether idle hint is supported
             bool mIdleHintIsSupported;
 
+            String8 mDisplayTraceName;
             std::string mIdleHintStr;
             std::string mRefreshRateHintPrefixStr;
 
@@ -1470,8 +1472,9 @@ class ExynosDisplay {
         static const constexpr nsecs_t SIGNAL_TIME_PENDING = INT64_MAX;
         static const constexpr nsecs_t SIGNAL_TIME_INVALID = -1;
         std::unordered_map<uint32_t, RollingAverage<kAveragesBufferSize>> mRollingAverages;
-        // mPowerHalHint should be declared only after mDisplayId have been declared since
-        // mDisplayId is needed as the parameter of PowerHalHintWorker's constructor
+        // mPowerHalHint should be declared only after mDisplayId and mDisplayTraceName have been
+        // declared since mDisplayId and mDisplayTraceName are needed as the parameter of
+        // PowerHalHintWorker's constructor
         PowerHalHintWorker mPowerHalHint;
 
         std::optional<nsecs_t> mValidateStartTime;

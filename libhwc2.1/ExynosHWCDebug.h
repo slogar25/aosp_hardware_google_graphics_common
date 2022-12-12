@@ -17,6 +17,8 @@
 #define HWC_DEBUG_H
 
 #include <utils/String8.h>
+#include <utils/Trace.h>
+
 #include "ExynosHWC.h"
 #include "ExynosHWCHelper.h"
 
@@ -129,6 +131,32 @@ int32_t saveFenceTrace(ExynosDisplay *display);
         String8 saveString; \
         saveString.appendFormat(msg, ##__VA_ARGS__); \
         saveErrorLog(saveString, display); \
+    }
+
+class ScopedTraceEnder {
+public:
+    ~ScopedTraceEnder() { ATRACE_END(); }
+};
+
+#define ATRACE_FORMAT(fmt, ...)                     \
+    if (CC_UNLIKELY(ATRACE_ENABLED())) {            \
+        String8 traceName;                          \
+        traceName.appendFormat(fmt, ##__VA_ARGS__); \
+        ATRACE_BEGIN(traceName.string());           \
+    }                                               \
+    ScopedTraceEnder traceEnder
+
+#define DISPLAY_ATRACE_NAME(name) ATRACE_FORMAT("%s for %s", name, mDisplayTraceName.string())
+#define DISPLAY_ATRACE_CALL() DISPLAY_ATRACE_NAME(__func__)
+#define DISPLAY_ATRACE_INT(name, value)                                                     \
+    if (CC_UNLIKELY(ATRACE_ENABLED())) {                                                    \
+        ATRACE_INT(String8::format("%s for %s", name, mDisplayTraceName.string()).string(), \
+                   value);                                                                  \
+    }
+#define DISPLAY_ATRACE_INT64(name, value)                                                     \
+    if (CC_UNLIKELY(ATRACE_ENABLED())) {                                                      \
+        ATRACE_INT64(String8::format("%s for %s", name, mDisplayTraceName.string()).string(), \
+                     value);                                                                  \
     }
 
 #endif

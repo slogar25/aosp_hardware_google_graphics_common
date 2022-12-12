@@ -512,7 +512,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     // NOTE: mLhbmOn could be set to false at any time by setPowerOff in another
     // thread. Make sure no side effect if that happens. Or add lock if we have
     // to when new code is added.
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     {
         ATRACE_NAME("wait for power mode on");
         std::unique_lock<std::mutex> lock(mPowerModeMutex);
