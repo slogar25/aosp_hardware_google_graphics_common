@@ -58,7 +58,8 @@ extern struct update_time_info updateTimeInfo;
 constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr int64_t nsecsIdleHintTimeout = std::chrono::nanoseconds(100ms).count();
 
-ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId)
+ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId,
+                                                      const String8 &displayTraceName)
       : Worker("DisplayHints", HAL_PRIORITY_URGENT_DISPLAY),
         mNeedUpdateRefreshRateHint(false),
         mLastRefreshRateHint(0),
@@ -67,6 +68,7 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId)
         mIdleHintDeadlineTime(0),
         mIdleHintSupportIsChecked(false),
         mIdleHintIsSupported(false),
+        mDisplayTraceName(displayTraceName),
         mPowerModeState(HWC2_POWER_MODE_OFF),
         mVsyncPeriod(16666666),
         mConnectRetryCount(0),
@@ -342,7 +344,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, 
 
     bool enableIdleHint =
             (deadlineTime < systemTime(SYSTEM_TIME_MONOTONIC) && CC_LIKELY(deadlineTime > 0));
-    ATRACE_INT("HWCIdleHintTimer:", enableIdleHint);
+    DISPLAY_ATRACE_INT("HWCIdleHintTimer", enableIdleHint);
 
     if (mIdleHintIsEnabled != enableIdleHint || forceUpdate) {
         ret = sendPowerHalExtHint(mIdleHintStr, enableIdleHint);
@@ -460,13 +462,13 @@ void ExynosDisplay::PowerHalHintWorker::signalActualWorkDuration(nsecs_t actualD
     WorkDuration duration = {.durationNanos = reportedDurationNs, .timeStampNanos = systemTime()};
 
     if (sTraceHintSessionData) {
-        ATRACE_INT64("Measured duration", actualDurationNanos);
-        ATRACE_INT64("Target error term", mTargetWorkDuration - actualDurationNanos);
+        DISPLAY_ATRACE_INT64("Measured duration", actualDurationNanos);
+        DISPLAY_ATRACE_INT64("Target error term", mTargetWorkDuration - actualDurationNanos);
 
-        ATRACE_INT64("Reported duration", reportedDurationNs);
-        ATRACE_INT64("Reported target", mLastTargetDurationReported);
-        ATRACE_INT64("Reported target error term",
-                     mLastTargetDurationReported - reportedDurationNs);
+        DISPLAY_ATRACE_INT64("Reported duration", reportedDurationNs);
+        DISPLAY_ATRACE_INT64("Reported target", mLastTargetDurationReported);
+        DISPLAY_ATRACE_INT64("Reported target error term",
+                             mLastTargetDurationReported - reportedDurationNs);
     }
     ALOGV("Sending actual work duration of: %" PRId64 " on reported target: %" PRId64
           " with error: %" PRId64,
@@ -490,12 +492,12 @@ void ExynosDisplay::PowerHalHintWorker::signalTargetWorkDuration(nsecs_t targetD
     Lock();
     mTargetWorkDuration = targetDurationNanos - kTargetSafetyMargin.count();
 
-    if (sTraceHintSessionData) ATRACE_INT64("Time target", mTargetWorkDuration);
+    if (sTraceHintSessionData) DISPLAY_ATRACE_INT64("Time target", mTargetWorkDuration);
     bool shouldSignal = false;
     if (!sNormalizeTarget) {
         shouldSignal = needUpdateTargetWorkDurationLocked();
         if (shouldSignal && mActualWorkDuration.has_value() && sTraceHintSessionData) {
-            ATRACE_INT64("Target error term", *mActualWorkDuration - mTargetWorkDuration);
+            DISPLAY_ATRACE_INT64("Target error term", *mActualWorkDuration - mTargetWorkDuration);
         }
     }
     Unlock();
@@ -965,9 +967,10 @@ String8 ExynosCompositionInfo::getTypeStr()
     }
 }
 
-ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
-      : mDisplayId(HWC_DISPLAY_PRIMARY),
-        mType(HWC_NUM_DISPLAY_TYPES),
+ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device,
+                             const std::string &displayName)
+      : mDisplayId(getDisplayId(type, index)),
+        mType(type),
         mIndex(index),
         mDeconNodeName(""),
         mXres(1440),
@@ -977,7 +980,8 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mVsyncPeriod(16666666),
         mBtsVsyncPeriod(16666666),
         mDevice(device),
-        mDisplayName(""),
+        mDisplayName(displayName.c_str()),
+        mDisplayTraceName(String8::format("%s(%d)", displayName.c_str(), mDisplayId)),
         mPlugState(false),
         mHasSingleBuffer(false),
         mResourceManager(NULL),
@@ -1018,7 +1022,10 @@ ExynosDisplay::ExynosDisplay(uint32_t index, ExynosDevice *device)
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
         mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
-        mPowerHalHint(getDisplayId(mDisplayId, mIndex)) {
+        mPowerHalHint(mDisplayId, mDisplayTraceName),
+        mErrLogFileWriter(2, ERR_LOG_SIZE),
+        mDebugDumpFileWriter(10, 1, ".dump"),
+        mFenceFileWriter(2, FENCE_ERR_LOG_SIZE) {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
@@ -2407,31 +2414,15 @@ int ExynosDisplay::setWinConfigData() {
     return 0;
 }
 
-void ExynosDisplay::printDebugInfos(String8 &reason)
-{
-    FILE *pFile = NULL;
+void ExynosDisplay::printDebugInfos(String8 &reason) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     reason.appendFormat("errFrameNumber: %" PRId64 " time:%s\n", mErrorFrameCount,
                         getLocalTimeStr(tv).string());
     ALOGD("%s", reason.string());
 
-    if (mErrorFrameCount < HWC_PRINT_FRAME_NUM) {
-        char filePath[128];
-        sprintf(filePath, "%s/%s_hwc_debug%d.dump", ERROR_LOG_PATH0, mDisplayName.string(), (int)mErrorFrameCount);
-        pFile = fopen(filePath, "wb");
-        if (pFile == NULL) {
-            ALOGE("Fail to open file %s, error: %s", filePath, strerror(errno));
-            sprintf(filePath, "%s/%s_hwc_debug%d.dump", ERROR_LOG_PATH1, mDisplayName.string(), (int)mErrorFrameCount);
-            pFile = fopen(filePath, "wb");
-        }
-        if (pFile == NULL) {
-            ALOGE("Fail to open file %s, error: %s", filePath, strerror(errno));
-        } else {
-            ALOGI("%s was created", filePath);
-            fwrite(reason.string(), 1, reason.size(), pFile);
-        }
-    }
+    bool fileOpened = mDebugDumpFileWriter.chooseOpenedFile();
+    mDebugDumpFileWriter.write(reason);
     mErrorFrameCount++;
 
     android::String8 result;
@@ -2443,24 +2434,20 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
     clientCompInfo.dump(result);
     exynosCompInfo.dump(result);
     ALOGD("%s", result.string());
-    if (pFile != NULL) {
-        fwrite(result.string(), 1, result.size(), pFile);
-    }
+    mDebugDumpFileWriter.write(result);
     result.clear();
 
     result.appendFormat("=======================  dump exynos layers (%zu)  ================================\n",
             mLayers.size());
     ALOGD("%s", result.string());
-    if (pFile != NULL) {
-        fwrite(result.string(), 1, result.size(), pFile);
-    }
+    mDebugDumpFileWriter.write(result);
     result.clear();
     for (uint32_t i = 0; i < mLayers.size(); i++) {
         ExynosLayer *layer = mLayers[i];
         layer->printLayer();
-        if (pFile != NULL) {
+        if (fileOpened) {
             layer->dump(result);
-            fwrite(result.string(), 1, result.size(), pFile);
+            mDebugDumpFileWriter.write(result);
             result.clear();
         }
     }
@@ -2469,16 +2456,14 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
         result.appendFormat("=======================  dump ignore layers (%zu)  ================================\n",
                             mIgnoreLayers.size());
         ALOGD("%s", result.string());
-        if (pFile != NULL) {
-            fwrite(result.string(), 1, result.size(), pFile);
-        }
+        mDebugDumpFileWriter.write(result);
         result.clear();
         for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
             ExynosLayer *layer = mIgnoreLayers[i];
             layer->printLayer();
-            if (pFile != NULL) {
+            if (fileOpened) {
                 layer->dump(result);
-                fwrite(result.string(), 1, result.size(), pFile);
+                mDebugDumpFileWriter.write(result);
                 result.clear();
             }
         }
@@ -2486,23 +2471,19 @@ void ExynosDisplay::printDebugInfos(String8 &reason)
 
     result.appendFormat("=============================  dump win configs  ===================================\n");
     ALOGD("%s", result.string());
-    if (pFile != NULL) {
-        fwrite(result.string(), 1, result.size(), pFile);
-    }
+    mDebugDumpFileWriter.write(result);
     result.clear();
     for (size_t i = 0; i < mDpuData.configs.size(); i++) {
         ALOGD("config[%zu]", i);
         printConfig(mDpuData.configs[i]);
-        if (pFile != NULL) {
+        if (fileOpened) {
             result.appendFormat("config[%zu]\n", i);
             dumpConfig(result, mDpuData.configs[i]);
-            fwrite(result.string(), 1, result.size(), pFile);
+            mDebugDumpFileWriter.write(result);
             result.clear();
         }
     }
-    if (pFile != NULL) {
-        fclose(pFile);
-    }
+    mDebugDumpFileWriter.flush();
 }
 
 int32_t ExynosDisplay::validateWinConfigData()
@@ -3395,7 +3376,7 @@ bool ExynosDisplay::isFullScreenComposition() {
 }
 
 int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
 
     const bool mixedComposition = isMixedComposition();
@@ -4072,7 +4053,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
         hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
         hwc_vsync_period_change_timeline_t* outTimeline)
 {
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     Mutex::Autolock lock(mDisplayMutex);
 
     DISPLAY_LOGD(eDebugDisplayConfig,
@@ -4351,11 +4332,11 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
     if (actualChangeTime >= mVsyncPeriodChangeConstraints.desiredTimeNanos) {
         DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig");
         needSetActiveConfig = true;
-        ATRACE_INT("Pending ActiveConfig", 0);
+        DISPLAY_ATRACE_INT("Pending ActiveConfig", 0);
     } else {
         DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending (mDesiredConfig %d)",
                      mDesiredConfig);
-        ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
+        DISPLAY_ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
     }
 
     if (needSetActiveConfig) {
@@ -4481,8 +4462,7 @@ int32_t ExynosDisplay::setVsyncEnabledInternal(
 
 int32_t ExynosDisplay::validateDisplay(
         uint32_t* outNumTypes, uint32_t* outNumRequests) {
-
-    ATRACE_CALL();
+    DISPLAY_ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastValidateTime, NULL);
     Mutex::Autolock lock(mDisplayMutex);
 
@@ -5868,13 +5848,13 @@ void ExynosDisplay::traceLayerTypes() {
                 break;
         }
     }
-    ATRACE_INT("HWComposer: DPU Layer", dpu_count);
-    ATRACE_INT("HWComposer: G2D Layer", g2d_count);
-    ATRACE_INT("HWComposer: GPU Layer", gpu_count);
-    ATRACE_INT("HWComposer: RCD Layer", rcd_count);
-    ATRACE_INT("HWComposer: DPU Cached Layer", skip_count);
-    ATRACE_INT("HWComposer: SF Cached Layer", mIgnoreLayers.size());
-    ATRACE_INT("HWComposer: Total Layer", mLayers.size() + mIgnoreLayers.size());
+    DISPLAY_ATRACE_INT("HWComposer: DPU Layer", dpu_count);
+    DISPLAY_ATRACE_INT("HWComposer: G2D Layer", g2d_count);
+    DISPLAY_ATRACE_INT("HWComposer: GPU Layer", gpu_count);
+    DISPLAY_ATRACE_INT("HWComposer: RCD Layer", rcd_count);
+    DISPLAY_ATRACE_INT("HWComposer: DPU Cached Layer", skip_count);
+    DISPLAY_ATRACE_INT("HWComposer: SF Cached Layer", mIgnoreLayers.size());
+    DISPLAY_ATRACE_INT("HWComposer: Total Layer", mLayers.size() + mIgnoreLayers.size());
 }
 
 void ExynosDisplay::updateBrightnessState() {
@@ -6081,4 +6061,77 @@ int ExynosDisplay::lookupDisplayConfigs(const int32_t &width,
         }
     }
     return HWC2_ERROR_BAD_CONFIG;
+}
+
+FILE *ExynosDisplay::RotatingLogFileWriter::openLogFile(const std::string &filename,
+                                                        const std::string &mode) {
+    FILE *file = nullptr;
+    auto fullpath = std::string(ERROR_LOG_PATH0) + "/" + filename;
+    file = fopen(fullpath.c_str(), mode.c_str());
+    if (file != nullptr) {
+        return file;
+    }
+    ALOGE("Fail to open file %s, error: %s", fullpath.c_str(), strerror(errno));
+    fullpath = std::string(ERROR_LOG_PATH1) + "/" + filename;
+    file = fopen(fullpath.c_str(), mode.c_str());
+    if (file == nullptr) {
+        ALOGE("Fail to open file %s, error: %s", fullpath.c_str(), strerror(errno));
+    }
+    return file;
+}
+
+std::optional<nsecs_t> ExynosDisplay::RotatingLogFileWriter::getLastModifiedTimestamp(
+        const std::string &filename) {
+    struct stat fileStat;
+    auto fullpath = std::string(ERROR_LOG_PATH0) + "/" + filename;
+    if (stat(fullpath.c_str(), &fileStat) == 0) {
+        return fileStat.st_mtim.tv_sec * nsecsPerSec + fileStat.st_mtim.tv_nsec;
+    }
+    fullpath = std::string(ERROR_LOG_PATH1) + "/" + filename;
+    if (stat(fullpath.c_str(), &fileStat) == 0) {
+        return fileStat.st_mtim.tv_sec * nsecsPerSec + fileStat.st_mtim.tv_nsec;
+    }
+    return std::nullopt;
+}
+
+bool ExynosDisplay::RotatingLogFileWriter::chooseOpenedFile() {
+    if (mLastFileIndex < 0) {
+        // HWC could be restarted, so choose to open new file or continue the last modified file
+        int chosenIndex = 0;
+        nsecs_t lastModifTimestamp = 0;
+        for (int i = 0; i < mMaxFileCount; ++i) {
+            auto timestamp = getLastModifiedTimestamp(mPrefixName + std::to_string(i) + mExtension);
+            if (!timestamp.has_value()) {
+                chosenIndex = i;
+                break;
+            }
+            if (i == 0 || lastModifTimestamp < *timestamp) {
+                chosenIndex = i;
+                lastModifTimestamp = *timestamp;
+            }
+        }
+        auto filename = mPrefixName + std::to_string(chosenIndex) + mExtension;
+        mFile = openLogFile(filename, "ab");
+        if (mFile == nullptr) {
+            ALOGE("Unable to open log file for %s", filename.c_str());
+            return false;
+        }
+        mLastFileIndex = chosenIndex;
+    }
+
+    // Choose to use the same last file or move on to the next file
+    for (int i = 0; i < 2; ++i) {
+        if (mFile == nullptr) {
+            mFile = openLogFile(mPrefixName + std::to_string(mLastFileIndex) + mExtension,
+                                (i == 0) ? "ab" : "wb");
+        }
+        if (mFile != nullptr) {
+            auto fileSize = ftell(mFile);
+            if (fileSize < mThresholdSizePerFile) return true;
+            fclose(mFile);
+            mFile = nullptr;
+        }
+        mLastFileIndex = (mLastFileIndex + 1) % mMaxFileCount;
+    }
+    return false;
 }

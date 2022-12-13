@@ -388,9 +388,9 @@ struct DisplayControl {
 
 class ExynosDisplay {
     public:
-        uint32_t mDisplayId;
-        uint32_t mType;
-        uint32_t mIndex;
+        const uint32_t mDisplayId;
+        const uint32_t mType;
+        const uint32_t mIndex;
         String8 mDeconNodeName;
         uint32_t mXres;
         uint32_t mYres;
@@ -403,13 +403,15 @@ class ExynosDisplay {
         int                     mPsrMode;
 
         /* Constructor */
-        ExynosDisplay(uint32_t index, ExynosDevice *device);
+        ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device,
+                      const std::string& displayName);
         /* Destructor */
         virtual ~ExynosDisplay();
 
         ExynosDevice *mDevice;
 
-        String8 mDisplayName;
+        const String8 mDisplayName;
+        const String8 mDisplayTraceName;
         HwcMountOrientation mMountOrientation = HwcMountOrientation::ROT_0;
         Mutex mDisplayMutex;
 
@@ -1308,7 +1310,7 @@ class ExynosDisplay {
         /* Display hint to notify power hal */
         class PowerHalHintWorker : public Worker {
         public:
-            PowerHalHintWorker(uint32_t displayId);
+            PowerHalHintWorker(uint32_t displayId, const String8& displayTraceName);
             virtual ~PowerHalHintWorker();
             int Init();
 
@@ -1381,6 +1383,7 @@ class ExynosDisplay {
             // whether idle hint is supported
             bool mIdleHintIsSupported;
 
+            String8 mDisplayTraceName;
             std::string mIdleHintStr;
             std::string mRefreshRateHintPrefixStr;
 
@@ -1469,8 +1472,8 @@ class ExynosDisplay {
         static const constexpr nsecs_t SIGNAL_TIME_PENDING = INT64_MAX;
         static const constexpr nsecs_t SIGNAL_TIME_INVALID = -1;
         std::unordered_map<uint32_t, RollingAverage<kAveragesBufferSize>> mRollingAverages;
-        // mPowerHalHint should be declared only after mDisplayId and mIndex have been declared
-        // since the result of getDisplayId(mDisplayId, mIndex) is needed as the parameter of
+        // mPowerHalHint should be declared only after mDisplayId and mDisplayTraceName have been
+        // declared since mDisplayId and mDisplayTraceName are needed as the parameter of
         // PowerHalHintWorker's constructor
         PowerHalHintWorker mPowerHalHint;
 
@@ -1519,6 +1522,51 @@ class ExynosDisplay {
 
         // Resource TDM (Time-Division Multiplexing)
         std::map<uint32_t, displayTDMInfo> mDisplayTDMInfo;
+
+        class RotatingLogFileWriter {
+        public:
+            RotatingLogFileWriter(uint32_t maxFileCount, uint32_t thresholdSizePerFile,
+                                  std::string extension = ".txt")
+                  : mMaxFileCount(maxFileCount),
+                    mThresholdSizePerFile(thresholdSizePerFile),
+                    mPrefixName(""),
+                    mExtension(extension),
+                    mLastFileIndex(-1),
+                    mFile(nullptr) {}
+
+            ~RotatingLogFileWriter() {
+                if (mFile) {
+                    fclose(mFile);
+                }
+            }
+
+            bool chooseOpenedFile();
+            void write(const String8& content) {
+                if (mFile) {
+                    fwrite(content.string(), 1, content.size(), mFile);
+                }
+            }
+            void flush() {
+                if (mFile) {
+                    fflush(mFile);
+                }
+            }
+            void setPrefixName(const std::string& prefixName) { mPrefixName = prefixName; }
+
+        private:
+            FILE* openLogFile(const std::string& filename, const std::string& mode);
+            std::optional<nsecs_t> getLastModifiedTimestamp(const std::string& filename);
+
+            uint32_t mMaxFileCount;
+            uint32_t mThresholdSizePerFile;
+            std::string mPrefixName;
+            std::string mExtension;
+            int32_t mLastFileIndex;
+            FILE* mFile;
+        };
+        RotatingLogFileWriter mErrLogFileWriter;
+        RotatingLogFileWriter mDebugDumpFileWriter;
+        RotatingLogFileWriter mFenceFileWriter;
 };
 
 #endif //_EXYNOSDISPLAY_H

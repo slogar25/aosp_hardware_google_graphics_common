@@ -448,6 +448,7 @@ ExynosDisplayDrmInterface::~ExynosDisplayDrmInterface()
 void ExynosDisplayDrmInterface::init(ExynosDisplay *exynosDisplay)
 {
     mExynosDisplay = exynosDisplay;
+    mDisplayTraceName = mExynosDisplay->mDisplayTraceName;
     mDrmDevice = NULL;
     mDrmCrtc = NULL;
     mDrmConnector = NULL;
@@ -662,7 +663,7 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     getLowPowerDrmModeModeInfo();
 
-    mDrmVSyncWorker.Init(mDrmDevice, drmDisplayId);
+    mDrmVSyncWorker.Init(mDrmDevice, drmDisplayId, mDisplayTraceName);
     mDrmVSyncWorker.RegisterCallback(std::shared_ptr<VsyncCallback>(this));
 
     if (!mDrmDevice->planes().empty()) {
@@ -722,7 +723,7 @@ void ExynosDisplayDrmInterface::Callback(
 
     if (exynosDevice->onVsync_2_4(mExynosDisplay->mDisplayId, timestamp,
                                   mExynosDisplay->mVsyncPeriod)) {
-        ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
+        DISPLAY_ATRACE_INT(vsyncPeriodTag, static_cast<int32_t>(mExynosDisplay->mVsyncPeriod));
         return;
     }
 
@@ -820,7 +821,7 @@ int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
 
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
     if (exynosDevice->isCallbackAvailable(HWC2_CALLBACK_VSYNC_2_4)) {
-        ATRACE_INT(vsyncPeriodTag, 0);
+        DISPLAY_ATRACE_INT(vsyncPeriodTag, 0);
     }
 
     return NO_ERROR;

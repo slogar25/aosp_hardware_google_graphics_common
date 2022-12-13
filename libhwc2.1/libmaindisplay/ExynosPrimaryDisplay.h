@@ -25,7 +25,7 @@ using namespace displaycolor;
 class ExynosPrimaryDisplay : public ExynosDisplay {
     public:
         /* Methods */
-        ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device);
+        ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device, const std::string& displayName);
         ~ExynosPrimaryDisplay();
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);

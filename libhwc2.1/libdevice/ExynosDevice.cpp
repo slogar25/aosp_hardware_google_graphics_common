@@ -43,7 +43,6 @@ using aidl::android::hardware::graphics::composer3::IComposerCallback;
 
 class ExynosDevice;
 
-extern uint32_t mFenceLogSize;
 extern void PixelDisplayInit(ExynosDisplay *exynos_display, const std::string_view instance_str);
 
 static const std::map<const uint32_t, const std::string_view> pixelDisplayIntfName =
@@ -114,7 +113,9 @@ ExynosDevice::ExynosDevice()
         ALOGD("Create display[%zu] type: %d, index: %d", i, display_t.type, display_t.index);
         switch(display_t.type) {
             case HWC_DISPLAY_PRIMARY:
-                exynos_display = (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this,
+                                                                         display_t.display_name));
                 if(display_t.index == 0) {
                     exynos_display->mPlugState = true;
                     ExynosMPP::mainDisplayWidth = exynos_display->mXres;
@@ -128,10 +129,14 @@ ExynosDevice::ExynosDevice()
                 }
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                exynos_display = (ExynosDisplay *)(new ExynosExternalDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosExternalDisplayModule(display_t.index, this,
+                                                                          display_t.display_name));
                 break;
             case HWC_DISPLAY_VIRTUAL:
-                exynos_display = (ExynosDisplay *)(new ExynosVirtualDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosVirtualDisplayModule(display_t.index, this,
+                                                                         display_t.display_name));
                 mNumVirtualDisplay = 0;
                 break;
             default:
@@ -139,7 +144,6 @@ ExynosDevice::ExynosDevice()
                 break;
         }
         exynos_display->mDeconNodeName.appendFormat("%s", display_t.decon_node_name.c_str());
-        exynos_display->mDisplayName.appendFormat("%s", display_t.display_name.c_str());
         mDisplays.add(exynos_display);
         mDisplayMap.insert(std::make_pair(exynos_display->mDisplayId, exynos_display));
 
@@ -161,10 +165,15 @@ ExynosDevice::ExynosDevice()
         sprintf(fence_names[i], "_%2dh", i);
     }
 
-    String8 saveString;
-    saveString.appendFormat("ExynosDevice is initialized");
-    uint32_t errFileSize = saveErrorLog(saveString);
-    ALOGI("Initial errlog size: %d bytes\n", errFileSize);
+    for (auto it : mDisplays) {
+        std::string displayName = std::string(it->mDisplayName.string());
+        it->mErrLogFileWriter.setPrefixName(displayName + "_hwc_error_log");
+        it->mDebugDumpFileWriter.setPrefixName(displayName + "_hwc_debug");
+        it->mFenceFileWriter.setPrefixName(displayName + "_hwc_fence_state");
+        String8 saveString;
+        saveString.appendFormat("ExynosDisplay %s is initialized", it->mDisplayName.string());
+        saveErrorLog(saveString, it);
+    }
 
     initDeviceInterface(mInterfaceType);
 
@@ -859,7 +868,6 @@ bool ExynosDevice::validateFences(ExynosDisplay *display) {
 
     if (exynosHWCControl.doFenceFileDump) {
         ALOGD("Fence file dump !");
-        if (mFenceLogSize != 0) ALOGD("Fence file not empty!");
         saveFenceTrace(display);
         exynosHWCControl.doFenceFileDump = false;
     }
