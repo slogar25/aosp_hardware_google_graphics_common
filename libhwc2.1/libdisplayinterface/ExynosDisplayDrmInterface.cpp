@@ -842,18 +842,31 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
         err = HWC2_ERROR_BAD_CONFIG;
     }
 
+    const int32_t drmPreferredConfig = mDrmConnector->get_preferred_mode_id();
     if (err != HWC2_ERROR_NONE) {
-        config = mDrmConnector->get_preferred_mode_id();
+        config = drmPreferredConfig;
     }
     ALOGI("Preferred mode id: %d(%s), state: %d", config, modeStr, mDrmConnector->state());
 
-    if ((err = setActiveConfig(config)) < 0) {
-        ALOGE("failed to set default config, err %d", err);
-        return err;
+    auto &configs = mExynosDisplay->mDisplayConfigs;
+    if (config != drmPreferredConfig &&
+        (configs[config].width != configs[drmPreferredConfig].width ||
+         configs[config].height != configs[drmPreferredConfig].height)) {
+        // HWC cannot send a resolution change commit here until 1st frame update because of
+        // some panels requirement. Therefore, it calls setActiveConfigWithConstraints() help
+        // set mDesiredModeState correctly, and then trigger modeset in the 1s frame update.
+        if ((err = setActiveConfigWithConstraints(config)) < 0) {
+            ALOGE("failed to setActiveConfigWithConstraints(), err %d", err);
+            return err;
+        }
+    } else {
+        if ((err = setActiveConfig(config)) < 0) {
+            ALOGE("failed to set default config, err %d", err);
+            return err;
+        }
     }
 
-    mExynosDisplay->updateInternalDisplayConfigVariables(config);
-    return err;
+    return mExynosDisplay->updateInternalDisplayConfigVariables(config);
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayConfigs(

@@ -264,7 +264,10 @@ int32_t ExynosPrimaryDisplay::getPreferredDisplayConfigInternal(int32_t *outConf
 int32_t ExynosPrimaryDisplay::setPowerOn() {
     ATRACE_CALL();
     updateAppliedActiveConfig(0, 0);
-    int ret = applyPendingConfig();
+    int ret = NO_ERROR;
+    if (!mFirstPowerOn) {
+        ret = applyPendingConfig();
+    }
 
     if (!mPowerModeState.has_value() || (*mPowerModeState == HWC2_POWER_MODE_OFF)) {
         // check the dynamic recomposition thread by following display
