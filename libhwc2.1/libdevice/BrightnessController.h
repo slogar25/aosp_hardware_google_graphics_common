@@ -116,6 +116,7 @@ public:
     }
     int checkSysfsStatus(const char *file, const std::vector<std::string>& expectedValue,
                          const nsecs_t timeoutNs);
+    void resetLhbmState();
 
     uint32_t getBrightnessLevel() {
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
