@@ -343,6 +343,11 @@ int32_t ExynosPrimaryDisplay::setPowerDoze(hwc2_power_mode_t mode) {
         mPowerModeState = mode;
     }
 
+    // LHBM will be disabled in the kernel while entering AOD mode if it's
+    // already enabled. Reset the state to avoid the sync problem.
+    mBrightnessController->resetLhbmState();
+    mLhbmOn = false;
+
     ExynosDisplay::updateRefreshRateHint();
 
     return HWC2_ERROR_NONE;
