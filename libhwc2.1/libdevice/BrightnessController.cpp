@@ -389,9 +389,10 @@ float BrightnessController::getSdrDimRatioForInstantHbm() {
 }
 
 void BrightnessController::onClearDisplay() {
+    resetLhbmState();
+
     std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mEnhanceHbmReq.reset(false);
-    mLhbmReq.reset(false);
     mBrightnessFloatReq.reset(-1);
     mInstantHbmReq.reset(false);
 
@@ -404,9 +405,6 @@ void BrightnessController::onClearDisplay() {
     if (mBrightnessDimmingUsage == BrightnessDimmingUsage::NORMAL) {
         mDimming.store(true);
     }
-    mLhbm.reset(false);
-
-    mLhbmBrightnessAdj = false;
 
     std::lock_guard<std::recursive_mutex> lock1(mCabcModeMutex);
     mCabcMode.reset(false);
@@ -782,6 +780,13 @@ int BrightnessController::checkSysfsStatus(const char* file,
     };
 
     return ret == NO_ERROR;
+}
+
+void BrightnessController::resetLhbmState() {
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+    mLhbmReq.reset(false);
+    mLhbm.reset(false);
+    mLhbmBrightnessAdj = false;
 }
 
 void BrightnessController::setOutdoorVisibility(LbeState state) {
