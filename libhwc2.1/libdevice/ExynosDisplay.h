@@ -1567,6 +1567,24 @@ class ExynosDisplay {
         RotatingLogFileWriter mErrLogFileWriter;
         RotatingLogFileWriter mDebugDumpFileWriter;
         RotatingLogFileWriter mFenceFileWriter;
+
+    protected:
+        class OperationRateManager {
+        public:
+            OperationRateManager() {}
+            virtual ~OperationRateManager() {}
+
+            virtual int32_t onLowPowerMode(bool __unused enabled) { return 0; }
+            virtual int32_t onPeakRefreshRate(uint32_t __unused rate) { return 0; }
+            virtual int32_t onConfig(hwc2_config_t __unused cfg) { return 0; }
+            virtual int32_t onBrightness(uint32_t __unused dbv) { return 0; }
+            virtual int32_t onPowerMode(int32_t __unused mode) { return 0; }
+            virtual int32_t getOperationRate() { return 0; }
+        };
+
+    public:
+        std::unique_ptr<OperationRateManager> mOperationRateManager;
+        bool isOperationRateSupported() { return mOperationRateManager != nullptr; }
 };
 
 #endif //_EXYNOSDISPLAY_H

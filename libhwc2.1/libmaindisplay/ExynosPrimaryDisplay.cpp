@@ -378,6 +378,7 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     else
         mDREnable = mDRDefault;
 
+    if (mOperationRateManager) mOperationRateManager->onPowerMode(mode);
     switch (mode) {
         case HWC2_POWER_MODE_DOZE_SUSPEND:
         case HWC2_POWER_MODE_DOZE:
@@ -902,6 +903,9 @@ void ExynosPrimaryDisplay::dump(String8 &result) {
     result.appendFormat("Refresh rate delay: %" PRId64 " ns\n", mRefreshRateDelayNanos);
     for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
         result.appendFormat("\t[%u] vote to %" PRId64 " ns\n", i, mVrrThrottleNanos[i]);
+    }
+    if (mOperationRateManager) {
+        result.appendFormat("Operation rate: %d\n", mOperationRateManager->getOperationRate());
     }
     result.appendFormat("\n");
 }
