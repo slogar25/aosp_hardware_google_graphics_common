@@ -1080,6 +1080,10 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
 {
     ALOGD("%s:: %s config(%d) test(%d)", __func__, mExynosDisplay->mDisplayName.string(), config,
           test);
+
+    if (mExynosDisplay->mOperationRateManager) {
+        mExynosDisplay->mOperationRateManager->onConfig(config);
+    }
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
             [config](DrmMode const &m) { return m.id() == config;});
     if (mode == mDrmConnector->modes().end()) {

@@ -61,6 +61,9 @@ public:
     ndk::ScopedAStatus getPanelCalibrationStatus(PanelCalibrationStatus *_aidl_return) override;
     ndk::ScopedAStatus isDbmSupported(bool *_aidl_return) override;
     ndk::ScopedAStatus setDbmState(bool enabled) override;
+    ndk::ScopedAStatus setPeakRefreshRate(int rate) override;
+    ndk::ScopedAStatus setLowPowerMode(bool enabled) override;
+    ndk::ScopedAStatus isOperationRateSupported(bool *_aidl_return) override;
 
 private:
     bool runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
