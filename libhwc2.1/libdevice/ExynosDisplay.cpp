@@ -1025,7 +1025,8 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device
         mPowerHalHint(mDisplayId, mDisplayTraceName),
         mErrLogFileWriter(2, ERR_LOG_SIZE),
         mDebugDumpFileWriter(10, 1, ".dump"),
-        mFenceFileWriter(2, FENCE_ERR_LOG_SIZE) {
+        mFenceFileWriter(2, FENCE_ERR_LOG_SIZE),
+        mOperationRateManager(nullptr) {
     mDisplayControl.enableCompositionCrop = true;
     mDisplayControl.enableExynosCompositionOptimization = true;
     mDisplayControl.enableClientCompositionOptimization = true;
@@ -3981,9 +3982,16 @@ int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
 int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
 {
     if (mBrightnessController) {
-        return mBrightnessController->processDisplayBrightness(brightness, mVsyncPeriod,
-                                                               waitPresent);
+        int32_t ret;
+
+        ret = mBrightnessController->processDisplayBrightness(brightness, mVsyncPeriod,
+                                                              waitPresent);
+        if (ret == NO_ERROR && mOperationRateManager) {
+            mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
+        }
+        return ret;
     }
+
     return HWC2_ERROR_UNSUPPORTED;
 }
 
@@ -5913,6 +5921,9 @@ void ExynosDisplay::cleanupAfterClientDeath() {
 
 int32_t ExynosDisplay::flushDisplayBrightnessChange() {
     if (mBrightnessController) {
+        if (mOperationRateManager) {
+            mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
+        }
         return mBrightnessController->applyPendingChangeViaSysfs(mVsyncPeriod);
     }
     return NO_ERROR;
