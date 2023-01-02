@@ -1826,6 +1826,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 (plane->id() != static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId))
                 continue;
 
+            /* If this plane is not supported by the CRTC binded with ExynosDisplay,
+             * it should be disabled by this ExynosDisplay */
+            if (!plane->GetCrtcSupported(*mDrmCrtc))
+                continue;
+
             if ((ret = drmReq.atomicAddProperty(plane->id(),
                     plane->crtc_property(), 0)) < 0)
                 return ret;
@@ -1969,6 +1974,11 @@ int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
         if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
             (exynosMPP->mAssignedState & MPP_ASSIGN_STATE_RESERVED) &&
             (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mDisplayId))
+            continue;
+
+        /* If this plane is not supported by the CRTC binded with ExynosDisplay,
+         * it should be disabled by this ExynosDisplay */
+        if (!plane->GetCrtcSupported(*mDrmCrtc))
             continue;
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
