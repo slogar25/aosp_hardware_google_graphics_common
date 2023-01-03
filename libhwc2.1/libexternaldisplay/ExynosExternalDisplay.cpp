@@ -409,12 +409,13 @@ int ExynosExternalDisplay::enable()
     if (openExternalDisplay() < 0)
         return HWC2_ERROR_UNSUPPORTED;
 
-    if (mDisplayInterface->setPowerMode(HWC_POWER_MODE_NORMAL) < 0){
+    if (mDisplayInterface->setPowerMode(HWC_POWER_MODE_NORMAL) < 0) {
         DISPLAY_LOGE("set powermode ioctl failed errno : %d", errno);
         return HWC2_ERROR_UNSUPPORTED;
     }
 
     mEnabled = true;
+    mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_NORMAL;
 
     ALOGI("[ExternalDisplay] %s -", __func__);
 
@@ -428,17 +429,23 @@ int ExynosExternalDisplay::disable()
     if (!mEnabled)
         return HWC2_ERROR_NONE;
 
+    if (mHpdStatus) {
+        clearDisplay(false);
+        return HWC2_ERROR_NONE;
+    }
+
     if (mSkipStartFrame > (SKIP_EXTERNAL_FRAME - 1)) {
         clearDisplay(true);
     } else {
         ALOGI("Skip clearDisplay to avoid resource conflict");
     }
 
-    if (mDisplayInterface->setPowerMode(HWC_POWER_MODE_OFF) < 0){
+    if (mDisplayInterface->setPowerMode(HWC_POWER_MODE_OFF) < 0) {
         DISPLAY_LOGE("set powermode ioctl failed errno : %d", errno);
         return HWC2_ERROR_UNSUPPORTED;
     }
 
+    mEnabled = false;
     mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
 
     ALOGI("[ExternalDisplay] %s -", __func__);
@@ -459,9 +466,12 @@ int32_t ExynosExternalDisplay::setPowerMode(
         if (mode == HWC_POWER_MODE_OFF) {
             fb_blank = FB_BLANK_POWERDOWN;
             err = disable();
-        } else {
+        } else if (mode == HWC_POWER_MODE_NORMAL) {
             fb_blank = FB_BLANK_UNBLANK;
             err = enable();
+        } else {
+            DISPLAY_LOGE("unsupported powermode: %d", mode);
+            return HWC2_ERROR_UNSUPPORTED;
         }
 
         if (err != 0) {
@@ -476,8 +486,6 @@ int32_t ExynosExternalDisplay::setPowerMode(
 
         // check the dynamic recomposition thread by following display power status
         mDevice->checkDynamicRecompositionThread();
-
-        mPowerModeState = (hwc2_power_mode_t)mode;
 
         DISPLAY_LOGD(eDebugExternalDisplay, "%s:: mode(%d), blank(%d)", __func__, mode, fb_blank);
 
