@@ -159,7 +159,8 @@ LOCAL_HEADER_LIBRARIES += libgralloc_headers
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay libacryl \
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
-	android.hardware.graphics.mapper@2.0
+	android.hardware.graphics.mapper@2.0 \
+	android.hardware.graphics.composer3-V2-ndk
 
 LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V8-ndk \
                           libbinder_ndk \
