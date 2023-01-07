@@ -1021,7 +1021,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device
         mSkipFrame(false),
         mVsyncPeriodChangeConstraints{systemTime(SYSTEM_TIME_MONOTONIC), 0},
         mVsyncAppliedTimeLine{false, 0, systemTime(SYSTEM_TIME_MONOTONIC)},
-        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_NONE),
+        mConfigRequestState(hwc_request_state_t::SET_CONFIG_STATE_DONE),
         mPowerHalHint(mDisplayId, mDisplayTraceName),
         mErrLogFileWriter(2, ERR_LOG_SIZE),
         mDebugDumpFileWriter(10, 1, ".dump"),
@@ -4253,10 +4253,18 @@ int32_t ExynosDisplay::resetConfigRequestStateLocked(hwc2_config_t config) {
         DISPLAY_LOGI("%s: mConfigRequestState (%d) is not REQUESTED", __func__,
                      mConfigRequestState);
     } else {
-        DISPLAY_LOGD(eDebugDisplayInterfaceConfig, "%s: Change mConfigRequestState (%d) to NONE",
+        DISPLAY_LOGD(eDebugDisplayInterfaceConfig, "%s: Change mConfigRequestState (%d) to DONE",
                      __func__, mConfigRequestState);
-        mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_NONE;
+        mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_DONE;
         updateAppliedActiveConfig(mActiveConfig, systemTime(SYSTEM_TIME_MONOTONIC));
+
+        std::lock_guard<std::mutex> lock(mPeakRefreshRateMutex);
+        bool isPeakRefreshRate = isCurrentPeakRefreshRate();
+        DISPLAY_ATRACE_INT("isPeakRefreshRate", isPeakRefreshRate);
+        if (isPeakRefreshRate && mNotifyPeakRefreshRate) {
+            mPeakRefreshRateCondition.notify_one();
+            mNotifyPeakRefreshRate = false;
+        }
     }
     return NO_ERROR;
 }
