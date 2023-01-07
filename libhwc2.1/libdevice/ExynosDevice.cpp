@@ -183,7 +183,8 @@ ExynosDevice::ExynosDevice()
     mResourceManager->initDisplaysTDMInfo();
 
     if (mInterfaceType == INTERFACE_TYPE_DRM) {
-        setVBlankOffDelay(1);
+        /* disable vblank immediately after updates */
+        setVBlankOffDelay(-1);
     }
 
     char value[PROPERTY_VALUE_MAX];
