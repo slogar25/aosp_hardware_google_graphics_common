@@ -18,6 +18,7 @@
 #define _EXYNOSDEVICE_H
 
 #include <aidl/com/google/hardware/pixel/display/BnDisplay.h>
+#include <aidl/android/hardware/graphics/composer3/OverlayProperties.h>
 #include <cutils/atomic.h>
 #include <displaycolor/displaycolor.h>
 #include <hardware/hwcomposer2.h>
@@ -61,6 +62,7 @@ using HbmState = ::aidl::com::google::hardware::pixel::display::HbmState;
 using LbeState = ::aidl::com::google::hardware::pixel::display::LbeState;
 using PanelCalibrationStatus = ::aidl::com::google::hardware::pixel::display::PanelCalibrationStatus;
 
+using OverlayProperties = aidl::android::hardware::graphics::composer3::OverlayProperties;
 using namespace android;
 
 struct exynos_callback_info_t {
@@ -335,6 +337,9 @@ class ExynosDevice {
                                      hwc2_function_pointer_t point);
         void onVsyncIdle(hwc2_display_t displayId);
         bool isDispOffAsyncSupported() { return mDisplayOffAsync; };
+        virtual int32_t getOverlaySupport([[maybe_unused]] OverlayProperties* caps){
+            return HWC2_ERROR_UNSUPPORTED;
+        }
 
     protected:
         void initDeviceInterface(uint32_t interfaceType);
