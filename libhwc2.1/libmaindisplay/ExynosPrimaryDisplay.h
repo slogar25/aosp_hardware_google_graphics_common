@@ -88,6 +88,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         ResolutionInfo mResolutionInfo;
         std::string getPanelSysfsPath(const displaycolor::DisplayType& type);
 
+        uint32_t mRcdId = -1;
+
     private:
         static constexpr const char* kDisplayCalFilePath = "/mnt/vendor/persist/display/";
         static constexpr const char* kPanelGammaCalFilePrefix = "gamma_calib_data";
