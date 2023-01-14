@@ -30,6 +30,7 @@
 #include "BrightnessController.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
+#include "ExynosPrimaryDisplay.h"
 
 using namespace std::chrono_literals;
 using namespace SOC_VERSION;
@@ -594,6 +595,27 @@ void ExynosDisplayDrmInterface::updateMountOrientation()
     ALOGW("%s ignore unrecoganized orientation %" PRId64, __func__, drmOrientation);
 }
 
+void ExynosDisplayDrmInterface::parseRCDId(const DrmProperty &property) {
+    if (mExynosDisplay->mType != HWC_DISPLAY_PRIMARY) {
+        ALOGW("%s invalid display type: %d", __func__, mExynosDisplay->mType);
+        return;
+    }
+
+    if (property.id() == 0) {
+        static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId = -1;
+        return;
+    }
+
+    auto [err, rcd_id] = property.value();
+    if (err < 0) {
+        ALOGW("%s failed to get drm prop value", __func__);
+        return;
+    }
+
+    if (getSpecialChannelId(rcd_id) >= 0)
+        static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId = rcd_id;
+}
+
 uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
 {
     return type+index;
@@ -679,6 +701,8 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     parseColorModeEnums(mDrmCrtc->color_mode_property());
     parseMipiSyncEnums(mDrmConnector->mipi_sync());
     updateMountOrientation();
+
+    if (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) parseRCDId(mDrmCrtc->rcd_plane_id_property());
 
     if (mExynosDisplay->mBrightnessController &&
             mExynosDisplay->mBrightnessController->initDrm(*mDrmDevice, *mDrmConnector)) {
@@ -1771,15 +1795,18 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
     for (size_t i = 0; i < mExynosDisplay->mDpuData.rcdConfigs.size(); ++i) {
         exynos_win_config_data &config = mExynosDisplay->mDpuData.rcdConfigs[i];
-        if (config.state == config.WIN_STATE_RCD) {
-            const int channelId = mExynosDisplay->mDevice->getSpecialPlaneId(
-                    mExynosDisplay->mIndex); // TODO: b/227584297
-            auto &plane = mDrmDevice->planes().at(channelId);
-            uint32_t fbId = 0;
-            if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
-                HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
+        if ((config.state == config.WIN_STATE_RCD) &&
+            (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY)) {
+            const int32_t rcdId = static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId;
+            const int32_t channelId = getSpecialChannelId(rcdId);
+            if (channelId >= 0) {
+                auto &plane = mDrmDevice->planes().at(channelId);
+                uint32_t fbId = 0;
+                if ((ret = setupCommitFromDisplayConfig(drmReq, config, i, plane, fbId)) < 0) {
+                    HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
+                }
+                planeEnableInfo[plane->id()] = 1;
             }
-            planeEnableInfo[plane->id()] = 1;
         }
     }
 
@@ -1791,6 +1818,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
                 (exynosMPP->mAssignedState & MPP_ASSIGN_STATE_RESERVED) &&
                 (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mDisplayId))
+                continue;
+
+            if ((exynosMPP == NULL) && (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) &&
+                (plane->id() != static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId))
                 continue;
 
             if ((ret = drmReq.atomicAddProperty(plane->id(),
@@ -2443,4 +2474,17 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     *outPort = mDrmConnector->id();
 
     return HWC2_ERROR_NONE;
+}
+
+int32_t ExynosDisplayDrmInterface::getSpecialChannelId(uint32_t planeId) {
+    ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
+    for (int i = 0; i < exynosDevice->getSpecialPlaneNum(); i++) {
+        const int32_t channelId = exynosDevice->getSpecialPlaneId(i);
+        auto &plane = mDrmDevice->planes().at(channelId);
+        if (plane->id() == planeId) return channelId;
+    }
+
+    ALOGE("%s: Failed to get RCD planeId.", __func__);
+
+    return -EINVAL;
 }
