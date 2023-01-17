@@ -67,6 +67,7 @@ enum {
     SET_DISPLAY_RCDLAYER_ENABLED = 1007,
     TRIGGER_DISPLAY_IDLE_ENTER = 1008,
     SET_DISPLAY_DBM = 1009,
+    SET_DISPLAY_MULTI_THREADED_PRESENT = 1010,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -470,6 +471,17 @@ public:
         if (result) ALOGE("SET_DISPLAY_DBM transact error(%d)", result);
         return result;
     }
+
+    virtual int32_t setDisplayMultiThreadedPresent(const int32_t& displayId,
+                                                   const bool& enable) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(displayId);
+        data.writeBool(enable);
+        int result = remote()->transact(SET_DISPLAY_MULTI_THREADED_PRESENT, data, &reply);
+        if (result) ALOGE("SET_DISPLAY_MULTI_THREADED_PRESENT transact error(%d)", result);
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -757,6 +769,15 @@ status_t BnExynosHWCService::onTransact(
             int32_t display_id = data.readInt32();
             uint32_t on = data.readInt32();
             int32_t error = setDisplayDbm(display_id, on);
+            reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+
+        case SET_DISPLAY_MULTI_THREADED_PRESENT: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            int32_t displayId = data.readInt32();
+            bool enable = data.readBool();
+            int32_t error = setDisplayMultiThreadedPresent(displayId, enable);
             reply->writeInt32(error);
             return NO_ERROR;
         } break;

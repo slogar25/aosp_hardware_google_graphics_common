@@ -137,6 +137,8 @@ class HalImpl : public IComposerHal {
                               const ndk::ScopedFileDescriptor& releaseFence) override;
     int32_t setVsyncEnabled(int64_t display, bool enabled) override;
     int32_t getDisplayIdleTimerSupport(int64_t display, bool& outSupport) override;
+    int32_t getDisplayMultiThreadedPresentSupport(const int64_t& display,
+                                                  bool& outSupport) override;
     int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) override;
     int32_t getRCDLayerSupport(int64_t display, bool& outSupport) override;
     int32_t setLayerBlockingRegion(

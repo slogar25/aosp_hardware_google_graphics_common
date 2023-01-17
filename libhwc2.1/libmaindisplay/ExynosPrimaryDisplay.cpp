@@ -120,6 +120,8 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
     mBrightnessController = std::make_unique<BrightnessController>(
             mIndex, [this]() { mDevice->onRefresh(); },
             [this]() { updatePresentColorConversionInfo(); });
+
+    mDisplayControl.multiThreadedPresent = true;
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()

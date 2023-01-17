@@ -1049,4 +1049,11 @@ int32_t HalImpl::getDisplayIdleTimerSupport(int64_t display, bool& outSupport) {
     return halDisplay->getDisplayIdleTimerSupport(outSupport);
 }
 
+int32_t HalImpl::getDisplayMultiThreadedPresentSupport(const int64_t& display, bool& outSupport) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    return halDisplay->getDisplayMultiThreadedPresentSupport(outSupport);
+}
+
 } // namespace aidl::android::hardware::graphics::composer3::impl
