@@ -6049,6 +6049,11 @@ int32_t ExynosDisplay::getDisplayIdleTimerSupport(bool &outSupport) {
     return mDisplayInterface->getDisplayIdleTimerSupport(outSupport);
 }
 
+int32_t ExynosDisplay::getDisplayMultiThreadedPresentSupport(bool &outSupport) {
+    outSupport = mDisplayControl.multiThreadedPresent;
+    return NO_ERROR;
+}
+
 bool ExynosDisplay::isMixedComposition() {
     for (size_t i = 0; i < mLayers.size(); i++) {
         if (mLayers[i]->mBrightness < 1.0) {

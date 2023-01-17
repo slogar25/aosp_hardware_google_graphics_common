@@ -384,6 +384,8 @@ struct DisplayControl {
     bool forceReserveMPP = false;
     /** Skip M2MMPP processing **/
     bool skipM2mProcessing = true;
+    /** Enable multi-thread present **/
+    bool multiThreadedPresent = false;
 };
 
 class ExynosDisplay {
@@ -1224,6 +1226,7 @@ class ExynosDisplay {
         virtual uint64_t getPendingExpectedPresentTime() { return 0; }
         virtual void applyExpectedPresentTime() {}
         virtual int32_t getDisplayIdleTimerSupport(bool& outSupport);
+        virtual int32_t getDisplayMultiThreadedPresentSupport(bool& outSupport);
         virtual int32_t setDisplayIdleTimer(const int32_t __unused timeoutMs) {
             return HWC2_ERROR_UNSUPPORTED;
         }
