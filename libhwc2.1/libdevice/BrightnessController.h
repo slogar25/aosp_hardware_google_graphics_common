@@ -90,7 +90,7 @@ public:
      */
     float getSdrDimRatioForInstantHbm();
 
-    void onClearDisplay();
+    void onClearDisplay(bool needModeClear);
 
     /**
      * apply brightness change on drm path.

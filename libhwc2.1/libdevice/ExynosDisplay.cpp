@@ -4381,7 +4381,7 @@ int ExynosDisplay::clearDisplay(bool needModeClear) {
     mLastRetireFence = fence_close(mLastRetireFence, this, FENCE_TYPE_RETIRE, FENCE_IP_DPP);
 
     if (mBrightnessController) {
-        mBrightnessController->onClearDisplay();
+        mBrightnessController->onClearDisplay(needModeClear);
     }
     return ret;
 }

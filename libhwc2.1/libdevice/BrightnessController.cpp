@@ -60,6 +60,9 @@ int BrightnessController::initDrm(const DrmDevice& drmDevice,
 
     mLhbmSupported = connector.lhbm_on().id() != 0;
     mGhbmSupported = connector.hbm_mode().id() != 0;
+
+    /* allow the first brightness to apply */
+    mBrightnessFloatReq.set_dirty();
     return NO_ERROR;
 }
 
@@ -214,6 +217,9 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
 
     {
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+        /* apply the first brightness */
+        if (mBrightnessFloatReq.is_dirty()) mBrightnessLevel.set_dirty();
+
         mBrightnessFloatReq.store(brightness);
         if (!mBrightnessFloatReq.is_dirty()) {
             return NO_ERROR;
@@ -381,13 +387,17 @@ float BrightnessController::getSdrDimRatioForInstantHbm() {
     return ratio;
 }
 
-void BrightnessController::onClearDisplay() {
+void BrightnessController::onClearDisplay(bool needModeClear) {
     resetLhbmState();
+    mInstantHbmReq.reset(false);
+
+    if (mBrightnessLevel.is_dirty()) applyBrightnessViaSysfs(mBrightnessLevel.get());
+
+    if (!needModeClear) return;
 
     std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mEnhanceHbmReq.reset(false);
     mBrightnessFloatReq.reset(-1);
-    mInstantHbmReq.reset(false);
 
     mBrightnessLevel.reset(0);
     mDisplayWhitePointNits = 0;
