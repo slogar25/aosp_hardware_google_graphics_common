@@ -410,7 +410,7 @@ void BrightnessController::onClearDisplay(bool needModeClear) {
     }
 
     std::lock_guard<std::recursive_mutex> lock1(mCabcModeMutex);
-    mCabcMode.reset(false);
+    mCabcMode.reset(CabcMode::OFF);
 }
 
 int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
@@ -801,11 +801,15 @@ int BrightnessController::updateCabcMode() {
     if (!mCabcSupport || mCabcModeOfs.fail()) return HWC2_ERROR_UNSUPPORTED;
 
     std::lock_guard<std::recursive_mutex> lock(mCabcModeMutex);
-    bool mode = (!(isHdrLayerOn() || mOutdoorVisibility));
+    CabcMode mode;
+    if (mOutdoorVisibility)
+        mode = CabcMode::OFF;
+    else
+        mode = isHdrLayerOn() ? CabcMode::CABC_MOVIE_MODE : CabcMode::CABC_UI_MODE;
     mCabcMode.store(mode);
 
     if (mCabcMode.is_dirty()) {
-        applyCabcModeViaSysfs(mode);
+        applyCabcModeViaSysfs(static_cast<uint8_t>(mode));
         ALOGD("%s, isHdrLayerOn: %d, mOutdoorVisibility: %d.", __func__, isHdrLayerOn(),
               mOutdoorVisibility);
         mCabcMode.clear_dirty();
