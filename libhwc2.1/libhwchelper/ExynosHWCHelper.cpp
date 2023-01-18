@@ -672,7 +672,7 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
         HDEBUGLOGD(eDebugMPP, "size(Y) : %d", P010_Y_SIZE(width, height));
         return P010_Y_SIZE(width, height);
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
-        return YUV420N_Y_SIZE(width, height);
+        return NV12N_Y_SIZE(width, height);
     case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP_10B:
         return 2 * __ALIGN_UP(width, 64) * __ALIGN_UP(height, 8);
     case HAL_PIXEL_FORMAT_GOOGLE_NV12_SP:
