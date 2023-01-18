@@ -23,12 +23,14 @@
 #include <hardware/exynos/ion.h>
 #include <system/graphics.h>
 
+// This header is non-hermetic and needs to be after videodev2.h
 #include <ExynosJpegEncoderForCamera.h>
 
 #include "hwjpeg-internal.h"
+// This header is non-hermetic and needs to be after hwjpeg-internal.h
 #include "AppMarkerWriter.h"
-#include "ThumbnailScaler.h"
 #include "IFDWriter.h"
+#include "ThumbnailScaler.h"
 
 // Data length written by H/W without the scan data.
 #define NECESSARY_JPEG_LENGTH   (0x24B + 2 * JPEG_MARKER_SIZE)
@@ -169,6 +171,11 @@ int ExynosJpegEncoderForCamera::setThumbnailQuality(int quality)
     m_nThumbQuality = quality;
 
     return GetCompressor().SetQuality(0, m_nThumbQuality) ? 0 : -1;
+}
+
+int ExynosJpegEncoderForCamera::setThumbnailPadding(unsigned char *padding,
+                                                    unsigned int num_planes) {
+    return GetCompressor().SetPadding2(padding, num_planes) ? 0 : -1;
 }
 
 bool ExynosJpegEncoderForCamera::EnsureFormatIsApplied() {

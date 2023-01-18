@@ -214,6 +214,24 @@ public:
      */
     virtual bool SetQuality(const unsigned char __unused qtable[]) { return false; };
     /*
+     * SetPadding - Configures padding per plane for primary image
+     * @padding[in]     : Padding per plane
+     * @num_planes[in]  : Number of planes. This should match the number of elements in @padding
+     * @return          : true if padding is congured successfully.
+     *                    false, otherwise.
+     */
+    virtual bool SetPadding(unsigned char padding[], unsigned int num_planes) = 0;
+    /*
+     * SetPadding2 - Configures padding per plane for thumbnail image
+     * @padding[in]     : padding per plane
+     * @num_planes[in]  : Number of planes. This should match the number of elements in @padding
+     * @return          : true if padding is congured successfully.
+     *                    false, otherwise.
+     */
+    virtual bool SetPadding2(unsigned char __unused padding[], unsigned int __unused num_planes) {
+        return false;
+    }
+    /*
      * SetImageBuffer - Configure the uncompressed primary image buffers (userptr)
      * @buffers[in]     : addresses of the buffers
      * @len_buffers[in] : sizes of the buffers
@@ -505,6 +523,8 @@ class CHWJpegV4L2Compressor : public CHWJpegCompressor, private CHWJpegFlagManag
         HWJPEG_CTRL_QFACTOR,
         HWJPEG_CTRL_QFACTOR2,
         HWJPEG_CTRL_HWFC,
+        HWJPEG_CTRL_PADDING,
+        HWJPEG_CTRL_PADDING2,
         HWJPEG_CTRL_NUM,
     };
 
@@ -567,6 +587,8 @@ public:
     virtual bool SetQuality(unsigned int quality_factor,
                             unsigned int quality_factor2 = 0);
     virtual bool SetQuality(const unsigned char qtable[]);
+    virtual bool SetPadding(unsigned char padding[], unsigned int num_planes);
+    virtual bool SetPadding2(unsigned char padding[], unsigned int num_planes);
 
     virtual bool SetImageFormat(unsigned int v4l2_fmt, unsigned int width, unsigned int height,
                               unsigned int sec_width = 0, unsigned sec_height = 0);

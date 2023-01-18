@@ -18,13 +18,13 @@
 #ifndef __HARDWARE_EXYNOS_JPEG_ENCODER_FOR_CAMERA_H__
 #define __HARDWARE_EXYNOS_JPEG_ENCODER_FOR_CAMERA_H__
 
-#include <memory>
-
+#include <ExynosExif.h>
+#include <hardware/exynos/ExynosExif.h>
 #include <pthread.h>
 
-#include <ExynosExif.h>
+#include <memory>
+
 #include "ExynosJpegApi.h"
-#include <hardware/exynos/ExynosExif.h>
 
 class CAppMarkerWriter; // defined in libhwjpeg/AppMarkerWriter.h
 class ThumbnailScaler; // defined in libhwjpeg/thumbnail_scaler.h
@@ -109,6 +109,7 @@ public:
     int setInBuf2(char **pcBuf, int *iSize);
     int setThumbnailSize(int w, int h);
     int setThumbnailQuality(int quality);
+    int setThumbnailPadding(unsigned char *padding, unsigned int num_planes);
 
     void setExtScalerNum(int csc_hwscaler_id) { m_iHWScalerID = csc_hwscaler_id; }
 
