@@ -515,4 +515,15 @@ int32_t ExynosHWCService::setDisplayDbm(int32_t display_id, uint32_t on) {
     return NO_ERROR;
 }
 
+int32_t ExynosHWCService::setDisplayMultiThreadedPresent(const int32_t& displayId,
+                                                         const bool& enable) {
+    auto display = mHWCCtx->device->getDisplay(displayId);
+
+    if (display == nullptr) return -EINVAL;
+
+    display->mDisplayControl.multiThreadedPresent = enable;
+    ALOGD("ExynosHWCService::%s() display(%u) enable=%d", __func__, displayId, enable);
+    return NO_ERROR;
+}
+
 } //namespace android

@@ -25,6 +25,8 @@
 #include <aidl/android/hardware/graphics/common/ColorTransform.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
 #include <aidl/android/hardware/graphics/common/FRect.h>
+#include <aidl/android/hardware/graphics/common/HdrConversionCapability.h>
+#include <aidl/android/hardware/graphics/common/HdrConversionStrategy.h>
 #include <aidl/android/hardware/graphics/common/PixelFormat.h>
 #include <aidl/android/hardware/graphics/common/Point.h>
 #include <aidl/android/hardware/graphics/common/Rect.h>
@@ -122,7 +124,8 @@ class IComposerHal {
                                       DisplayAttribute attribute, int32_t* outValue) = 0;
     virtual int32_t getDisplayBrightnessSupport(int64_t display, bool& outSupport) = 0;
     virtual int32_t getDisplayIdleTimerSupport(int64_t display, bool& outSupport) = 0;
-
+    virtual int32_t getDisplayMultiThreadedPresentSupport(const int64_t& display,
+                                                          bool& outSupport) = 0;
     virtual int32_t getDisplayCapabilities(int64_t display,
                                            std::vector<DisplayCapability>* caps) = 0;
     virtual int32_t getDisplayConfigs(int64_t display, std::vector<int32_t>* configs) = 0;
@@ -160,6 +163,8 @@ class IComposerHal {
     virtual int32_t setBootDisplayConfig(int64_t display, int32_t config) = 0;
     virtual int32_t clearBootDisplayConfig(int64_t display) = 0;
     virtual int32_t getPreferredBootDisplayConfig(int64_t display, int32_t* config) = 0;
+    virtual int32_t getHdrConversionCapabilities(std::vector<common::HdrConversionCapability>*) = 0;
+    virtual int32_t setHdrConversionStrategy(const common::HdrConversionStrategy&) = 0;
     virtual int32_t setAutoLowLatencyMode(int64_t display, bool on) = 0;
     virtual int32_t setClientTarget(int64_t display, buffer_handle_t target,
                                     const ndk::ScopedFileDescriptor& fence,

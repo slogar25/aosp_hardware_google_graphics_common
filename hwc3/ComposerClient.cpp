@@ -171,6 +171,16 @@ ndk::ScopedAStatus ComposerClient::getDisplayCapabilities(int64_t display,
         caps->push_back(DisplayCapability::DISPLAY_IDLE_TIMER);
     }
 
+    err = mHal->getDisplayMultiThreadedPresentSupport(display, support);
+    if (err != ::android::OK) {
+        LOG(ERROR) << "failed to getDisplayMultiThreadedPresentSupport: " << err;
+        return TO_BINDER_STATUS(err);
+    }
+
+    if (support) {
+        caps->push_back(DisplayCapability::MULTI_THREADED_PRESENT);
+    }
+
     return TO_BINDER_STATUS(err);
 }
 
@@ -339,6 +349,20 @@ ndk::ScopedAStatus ComposerClient::clearBootDisplayConfig(int64_t display) {
 ndk::ScopedAStatus ComposerClient::getPreferredBootDisplayConfig(int64_t display, int32_t* config) {
     DEBUG_DISPLAY_FUNC(display);
     auto err = mHal->getPreferredBootDisplayConfig(display, config);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::getHdrConversionCapabilities(
+        std::vector<common::HdrConversionCapability>* hdrConversionCapabilities) {
+    DEBUG_FUNC();
+    auto err = mHal->getHdrConversionCapabilities(hdrConversionCapabilities);
+    return TO_BINDER_STATUS(err);
+}
+
+ndk::ScopedAStatus ComposerClient::setHdrConversionStrategy(
+        const common::HdrConversionStrategy& hdrConversionStrategy) {
+    DEBUG_FUNC();
+    auto err = mHal->setHdrConversionStrategy(hdrConversionStrategy);
     return TO_BINDER_STATUS(err);
 }
 

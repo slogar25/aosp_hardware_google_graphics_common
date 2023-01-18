@@ -93,6 +93,8 @@ class HalImpl : public IComposerHal {
     int32_t setBootDisplayConfig(int64_t display, int32_t config) override;
     int32_t clearBootDisplayConfig(int64_t display) override;
     int32_t getPreferredBootDisplayConfig(int64_t display, int32_t* config) override;
+    int32_t getHdrConversionCapabilities(std::vector<common::HdrConversionCapability>*) override;
+    int32_t setHdrConversionStrategy(const common::HdrConversionStrategy&) override;
     int32_t setAutoLowLatencyMode(int64_t display, bool on) override;
     int32_t setClientTarget(int64_t display, buffer_handle_t target,
                             const ndk::ScopedFileDescriptor& fence, common::Dataspace dataspace,
@@ -137,6 +139,8 @@ class HalImpl : public IComposerHal {
                               const ndk::ScopedFileDescriptor& releaseFence) override;
     int32_t setVsyncEnabled(int64_t display, bool enabled) override;
     int32_t getDisplayIdleTimerSupport(int64_t display, bool& outSupport) override;
+    int32_t getDisplayMultiThreadedPresentSupport(const int64_t& display,
+                                                  bool& outSupport) override;
     int32_t setIdleTimerEnabled(int64_t display, int32_t timeout) override;
     int32_t getRCDLayerSupport(int64_t display, bool& outSupport) override;
     int32_t setLayerBlockingRegion(
