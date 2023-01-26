@@ -135,7 +135,7 @@ endif
 include $(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/Android.mk
 
 LOCAL_CFLAGS += -DHLOG_CODE=0
-LOCAL_CFLAGS += -DLOG_TAG=\"display\"
+LOCAL_CFLAGS += -DLOG_TAG=\"hwc-display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
@@ -193,7 +193,7 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libdrm
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_C_INCLUDES)
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
-LOCAL_CFLAGS += -DLOG_TAG=\"hwcservice\"
+LOCAL_CFLAGS += -DLOG_TAG=\"hwc-service\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
 LOCAL_SRC_FILES := \
@@ -233,7 +233,7 @@ LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_ha
 LOCAL_HEADER_LIBRARIES += libgralloc_headers
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
-LOCAL_CFLAGS += -DLOG_TAG=\"hwcomposer\"
+LOCAL_CFLAGS += -DLOG_TAG=\"hwc-2\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
