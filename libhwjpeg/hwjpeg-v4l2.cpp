@@ -18,8 +18,11 @@
 #include <linux/videodev2.h>
 #include <linux/v4l2-controls.h>
 
+// This header is non-hermetic and needs to be after videodev2.h
 #include <exynos-hwjpeg.h>
+
 #include "hwjpeg-internal.h"
+#include "log/log_main.h"
 
 CHWJpegV4L2Compressor::CHWJpegV4L2Compressor(): CHWJpegCompressor("/dev/video12")
 {
@@ -142,6 +145,51 @@ bool CHWJpegV4L2Compressor::SetQuality(const unsigned char qtable[])
         ALOGERR("Failed to configure %u controls", ctrls.count);
         return false;
     }
+
+    return true;
+}
+
+bool CHWJpegV4L2Compressor::SetPadding(unsigned char padding[], unsigned int num_planes) {
+    if (num_planes > 3 || num_planes < 1) {
+        ALOGE("Attempting to set padding for incorrect number of buffers");
+        return false;
+    }
+
+    unsigned int padding_value = 0;
+
+    for (int i = num_planes - 1; i >= 0; i--) {
+        padding_value <<= 8;
+        padding_value |= padding[i];
+    }
+
+    m_v4l2Controls[HWJPEG_CTRL_PADDING].id = V4L2_CID_JPEG_PADDING;
+    m_v4l2Controls[HWJPEG_CTRL_PADDING].value = static_cast<__s32>(padding_value);
+    m_uiControlsToSet |= 1 << HWJPEG_CTRL_PADDING;
+
+    return true;
+}
+
+bool CHWJpegV4L2Compressor::SetPadding2(unsigned char padding[], unsigned int num_planes) {
+    if (!IsDeviceCapability(V4L2_CAP_EXYNOS_JPEG_B2B_COMPRESSION)) {
+        ALOGE("Back-to-back compression is not suppored by H/W");
+        return false;
+    }
+
+    if (num_planes > 3 || num_planes < 1) {
+        ALOGE("Attempting to set padding for incorrect number of buffers");
+        return false;
+    }
+
+    unsigned int padding_value = 0;
+
+    for (int i = num_planes - 1; i >= 0; i--) {
+        padding_value <<= 8;
+        padding_value |= padding[i];
+    }
+
+    m_v4l2Controls[HWJPEG_CTRL_PADDING2].id = V4L2_CID_JPEG_SEC_PADDING;
+    m_v4l2Controls[HWJPEG_CTRL_PADDING2].value = static_cast<__s32>(padding_value);
+    m_uiControlsToSet |= 1 << HWJPEG_CTRL_PADDING2;
 
     return true;
 }

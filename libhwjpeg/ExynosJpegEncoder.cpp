@@ -17,6 +17,7 @@
 
 #include <linux/videodev2.h>
 
+// This header is non-hermetic and needs to be after videodev2.h
 #include <ExynosJpegApi.h>
 
 #include "hwjpeg-internal.h"
@@ -226,4 +227,8 @@ bool ExynosJpegEncoder::__EnsureFormatIsApplied() {
 
 int ExynosJpegEncoder::setQuality(const unsigned char q_table[]) {
     return m_hwjpeg.SetQuality(q_table) ? 0 : -1;
+}
+
+int ExynosJpegEncoder::setPadding(unsigned char *padding, unsigned int num_planes) {
+    return m_hwjpeg.SetPadding(padding, num_planes) ? 0 : -1;
 }
