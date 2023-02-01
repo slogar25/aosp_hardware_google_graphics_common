@@ -119,6 +119,9 @@ void ExynosExternalDisplay::closeExternalDisplay()
         layer->mReleaseFence = -1;
         layer->mLayerBuffer = NULL;
     }
+
+    mClientCompositionInfo.initializeInfos(this);
+    mExynosCompositionInfo.initializeInfos(this);
 }
 
 int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_config_t* outConfigs)
