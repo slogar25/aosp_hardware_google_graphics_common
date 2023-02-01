@@ -21,7 +21,7 @@
 #include <cutils/properties.h>
 
 #define EXTERNAL_DISPLAY_SKIP_LAYER   0x00000100
-#define SKIP_EXTERNAL_FRAME 5
+#define SKIP_EXTERNAL_FRAME 0
 
 class ExynosExternalDisplay : public ExynosDisplay {
     public:
