@@ -118,7 +118,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
     if (mEarlyWakeupDispFd == nullptr)
         ALOGE("open %s failed! %s", earlyWakeupNodeBase, strerror(errno));
     mBrightnessController = std::make_unique<BrightnessController>(
-            mIndex, [this]() { mDevice->onRefresh(); },
+            mIndex, [this]() { mDevice->onRefresh(mDisplayId); },
             [this]() { updatePresentColorConversionInfo(); });
 
     mDisplayControl.multiThreadedPresent = true;
