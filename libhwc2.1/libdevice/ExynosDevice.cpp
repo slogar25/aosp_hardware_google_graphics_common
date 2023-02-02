@@ -473,7 +473,7 @@ int32_t ExynosDevice::registerCallback (
             }
         }
     }
-
+    /* TODO(b/265244856): called by register callback vsync. it's only hwc2. */
     if (descriptor == HWC2_CALLBACK_VSYNC)
         mResourceManager->doPreProcessing();
 
@@ -876,6 +876,7 @@ bool ExynosDevice::validateFences(ExynosDisplay *display) {
 }
 
 void ExynosDevice::compareVsyncPeriod() {
+    /* TODO(b/265244856): to clarify what purpose of the function */
     ExynosDisplay *primary_display = getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
     ExynosDisplay *external_display = getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
 
