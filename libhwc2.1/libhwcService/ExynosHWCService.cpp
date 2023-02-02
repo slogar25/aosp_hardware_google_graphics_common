@@ -336,11 +336,10 @@ int ExynosHWCService::setHWCCtl(uint32_t display, uint32_t ctrl, int32_t val)
     return err;
 }
 
-int ExynosHWCService::setDDIScaler(uint32_t width, uint32_t height)
-{
+int ExynosHWCService::setDDIScaler(uint32_t display_id, uint32_t width, uint32_t height) {
     ALOGD_IF(HWC_SERVICE_DEBUG, "%s, width=%d, height=%d", __func__, width, height);
     if (mHWCCtx) {
-        ExynosDisplay *display = (ExynosDisplay*)mHWCCtx->device->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+        ExynosDisplay *display = (ExynosDisplay *)mHWCCtx->device->getDisplay(display_id);
 
         if (display == NULL)
             return -EINVAL;
