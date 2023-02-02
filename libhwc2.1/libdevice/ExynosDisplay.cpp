@@ -1593,7 +1593,7 @@ bool ExynosDisplay::skipStaticLayerChanged(ExynosCompositionInfo& compositionInf
 }
 
 void ExynosDisplay::requestLhbm(bool on) {
-    mDevice->onRefresh();
+    mDevice->onRefresh(mDisplayId);
     if (mBrightnessController) {
         mBrightnessController->processLocalHbm(on);
     }
@@ -3464,7 +3464,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             ret = HWC2_ERROR_NOT_VALIDATED;
         }
         mRenderingState = RENDERING_STATE_PRESENTED;
-        mDevice->onRefresh();
+        mDevice->onRefresh(mDisplayId);
         return ret;
     }
 
