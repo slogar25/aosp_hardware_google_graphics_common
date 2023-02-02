@@ -365,11 +365,12 @@ public:
         return result;
     };
 
-    virtual int setDDIScaler(uint32_t width, uint32_t height) {
+    virtual int setDDIScaler(uint32_t displayId, uint32_t width, uint32_t height) {
         Parcel data, reply;
         data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
-        data.writeInt32(width);
-        data.writeInt32(height);
+        data.writeUint32(displayId);
+        data.writeUint32(width);
+        data.writeUint32(height);
         int result = remote()->transact(SET_DDISCALER, data, &reply);
         if (result == NO_ERROR)
             result = reply.readInt32();
@@ -635,9 +636,10 @@ status_t BnExynosHWCService::onTransact(
         } break;
         case SET_DDISCALER: {
             CHECK_INTERFACE(IExynosHWCService, data, reply);
-            uint32_t width = data.readInt32();
-            uint32_t height = data.readInt32();
-            int error = setDDIScaler(width, height);
+            uint32_t display_id = data.readUint32();
+            uint32_t width = data.readUint32();
+            uint32_t height = data.readUint32();
+            int error = setDDIScaler(display_id, width, height);
             reply->writeInt32(error);
             return NO_ERROR;
         } break;
