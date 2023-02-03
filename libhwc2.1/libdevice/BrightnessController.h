@@ -114,7 +114,7 @@ public:
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mLhbm.get();
     }
-    int checkSysfsStatus(const std::string& file, const std::vector<std::string>& expectedValue,
+    int checkSysfsStatus(const char *file, const std::vector<std::string>& expectedValue,
                          const nsecs_t timeoutNs);
     void resetLhbmState();
 
@@ -142,21 +142,6 @@ public:
     void setOutdoorVisibility(LbeState state);
 
     int updateCabcMode();
-
-    const std::string GetPanelSysfileByIndex(const char *file_pattern) {
-        String8 nodeName;
-        nodeName.appendFormat(file_pattern, mPanelIndex);
-        return nodeName.c_str();
-    }
-
-    const std::string GetPanelRefreshRateSysfile() {
-        String8 nodeName;
-        nodeName.appendFormat(kRefreshrateFileNode,
-                              mPanelIndex == 0           ? "primary"
-                                      : mPanelIndex == 1 ? "secondary"
-                                                         : "unknown");
-        return nodeName.c_str();
-    }
 
     struct BrightnessTable {
         float mBriStart;
