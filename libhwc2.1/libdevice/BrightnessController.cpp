@@ -253,15 +253,14 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     // path should check the sysfs content.
     if (mUncheckedGbhmRequest) {
         ATRACE_NAME("check_ghbm_mode");
-        checkSysfsStatus(GetPanelSysfileByIndex(kGlobalHbmModeFileNode),
+        checkSysfsStatus(kGlobalHbmModeFileNode,
                          {std::to_string(toUnderlying(mPendingGhbmStatus.load()))}, vsyncNs * 5);
         mUncheckedGbhmRequest = false;
     }
 
     if (mUncheckedLhbmRequest) {
         ATRACE_NAME("check_lhbm_mode");
-        checkSysfsStatus(GetPanelSysfileByIndex(kLocalHbmModeFileNode),
-                         {std::to_string(mPendingLhbmStatus)}, vsyncNs * 5);
+        checkSysfsStatus(kLocalHbmModeFileNode, {std::to_string(mPendingLhbmStatus)}, vsyncNs * 5);
         mUncheckedLhbmRequest = false;
     }
 
@@ -300,8 +299,7 @@ int BrightnessController::applyPendingChangeViaSysfs(const nsecs_t vsyncNs) {
 
     if (mUncheckedBlRequest) {
         ATRACE_NAME("check_bl_value");
-        checkSysfsStatus(GetPanelSysfileByIndex(BRIGHTNESS_SYSFS_NODE),
-                         {std::to_string(mPendingBl)}, vsyncNs * 5);
+        checkSysfsStatus(BRIGHTNESS_SYSFS_NODE, {std::to_string(mPendingBl)}, vsyncNs * 5);
         mUncheckedBlRequest = false;
     }
 
@@ -706,39 +704,45 @@ int BrightnessController::queryBrightness(float brightness, bool *ghbm, uint32_t
 }
 
 // Return immediately if it's already in the status. Otherwise poll the status
-int BrightnessController::checkSysfsStatus(const std::string& file,
+int BrightnessController::checkSysfsStatus(const char* file,
                                            const std::vector<std::string>& expectedValue,
                                            const nsecs_t timeoutNs) {
     ATRACE_CALL();
 
-    if (expectedValue.size() == 0) {
-      return -EINVAL;
-    }
+    if (expectedValue.size() == 0) return false;
 
     char buf[16];
-    UniqueFd fd = open(file.c_str(), O_RDONLY);
+    String8 nodeName;
+    if (std::strstr(file, "%d")) {
+        nodeName.appendFormat(file, mPanelIndex);
+    } else if (std::strstr(file, "%s")) {
+        nodeName.appendFormat(file, mPanelIndex == 0 ? "primary"
+                                    : mPanelIndex == 1 ? "secondary" : "unknown");
+    } else {
+        nodeName = file;
+    }
+    UniqueFd fd = open(nodeName.string(), O_RDONLY);
     if (fd.get() < 0) {
-        ALOGE("%s failed to open sysfs %s: %s", __func__, file.c_str(), strerror(errno));
-        return -ENOENT;
+        ALOGE("%s failed to open sysfs %s: %s", __func__, nodeName.c_str(), strerror(errno));
+        return false;
     }
 
     int size = read(fd.get(), buf, sizeof(buf));
     if (size <= 0) {
-        ALOGE("%s failed to read from %s: %s", __func__, file.c_str(), strerror(errno));
-        return -EIO;
+        ALOGE("%s failed to read from %s: %s", __func__, nodeName.c_str(), strerror(errno));
+        return false;
     }
 
     // '- 1' to remove trailing '\n'
     std::string val = std::string(buf, size - 1);
     if (std::find(expectedValue.begin(), expectedValue.end(), val) != expectedValue.end()) {
-        return OK;
+        return true;
     } else if (timeoutNs == 0) {
-        // not get the expected value and no intention to wait
-        return -EINVAL;
+        return false;
     }
 
     struct pollfd pfd;
-    int ret = -EINVAL;
+    int ret = EINVAL;
 
     auto startTime = systemTime(SYSTEM_TIME_MONOTONIC);
     pfd.fd = fd.get();
@@ -752,9 +756,9 @@ int BrightnessController::checkSysfsStatus(const std::string& file,
         }
         int pollRet = poll(&pfd, 1, ns2ms(remainTimeNs));
         if (pollRet == 0) {
-            ALOGW("%s poll %s timeout", __func__, file.c_str());
+            ALOGW("%s poll %s timeout", __func__, nodeName.c_str());
             // time out
-            ret = -ETIMEDOUT;
+            ret = ETIMEDOUT;
             break;
         } else if (pollRet > 0) {
             if (!(pfd.revents & POLLPRI)) {
@@ -777,13 +781,12 @@ int BrightnessController::checkSysfsStatus(const std::string& file,
                     if (values.size() > 0) {
                         values.resize(values.size() - 1);
                     }
-                    ALOGW("%s read %s expected %s after notified on file %s", __func__, val.c_str(),
-                          values.c_str(), file.c_str());
+                    ALOGE("%s read %s expected %s after notified", __func__, val.c_str(),
+                          values.c_str());
                 }
             } else {
-                ret = -EIO;
-                ALOGE("%s failed to read after notified %d on file %s", __func__, errno,
-                      file.c_str());
+                ret = EIO;
+                ALOGE("%s failed to read after notified %d", __func__, errno);
                 break;
             }
         } else {
@@ -791,13 +794,13 @@ int BrightnessController::checkSysfsStatus(const std::string& file,
                 continue;
             }
 
-            ALOGE("%s poll failed %d on file %s", __func__, errno, file.c_str());
-            ret = -errno;
+            ALOGE("%s poll failed %d", __func__, errno);
+            ret = errno;
             break;
         }
     };
 
-    return ret;
+    return ret == NO_ERROR;
 }
 
 void BrightnessController::resetLhbmState() {
