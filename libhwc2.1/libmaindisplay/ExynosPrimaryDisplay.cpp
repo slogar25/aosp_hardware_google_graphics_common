@@ -520,7 +520,6 @@ bool ExynosPrimaryDisplay::isLhbmSupported() {
 // This function should be called by other threads (e.g. sensor HAL).
 // HWCService can call this function but it should be for test purpose only.
 int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
-    int ret;
     // NOTE: mLhbmOn could be set to false at any time by setPowerOff in another
     // thread. Make sure no side effect if that happens. Or add lock if we have
     // to when new code is added.
@@ -541,12 +540,12 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
 
     float peak_rr = getPeakRefreshRate();
     if (enabled && peak_rr > 0) {
-        ATRACE_NAME("wait for peak rr sent");
-        auto rrSysfs = mBrightnessController->GetPanelRefreshRateSysfile();
-        ret = mBrightnessController->checkSysfsStatus(rrSysfs,
+        ATRACE_NAME("wait for peak refresh rate");
+        bool succ = mBrightnessController->checkSysfsStatus(
+                                                BrightnessController::kRefreshrateFileNode,
                                                 {std::to_string(std::lround(peak_rr))},
                                                 ms2ns(kLhbmWaitForPeakRefreshRateMs));
-        if (ret != OK) {
+        if (!succ) {
             ALOGE("%s: check refresh rate sysfs node failed", __func__);
             return -EINVAL;
         }
@@ -556,13 +555,12 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         setLHBMRefreshRateThrottle(kLhbmRefreshRateThrottleMs);
     }
 
-    auto lhbmSysfs = mBrightnessController->GetPanelSysfileByIndex(
-            BrightnessController::kLocalHbmModeFileNode);
-    ret = mBrightnessController->checkSysfsStatus(lhbmSysfs,
-                                         {std::to_string(static_cast<int>(
-                                                 BrightnessController::LhbmMode::DISABLED))},
-                                         0);
-    bool wasDisabled = ret == OK;
+    bool wasDisabled =
+            mBrightnessController
+                    ->checkSysfsStatus(BrightnessController::kLocalHbmModeFileNode,
+                                       {std::to_string(static_cast<int>(
+                                               BrightnessController::LhbmMode::DISABLED))},
+                                       0);
     if (!enabled && wasDisabled) {
         ALOGW("lhbm is at DISABLED state, skip disabling");
         return NO_ERROR;
@@ -583,9 +581,10 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     requestLhbm(enabled);
     constexpr uint32_t kSysfsCheckTimeoutMs = 500;
     ALOGI("setLhbmState =%d", enabled);
-    ret = mBrightnessController->checkSysfsStatus(lhbmSysfs, checkingValue,
-                                                  ms2ns(kSysfsCheckTimeoutMs));
-    if (ret != OK) {
+    bool succeed =
+            mBrightnessController->checkSysfsStatus(BrightnessController::kLocalHbmModeFileNode,
+                                                    checkingValue, ms2ns(kSysfsCheckTimeoutMs));
+    if (!succeed) {
         ALOGE("failed to update lhbm mode");
         if (enabled) {
             setLHBMRefreshRateThrottle(0);
@@ -598,11 +597,11 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         bool enablingStateSupported = !mFramesToReachLhbmPeakBrightness;
         if (enablingStateSupported) {
             ATRACE_NAME("lhbm_wait_peak_brightness");
-            ret = mBrightnessController->checkSysfsStatus(lhbmSysfs,
+            if (!mBrightnessController
+                         ->checkSysfsStatus(BrightnessController::kLocalHbmModeFileNode,
                                             {std::to_string(static_cast<int>(
                                                     BrightnessController::LhbmMode::ENABLED))},
-                                            ms2ns(kSysfsCheckTimeoutMs));
-            if (ret != OK) {
+                                            ms2ns(kSysfsCheckTimeoutMs))) {
                 ALOGE("failed to wait for lhbm becoming effective");
                 return -EIO;
             }
