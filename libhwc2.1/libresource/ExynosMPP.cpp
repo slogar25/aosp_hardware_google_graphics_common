@@ -1092,23 +1092,16 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
 
     VendorGraphicBufferMeta gmeta(dst_handle);
 
-    uint32_t prevAssignedBufferNum =
-            getBufferNumOfFormat(gmeta.format, getCompressionType(dst_handle));
-    uint32_t assignedBufferNum = getBufferNumOfFormat(dst.format, getCompressionType(dst_handle));
-
     MPP_LOGD(eDebugMPP | eDebugBuf, "\tdst_handle(%p) afbc (%u) sbwc (%u) lossy (%u)", dst_handle,
              isAFBCCompressed(dst_handle), isFormatSBWC(gmeta.format), isFormatLossy(gmeta.format));
     MPP_LOGD(eDebugMPP | eDebugBuf,
-             "\tAssignedDisplay[%d, %d] format[0x%8x, 0x%8x], bufferType[%d, %d], bufferNum[%d, "
-             "%d] "
+             "\tAssignedDisplay[%d, %d] format[0x%8x, 0x%8x], bufferType[%d, %d], "
              "usageFlags: 0x%" PRIx64 ", need comp_type 0x%x lossy %u",
              mPrevAssignedDisplayType, assignedDisplay, gmeta.format, dst.format,
-             mDstImgs[index].bufferType, getBufferType(dst.usageFlags), prevAssignedBufferNum,
-             assignedBufferNum, dst.usageFlags, dst.compressionInfo.type,
-             isFormatLossy(dst.format));
+             mDstImgs[index].bufferType, getBufferType(dst.usageFlags), dst.usageFlags,
+             dst.compressionInfo.type, isFormatLossy(dst.format));
 
     bool realloc = (mPrevAssignedDisplayType != assignedDisplay) ||
-            (prevAssignedBufferNum < assignedBufferNum) ||
             (formatToBpp(gmeta.format) < formatToBpp(dst.format)) ||
             ((gmeta.stride * gmeta.vstride) <
              (int)(getAlignedDstFullWidth(dst) * dst.fullHeight)) ||
