@@ -75,7 +75,6 @@ int ExynosExternalDisplay::openExternalDisplay()
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
     int ret = 0;
-    setVsyncEnabledInternal(HWC2_VSYNC_ENABLE);
 
     mSkipFrameCount = SKIP_FRAME_COUNT;
     mSkipStartFrame = 0;
