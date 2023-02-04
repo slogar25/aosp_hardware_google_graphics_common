@@ -307,7 +307,7 @@ int32_t ExynosExternalDisplay::presentDisplay(
             ret = HWC2_ERROR_NOT_VALIDATED;
         }
         mRenderingState = RENDERING_STATE_PRESENTED;
-        mDevice->onRefresh();
+        mDevice->onRefresh(mDisplayId);
         return ret;
     }
 
@@ -346,7 +346,7 @@ int32_t ExynosExternalDisplay::presentDisplay(
          */
         setGeometryChanged(GEOMETRY_DISPLAY_FORCE_VALIDATE);
 
-        mDevice->onRefresh();
+        mDevice->onRefresh(mDisplayId);
 
         return HWC2_ERROR_NONE;
     }
@@ -542,7 +542,7 @@ void ExynosExternalDisplay::handleHotplugEvent()
                 closeExternalDisplay();
             }
             hotplug();
-            mDevice->onRefresh();
+            mDevice->onRefresh(mDisplayId);
         }
     }
 

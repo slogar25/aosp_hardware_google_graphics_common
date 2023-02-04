@@ -252,7 +252,7 @@ void ExynosHWCService::enableMPP(uint32_t physicalType, uint32_t physicalIndex, 
             __func__, physicalType, physicalIndex, logicalIndex, enable);
     ExynosResourceManager::enableMPP(physicalType, physicalIndex, logicalIndex, enable);
     mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
-    mHWCCtx->device->onRefresh();
+    mHWCCtx->device->onRefreshDisplays();
 }
 
 void ExynosHWCService::setScaleDownRatio(uint32_t physicalType,
@@ -262,7 +262,7 @@ void ExynosHWCService::setScaleDownRatio(uint32_t physicalType,
             __func__, physicalType, physicalIndex, logicalIndex, scaleDownRatio);
     ExynosResourceManager::setScaleDownRatio(physicalType, physicalIndex, logicalIndex, scaleDownRatio);
     mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
-    mHWCCtx->device->onRefresh();
+    mHWCCtx->device->onRefreshDisplays();
 }
 
 void ExynosHWCService::setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) {
@@ -336,11 +336,10 @@ int ExynosHWCService::setHWCCtl(uint32_t display, uint32_t ctrl, int32_t val)
     return err;
 }
 
-int ExynosHWCService::setDDIScaler(uint32_t width, uint32_t height)
-{
+int ExynosHWCService::setDDIScaler(uint32_t display_id, uint32_t width, uint32_t height) {
     ALOGD_IF(HWC_SERVICE_DEBUG, "%s, width=%d, height=%d", __func__, width, height);
     if (mHWCCtx) {
-        ExynosDisplay *display = (ExynosDisplay*)mHWCCtx->device->getDisplay(getDisplayId(HWC_DISPLAY_PRIMARY, 0));
+        ExynosDisplay *display = (ExynosDisplay *)mHWCCtx->device->getDisplay(display_id);
 
         if (display == NULL)
             return -EINVAL;
@@ -482,7 +481,7 @@ int32_t ExynosHWCService::setDisplayRCDLayerEnabled(uint32_t displayIndex, bool 
     auto ret = primaryDisplay->setDebugRCDLayerEnabled(enable);
 
     mHWCCtx->device->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
-    mHWCCtx->device->onRefresh();
+    mHWCCtx->device->onRefresh(getDisplayId(HWC_DISPLAY_PRIMARY, displayIndex));
 
     return ret;
 }
@@ -511,7 +510,7 @@ int32_t ExynosHWCService::setDisplayDbm(int32_t display_id, uint32_t on) {
 
     ALOGD("ExynosHWCService::%s() display(%u) on=%d", __func__, display_id, on);
     display->setDbmState(!!on);
-    mHWCCtx->device->onRefresh();
+    mHWCCtx->device->onRefresh(display_id);
     return NO_ERROR;
 }
 
