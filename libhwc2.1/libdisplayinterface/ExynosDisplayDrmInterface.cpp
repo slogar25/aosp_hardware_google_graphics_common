@@ -30,6 +30,7 @@
 #include "BrightnessController.h"
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
+#include "ExynosLayer.h"
 #include "ExynosPrimaryDisplay.h"
 
 using namespace std::chrono_literals;
@@ -291,10 +292,14 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     if (config.layer || config.buffer_id) {
         Mutex::Autolock lock(mMutex);
         auto &cachedBuffers = mCachedLayerBuffers[config.layer];
-        if (cachedBuffers.size() > MAX_CACHED_BUFFERS_PER_LAYER) {
-            ALOGW("FBManager: cached buffers size %zu exceeds limitation while adding fbId %d",
-                  cachedBuffers.size(), fbId);
-            printExynosLayer(config.layer);
+        auto maxCachedBufferSize = MAX_CACHED_BUFFERS_PER_LAYER;
+        if (config.protection && config.layer && config.layer->mM2mMPP) {
+            maxCachedBufferSize = MAX_CACHED_SECURE_BUFFERS_PER_G2D_LAYER;
+        }
+
+        if (cachedBuffers.size() > maxCachedBufferSize) {
+            ALOGW("FBManager: cached buffers size %zu exceeds limitation(%zu) while adding fbId %d",
+                  cachedBuffers.size(), maxCachedBufferSize, fbId);
             mCleanBuffers.splice(mCleanBuffers.end(), cachedBuffers);
         }
 
@@ -920,11 +925,12 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         /* key: (width<<32 | height) */
         std::map<uint64_t, uint32_t> groupIds;
         uint32_t groupId = 0;
-        uint32_t min_vsync_period = UINT_MAX;
+        float peakRr = -1;
 
         for (const DrmMode &mode : mDrmConnector->modes()) {
             displayConfigs_t configs;
-            configs.vsyncPeriod = nsecsPerSec/ mode.v_refresh();
+            float rr = mode.v_refresh();
+            configs.vsyncPeriod = nsecsPerSec / rr;
             configs.width = mode.h_display();
             configs.height = mode.v_display();
             uint64_t key = ((uint64_t)configs.width<<32) | configs.height;
@@ -941,14 +947,15 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             configs.Xdpi = mm_width ? (mode.h_display() * kUmPerInch) / mm_width : -1;
             // Dots per 1000 inches
             configs.Ydpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
-            // find min vsync period
-            if (configs.vsyncPeriod <= min_vsync_period) min_vsync_period = configs.vsyncPeriod;
+            // find peak rr
+            if (rr > peakRr)
+                  peakRr = rr;
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
             ALOGD("config group(%d), w(%d), h(%d), vsync(%d), xdpi(%d), ydpi(%d)",
                     configs.groupId, configs.width, configs.height,
                     configs.vsyncPeriod, configs.Xdpi, configs.Ydpi);
         }
-        mExynosDisplay->setMinDisplayVsyncPeriod(min_vsync_period);
+        mExynosDisplay->setPeakRefreshRate(peakRr);
     }
 
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());

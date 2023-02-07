@@ -555,10 +555,6 @@ class ExynosDisplay {
 
         hwc2_config_t mActiveConfig = UINT_MAX;
 
-        bool mNotifyPeakRefreshRate = false;
-        std::mutex mPeakRefreshRateMutex;
-        std::condition_variable mPeakRefreshRateCondition;
-
         void initDisplay();
 
         int getId();
@@ -1278,11 +1274,10 @@ class ExynosDisplay {
         // is the hint session both enabled and supported
         bool usePowerHintSession();
 
-        void setMinDisplayVsyncPeriod(uint32_t period) { mMinDisplayVsyncPeriod = period; }
-
-        bool isCurrentPeakRefreshRate(void) {
-            return ((mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_DONE) &&
-                    (mVsyncPeriod == mMinDisplayVsyncPeriod));
+        void setPeakRefreshRate(float rr) { mPeakRefreshRate = rr; }
+        float getPeakRefreshRate() {
+            float opRate = mOperationRateManager ? mOperationRateManager->getOperationRate() : 0;
+            return opRate ?: mPeakRefreshRate;
         }
 
         // check if there are any dimmed layers
@@ -1307,8 +1302,8 @@ class ExynosDisplay {
         static constexpr float kHdrFullScreen = 0.5;
         uint32_t mHdrFullScrenAreaThreshold;
 
-        // vsync period of peak refresh rate
-        uint32_t mMinDisplayVsyncPeriod;
+        // peak refresh rate
+        float mPeakRefreshRate = -1.0f;
 
         // track if the last frame is a mixed composition, to detect mixed
         // composition to non-mixed composition transition.
