@@ -538,16 +538,16 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
         }
     }
 
-    if (enabled) {
+    float peak_rr = getPeakRefreshRate();
+    if (enabled && peak_rr > 0) {
         ATRACE_NAME("wait for peak refresh rate");
-        std::unique_lock<std::mutex> lock(mPeakRefreshRateMutex);
-        mNotifyPeakRefreshRate = true;
-        if (!mPeakRefreshRateCondition.wait_for(lock,
-                                                std::chrono::milliseconds(
-                                                        kLhbmWaitForPeakRefreshRateMs),
-                                                [this]() { return isCurrentPeakRefreshRate(); })) {
-            ALOGW("setLhbmState(on) wait for peak refresh rate timeout !");
-            return TIMED_OUT;
+        bool succ = mBrightnessController->checkSysfsStatus(
+                                                BrightnessController::kRefreshrateFileNode,
+                                                {std::to_string(std::lround(peak_rr))},
+                                                ms2ns(kLhbmWaitForPeakRefreshRateMs));
+        if (!succ) {
+            ALOGE("%s: check refresh rate sysfs node failed", __func__);
+            return -EINVAL;
         }
     }
 
