@@ -217,8 +217,6 @@ public:
                 "/sys/class/backlight/panel%d-backlight/local_hbm_mode";
     static constexpr const char* kDimBrightnessFileNode =
             "/sys/class/backlight/panel%d-backlight/dim_brightness";
-    static constexpr const char* kRefreshrateFileNode =
-            "/sys/devices/platform/exynos-drm/%s-panel/refresh_rate";
 
 private:
     // sync brightness change for mixed composition when there is more than 50% luminance change.
