@@ -589,6 +589,8 @@ class ExynosDisplay {
 
         int checkLayerFps();
 
+        int switchDynamicReCompMode(dynamic_recomp_mode mode);
+
         int checkDynamicReCompMode();
 
         int handleDynamicReCompMode();
