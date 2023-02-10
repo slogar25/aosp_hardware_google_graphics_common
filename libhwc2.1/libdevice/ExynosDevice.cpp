@@ -311,10 +311,10 @@ void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
             event_cnt[i] = display[i]->mUpdateEventCnt;
 
         /*
-         * If there is no update for more than 100ms, favor the 3D composition mode.
-         * If all other conditions are met, mode will be switched to 3D composition.
+         * If there is no update for more than 5s, favor the client composition mode.
+         * If all other conditions are met, mode will be switched to client composition.
          */
-        usleep(100000);
+        usleep(5000000);
         for (uint32_t i = 0; i < dev->mDisplays.size(); i++) {
             if (display[i]->mDREnable &&
                 display[i]->mPlugState == true &&
@@ -729,7 +729,7 @@ void ExynosDevice::setHWCControl(uint32_t displayId, uint32_t ctrl, int32_t val)
             break;
         case HWC_CTL_DYNAMIC_RECOMP:
             ALOGI("%s::HWC_CTL_DYNAMIC_RECOMP on/off = %d", __func__, val);
-            setDynamicRecomposition((unsigned int)val);
+            setDynamicRecomposition(displayId, (unsigned int)val);
             break;
         case HWC_CTL_ENABLE_FENCE_TRACER:
             ALOGI("%s::HWC_CTL_ENABLE_FENCE_TRACER on/off=%d", __func__, val);
@@ -754,9 +754,14 @@ void ExynosDevice::setDisplayMode(uint32_t displayMode)
     exynosHWCControl.displayMode = displayMode;
 }
 
-void ExynosDevice::setDynamicRecomposition(unsigned int on)
-{
+void ExynosDevice::setDynamicRecomposition(uint32_t displayId, unsigned int on) {
     exynosHWCControl.useDynamicRecomp = on;
+    ExynosDisplay *display = getDisplay(displayId);
+    if (display) {
+        display->mDRDefault = on;
+        display->mDREnable = on;
+        onRefresh(displayId);
+    }
 }
 
 bool ExynosDevice::checkDisplayConnection(uint32_t displayId)

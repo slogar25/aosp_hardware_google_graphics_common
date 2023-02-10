@@ -67,10 +67,6 @@ public:
 
     virtual int setDDIScaler(uint32_t display_id, uint32_t width, uint32_t height);
     virtual void setLbeCtrl(uint32_t display_id, uint32_t state, uint32_t lux) override;
-#if 0
-    void setPSRExitCallback(void (*callback)(exynos_hwc_composer_device_1_t *));
-    virtual void notifyPSRExit();
-#endif
     virtual int32_t setDisplayDeviceMode(int32_t display_id, int32_t mode);
     virtual int32_t setPanelGammaTableSource(int32_t display_id, int32_t type, int32_t source);
     virtual int32_t setDisplayBrightness(int32_t display_id, float brightness);
@@ -91,7 +87,6 @@ private:
     Mutex mLock;
     ExynosHWCCtx *mHWCCtx;
     void (*bootFinishedCallback)(ExynosHWCCtx *);
-    void (*doPSRExit)(ExynosHWCCtx *ctx);
 };
 
 }
