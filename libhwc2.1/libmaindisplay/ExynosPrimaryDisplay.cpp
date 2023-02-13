@@ -836,7 +836,7 @@ void ExynosPrimaryDisplay::handleDisplayIdleEnter(const uint32_t idleTeRefreshRa
     bool needed = false;
     for (size_t i = 0; i < mLayers.size(); i++) {
         if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP == nullptr &&
-            !mLayers[i]->checkDownscaleCap(idleTeRefreshRate)) {
+            !mLayers[i]->checkBtsCap(idleTeRefreshRate)) {
             needed = true;
             break;
         }
@@ -981,7 +981,7 @@ void ExynosPrimaryDisplay::checkBtsReassignResource(const uint32_t vsyncPeriod,
     if (vsyncPeriod < btsVsyncPeriod) {
         for (size_t i = 0; i < mLayers.size(); i++) {
             if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP == nullptr &&
-                !mLayers[i]->checkDownscaleCap(refreshRate)) {
+                !mLayers[i]->checkBtsCap(refreshRate)) {
                 mLayers[i]->setGeometryChanged(GEOMETRY_DEVICE_CONFIG_CHANGED);
                 break;
             }
