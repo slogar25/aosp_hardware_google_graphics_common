@@ -70,6 +70,7 @@
 #include <aidl/android/hardware/graphics/composer3/PresentFence.h>
 #include <aidl/android/hardware/graphics/composer3/PresentOrValidate.h>
 #include <aidl/android/hardware/graphics/composer3/ReadbackBufferAttributes.h>
+#include <aidl/android/hardware/graphics/composer3/RefreshRateChangedDebugData.h>
 #include <aidl/android/hardware/graphics/composer3/ReleaseFences.h>
 #include <aidl/android/hardware/graphics/composer3/RenderIntent.h>
 #include <aidl/android/hardware/graphics/composer3/VirtualDisplay.h>
@@ -105,6 +106,7 @@ class IComposerHal {
                                                 const VsyncPeriodChangeTimeline& timeline) = 0;
         virtual void onVsyncIdle(int64_t display) = 0;
         virtual void onSeamlessPossible(int64_t display) = 0;
+        virtual void onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) = 0;
     };
     virtual void registerEventCallback(EventCallback* callback) = 0;
     virtual void unregisterEventCallback() = 0;
@@ -227,6 +229,7 @@ class IComposerHal {
     virtual int32_t setLayerBlockingRegion(
             int64_t display, int64_t layer,
             const std::vector<std::optional<common::Rect>>& blockingRegion) = 0;
+    virtual int32_t setRefreshRateChangedCallbackDebugEnabled(int64_t display, bool enabled) = 0;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::detail
