@@ -462,7 +462,7 @@ class ExynosLayer : public ExynosMPPSource {
         int32_t setSrcExynosImage(exynos_image *src_img);
         int32_t setDstExynosImage(exynos_image *dst_img);
         int32_t resetAssignedResource();
-        bool checkDownscaleCap(uint32_t btsRefreshRate);
+        bool checkBtsCap(const uint32_t btsRefreshRate);
 
         void setSrcAcquireFence();
 
