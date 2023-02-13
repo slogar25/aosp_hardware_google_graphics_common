@@ -374,7 +374,6 @@ void ExynosDisplay::PowerHalHintWorker::forceUpdateHints(void) {
 int32_t ExynosDisplay::PowerHalHintWorker::sendActualWorkDuration() {
     Lock();
     if (mPowerHintSession == nullptr) {
-        ALOGW("Cannot send actual work duration, power hint session not running");
         Unlock();
         return -EINVAL;
     }
@@ -413,7 +412,6 @@ int32_t ExynosDisplay::PowerHalHintWorker::updateTargetWorkDuration() {
     }
 
     if (mPowerHintSession == nullptr) {
-        ALOGW("Cannot send target work duration, power hint session not running");
         return -EINVAL;
     }
 
