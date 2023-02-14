@@ -117,6 +117,7 @@ bool CJpegStreamParser::Parse(unsigned char *streambase, size_t length)
         }
 
         unsigned char marker = *addr++;
+        filelen -= 2;
 
         if ((marker != 0xC4) && ((marker & 0xF0) == 0xC0)) { // SOFn
             if (marker != 0xC0) {
@@ -124,7 +125,7 @@ bool CJpegStreamParser::Parse(unsigned char *streambase, size_t length)
                 return false;
             }
 
-            if (filelen < GetLength(addr)) {
+            if (filelen < 2 || filelen < GetLength(addr)) {
                 ALOGE("Too small SOF0 segment");
                 return false;
             }
@@ -143,14 +144,19 @@ bool CJpegStreamParser::Parse(unsigned char *streambase, size_t length)
                 return false;
             }
 
-            if (filelen < GetLength(addr)) {
+            if (filelen < 2 || filelen < GetLength(addr)) {
                 ALOGE("Corrupted JPEG stream");
                 return false;
             }
         }
 
-        if (GetLength(addr) == 0) {
+        if (filelen < 2 || GetLength(addr) == 0) {
             ALOGE("Invalid length 0 is read at offset %lu", GetOffset(addr));
+            return false;
+        }
+
+        if (filelen < GetLength(addr)) {
+            ALOGE("Corrupted JPEG Stream");
             return false;
         }
 
