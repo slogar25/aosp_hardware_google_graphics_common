@@ -174,6 +174,8 @@ class ExynosDevice {
         volatile int32_t mDRThreadStatus;
         std::atomic<bool> mDRLoopStatus;
         bool mPrimaryBlank;
+        std::mutex mDRWakeUpMutex;
+        std::condition_variable mDRWakeUpCondition;
 
         /**
          * Callback informations those are used by SurfaceFlinger.
