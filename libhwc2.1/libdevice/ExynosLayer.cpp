@@ -55,6 +55,8 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
         mFrameCount(0),
         mLastFrameCount(0),
         mLastFpsTime(0),
+        mNextLastFrameCount(0),
+        mNextLastFpsTime(0),
         mLastLayerBuffer(NULL),
         mLayerBuffer(NULL),
         mDamageNum(0),
