@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "ExynosDevice.h"
 
 #include <aidl/android/hardware/graphics/composer3/IComposerCallback.h>
@@ -267,6 +269,7 @@ bool ExynosDevice::isDynamicRecompositionThreadAlive()
 
 void ExynosDevice::checkDynamicRecompositionThread()
 {
+    ATRACE_CALL();
     // If thread was destroyed, create thread and run. (resume status)
     if (isDynamicRecompositionThreadAlive() == false) {
         for (uint32_t i = 0; i < mDisplays.size(); i++) {
@@ -282,6 +285,7 @@ void ExynosDevice::checkDynamicRecompositionThread()
                 return;
         }
         mDRLoopStatus = false;
+        mDRWakeUpCondition.notify_one();
         mDRThread.join();
     }
 }
@@ -314,7 +318,13 @@ void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
          * If there is no update for more than 5s, favor the client composition mode.
          * If all other conditions are met, mode will be switched to client composition.
          */
-        usleep(5000000);
+        {
+            std::unique_lock<std::mutex> lock(dev->mDRWakeUpMutex);
+            dev->mDRWakeUpCondition.wait_for(lock, std::chrono::seconds(5));
+            if (!dev->mDRLoopStatus) {
+                break;
+            }
+        }
         for (uint32_t i = 0; i < dev->mDisplays.size(); i++) {
             if (display[i]->mDREnable &&
                 display[i]->mPlugState == true &&
