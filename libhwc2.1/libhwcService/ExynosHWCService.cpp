@@ -503,4 +503,17 @@ int32_t ExynosHWCService::setDisplayMultiThreadedPresent(const int32_t& displayI
     return NO_ERROR;
 }
 
+int32_t ExynosHWCService::triggerRefreshRateIndicatorUpdate(uint32_t displayId,
+                                                            uint32_t refreshRate) {
+    auto display = mHWCCtx->device->getDisplay(displayId);
+
+    if (display == nullptr) return -EINVAL;
+
+    ALOGD("ExynosHWCService::%s() displayID(%u) refreshRate(%u)", __func__, displayId, refreshRate);
+    if (display->mRefreshRateIndicatorHandler) {
+        display->mRefreshRateIndicatorHandler->updateRefreshRate(refreshRate);
+    }
+    return NO_ERROR;
+}
+
 } //namespace android

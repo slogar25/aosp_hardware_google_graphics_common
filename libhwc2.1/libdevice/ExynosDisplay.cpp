@@ -6225,6 +6225,11 @@ void ExynosDisplay::RefreshRateIndicatorHandler::handleSysfsEvent() {
     updateRefreshRateLocked(refreshRate);
 }
 
+void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRate(int refreshRate) {
+    std::scoped_lock lock(mMutex);
+    updateRefreshRateLocked(refreshRate);
+}
+
 int32_t ExynosDisplay::setRefreshRateChangedCallbackDebugEnabled(bool enabled) {
     if ((!!mRefreshRateIndicatorHandler) == enabled) {
         ALOGW("%s: RefreshRateChangedCallbackDebug is already %s", __func__,

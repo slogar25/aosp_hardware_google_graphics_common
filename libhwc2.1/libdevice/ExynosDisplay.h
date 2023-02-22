@@ -1606,6 +1606,7 @@ class ExynosDisplay {
             virtual void handleSysfsEvent() override;
             virtual int getFd() override { return mFd.get(); };
             bool isIgnoringLastUpdate() { return mIgnoringLastUpdate; }
+            void updateRefreshRate(int refreshRate);
 
         private:
             void updateRefreshRateLocked(int refreshRate) REQUIRES(mMutex);
