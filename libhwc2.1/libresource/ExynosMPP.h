@@ -578,7 +578,8 @@ public:
     virtual bool isSupportedHStrideCrop(struct exynos_image &src);
     bool checkDownscaleCap(const float resolution, const float displayRatio_V) const;
     virtual bool checkSpecificRestriction(const uint32_t __unused refreshRate,
-                                          const struct exynos_image __unused &src) {
+                                          const struct exynos_image __unused &src,
+                                          const struct exynos_image __unused &dst) {
         return false;
     }
     virtual uint32_t getDownscaleRestriction(const struct exynos_image &src,
