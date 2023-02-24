@@ -968,13 +968,12 @@ bool ExynosLayer::checkBtsCap(const uint32_t bts_refresh_rate) {
     if (mOtfMPP == nullptr) return true;
 
     exynos_image src_img;
+    exynos_image dst_img;
     setSrcExynosImage(&src_img);
-    if (mOtfMPP->checkSpecificRestriction(bts_refresh_rate, src_img)) {
+    setDstExynosImage(&dst_img);
+    if (mOtfMPP->checkSpecificRestriction(bts_refresh_rate, src_img, dst_img)) {
         return false;
     }
-
-    exynos_image dst_img;
-    setDstExynosImage(&dst_img);
 
     const bool isPerpendicular = !!(src_img.transform & HAL_TRANSFORM_ROT_90);
     const uint32_t srcWidth = isPerpendicular ? src_img.h : src_img.w;
