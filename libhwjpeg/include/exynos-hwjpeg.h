@@ -18,20 +18,9 @@
 #ifndef __EXYNOS_HWJPEG_H__
 #define __EXYNOS_HWJPEG_H__
 
+#include <linux/videodev2.h>
+
 #include <cstddef> // size_t
-/*
- * exynos-hwjpeg.h does not include videodev2.h because Exynos HAL code may
- * define its version of videodev2.h that may differ from <linux/videodev2.h>
- * of the current Linux version.
- * To prevent conflict different versions of videodev2.h, this header file does
- * not include videodev2.h even though it depends on the data types defined in
- * videodev2.h.
- * Therefore, the source files that include this header file, they should
- * include their proper version of videodev2.h.
- */
-#ifndef VIDEO_MAX_PLANES
-#error 'linux/videodev2.h' should be included before 'exynos-hwjpeg.h'
-#endif
 
 #if VIDEO_MAX_PLANES < 6
 #error VIDEO_MAX_PLANES should not be smaller than 6
