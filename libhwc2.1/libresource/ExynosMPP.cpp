@@ -130,40 +130,6 @@ void ExynosMPPSource::setExynosMidImage(exynos_image mid_img)
     mMidImg = mid_img;
 }
 
-uint32_t ExynosMPPSource::needHWResource(tdm_attr_t attr) {
-    uint32_t ret = 0;
-
-    switch (attr) {
-        case TDM_ATTR_SBWC:
-            ret = (isFormatSBWC(mSrcImg.format)) ? 1 : 0;
-            break;
-        case TDM_ATTR_AFBC:
-            ret = (mSrcImg.compressed == 1) ? 1 : 0;
-            break;
-        case TDM_ATTR_ITP: // CSC
-            ret = (isFormatYUV(mSrcImg.format)) ? 1 : 0;
-            break;
-        case TDM_ATTR_ROT_90:
-            ret = ((mSrcImg.transform & HAL_TRANSFORM_ROT_90) == 0) ? 0 : 1;
-            break;
-        case TDM_ATTR_SCALE:
-            {
-                bool isPerpendicular = !!(mSrcImg.transform & HAL_TRANSFORM_ROT_90);
-                if (isPerpendicular) {
-                    ret = ((mSrcImg.w != mDstImg.h) || (mSrcImg.h != mDstImg.w)) ? 1 : 0;
-                } else {
-                    ret = ((mSrcImg.w != mDstImg.w) || (mSrcImg.h != mDstImg.h)) ? 1 : 0;
-                }
-            }
-            break;
-        default:
-            ret = 0;
-            break;
-    }
-
-    return ret;
-}
-
 ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
         uint32_t physicalType, uint32_t logicalType, const char *name,
         uint32_t physicalIndex, uint32_t logicalIndex, uint32_t preAssignInfo)
