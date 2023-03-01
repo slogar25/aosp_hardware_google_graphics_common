@@ -1278,7 +1278,8 @@ class ExynosDisplay {
 
         void setPeakRefreshRate(float rr) { mPeakRefreshRate = rr; }
         float getPeakRefreshRate() {
-            return mPeakRefreshRate;
+            float opRate = mOperationRateManager ? mOperationRateManager->getOperationRate() : 0;
+            return opRate ?: mPeakRefreshRate;
         }
 
         // check if there are any dimmed layers
