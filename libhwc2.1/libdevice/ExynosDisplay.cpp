@@ -4255,14 +4255,6 @@ int32_t ExynosDisplay::resetConfigRequestStateLocked(hwc2_config_t config) {
                      __func__, mConfigRequestState);
         mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_DONE;
         updateAppliedActiveConfig(mActiveConfig, systemTime(SYSTEM_TIME_MONOTONIC));
-
-        std::lock_guard<std::mutex> lock(mPeakRefreshRateMutex);
-        bool isPeakRefreshRate = isCurrentPeakRefreshRate();
-        DISPLAY_ATRACE_INT("isPeakRefreshRate", isPeakRefreshRate);
-        if (isPeakRefreshRate && mNotifyPeakRefreshRate) {
-            mPeakRefreshRateCondition.notify_one();
-            mNotifyPeakRefreshRate = false;
-        }
     }
     return NO_ERROR;
 }
