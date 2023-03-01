@@ -116,6 +116,10 @@ public:
     }
     int checkSysfsStatus(const std::string& file, const std::vector<std::string>& expectedValue,
                          const nsecs_t timeoutNs);
+    bool fileExists(const std::string& file) {
+        struct stat sb;
+        return stat(file.c_str(), &sb) == 0;
+    }
     void resetLhbmState();
 
     uint32_t getBrightnessLevel() {
