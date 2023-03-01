@@ -87,6 +87,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         // Prepare multi resolution
         ResolutionInfo mResolutionInfo;
         std::string getPanelSysfsPath(const displaycolor::DisplayType& type);
+        bool isConfigSettingEnabled();
 
         uint32_t mRcdId = -1;
 
@@ -120,9 +121,18 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         FILE* mLhbmFd;
         std::atomic<bool> mLhbmOn;
         int32_t mFramesToReachLhbmPeakBrightness;
+        bool mConfigSettingDisabled = false;
+        int64_t mConfigSettingDisabledTimestamp = 0;
         // timeout value of waiting for peak refresh rate
-        static constexpr uint32_t kLhbmWaitForPeakRefreshRateMs = 200;
-        static constexpr uint32_t kLhbmRefreshRateThrottleMs = 1000;
+        static constexpr uint32_t kLhbmWaitForPeakRefreshRateMs = 100U;
+        static constexpr uint32_t kLhbmRefreshRateThrottleMs = 1000U;
+        static constexpr uint32_t kLhbmMaxEnablingDurationMs = 1000U;
+        static constexpr uint32_t kSysfsCheckTimeoutMs = 500U;
+        void enableConfigSetting(bool en);
+        int32_t getTimestampDeltaMs(int64_t endNs, int64_t beginNs) {
+            if (endNs == 0) endNs = systemTime(SYSTEM_TIME_MONOTONIC);
+            return (endNs - beginNs) / 1000000;
+        }
 
         FILE* mEarlyWakeupDispFd;
         static constexpr const char* kWakeupDispFilePath =
