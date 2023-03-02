@@ -925,11 +925,12 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         /* key: (width<<32 | height) */
         std::map<uint64_t, uint32_t> groupIds;
         uint32_t groupId = 0;
-        uint32_t min_vsync_period = UINT_MAX;
+        float peakRr = -1;
 
         for (const DrmMode &mode : mDrmConnector->modes()) {
             displayConfigs_t configs;
-            configs.vsyncPeriod = nsecsPerSec/ mode.v_refresh();
+            float rr = mode.v_refresh();
+            configs.vsyncPeriod = nsecsPerSec / rr;
             configs.width = mode.h_display();
             configs.height = mode.v_display();
             uint64_t key = ((uint64_t)configs.width<<32) | configs.height;
@@ -946,14 +947,15 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             configs.Xdpi = mm_width ? (mode.h_display() * kUmPerInch) / mm_width : -1;
             // Dots per 1000 inches
             configs.Ydpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
-            // find min vsync period
-            if (configs.vsyncPeriod <= min_vsync_period) min_vsync_period = configs.vsyncPeriod;
+            // find peak rr
+            if (rr > peakRr)
+                  peakRr = rr;
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
             ALOGD("config group(%d), w(%d), h(%d), vsync(%d), xdpi(%d), ydpi(%d)",
                     configs.groupId, configs.width, configs.height,
                     configs.vsyncPeriod, configs.Xdpi, configs.Ydpi);
         }
-        mExynosDisplay->setMinDisplayVsyncPeriod(min_vsync_period);
+        mExynosDisplay->setPeakRefreshRate(peakRr);
     }
 
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
@@ -1110,9 +1112,6 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
     ALOGD("%s:: %s config(%d) test(%d)", __func__, mExynosDisplay->mDisplayName.string(), config,
           test);
 
-    if (mExynosDisplay->mOperationRateManager) {
-        mExynosDisplay->mOperationRateManager->onConfig(config);
-    }
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
             [config](DrmMode const &m) { return m.id() == config;});
     if (mode == mDrmConnector->modes().end()) {
@@ -1149,6 +1148,9 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
     if (!test) {
         if (modeBlob) { /* only replace desired mode if it has changed */
             mDesiredModeState.setMode(*mode, modeBlob, drmReq);
+            if (mExynosDisplay->mOperationRateManager) {
+                mExynosDisplay->mOperationRateManager->onConfig(config);
+            }
         } else {
             ALOGD("%s:: same desired mode %d", __func__, config);
         }
@@ -1232,6 +1234,10 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
     if (mode == mDrmConnector->modes().end()) {
         HWC_LOGE(mExynosDisplay, "Could not find active mode for %d", config);
         return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    if (mExynosDisplay->mOperationRateManager) {
+        mExynosDisplay->mOperationRateManager->onConfig(config);
     }
 
     mExynosDisplay->updateAppliedActiveConfig(config, systemTime(SYSTEM_TIME_MONOTONIC));
