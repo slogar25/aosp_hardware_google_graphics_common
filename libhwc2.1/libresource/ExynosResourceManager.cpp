@@ -386,7 +386,7 @@ int32_t ExynosResourceManager::assignResource(ExynosDisplay *display)
     HDEBUGLOGD(eDebugTDM, "%s layer's calculation start", __func__);
     for (uint32_t i = 0; i < display->mLayers.size(); i++) {
         display->mLayers[i]->resetValidateData();
-        calculateHWResourceAmount(display->mLayers[i]);
+        calculateHWResourceAmount(display, display->mLayers[i]);
     }
 
     display->initializeValidateInfos();
@@ -1010,7 +1010,7 @@ int32_t ExynosResourceManager::assignCompositionTarget(ExynosDisplay * display, 
         compositionInfo->setExynosImage(src_img, dst_img);
         compositionInfo->setExynosMidImage(dst_img);
         HDEBUGLOGD(eDebugTDM, "%s M2M target calculation start", __func__);
-        calculateHWResourceAmount(compositionInfo);
+        calculateHWResourceAmount(display, compositionInfo);
 
         isSupported = mOtfMPPs[i]->isSupported(*display, src_img, dst_img);
         if (isSupported == NO_ERROR)
@@ -1584,7 +1584,7 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                                 HDEBUGLOGD(eDebugTDM,
                                            "%s Composition target calculation start (candidates)",
                                            __func__);
-                                calculateHWResourceAmount(&dpuSrcInfo);
+                                calculateHWResourceAmount(display, &dpuSrcInfo);
 
                                 isAssignableFlag = isAssignable(mOtfMPPs[k], display, otf_src_img,
                                                                 otf_dst_img, &dpuSrcInfo);
