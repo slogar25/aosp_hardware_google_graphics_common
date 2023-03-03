@@ -227,6 +227,7 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
                     display->mDisplayInterface) != NO_ERROR) {
             ALOGD("Remove display[%d], Failed to initialize display interface", i);
             mDisplays.removeAt(i);
+            mDisplayMap.erase(display->mDisplayId);
             delete display;
         } else {
             i++;

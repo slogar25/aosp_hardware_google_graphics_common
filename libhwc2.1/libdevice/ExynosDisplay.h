@@ -286,20 +286,20 @@ class ExynosSortedLayer : public Vector <ExynosLayer*>
         static int compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs);
 };
 
-class displayTDMInfo {
+class DisplayTDMInfo {
     public:
         /* Could be extended */
-        typedef struct resourceAmount {
+        typedef struct ResourceAmount {
             uint32_t totalAmount;
-        } resourceAmount_t;
-        std::map<tdm_attr_t, resourceAmount_t> mAmount;
+        } ResourceAmount_t;
+        std::map<tdm_attr_t, ResourceAmount_t> mAmount;
 
-        uint32_t initTDMInfo(resourceAmount_t amount, tdm_attr_t attr) {
+        uint32_t initTDMInfo(ResourceAmount_t amount, tdm_attr_t attr) {
             mAmount[attr] = amount;
             return 0;
         }
 
-        resourceAmount_t getAvailableAmount(tdm_attr_t attr) { return mAmount[attr]; }
+        ResourceAmount_t getAvailableAmount(tdm_attr_t attr) { return mAmount[attr]; }
 };
 
 class ExynosCompositionInfo : public ExynosMPPSource {
@@ -1525,7 +1525,7 @@ class ExynosDisplay {
         virtual bool isEnabled() { return mPlugState; }
 
         // Resource TDM (Time-Division Multiplexing)
-        std::map<uint32_t, displayTDMInfo> mDisplayTDMInfo;
+        std::map<uint32_t, DisplayTDMInfo> mDisplayTDMInfo;
 
         class RotatingLogFileWriter {
         public:

@@ -239,7 +239,6 @@ class ExynosResourceManager {
         }
         virtual uint32_t setDisplaysTDMInfo() { return 0; }
         virtual uint32_t initDisplaysTDMInfo() { return 0; }
-        virtual uint32_t calculateHWResourceAmount(ExynosMPPSource __unused *mppSrc) { return 0; }
         virtual uint32_t calculateHWResourceAmount(ExynosDisplay __unused *display,
                                                    ExynosMPPSource __unused *mppSrc) {
             return 0;
