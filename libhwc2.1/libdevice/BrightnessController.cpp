@@ -713,12 +713,23 @@ int BrightnessController::checkSysfsStatus(const char* file,
 
     char buf[16];
     String8 nodeName;
-    nodeName.appendFormat(file, mPanelIndex);
+    if (std::strstr(file, "%d")) {
+        nodeName.appendFormat(file, mPanelIndex);
+    } else if (std::strstr(file, "%s")) {
+        nodeName.appendFormat(file, mPanelIndex == 0 ? "primary"
+                                    : mPanelIndex == 1 ? "secondary" : "unknown");
+    } else {
+        nodeName = file;
+    }
     UniqueFd fd = open(nodeName.string(), O_RDONLY);
+    if (fd.get() < 0) {
+        ALOGE("%s failed to open sysfs %s: %s", __func__, nodeName.c_str(), strerror(errno));
+        return false;
+    }
 
     int size = read(fd.get(), buf, sizeof(buf));
     if (size <= 0) {
-        ALOGE("%s failed to read from %s", __func__, kLocalHbmModeFileNode);
+        ALOGE("%s failed to read from %s: %s", __func__, nodeName.c_str(), strerror(errno));
         return false;
     }
 
@@ -745,7 +756,7 @@ int BrightnessController::checkSysfsStatus(const char* file,
         }
         int pollRet = poll(&pfd, 1, ns2ms(remainTimeNs));
         if (pollRet == 0) {
-            ALOGW("%s poll timeout", __func__);
+            ALOGW("%s poll %s timeout", __func__, nodeName.c_str());
             // time out
             ret = ETIMEDOUT;
             break;
@@ -760,7 +771,8 @@ int BrightnessController::checkSysfsStatus(const char* file,
                 val = std::string(buf, size - 1);
                 if (std::find(expectedValue.begin(), expectedValue.end(), val) !=
                     expectedValue.end()) {
-                    ret = 0;
+                    ret = OK;
+                    break;
                 } else {
                     std::string values;
                     for (auto& s : expectedValue) {
@@ -771,13 +783,12 @@ int BrightnessController::checkSysfsStatus(const char* file,
                     }
                     ALOGE("%s read %s expected %s after notified", __func__, val.c_str(),
                           values.c_str());
-                    ret = EINVAL;
                 }
             } else {
                 ret = EIO;
                 ALOGE("%s failed to read after notified %d", __func__, errno);
+                break;
             }
-            break;
         } else {
             if (errno == EAGAIN || errno == EINTR) {
                 continue;
