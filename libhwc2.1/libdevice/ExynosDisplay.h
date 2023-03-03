@@ -1277,9 +1277,9 @@ class ExynosDisplay {
         bool usePowerHintSession();
 
         void setPeakRefreshRate(float rr) { mPeakRefreshRate = rr; }
-        float getPeakRefreshRate() {
+        uint32_t getPeakRefreshRate() {
             float opRate = mOperationRateManager ? mOperationRateManager->getOperationRate() : 0;
-            return opRate ?: mPeakRefreshRate;
+            return static_cast<uint32_t>(std::round(opRate ?: mPeakRefreshRate));
         }
 
         // check if there are any dimmed layers

@@ -1142,9 +1142,6 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
     ALOGD("%s:: %s config(%d) test(%d)", __func__, mExynosDisplay->mDisplayName.string(), config,
           test);
 
-    if (mExynosDisplay->mOperationRateManager) {
-        mExynosDisplay->mOperationRateManager->onConfig(config);
-    }
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
             [config](DrmMode const &m) { return m.id() == config;});
     if (mode == mDrmConnector->modes().end()) {
@@ -1181,6 +1178,9 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
     if (!test) {
         if (modeBlob) { /* only replace desired mode if it has changed */
             mDesiredModeState.setMode(*mode, modeBlob, drmReq);
+            if (mExynosDisplay->mOperationRateManager) {
+                mExynosDisplay->mOperationRateManager->onConfig(config);
+            }
         } else {
             ALOGD("%s:: same desired mode %d", __func__, config);
         }
@@ -1264,6 +1264,10 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
     if (mode == mDrmConnector->modes().end()) {
         HWC_LOGE(mExynosDisplay, "Could not find active mode for %d", config);
         return HWC2_ERROR_BAD_CONFIG;
+    }
+
+    if (mExynosDisplay->mOperationRateManager) {
+        mExynosDisplay->mOperationRateManager->onConfig(config);
     }
 
     mExynosDisplay->updateAppliedActiveConfig(config, systemTime(SYSTEM_TIME_MONOTONIC));
