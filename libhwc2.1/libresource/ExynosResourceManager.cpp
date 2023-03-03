@@ -383,10 +383,8 @@ int32_t ExynosResourceManager::assignResource(ExynosDisplay *display)
         return NO_ERROR;
     }
 
-    HDEBUGLOGD(eDebugTDM, "%s layer's calculation start", __func__);
     for (uint32_t i = 0; i < display->mLayers.size(); i++) {
         display->mLayers[i]->resetValidateData();
-        calculateHWResourceAmount(display, display->mLayers[i]);
     }
 
     display->initializeValidateInfos();
@@ -395,6 +393,11 @@ int32_t ExynosResourceManager::assignResource(ExynosDisplay *display)
         HWC_LOGE(display, "%s:: preProcessLayer() error (%d)",
                 __func__, ret);
         return ret;
+    }
+
+    HDEBUGLOGD(eDebugTDM, "%s layer's calculation start", __func__);
+    for (uint32_t i = 0; i < display->mLayers.size(); i++) {
+        calculateHWResourceAmount(display, display->mLayers[i]);
     }
 
     if (mDevice->isFirstValidate()) {
