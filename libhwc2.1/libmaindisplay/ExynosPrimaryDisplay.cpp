@@ -273,7 +273,7 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
     ATRACE_CALL();
     updateAppliedActiveConfig(0, 0);
     int ret = NO_ERROR;
-    if (!mFirstPowerOn) {
+    if (mDisplayId != 0 || !mFirstPowerOn) {
         ret = applyPendingConfig();
     }
 
