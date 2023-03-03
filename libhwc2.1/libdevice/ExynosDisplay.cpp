@@ -1305,7 +1305,7 @@ void ExynosDisplay::doPreProcessing() {
         /* Set any flag to mGeometryChanged */
         setGeometryChanged(GEOMETRY_DEVICE_SCENARIO_CHANGED);
     }
-#ifndef HWC_SKIP_VALIDATE
+#ifdef HWC_NO_SUPPORT_SKIP_VALIDATE
     if (mDevice->checkNonInternalConnection()) {
         /* Set any flag to mGeometryChanged */
         mDevice->mGeometryChanged = 0x10;
@@ -3470,7 +3470,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
          * presentDisplay() can be called before validateDisplay()
          * when HWC2_CAPABILITY_SKIP_VALIDATE is supported
          */
-#ifndef HWC_SKIP_VALIDATE
+#ifdef HWC_NO_SUPPORT_SKIP_VALIDATE
         DISPLAY_LOGE("%s:: Skip validate is not supported. Invalid rendering state : %d", __func__, mRenderingState);
         goto err;
 #endif

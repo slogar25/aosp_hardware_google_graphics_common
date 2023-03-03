@@ -192,7 +192,7 @@ void exynos_getCapabilities(struct hwc2_device *dev, uint32_t *outCount, int32_t
     if (!exynosDevice)
         *outCapabilities = 0;
     else
-        return exynosDevice->getCapabilities(outCount, outCapabilities);
+        return exynosDevice->getCapabilitiesLegacy(outCount, outCapabilities);
 }
 
 void exynos_dump(hwc2_device_t *dev, uint32_t *outSize, char *outBuffer)

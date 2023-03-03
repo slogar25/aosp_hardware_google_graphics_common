@@ -300,6 +300,7 @@ class ExynosDevice {
         void setDisplayMode(uint32_t displayMode);
         bool checkDisplayConnection(uint32_t displayId);
         bool checkNonInternalConnection();
+        void getCapabilitiesLegacy(uint32_t *outCount, int32_t *outCapabilities);
         void getCapabilities(uint32_t *outCount, int32_t* outCapabilities);
         void setGeometryChanged(uint64_t changedBit) { mGeometryChanged|= changedBit;};
         void clearGeometryChanged();
