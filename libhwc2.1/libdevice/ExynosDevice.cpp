@@ -227,6 +227,7 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
                     display->mDisplayInterface) != NO_ERROR) {
             ALOGD("Remove display[%d], Failed to initialize display interface", i);
             mDisplays.removeAt(i);
+            mDisplayMap.erase(display->mDisplayId);
             delete display;
         } else {
             i++;
@@ -799,13 +800,12 @@ bool ExynosDevice::checkNonInternalConnection()
     return false;
 }
 
-void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t* outCapabilities)
-{
+void ExynosDevice::getCapabilitiesLegacy(uint32_t *outCount, int32_t *outCapabilities) {
     uint32_t capabilityNum = 0;
 #ifdef HWC_SUPPORT_COLOR_TRANSFORM
     capabilityNum++;
 #endif
-#ifdef HWC_SKIP_VALIDATE
+#ifndef HWC_NO_SUPPORT_SKIP_VALIDATE
     capabilityNum++;
 #endif
     if (outCapabilities == NULL) {
@@ -816,14 +816,34 @@ void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t* outCapabilities)
         ALOGE("%s:: invalid outCount(%d), should be(%d)", __func__, *outCount, capabilityNum);
         return;
     }
-#if defined(HWC_SUPPORT_COLOR_TRANSFORM) || defined(HWC_SKIP_VALIDATE)
+#if defined(HWC_SUPPORT_COLOR_TRANSFORM) || !defined(HWC_NO_SUPPORT_SKIP_VALIDATE)
     uint32_t index = 0;
 #endif
 #ifdef HWC_SUPPORT_COLOR_TRANSFORM
     outCapabilities[index++] = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM;
 #endif
-#ifdef HWC_SKIP_VALIDATE
+#ifndef HWC_NO_SUPPORT_SKIP_VALIDATE
     outCapabilities[index++] = HWC2_CAPABILITY_SKIP_VALIDATE;
+#endif
+    return;
+}
+
+void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t *outCapabilities) {
+    uint32_t capabilityNum = 0;
+#ifdef HWC_SUPPORT_COLOR_TRANSFORM
+    capabilityNum++;
+#endif
+    if (outCapabilities == NULL) {
+        *outCount = capabilityNum;
+        return;
+    }
+    if (capabilityNum != *outCount) {
+        ALOGE("%s:: invalid outCount(%d), should be(%d)", __func__, *outCount, capabilityNum);
+        return;
+    }
+#if defined(HWC_SUPPORT_COLOR_TRANSFORM)
+    uint32_t index = 0;
+    outCapabilities[index++] = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM;
 #endif
     return;
 }
