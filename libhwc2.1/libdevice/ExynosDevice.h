@@ -17,8 +17,8 @@
 #ifndef _EXYNOSDEVICE_H
 #define _EXYNOSDEVICE_H
 
-#include <aidl/com/google/hardware/pixel/display/BnDisplay.h>
 #include <aidl/android/hardware/graphics/composer3/OverlayProperties.h>
+#include <aidl/com/google/hardware/pixel/display/BnDisplay.h>
 #include <cutils/atomic.h>
 #include <displaycolor/displaycolor.h>
 #include <hardware/hwcomposer2.h>
@@ -36,6 +36,7 @@
 #include <map>
 #include <thread>
 
+#include "ExynosDeviceInterface.h"
 #include "ExynosHWC.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosHWCModule.h"
@@ -143,10 +144,8 @@ enum {
     GEOMETRY_ERROR_CASE                       = 1ULL << 63,
 };
 
-class ExynosDevice;
 class ExynosDisplay;
 class ExynosResourceManager;
-class ExynosDeviceInterface;
 
 class ExynosDevice {
     public:
@@ -345,6 +344,8 @@ class ExynosDevice {
         virtual int32_t getOverlaySupport([[maybe_unused]] OverlayProperties* caps){
             return HWC2_ERROR_UNSUPPORTED;
         }
+
+        void onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod);
 
     protected:
         void initDeviceInterface(uint32_t interfaceType);
