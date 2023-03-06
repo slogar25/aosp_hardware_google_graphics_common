@@ -31,6 +31,10 @@ class ExynosDeviceDrmInterface : public ExynosDeviceInterface {
         virtual int32_t initDisplayInterface(
                 std::unique_ptr<ExynosDisplayInterface> &dispInterface) override;
         virtual void updateRestrictions() override;
+        virtual int32_t registerSysfsEventHandler(
+                std::shared_ptr<DrmSysfsEventHandler> handler) override;
+        virtual int32_t unregisterSysfsEventHandler(int sysfsFd) override;
+
     protected:
         class ExynosDrmEventHandler : public DrmEventHandler,
                                       public DrmHistogramEventHandler,

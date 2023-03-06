@@ -59,6 +59,7 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
         mNextLastFpsTime(0),
         mLastLayerBuffer(NULL),
         mLayerBuffer(NULL),
+        mLastUpdateTime(0),
         mDamageNum(0),
         mBlending(HWC2_BLEND_MODE_NONE),
         mPlaneAlpha(1.0),
@@ -419,6 +420,11 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
         Mutex::Autolock lock(mDisplay->mDRMutex);
         mLayerBuffer = buffer;
         checkFps(mLastLayerBuffer != mLayerBuffer);
+        if (mLayerBuffer != mLastLayerBuffer) {
+            mLastUpdateTime = systemTime(CLOCK_MONOTONIC);
+            if (mCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+                mDisplay->mBufferUpdates++;
+        }
     }
     mPrevAcquireFence =
             fence_close(mPrevAcquireFence, mDisplay, FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_UNDEFINED);
@@ -1157,8 +1163,10 @@ void ExynosLayer::printLayer()
 
 void ExynosLayer::setGeometryChanged(uint64_t changedBit)
 {
+    mLastUpdateTime = systemTime(CLOCK_MONOTONIC);
     mGeometryChanged |= changedBit;
-    mDisplay->setGeometryChanged(changedBit);
+    if (mCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+        mDisplay->setGeometryChanged(changedBit);
 }
 
 int ExynosLayer::allocMetaParcel()
