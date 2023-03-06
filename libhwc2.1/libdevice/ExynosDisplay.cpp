@@ -31,6 +31,7 @@
 #include <sys/ioctl.h>
 #include <utils/CallStack.h>
 
+#include <charconv>
 #include <future>
 #include <map>
 
@@ -988,6 +989,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device
         mClientCompositionInfo(COMPOSITION_CLIENT),
         mExynosCompositionInfo(COMPOSITION_EXYNOS),
         mGeometryChanged(0x0),
+        mBufferUpdates(0),
         mRenderingState(RENDERING_STATE_NONE),
         mHWCRenderingState(RENDERING_STATE_NONE),
         mDisplayBW(0),
@@ -1475,9 +1477,14 @@ void ExynosDisplay::setGeometryChanged(uint64_t changedBit) {
 void ExynosDisplay::clearGeometryChanged()
 {
     mGeometryChanged = 0;
+    mBufferUpdates = 0;
     for (size_t i=0; i < mLayers.size(); i++) {
         mLayers[i]->clearGeometryChanged();
     }
+}
+
+bool ExynosDisplay::isFrameUpdate() {
+    return mGeometryChanged > 0 || mBufferUpdates > 0;
 }
 
 int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
@@ -1701,11 +1708,13 @@ int ExynosDisplay::skipStaticLayers(ExynosCompositionInfo& compositionInfo)
     return NO_ERROR;
 }
 
-bool ExynosDisplay::skipSignalIdleForVideoLayer(void) {
-    /* ignore the frame update in case we have video layer but ui layer is not updated */
+bool ExynosDisplay::skipSignalIdle(void) {
     for (size_t i = 0; i < mLayers.size(); i++) {
-        if (!mLayers[i]->isLayerFormatYuv() &&
-            mLayers[i]->mLastLayerBuffer != mLayers[i]->mLayerBuffer) {
+        // Frame update for refresh rate overlay indicator layer can be ignored
+        if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) continue;
+        // Frame update for video layer can be ignored
+        if (mLayers[i]->isLayerFormatYuv()) continue;
+        if (mLayers[i]->mLastLayerBuffer != mLayers[i]->mLayerBuffer) {
             return false;
         }
     }
@@ -3024,6 +3033,9 @@ int32_t ExynosDisplay::getLayerCompositionTypeForValidationType(uint32_t layerIn
     } else if ((mLayers[layerIndex]->mCompositionType == HWC2_COMPOSITION_SOLID_COLOR) &&
                (mLayers[layerIndex]->mValidateCompositionType == HWC2_COMPOSITION_DEVICE)) {
         type = HWC2_COMPOSITION_SOLID_COLOR;
+    } else if ((mLayers[layerIndex]->mCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) &&
+               (mLayers[layerIndex]->mValidateCompositionType == HWC2_COMPOSITION_DEVICE)) {
+        type = HWC2_COMPOSITION_REFRESH_RATE_INDICATOR;
     } else {
         type = mLayers[layerIndex]->mValidateCompositionType;
     }
@@ -3601,8 +3613,12 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         goto err;
     }
 
-    if (mGeometryChanged != 0 || !skipSignalIdleForVideoLayer()) {
+    if (mGeometryChanged != 0 || !skipSignalIdle()) {
         mPowerHalHint.signalIdle();
+    }
+
+    if (isFrameUpdate()) {
+        updateRefreshRateIndicator();
     }
 
     handleWindowUpdate();
@@ -6148,4 +6164,123 @@ bool ExynosDisplay::RotatingLogFileWriter::chooseOpenedFile() {
         mLastFileIndex = (mLastFileIndex + 1) % mMaxFileCount;
     }
     return false;
+}
+
+ExynosDisplay::RefreshRateIndicatorHandler::RefreshRateIndicatorHandler(ExynosDisplay *display)
+      : mDisplay(display), mLastRefreshRate(0), mLastCallbackTime(0) {}
+
+int32_t ExynosDisplay::RefreshRateIndicatorHandler::init() {
+    auto path = String8::format(kRefreshRateStatePathFormat, mDisplay->mIndex);
+    mFd.Set(open(path.c_str(), O_RDONLY));
+    if (mFd.get() < 0) {
+        ALOGE("Failed to open sysfs(%s) for refresh rate debug event: %s", path.c_str(),
+              strerror(errno));
+        return -errno;
+    }
+
+    return NO_ERROR;
+}
+
+void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRateLocked(int refreshRate) {
+    ATRACE_CALL();
+    ATRACE_INT("Refresh rate indicator event", refreshRate);
+    auto lastUpdate = mDisplay->getLastLayerUpdateTime();
+    // Ignore refresh rate increase that is caused by refresh rate indicator update but there's
+    // no update for the other layers
+    if (refreshRate > mLastRefreshRate && mLastRefreshRate > 0 && lastUpdate < mLastCallbackTime) {
+        mIgnoringLastUpdate = true;
+        return;
+    }
+    mIgnoringLastUpdate = false;
+    if (refreshRate == mLastRefreshRate) {
+        return;
+    }
+    mLastRefreshRate = refreshRate;
+    mLastCallbackTime = systemTime(CLOCK_MONOTONIC);
+    ATRACE_INT("Refresh rate indicator callback", mLastRefreshRate);
+    mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId, s2ns(1) / mLastRefreshRate);
+}
+
+void ExynosDisplay::RefreshRateIndicatorHandler::handleSysfsEvent() {
+    ATRACE_CALL();
+    std::scoped_lock lock(mMutex);
+
+    char buffer[1024];
+    lseek(mFd.get(), 0, SEEK_SET);
+    int ret = read(mFd.get(), &buffer, sizeof(buffer));
+    if (ret < 0) {
+        ALOGE("%s: Failed to read refresh rate from fd %d: %s", __func__, mFd.get(),
+              strerror(errno));
+        return;
+    }
+    std::string_view bufferView(buffer);
+    auto pos = bufferView.find('@');
+    if (pos == std::string::npos) {
+        ALOGE("%s: Failed to parse refresh rate event (invalid format)", __func__);
+        return;
+    }
+    int refreshRate = 0;
+    std::from_chars(bufferView.data() + pos + 1, bufferView.data() + bufferView.size() - 1,
+                    refreshRate);
+    updateRefreshRateLocked(refreshRate);
+}
+
+void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRate(int refreshRate) {
+    std::scoped_lock lock(mMutex);
+    updateRefreshRateLocked(refreshRate);
+}
+
+int32_t ExynosDisplay::setRefreshRateChangedCallbackDebugEnabled(bool enabled) {
+    if ((!!mRefreshRateIndicatorHandler) == enabled) {
+        ALOGW("%s: RefreshRateChangedCallbackDebug is already %s", __func__,
+              enabled ? "enabled" : "disabled");
+        return NO_ERROR;
+    }
+    int32_t ret = NO_ERROR;
+    if (enabled) {
+        mRefreshRateIndicatorHandler = std::make_shared<RefreshRateIndicatorHandler>(this);
+        if (!mRefreshRateIndicatorHandler) {
+            ALOGE("%s: Failed to create refresh rate debug handler", __func__);
+            return -ENOMEM;
+        }
+        ret = mRefreshRateIndicatorHandler->init();
+        if (ret != NO_ERROR) {
+            ALOGE("%s: Failed to initialize refresh rate debug handler: %d", __func__, ret);
+            mRefreshRateIndicatorHandler.reset();
+            return ret;
+        }
+        ret = mDevice->mDeviceInterface->registerSysfsEventHandler(mRefreshRateIndicatorHandler);
+        if (ret != NO_ERROR) {
+            ALOGE("%s: Failed to register sysfs event handler: %d", __func__, ret);
+            mRefreshRateIndicatorHandler.reset();
+            return ret;
+        }
+        // Call the callback immediately
+        mRefreshRateIndicatorHandler->handleSysfsEvent();
+    } else {
+        ret = mDevice->mDeviceInterface->unregisterSysfsEventHandler(
+                mRefreshRateIndicatorHandler->getFd());
+        mRefreshRateIndicatorHandler.reset();
+    }
+    return ret;
+}
+
+nsecs_t ExynosDisplay::getLastLayerUpdateTime() {
+    Mutex::Autolock lock(mDRMutex);
+    nsecs_t time = 0;
+    for (size_t i = 0; i < mLayers.size(); ++i) {
+        // The update from refresh rate indicator layer should be ignored
+        if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) continue;
+        time = max(time, mLayers[i]->mLastUpdateTime);
+    }
+    return time;
+}
+
+void ExynosDisplay::updateRefreshRateIndicator() {
+    // Update refresh rate indicator if the last update event is ignored to make sure that
+    // the refresh rate caused by the current frame update will be applied immediately since
+    // we may not receive the sysfs event if the refresh rate is the same as the last ignored one.
+    if (!mRefreshRateIndicatorHandler || !mRefreshRateIndicatorHandler->isIgnoringLastUpdate())
+        return;
+    mRefreshRateIndicatorHandler->handleSysfsEvent();
 }

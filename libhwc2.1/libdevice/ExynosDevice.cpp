@@ -1209,3 +1209,19 @@ void ExynosDevice::onVsyncIdle(hwc2_display_t displayId) {
                                       hwc2_display_t hwcDisplay)>(callbackInfo.funcPointer);
     callbackFunc(callbackInfo.callbackData, displayId);
 }
+
+void ExynosDevice::onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod) {
+    Mutex::Autolock lock(mDeviceCallbackMutex);
+    const auto &refreshRateCallback =
+            mHwc3CallbackInfos.find(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug);
+
+    if (refreshRateCallback == mHwc3CallbackInfos.end()) return;
+
+    const auto &callbackInfo = refreshRateCallback->second;
+    if (callbackInfo.funcPointer == nullptr || callbackInfo.callbackData == nullptr) return;
+
+    auto callbackFunc =
+            reinterpret_cast<void (*)(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
+                                      hwc2_vsync_period_t)>(callbackInfo.funcPointer);
+    callbackFunc(callbackInfo.callbackData, displayId, vsyncPeriod);
+}

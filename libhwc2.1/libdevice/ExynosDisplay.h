@@ -27,6 +27,7 @@
 #include <chrono>
 #include <set>
 
+#include "DeconHeader.h"
 #include "ExynosDisplayInterface.h"
 #include "ExynosHWC.h"
 #include "ExynosHWCDebug.h"
@@ -34,8 +35,8 @@
 #include "ExynosHwc3Types.h"
 #include "ExynosMPP.h"
 #include "ExynosResourceManager.h"
+#include "drmeventlistener.h"
 #include "worker.h"
-#include "DeconHeader.h"
 
 #define HWC_CLEARDISPLAY_WITH_COLORMAP
 #define HWC_PRINT_FRAME_NUM     10
@@ -449,8 +450,15 @@ class ExynosDisplay {
          * Geometry change info is described by bit map.
          * This flag is cleared when resource assignment for all displays
          * is done.
+         * Geometry changed to layer REFRESH_RATE_INDICATOR will be excluded.
          */
         uint64_t  mGeometryChanged;
+
+        /**
+         * The number of buffer updates in the current frame.
+         * Buffer update for layer REFRESH_RATE_INDICATOR will be excluded.
+         */
+        uint32_t mBufferUpdates;
 
         /**
          * Rendering step information that is seperated by
@@ -1190,6 +1198,7 @@ class ExynosDisplay {
         void setHWCControl(uint32_t ctrl, int32_t val);
         void setGeometryChanged(uint64_t changedBit);
         void clearGeometryChanged();
+        bool isFrameUpdate();
 
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
@@ -1293,7 +1302,7 @@ class ExynosDisplay {
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
 
-        bool skipSignalIdleForVideoLayer();
+        bool skipSignalIdle();
 
         /// minimum possible dim rate in the case hbm peak is 1000 nits and norml
         // display brightness is 2 nits
@@ -1589,6 +1598,34 @@ class ExynosDisplay {
     public:
         std::unique_ptr<OperationRateManager> mOperationRateManager;
         bool isOperationRateSupported() { return mOperationRateManager != nullptr; }
+
+        class RefreshRateIndicatorHandler : public DrmSysfsEventHandler {
+        public:
+            RefreshRateIndicatorHandler(ExynosDisplay* display);
+            int32_t init();
+            virtual void handleSysfsEvent() override;
+            virtual int getFd() override { return mFd.get(); };
+            bool isIgnoringLastUpdate() { return mIgnoringLastUpdate; }
+            void updateRefreshRate(int refreshRate);
+
+        private:
+            void updateRefreshRateLocked(int refreshRate) REQUIRES(mMutex);
+
+            ExynosDisplay* mDisplay;
+            int mLastRefreshRate GUARDED_BY(mMutex);
+            nsecs_t mLastCallbackTime GUARDED_BY(mMutex);
+            std::atomic_bool mIgnoringLastUpdate = false;
+            UniqueFd mFd;
+            std::mutex mMutex;
+
+            static constexpr auto kRefreshRateStatePathFormat =
+                    "/sys/class/backlight/panel%d-backlight/state";
+        };
+
+        std::shared_ptr<RefreshRateIndicatorHandler> mRefreshRateIndicatorHandler;
+        int32_t setRefreshRateChangedCallbackDebugEnabled(bool enabled);
+        void updateRefreshRateIndicator();
+        nsecs_t getLastLayerUpdateTime();
 };
 
 #endif //_EXYNOSDISPLAY_H
