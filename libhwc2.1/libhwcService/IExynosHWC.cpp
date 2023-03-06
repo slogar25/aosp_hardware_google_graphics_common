@@ -65,6 +65,7 @@ enum {
     TRIGGER_DISPLAY_IDLE_ENTER = 1008,
     SET_DISPLAY_DBM = 1009,
     SET_DISPLAY_MULTI_THREADED_PRESENT = 1010,
+    TRIGGER_REFRESH_RATE_INDICATOR_UPDATE = 1011,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -446,7 +447,7 @@ public:
         data.writeUint32(displayIndex);
         data.writeUint32(idleTeRefreshRate);
 
-        auto result = remote()->transact(SET_DISPLAY_RCDLAYER_ENABLED, data, &reply);
+        auto result = remote()->transact(TRIGGER_DISPLAY_IDLE_ENTER, data, &reply);
         ALOGE_IF(result != NO_ERROR, "TRIGGER_DISPLAY_IDLE_ENTER transact error(%d)", result);
         return result;
     }
@@ -469,6 +470,19 @@ public:
         data.writeBool(enable);
         int result = remote()->transact(SET_DISPLAY_MULTI_THREADED_PRESENT, data, &reply);
         if (result) ALOGE("SET_DISPLAY_MULTI_THREADED_PRESENT transact error(%d)", result);
+        return result;
+    }
+
+    virtual int32_t triggerRefreshRateIndicatorUpdate(uint32_t displayId,
+                                                      uint32_t refreshRate) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(displayId);
+        data.writeUint32(refreshRate);
+
+        auto result = remote()->transact(TRIGGER_REFRESH_RATE_INDICATOR_UPDATE, data, &reply);
+        ALOGE_IF(result != NO_ERROR, "TRIGGER_REFRESH_RATE_INDICATOR_UPDATE transact error(%d)",
+                 result);
         return result;
     }
 };
@@ -732,6 +746,13 @@ status_t BnExynosHWCService::onTransact(
             int32_t error = setDisplayMultiThreadedPresent(displayId, enable);
             reply->writeInt32(error);
             return NO_ERROR;
+        } break;
+
+        case TRIGGER_REFRESH_RATE_INDICATOR_UPDATE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t displayId = data.readUint32();
+            uint32_t refreshRate = data.readUint32();
+            return triggerRefreshRateIndicatorUpdate(displayId, refreshRate);
         } break;
 
         default:

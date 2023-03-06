@@ -76,6 +76,7 @@ public:
     virtual int32_t setDisplayDbm(int32_t display_id, uint32_t on) = 0;
     virtual int32_t setDisplayMultiThreadedPresent(const int32_t& displayId,
                                                    const bool& enable) = 0;
+    virtual int32_t triggerRefreshRateIndicatorUpdate(uint32_t displayId, uint32_t refreshRate) = 0;
 };
 
 /* Native Interface */

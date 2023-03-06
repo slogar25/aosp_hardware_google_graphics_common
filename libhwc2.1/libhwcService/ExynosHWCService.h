@@ -81,6 +81,8 @@ public:
 
     virtual int32_t setDisplayMultiThreadedPresent(const int32_t& display_id,
                                                    const bool& enable) override;
+    virtual int32_t triggerRefreshRateIndicatorUpdate(uint32_t displayId,
+                                                      uint32_t refreshRate) override;
 
 private:
     friend class Singleton<ExynosHWCService>;
