@@ -713,7 +713,8 @@ int32_t ExynosLayer::setLayerPerFrameMetadataBlobs(uint32_t numElements, const i
                 mMetaParcel->eType =
                     static_cast<ExynosVideoInfoType>(mMetaParcel->eType | VIDEO_INFO_TYPE_HDR_DYNAMIC);
                 ExynosHdrDynamicInfo *info = &(mMetaParcel->sHdrDynamicInfo);
-                Exynos_parsing_user_data_registered_itu_t_t35(info, (void *)metadata_start);
+                Exynos_parsing_user_data_registered_itu_t_t35(info, (void*)metadata_start,
+                                                              sizes[i]);
             } else {
                 ALOGE("Layer has no metaParcel!");
                 return HWC2_ERROR_UNSUPPORTED;
