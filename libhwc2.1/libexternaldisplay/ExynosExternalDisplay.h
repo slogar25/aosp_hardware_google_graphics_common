@@ -47,6 +47,9 @@ class ExynosExternalDisplay : public ExynosDisplay {
         virtual void closeExternalDisplay();
         virtual int32_t getActiveConfig(hwc2_config_t* outconfig);
         virtual int32_t startPostProcessing();
+
+        virtual int32_t setColorTransform(const float *, int32_t) { return HWC2_ERROR_NONE; }
+
         virtual int32_t setClientTarget(
                 buffer_handle_t target,
                 int32_t acquireFence, int32_t /*android_dataspace_t*/ dataspace);
