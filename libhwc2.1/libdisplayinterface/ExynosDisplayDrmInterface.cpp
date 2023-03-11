@@ -431,7 +431,8 @@ int32_t ExynosDisplayDrmInterface::getDefaultModeId(int32_t *modeId) {
     return NO_ERROR;
 }
 
-ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay)
+ExynosDisplayDrmInterface::ExynosDisplayDrmInterface(ExynosDisplay *exynosDisplay):
+    mMonitorDescription{0}
 {
     mType = INTERFACE_TYPE_DRM;
     init(exynosDisplay);
@@ -2422,6 +2423,11 @@ int32_t ExynosDisplayDrmInterface::getDisplayFakeEdid(uint8_t &outPort, uint32_t
     edid_buf[58] = (width >> 4) & 0xf0;
     edid_buf[59] = height & 0xff;
     edid_buf[61] = (height >> 4) & 0xf0;
+
+    if (mMonitorDescription[0] != 0) {
+        /* Descriptor block 3 starts at address 90, data offset is 5 bytes */
+        memcpy(&edid_buf[95], mMonitorDescription.data(), mMonitorDescription.size());
+    }
 
     unsigned int sum = std::accumulate(edid_buf.begin(), edid_buf.end() - 1, 0);
     edid_buf[127] = (0x100 - (sum & 0xFF)) & 0xFF;
