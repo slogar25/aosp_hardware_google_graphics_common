@@ -10,6 +10,7 @@ cc_library_shared {
         "AppMarkerWriter.cpp",
         "ExynosJpegEncoder.cpp",
         "ExynosJpegEncoderForCamera.cpp",
+        "FileLock.cpp",
         "hwjpeg-base.cpp",
         "hwjpeg-v4l2.cpp",
         "libhwjpeg-exynos.cpp",

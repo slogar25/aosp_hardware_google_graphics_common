@@ -19,6 +19,15 @@
 #include <linux/videodev2.h>
 
 #include "hwjpeg-internal.h"
+
+int ExynosJpegEncoder::lock() {
+    return m_hwjpeg.lock();
+}
+
+int ExynosJpegEncoder::unlock() {
+    return m_hwjpeg.unlock();
+}
+
 int ExynosJpegEncoder::setJpegConfig(void *pConfig) {
     ExynosJpegEncoder *that = reinterpret_cast<ExynosJpegEncoder *>(pConfig);
 
