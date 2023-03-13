@@ -26,6 +26,9 @@
 #error VIDEO_MAX_PLANES should not be smaller than 6
 #endif
 
+#include "FileLock.h"
+#include "android-base/thread_annotations.h"
+
 // Exynos JPEG specific device capabilities
 // Defined in the driver. Not in videodev2.h
 #define V4L2_CAP_EXYNOS_JPEG_DECOMPRESSION 0x0100
@@ -581,6 +584,8 @@ class CHWJpegV4L2Compressor : public CHWJpegCompressor, private CHWJpegFlagManag
 
     bool m_bEnableHWFC;
 
+    FileLock file_lock_;
+
     bool IsB2BCompression() {
         return (TO_SEC_IMG_SIZE(m_v4l2Format.fmt.pix_mp.width) +
                 TO_SEC_IMG_SIZE(m_v4l2Format.fmt.pix_mp.height)) != 0;
@@ -600,6 +605,12 @@ class CHWJpegV4L2Compressor : public CHWJpegCompressor, private CHWJpegFlagManag
 public:
     CHWJpegV4L2Compressor();
     virtual ~CHWJpegV4L2Compressor();
+
+    // Acquires exclusive lock to V4L2 device. This must be called before starting image
+    // configuration. This is a blocking call.
+    int lock();
+    // Releases exclusive lock to V4L2 device. This should be called after encoding is complete.
+    int unlock();
 
     unsigned int GetHWDelay() { return m_uiHWDelay; }
 
