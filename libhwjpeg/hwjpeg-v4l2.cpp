@@ -22,7 +22,8 @@
 #include "hwjpeg-internal.h"
 #include "log/log_main.h"
 
-CHWJpegV4L2Compressor::CHWJpegV4L2Compressor() : CHWJpegCompressor("/dev/video12") {
+CHWJpegV4L2Compressor::CHWJpegV4L2Compressor()
+      : CHWJpegCompressor("/dev/video12"), file_lock_(FileLock(GetDeviceFD())) {
     memset(&m_v4l2Format, 0, sizeof(m_v4l2Format));
     memset(&m_v4l2SrcBuffer, 0, sizeof(m_v4l2SrcBuffer));
     memset(&m_v4l2DstBuffer, 0, sizeof(m_v4l2DstBuffer));
@@ -67,6 +68,14 @@ CHWJpegV4L2Compressor::~CHWJpegV4L2Compressor() {
     StopStreaming();
 
     ALOGD("CHWJpegV4L2Compressor Destroyed: %p, FD %d", this, GetDeviceFD());
+}
+
+int CHWJpegV4L2Compressor::lock() {
+    return file_lock_.lock();
+}
+
+int CHWJpegV4L2Compressor::unlock() {
+    return file_lock_.unlock();
 }
 
 bool CHWJpegV4L2Compressor::SetChromaSampFactor(unsigned int horizontal, unsigned int vertical) {
