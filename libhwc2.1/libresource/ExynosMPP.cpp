@@ -351,7 +351,7 @@ bool ExynosMPP::isDataspaceSupportedByMPP(struct exynos_image &src, struct exyno
     return checkCSCRestriction(src, dst);
 }
 
-bool ExynosMPP::isSupportedHDR10Plus(struct exynos_image &src, struct exynos_image &dst)
+bool ExynosMPP::isSupportedHDR(struct exynos_image &src, struct exynos_image &dst)
 {
 
     uint32_t srcStandard = (src.dataSpace & HAL_DATASPACE_STANDARD_MASK);
@@ -359,7 +359,7 @@ bool ExynosMPP::isSupportedHDR10Plus(struct exynos_image &src, struct exynos_ima
     uint32_t srcTransfer = (src.dataSpace & HAL_DATASPACE_TRANSFER_MASK);
     uint32_t dstTransfer = (dst.dataSpace & HAL_DATASPACE_TRANSFER_MASK);
 
-    if (hasHdr10Plus(src)) {
+    if (hasHdr10Plus(src) || hasHdrInfo(src) ) {
         if (mAttr & MPP_ATTR_HDR10PLUS)
             return true;
         else if ((srcStandard == dstStandard) && (srcTransfer == dstTransfer))
@@ -2100,7 +2100,7 @@ int64_t ExynosMPP::isSupported(ExynosDisplay &display, struct exynos_image &src,
         return -eMPPUnsupportedFormat;
     else if (!isDataspaceSupportedByMPP(src, dst))
         return -eMPPUnsupportedCSC;
-    else if (!isSupportedHDR10Plus(src, dst))
+    else if (!isSupportedHDR(src, dst))
         return -eMPPUnsupportedDynamicMeta;
     else if (!isSupportedBlend(src))
         return -eMPPUnsupportedBlending;
