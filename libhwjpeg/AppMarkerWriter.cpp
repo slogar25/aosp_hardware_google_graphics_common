@@ -260,7 +260,7 @@ void CAppMarkerWriter::PrepareAppWriter(char *base, exif_attribute_t *exif,
     m_pExtra = extra;
 
     //     |<- m_szApp1 ->|<- m_szMaxThumbSize ->|<-m_szAppX->|
-    //     |<----- size of total APP1 and APP4 segments ----->|<-APP11->|<-- main image
+    //     |<----- size of total APP1 and APPX segments ----->|<-APP11->|<-- main image
     // m_pAppBase   m_pThumbBase                 |            |    return
     //     |              |                      |            |        ||
     //     v              v                      |            |        v|
