@@ -76,6 +76,7 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
 ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
                                            const std::string &displayName)
       : ExynosDisplay(HWC_DISPLAY_PRIMARY, index, device, displayName),
+        mUseBlockingZoneForMinIdleRefreshRate(false),
         mMinIdleRefreshRate(0),
         mRefreshRateDelayNanos(0),
         mLastRefreshRateAppliedNanos(0),
@@ -88,6 +89,21 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
     /* Initialization */
     mFramesToReachLhbmPeakBrightness =
             property_get_int32("vendor.primarydisplay.lhbm.frames_to_reach_peak_brightness", 3);
+
+    /* TODO(b/274705046): use drm properties instead of system properties */
+    mDefaultMinIdleRefreshRate =
+            property_get_int32("vendor.primarydisplay.min_idle_refresh_rate.default", 0);
+    mMinIdleRefreshRateForBlockingZone =
+            property_get_int32("vendor.primarydisplay.min_idle_refresh_rate.blocking_zone", 0);
+    mDbvThresholdForBlockingZone =
+            property_get_int32("vendor.primarydisplay.min_idle_refresh_rate.blocking_zone_dbv", 0);
+    if (mDefaultMinIdleRefreshRate && mMinIdleRefreshRateForBlockingZone &&
+        mDbvThresholdForBlockingZone) {
+        mUseBlockingZoneForMinIdleRefreshRate = true;
+        ALOGI("%s min_default=%d min_blocking_zone=%d dbv_blocking_zone=%d", __func__,
+              mDefaultMinIdleRefreshRate, mMinIdleRefreshRateForBlockingZone,
+              mDbvThresholdForBlockingZone);
+    }
 
     // Allow to enable dynamic recomposition after every power on
     // since it will always be disabled for every power off
@@ -911,20 +927,39 @@ void ExynosPrimaryDisplay::handleDisplayIdleEnter(const uint32_t idleTeRefreshRa
     setDisplayNeedHandleIdleExit(needed, false);
 }
 
-int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int fps) {
-    mMinIdleRefreshRate = fps;
+int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
+                                                const VrrThrottleRequester requester) {
+    int fps = (targetFps <= 0) ? mDefaultMinIdleRefreshRate : targetFps;
+    if (requester == VrrThrottleRequester::BRIGHTNESS && mUseBlockingZoneForMinIdleRefreshRate) {
+        uint32_t level = mBrightnessController->getBrightnessLevel();
+        fps = (level < mDbvThresholdForBlockingZone) ? mMinIdleRefreshRateForBlockingZone
+                                                     : mDefaultMinIdleRefreshRate;
+    }
+    if (fps == mMinIdleRefreshRate) return NO_ERROR;
+
+    ALOGD("%s requester %u, fps %d", __func__, toUnderlying(requester), fps);
+    std::lock_guard<std::mutex> lock(mMinIdleRefreshRateMutex);
+    int maxMinIdleFps = 0;
+    mVrrThrottleFps[toUnderlying(requester)] = fps;
+    for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
+        if (mVrrThrottleFps[i] > maxMinIdleFps) {
+            maxMinIdleFps = mVrrThrottleFps[i];
+        }
+    }
+    if (maxMinIdleFps == mMinIdleRefreshRate) return NO_ERROR;
 
     const std::string path = getPanelSysfsPath(getDisplayTypeFromIndex(mIndex)) + "min_vrefresh";
     std::ofstream ofs(path);
     if (!ofs.is_open()) {
-        ALOGW("Unable to open node '%s', error = %s", path.c_str(), strerror(errno));
+        ALOGW("%s Unable to open node '%s', error = %s", __func__, path.c_str(), strerror(errno));
         return errno;
     } else {
-        ofs << mMinIdleRefreshRate;
+        ofs << maxMinIdleFps;
         ofs.close();
         ALOGI("ExynosPrimaryDisplay::%s() writes min_vrefresh(%d) to the sysfs node", __func__,
-              fps);
+              maxMinIdleFps);
     }
+    mMinIdleRefreshRate = maxMinIdleFps;
     return NO_ERROR;
 }
 
@@ -963,7 +998,15 @@ void ExynosPrimaryDisplay::dump(String8 &result) {
     for (uint32_t i = 0; i < toUnderlying(DispIdleTimerRequester::MAX); i++) {
         result.appendFormat("\t[%u] vote to %" PRId64 " ns\n", i, mDisplayIdleTimerNanos[i]);
     }
-    result.appendFormat("Min idle refresh rate: %d\n", mMinIdleRefreshRate);
+    result.appendFormat("Min idle refresh rate: %d, default: %d\n", mMinIdleRefreshRate,
+                        mDefaultMinIdleRefreshRate);
+    if (mUseBlockingZoneForMinIdleRefreshRate) {
+        result.appendFormat("\tblocking zone level: %d, min refresh rate: %d\n",
+                            mDbvThresholdForBlockingZone, mMinIdleRefreshRateForBlockingZone);
+        for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
+            result.appendFormat("\t\t[%u] vote to %d\n", i, mVrrThrottleFps[i]);
+        }
+    }
     result.appendFormat("Refresh rate delay: %" PRId64 " ns\n", mRefreshRateDelayNanos);
     for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
         result.appendFormat("\t[%u] vote to %" PRId64 " ns\n", i, mVrrThrottleNanos[i]);
