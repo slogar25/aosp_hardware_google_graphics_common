@@ -114,6 +114,11 @@ public:
     }
     virtual ~ExynosJpegEncoder() { destroy(); }
 
+    // Acquire exclusive lock to V4L2 device. This is a blocking call.
+    int lock();
+    // Release exclusive lock to V4L2 device.
+    int unlock();
+
     // Return 0 on success, -1 on error
     int flagCreate() { return m_hwjpeg.Okay() ? 0 : -1; }
     virtual int create(void) { return flagCreate(); }
