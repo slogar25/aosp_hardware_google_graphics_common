@@ -397,6 +397,12 @@ String8 getCompressionStr(CompressionInfo compression) {
     return result;
 }
 
+bool isAFBC32x8(CompressionInfo compression) {
+    return (compression.type == COMP_TYPE_AFBC) &&
+            ((compression.modifier & AFBC_FORMAT_MOD_BLOCK_SIZE_MASK) ==
+             AFBC_FORMAT_MOD_BLOCK_SIZE_32x8);
+}
+
 uint32_t halDataSpaceToV4L2ColorSpace(android_dataspace data_space)
 {
     uint32_t standard_data_space = (data_space & HAL_DATASPACE_STANDARD_MASK);
