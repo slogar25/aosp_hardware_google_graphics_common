@@ -699,6 +699,8 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
     case HAL_PIXEL_FORMAT_EXYNOS_YCrCb_420_SP_M_10B_SBWC:
         return SBWC_10B_Y_SIZE(width, height) +
             SBWC_10B_Y_HEADER_SIZE(width, height);
+    case MALI_GRALLOC_FORMAT_INTERNAL_NV21:
+        return __ALIGN_UP(width, 64) * __ALIGN_UP(height, 2);
     }
 
     return NV12M_Y_SIZE(width, height) + ((width % 128) == 0 ? 0 : 256);
