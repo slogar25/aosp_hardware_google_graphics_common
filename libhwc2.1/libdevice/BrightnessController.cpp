@@ -246,7 +246,8 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
         } else {
             level = brightness < 0 ? 0 : static_cast<uint32_t>(brightness * mMaxBrightness + 0.5f);
         }
-        // go sysfs path
+        // clear dirty before go sysfs path
+        mBrightnessFloatReq.clear_dirty();
     }
 
     // Sysfs path is faster than drm path. If there is an unchecked drm path change, the sysfs
