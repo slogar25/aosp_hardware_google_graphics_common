@@ -473,6 +473,8 @@ class ExynosMPPSource {
             mHWResourceAmount[attr] = amount;
             return 0;
         }
+
+        bool mNeedPreblending;
 };
 
 bool exynosMPPSourceComp(const ExynosMPPSource* l, const ExynosMPPSource* r);

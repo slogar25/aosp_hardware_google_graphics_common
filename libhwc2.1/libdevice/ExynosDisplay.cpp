@@ -4548,12 +4548,6 @@ int32_t ExynosDisplay::validateDisplay(
 
     updateBrightnessState();
 
-    if ((ret = updateColorConversionInfo()) != NO_ERROR) {
-        validateError = true;
-        DISPLAY_LOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
-                __func__, ret);
-    }
-
     if ((ret = skipStaticLayers(mClientCompositionInfo)) != NO_ERROR) {
         validateError = true;
         HWC_LOGE(this, "%s:: skipStaticLayers() fail, display(%d), ret(%d)", __func__, mDisplayId, ret);

@@ -401,6 +401,7 @@ typedef struct exynos_image {
     ExynosVideoMeta metaParcel;
     ExynosVideoInfoType metaType = VIDEO_INFO_TYPE_INVALID;
     bool needColorTransform = false;
+    bool needPreblending = false;
 
     bool isDimLayer()
     {
