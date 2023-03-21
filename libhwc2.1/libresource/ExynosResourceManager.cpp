@@ -395,6 +395,12 @@ int32_t ExynosResourceManager::assignResource(ExynosDisplay *display)
         return ret;
     }
 
+    if ((ret = display->updateColorConversionInfo()) != NO_ERROR) {
+        HWC_LOGE(display, "%s:: updateColorConversionInfo() fail, ret(%d)", __func__, ret);
+        return ret;
+    }
+    display->checkPreblendingRequirement();
+
     HDEBUGLOGD(eDebugTDM, "%s layer's calculation start", __func__);
     for (uint32_t i = 0; i < display->mLayers.size(); i++) {
         calculateHWResourceAmount(display, display->mLayers[i]);
@@ -2728,8 +2734,7 @@ uint32_t ExynosResourceManager::needHWResource(ExynosDisplay *display, exynos_im
             ret = (isFormatYUV(srcImg.format)) ? 1 : 0;
             break;
         case TDM_ATTR_WCG:
-            ret = (needHdrProcessing(display, srcImg, dstImg)) ? 1 : 0;
-            HDEBUGLOGD(eDebugTDM, "needHdrProcessing : %d", ret);
+            ret = (srcImg.needPreblending) ? 1 : 0;
             break;
         case TDM_ATTR_ROT_90:
             ret = ((srcImg.transform & HAL_TRANSFORM_ROT_90) == 0) ? 0 : 1;
