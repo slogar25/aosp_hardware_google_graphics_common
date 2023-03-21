@@ -473,9 +473,6 @@ class ExynosMPPSource {
             mHWResourceAmount[attr] = amount;
             return 0;
         }
-
-        /* return 1 if it's needed */
-        uint32_t needHWResource(tdm_attr_t attr);
 };
 
 bool exynosMPPSourceComp(const ExynosMPPSource* l, const ExynosMPPSource* r);
