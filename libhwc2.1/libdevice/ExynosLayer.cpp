@@ -884,6 +884,7 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
     }
 
     src_img->needColorTransform = mLayerColorTransform.enable;
+    src_img->needPreblending = mNeedPreblending;
 
     return NO_ERROR;
 }

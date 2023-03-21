@@ -1626,6 +1626,7 @@ class ExynosDisplay {
         int32_t setRefreshRateChangedCallbackDebugEnabled(bool enabled);
         void updateRefreshRateIndicator();
         nsecs_t getLastLayerUpdateTime();
+        virtual void checkPreblendingRequirement(){};
 };
 
 #endif //_EXYNOSDISPLAY_H

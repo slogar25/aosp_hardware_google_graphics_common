@@ -84,11 +84,11 @@ void dump(const restriction_size_t &restrictionSize, String8 &result) {
 }
 
 ExynosMPPSource::ExynosMPPSource()
-    : mSourceType(MPP_SOURCE_MAX),
-    mSource(NULL),
-    mOtfMPP(NULL),
-    mM2mMPP(NULL)
-{
+      : mSourceType(MPP_SOURCE_MAX),
+        mSource(NULL),
+        mOtfMPP(NULL),
+        mM2mMPP(NULL),
+        mNeedPreblending(false) {
     memset(&mSrcImg, 0, sizeof(mSrcImg));
     mSrcImg.acquireFenceFd = -1;
     mSrcImg.releaseFenceFd = -1;
@@ -128,40 +128,6 @@ void ExynosMPPSource::setExynosImage(exynos_image src_img, exynos_image dst_img)
 void ExynosMPPSource::setExynosMidImage(exynos_image mid_img)
 {
     mMidImg = mid_img;
-}
-
-uint32_t ExynosMPPSource::needHWResource(tdm_attr_t attr) {
-    uint32_t ret = 0;
-
-    switch (attr) {
-        case TDM_ATTR_SBWC:
-            ret = (isFormatSBWC(mSrcImg.format)) ? 1 : 0;
-            break;
-        case TDM_ATTR_AFBC:
-            ret = (mSrcImg.compressed == 1) ? 1 : 0;
-            break;
-        case TDM_ATTR_ITP: // CSC
-            ret = (isFormatYUV(mSrcImg.format)) ? 1 : 0;
-            break;
-        case TDM_ATTR_ROT_90:
-            ret = ((mSrcImg.transform & HAL_TRANSFORM_ROT_90) == 0) ? 0 : 1;
-            break;
-        case TDM_ATTR_SCALE:
-            {
-                bool isPerpendicular = !!(mSrcImg.transform & HAL_TRANSFORM_ROT_90);
-                if (isPerpendicular) {
-                    ret = ((mSrcImg.w != mDstImg.h) || (mSrcImg.h != mDstImg.w)) ? 1 : 0;
-                } else {
-                    ret = ((mSrcImg.w != mDstImg.w) || (mSrcImg.h != mDstImg.h)) ? 1 : 0;
-                }
-            }
-            break;
-        default:
-            ret = 0;
-            break;
-    }
-
-    return ret;
 }
 
 ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
