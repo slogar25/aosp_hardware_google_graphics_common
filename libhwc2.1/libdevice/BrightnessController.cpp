@@ -198,7 +198,6 @@ void BrightnessController::initBrightnessSysfs() {
     mBrightnessOfs.open(nodeName.string(), std::ofstream::out);
     if (mBrightnessOfs.fail()) {
         ALOGE("%s %s fail to open", __func__, nodeName.string());
-        mBrightnessOfs.close();
         return;
     }
 
@@ -213,6 +212,14 @@ void BrightnessController::initBrightnessSysfs() {
 
     ifsMaxBrightness >> mMaxBrightness;
     ifsMaxBrightness.close();
+
+    nodeName.clear();
+    nodeName.appendFormat(kGlobalAclModeFileNode, mPanelIndex);
+    mAclModeOfs.open(nodeName.string(), std::ofstream::out);
+    if (mAclModeOfs.fail()) {
+        ALOGI("%s %s not supported", __func__, nodeName.string());
+    } else
+        mAclMode.set_dirty();
 }
 
 void BrightnessController::initCabcSysfs() {
@@ -225,7 +232,6 @@ void BrightnessController::initCabcSysfs() {
     mCabcModeOfs.open(nodeName.string(), std::ofstream::out);
     if (mCabcModeOfs.fail()) {
         ALOGE("%s %s fail to open", __func__, nodeName.string());
-        mCabcModeOfs.close();
         return;
     }
 }
@@ -286,6 +292,28 @@ void BrightnessController::processDimmingOff() {
         updateStates();
         mFrameRefresh();
     }
+}
+
+int BrightnessController::updateAclMode(bool on) {
+    if (!mAclModeOfs.is_open()) return HWC2_ERROR_UNSUPPORTED;
+
+    mAclMode.store(on);
+
+    if (!mAclMode.is_dirty()) return NO_ERROR;
+
+    mAclModeOfs.seekp(std::ios_base::beg);
+    mAclModeOfs << std::to_string(on);
+    mAclModeOfs.flush();
+    if (mAclModeOfs.fail()) {
+        ALOGW("%s write acl_mode to %d error = %s", __func__, on, strerror(errno));
+        mAclModeOfs.clear();
+        return HWC2_ERROR_NO_RESOURCES;
+    }
+
+    mAclMode.clear_dirty();
+    ALOGI("%s acl_mode = %d", __func__, mAclMode.get());
+
+    return NO_ERROR;
 }
 
 int BrightnessController::processDisplayBrightness(float brightness, const nsecs_t vsyncNs,
@@ -1048,6 +1076,8 @@ void BrightnessController::dump(String8& result) {
     result.appendFormat("\tcabc supported %d, cabcMode %d\n", mCabcModeOfs.is_open(),
                         mCabcMode.get());
     result.appendFormat("\tignore brightness update request %d\n", mIgnoreBrightnessUpdateRequests);
+    result.appendFormat("\tacl mode supported %d, acl mode %d\n", mAclModeOfs.is_open(),
+                        mAclMode.get());
 
     result.appendFormat("\n");
 }
