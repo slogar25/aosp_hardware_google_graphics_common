@@ -293,6 +293,12 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     uint32_t level;
     bool ghbm;
 
+    if (mIgnoreBrightnessUpdateRequests) {
+        ALOGI("%s: Brightness update is ignored. requested: %f, current: %f",
+            __func__, brightness, mBrightnessFloatReq.get());
+        return NO_ERROR;
+    }
+
     if (brightness < -1.0f || brightness > 1.0f) {
         return HWC2_ERROR_BAD_PARAMETER;
     }
@@ -355,6 +361,12 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     }
 
     return applyBrightnessViaSysfs(level);
+}
+
+int BrightnessController::ignoreBrightnessUpdateRequests(bool ignore) {
+    mIgnoreBrightnessUpdateRequests = ignore;
+
+    return NO_ERROR;
 }
 
 // In HWC3, brightness change could be applied via drm commit or sysfs path.
@@ -1035,6 +1047,7 @@ void BrightnessController::dump(String8& result) {
                         mPrevDisplayWhitePointNits);
     result.appendFormat("\tcabc supported %d, cabcMode %d\n", mCabcModeOfs.is_open(),
                         mCabcMode.get());
+    result.appendFormat("\tignore brightness update request %d\n", mIgnoreBrightnessUpdateRequests);
 
     result.appendFormat("\n");
 }
