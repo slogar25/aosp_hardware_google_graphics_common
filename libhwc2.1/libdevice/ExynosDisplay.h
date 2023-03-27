@@ -152,6 +152,7 @@ enum class VrrThrottleRequester : uint32_t {
     PIXEL_DISP = 0,
     TEST,
     LHBM,
+    BRIGHTNESS,
     MAX,
 };
 
@@ -1273,7 +1274,10 @@ class ExynosDisplay {
         std::unique_ptr<ExynosDisplayInterface> mDisplayInterface;
         void requestLhbm(bool on);
 
-        virtual int setMinIdleRefreshRate(const int __unused fps) { return NO_ERROR; }
+        virtual int setMinIdleRefreshRate(const int __unused fps,
+                                          const VrrThrottleRequester __unused requester) {
+            return NO_ERROR;
+        }
         virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos,
                                                 const VrrThrottleRequester __unused requester) {
             return NO_ERROR;

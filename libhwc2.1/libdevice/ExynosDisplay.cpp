@@ -4000,8 +4000,10 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
 
         ret = mBrightnessController->processDisplayBrightness(brightness, mVsyncPeriod,
                                                               waitPresent);
-        if (ret == NO_ERROR && mOperationRateManager) {
-            mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
+        if (ret == NO_ERROR) {
+            setMinIdleRefreshRate(0, VrrThrottleRequester::BRIGHTNESS);
+            if (mOperationRateManager)
+                mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
         }
         return ret;
     }
@@ -5929,6 +5931,7 @@ void ExynosDisplay::cleanupAfterClientDeath() {
 
 int32_t ExynosDisplay::flushDisplayBrightnessChange() {
     if (mBrightnessController) {
+        setMinIdleRefreshRate(0, VrrThrottleRequester::BRIGHTNESS);
         if (mOperationRateManager) {
             mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
         }
