@@ -84,11 +84,7 @@ void dump(const restriction_size_t &restrictionSize, String8 &result) {
 }
 
 ExynosMPPSource::ExynosMPPSource()
-      : mSourceType(MPP_SOURCE_MAX),
-        mSource(NULL),
-        mOtfMPP(NULL),
-        mM2mMPP(NULL),
-        mNeedPreblending(false) {
+      : mSourceType(MPP_SOURCE_MAX), mSource(NULL), mOtfMPP(NULL), mM2mMPP(NULL) {
     memset(&mSrcImg, 0, sizeof(mSrcImg));
     mSrcImg.acquireFenceFd = -1;
     mSrcImg.releaseFenceFd = -1;
