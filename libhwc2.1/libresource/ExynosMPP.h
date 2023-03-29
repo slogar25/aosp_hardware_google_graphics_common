@@ -474,7 +474,7 @@ class ExynosMPPSource {
             return 0;
         }
 
-        bool mNeedPreblending;
+        bool mNeedPreblending = false;
 };
 
 bool exynosMPPSourceComp(const ExynosMPPSource* l, const ExynosMPPSource* r);
