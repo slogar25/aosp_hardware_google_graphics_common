@@ -40,6 +40,10 @@
 class BrightnessController {
 public:
     using HdrLayerState = displaycolor::HdrLayerState;
+    using DisplayBrightnessRange = displaycolor::DisplayBrightnessRange;
+    using BrightnessRangeMap = displaycolor::BrightnessRangeMap;
+    using IBrightnessTable = displaycolor::IBrightnessTable;
+    using BrightnessMode = displaycolor::BrightnessMode;
 
     class DimmingMsgHandler : public virtual ::android::MessageHandler {
     public:
@@ -162,24 +166,10 @@ public:
         return nodeName.c_str();
     }
 
-    struct BrightnessTable {
-        float mBriStart;
-        float mBriEnd;
-        uint32_t mBklStart;
-        uint32_t mBklEnd;
-        uint32_t mNitsStart;
-        uint32_t mNitsEnd;
-        BrightnessTable() {}
-        BrightnessTable(const brightness_attribute &attr)
-              : mBriStart(static_cast<float>(attr.percentage.min) / 100.0f),
-                mBriEnd(static_cast<float>(attr.percentage.max) / 100.0f),
-                mBklStart(attr.level.min),
-                mBklEnd(attr.level.max),
-                mNitsStart(attr.nits.min),
-                mNitsEnd(attr.nits.max) {}
-    };
-
-    const BrightnessTable *getBrightnessTable() { return mBrightnessTable; }
+    void updateBrightnessTable(const IBrightnessTable* table);
+    const BrightnessRangeMap& getBrightnessRanges() const {
+        return mKernelBrightnessTable.GetBrightnessRangeMap();
+    }
 
     /*
      * WARNING: This enum is parsed by Battery Historian. Add new values, but
@@ -240,6 +230,82 @@ public:
             "/sys/devices/platform/exynos-drm/%s-panel/refresh_rate";
 
 private:
+    // This is a backup implementation of brightness table. It would be applied only when the system
+    // failed to initiate libdisplaycolor. The complete implementation is class
+    // DisplayData::BrightnessTable
+    class LinearBrightnessTable : public IBrightnessTable {
+    public:
+        LinearBrightnessTable() : mIsValid(false) {}
+        void Init(const struct brightness_capability* cap);
+        bool IsValid() const { return mIsValid; }
+        const BrightnessRangeMap& GetBrightnessRangeMap() const { return mBrightnessRanges; }
+
+        /* IBrightnessTable functions */
+        std::optional<std::reference_wrapper<const DisplayBrightnessRange>> GetBrightnessRange(
+                BrightnessMode bm) const override {
+            if (mBrightnessRanges.count(bm) == 0) {
+                return std::nullopt;
+            }
+            return mBrightnessRanges.at(bm);
+        }
+        std::optional<float> BrightnessToNits(float brightness, BrightnessMode& bm) const override;
+        std::optional<uint32_t> NitsToDbv(BrightnessMode bm, float nits) const override;
+        std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const override;
+
+        BrightnessMode GetBrightnessMode(float brightness) const {
+            for (const auto& [mode, range] : mBrightnessRanges) {
+                if (((!range.brightness_min_exclusive && brightness == range.brightness_min) ||
+                     brightness > range.brightness_min) &&
+                    brightness <= range.brightness_max) {
+                    return mode;
+                }
+            }
+            // return BM_MAX if there is no matching range
+            return BrightnessMode::BM_MAX;
+        }
+
+    private:
+        static void setBrightnessRangeFromAttribute(const struct brightness_attribute& attr,
+                                                    displaycolor::DisplayBrightnessRange& range) {
+            range.nits_min = attr.nits.min;
+            range.nits_max = attr.nits.max;
+            range.dbv_min = attr.level.min;
+            range.dbv_max = attr.level.max;
+            range.brightness_min_exclusive = false;
+            range.brightness_min = static_cast<float>(attr.percentage.min) / 100.0f;
+            range.brightness_max = static_cast<float>(attr.percentage.max) / 100.0f;
+        }
+        /**
+         * Implement linear interpolation/extrapolation formula:
+         *  y = y1+(y2-y1)*(x-x1)/(x2-x1)
+         * Return NAN for following cases:
+         *  - Attempt to do extrapolation when x1==x2
+         *  - Undefined output when (x2 == x1) and (y2 != y1)
+         */
+        static inline float LinearInterpolation(float x, float x1, float x2, float y1, float y2) {
+            if (x2 == x1) {
+                if (x != x1) {
+                    ALOGE("%s: attempt to do extrapolation when x1==x2", __func__);
+                    return NAN;
+                }
+                if (y2 == y1) {
+                    // This is considered a normal case. (interpolation between a single point)
+                    return y1;
+                } else {
+                    // The output is undefined when (y1!=y2)
+                    ALOGE("%s: undefined output when (x2 == x1) and (y2 != y1)", __func__);
+                    return NAN;
+                }
+            }
+            float t = (x - x1) / (x2 - x1);
+            return y1 + (y2 - y1) * t;
+        }
+        inline bool SupportHBM() const {
+            return mBrightnessRanges.count(BrightnessMode::BM_HBM) > 0;
+        }
+        bool mIsValid;
+        BrightnessRangeMap mBrightnessRanges;
+    };
     // sync brightness change for mixed composition when there is more than 50% luminance change.
     // The percentage is calculated as:
     //        (big_lumi - small_lumi) / small_lumi
@@ -276,7 +342,9 @@ private:
     bool mGhbmSupported = false;
     bool mDbmSupported = false;
     bool mBrightnessIntfSupported = false;
-    BrightnessTable mBrightnessTable[toUnderlying(BrightnessRange::MAX)];
+    LinearBrightnessTable mKernelBrightnessTable;
+    // External object from libdisplaycolor
+    const IBrightnessTable* mBrightnessTable = nullptr;
 
     int32_t mPanelIndex;
     DrmEnumParser::MapHal2DrmEnum mHbmModeEnums;
