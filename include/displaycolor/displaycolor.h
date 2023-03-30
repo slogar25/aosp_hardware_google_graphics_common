@@ -20,6 +20,9 @@
 #include <android/hardware/graphics/common/1.1/types.h>
 #include <android/hardware/graphics/common/1.2/types.h>
 
+#include <functional>
+#include <memory>
+#include <optional>
 #include <string>
 
 namespace displaycolor {
@@ -98,23 +101,52 @@ enum class HdrLayerState {
     kHdrLarge,
 };
 
-struct DisplayBrightnessTable {
-    float nbm_nits_min;
-    float nbm_nits_max;
-    float hbm_nits_min;
-    float hbm_nits_max;
+struct DisplayBrightnessRange {
+    // inclusive lower bound
+    float nits_min;
+    // inclusive upper bound
+    float nits_max;
 
-    uint32_t nbm_dbv_min;
-    uint32_t nbm_dbv_max;
-    uint32_t hbm_dbv_min;
-    uint32_t hbm_dbv_max;
+    // inclusive lower bound
+    uint32_t dbv_min;
+    // inclusive upper bound
+    uint32_t dbv_max;
+
+    bool brightness_min_exclusive;
+    float brightness_min;
+    // inclusive upper bound
+    float brightness_max;
+
+    bool IsValid() const {
+        // Criteria
+        // 1. max >= min
+        // 2. float min >= 0
+        return nits_min >= 0 && brightness_min >= 0 && nits_max >= nits_min && dbv_max >= dbv_min &&
+                brightness_max >= brightness_min;
+    }
+};
+typedef std::map<BrightnessMode, DisplayBrightnessRange> BrightnessRangeMap;
+
+class IBrightnessTable {
+public:
+    virtual ~IBrightnessTable(){};
+
+    virtual std::optional<std::reference_wrapper<const DisplayBrightnessRange>> GetBrightnessRange(
+            BrightnessMode bm) const = 0;
+    virtual std::optional<float> BrightnessToNits(float brightness, BrightnessMode &bm) const = 0;
+    virtual std::optional<uint32_t> NitsToDbv(BrightnessMode bm, float nits) const = 0;
+    virtual std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const = 0;
 };
 
+/**
+ * @brief This structure holds data imported from HWC.
+ */
 struct DisplayInfo {
     std::string panel_name;
     std::string panel_serial;
 
-    DisplayBrightnessTable brightness_table;
+    // If brightness table exists in pb file, it will overwrite values in brightness_ranges
+    BrightnessRangeMap brightness_ranges;
 };
 
 struct Color {
@@ -423,6 +455,15 @@ class IDisplayColorGeneric {
      * @return The calibrated serial number.
      */
     virtual const std::string& GetCalibratedSerialNumber(DisplayType display) const = 0;
+
+    /**
+     * @brief Get brightness table to do brightness conversion between {normalized brightness, nits,
+     * dbv}.
+     * @param display Reserved field to choose display type.
+     * @param table Return brightness table if successful, nullptr if the table is not valid.
+     * @return OK if successful, error otherwise.
+     */
+    virtual int GetBrightnessTable(DisplayType display, const IBrightnessTable *&table) const = 0;
 };
 
 extern "C" {
