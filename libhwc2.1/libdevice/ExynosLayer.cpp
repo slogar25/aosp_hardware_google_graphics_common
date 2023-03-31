@@ -849,7 +849,12 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
             src_img->fullHeight = pixel_align_down((gmeta.vstride / 2), 2);
         } else {
             src_img->fullWidth = gmeta.stride;
-            src_img->fullHeight = gmeta.vstride;
+            // The BW VDEC will generate AFBC streams based on the initial requested height
+            // instead of the adjusted vstride from gralloc.
+            src_img->fullHeight = (isAFBC32x8(mCompressionInfo) &&
+                                   (gmeta.producer_usage & VendorGraphicBufferUsage::BW))
+                    ? gmeta.height
+                    : gmeta.vstride;
         }
         if (!mPreprocessedInfo.mUsePrivateFormat)
             src_img->format = gmeta.format;

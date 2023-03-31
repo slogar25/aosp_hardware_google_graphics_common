@@ -442,6 +442,7 @@ uint64_t getFormatModifier(const buffer_handle_t handle);
 uint32_t getCompressionType(const buffer_handle_t handle);
 CompressionInfo getCompressionInfo(buffer_handle_t handle);
 String8 getCompressionStr(CompressionInfo compression);
+bool isAFBC32x8(CompressionInfo compression);
 
 bool isFormatRgb(int format);
 bool isFormatYUV(int format);
