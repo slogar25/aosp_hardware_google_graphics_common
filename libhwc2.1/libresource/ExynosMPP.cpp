@@ -366,8 +366,7 @@ bool ExynosMPP::checkRotationCondition(struct exynos_image &src)
     /* Other DPPs */
     if ((src.transform & HAL_TRANSFORM_ROT_90) == 0)
     {
-        if ((src.compressed == 1) && (src.transform != 0))
-            return false;
+        if ((src.compressionInfo.type == COMP_TYPE_AFBC) && (src.transform != 0)) return false;
         return true;
     } else {
         return false;
@@ -398,14 +397,14 @@ bool ExynosMPP::isSupportedTransform(struct exynos_image &src)
 
 bool ExynosMPP::isSupportedCompression(struct exynos_image &src)
 {
-    if (src.compressed) {
+    if (src.compressionInfo.type == COMP_TYPE_AFBC) {
         if (mAttr & MPP_ATTR_AFBC)
             return true;
         else
             return false;
-    } else {
-        return true;
     }
+
+    return true;
 }
 
 bool ExynosMPP::isSupportedCapability(ExynosDisplay &display, struct exynos_image &src)
@@ -1089,10 +1088,10 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
     MPP_LOGD(eDebugMPP | eDebugBuf,
              "\tAssignedDisplay[%d, %d] format[0x%8x, 0x%8x], bufferType[%d, %d], bufferNum[%d, "
              "%d] "
-             "usageFlags: 0x%" PRIx64 ", need afbc %u sbwc %u lossy %u",
+             "usageFlags: 0x%" PRIx64 ", need comp_type 0x%x lossy %u",
              mPrevAssignedDisplayType, assignedDisplay, gmeta.format, dst.format,
              mDstImgs[index].bufferType, getBufferType(dst.usageFlags), prevAssignedBufferNum,
-             assignedBufferNum, dst.usageFlags, dst.compressed, isFormatSBWC(dst.format),
+             assignedBufferNum, dst.usageFlags, dst.compressionInfo.type,
              isFormatLossy(dst.format));
 
     bool realloc = (mPrevAssignedDisplayType != assignedDisplay) ||
@@ -1100,7 +1099,7 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
             (formatToBpp(gmeta.format) < formatToBpp(dst.format)) ||
             ((gmeta.stride * gmeta.vstride) < (int)(dst.fullWidth * dst.fullHeight)) ||
             (mDstImgs[index].bufferType != getBufferType(dst.usageFlags)) ||
-            (isAFBCCompressed(dst_handle) != dst.compressed) ||
+            (isAFBCCompressed(dst_handle) != (dst.compressionInfo.type == COMP_TYPE_AFBC)) ||
             (isFormatSBWC(gmeta.format) != isFormatSBWC(dst.format)) ||
             (isFormatLossy(gmeta.format) != isFormatLossy(dst.format));
 
@@ -1123,17 +1122,18 @@ bool ExynosMPP::canUsePrevFrame()
 
     for (uint32_t i = 0; i < mPrevFrameInfo.srcNum; i++) {
         if ((mPrevFrameInfo.srcInfo[i].bufferHandle != mAssignedSources[i]->mSrcImg.bufferHandle) ||
-            (mPrevFrameInfo.srcInfo[i].x !=  mAssignedSources[i]->mSrcImg.x) ||
-            (mPrevFrameInfo.srcInfo[i].y !=  mAssignedSources[i]->mSrcImg.y) ||
-            (mPrevFrameInfo.srcInfo[i].w !=  mAssignedSources[i]->mSrcImg.w) ||
-            (mPrevFrameInfo.srcInfo[i].h !=  mAssignedSources[i]->mSrcImg.h) ||
-            (mPrevFrameInfo.srcInfo[i].format !=  mAssignedSources[i]->mSrcImg.format) ||
-            (mPrevFrameInfo.srcInfo[i].usageFlags !=  mAssignedSources[i]->mSrcImg.usageFlags) ||
-            (mPrevFrameInfo.srcInfo[i].dataSpace !=  mAssignedSources[i]->mSrcImg.dataSpace) ||
-            (mPrevFrameInfo.srcInfo[i].blending !=  mAssignedSources[i]->mSrcImg.blending) ||
-            (mPrevFrameInfo.srcInfo[i].transform !=  mAssignedSources[i]->mSrcImg.transform) ||
-            (mPrevFrameInfo.srcInfo[i].compressed !=  mAssignedSources[i]->mSrcImg.compressed) ||
-            (mPrevFrameInfo.srcInfo[i].planeAlpha !=  mAssignedSources[i]->mSrcImg.planeAlpha) ||
+            (mPrevFrameInfo.srcInfo[i].x != mAssignedSources[i]->mSrcImg.x) ||
+            (mPrevFrameInfo.srcInfo[i].y != mAssignedSources[i]->mSrcImg.y) ||
+            (mPrevFrameInfo.srcInfo[i].w != mAssignedSources[i]->mSrcImg.w) ||
+            (mPrevFrameInfo.srcInfo[i].h != mAssignedSources[i]->mSrcImg.h) ||
+            (mPrevFrameInfo.srcInfo[i].format != mAssignedSources[i]->mSrcImg.format) ||
+            (mPrevFrameInfo.srcInfo[i].usageFlags != mAssignedSources[i]->mSrcImg.usageFlags) ||
+            (mPrevFrameInfo.srcInfo[i].dataSpace != mAssignedSources[i]->mSrcImg.dataSpace) ||
+            (mPrevFrameInfo.srcInfo[i].blending != mAssignedSources[i]->mSrcImg.blending) ||
+            (mPrevFrameInfo.srcInfo[i].transform != mAssignedSources[i]->mSrcImg.transform) ||
+            (mPrevFrameInfo.srcInfo[i].compressionInfo.type !=
+             mAssignedSources[i]->mSrcImg.compressionInfo.type) ||
+            (mPrevFrameInfo.srcInfo[i].planeAlpha != mAssignedSources[i]->mSrcImg.planeAlpha) ||
             (mPrevFrameInfo.dstInfo[i].x != mAssignedSources[i]->mMidImg.x) ||
             (mPrevFrameInfo.dstInfo[i].y != mAssignedSources[i]->mMidImg.y) ||
             (mPrevFrameInfo.dstInfo[i].w != mAssignedSources[i]->mMidImg.w) ||
@@ -1217,8 +1217,15 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
     srcImgInfo->bufferType = getBufferType(srcHandle);
     if (srcImgInfo->bufferType == MPP_BUFFER_SECURE_DRM)
         attribute |= AcrylicCanvas::ATTR_PROTECTED;
-    if (src.compressed)
-        attribute |= AcrylicCanvas::ATTR_COMPRESSED;
+    /*Change AFBC attribute on the basis of the modifier*/
+    if (src.compressionInfo.type != COMP_TYPE_NONE) {
+        if ((src.compressionInfo.modifier & AFBC_FORMAT_MOD_BLOCK_SIZE_MASK) ==
+            AFBC_FORMAT_MOD_BLOCK_SIZE_32x8) {
+            attribute |= AcrylicCanvas::ATTR_COMPRESSED_WIDEBLK;
+        } else {
+            attribute |= AcrylicCanvas::ATTR_COMPRESSED;
+        }
+    }
 
     srcImgInfo->bufferHandle = srcHandle;
     srcImgInfo->acrylicAcquireFenceFd =
@@ -1769,7 +1776,10 @@ int32_t ExynosMPP::getDstImageInfo(exynos_image *img)
     img->acquireFenceFd = -1;
     img->releaseFenceFd = -1;
 
-    img->compressed = needCompressDstBuf();
+    if (needCompressDstBuf()) {
+        img->compressionInfo.type = COMP_TYPE_AFBC;
+        img->compressionInfo.modifier = AFBC_FORMAT_MOD_BLOCK_SIZE_16x16;
+    }
 
     if (mDstImgs[mCurrentDstBuf].bufferHandle == NULL) {
         img->acquireFenceFd = -1;
@@ -1777,6 +1787,7 @@ int32_t ExynosMPP::getDstImageInfo(exynos_image *img)
         return -EFAULT;
     } else {
         img->bufferHandle = mDstImgs[mCurrentDstBuf].bufferHandle;
+        img->compressionInfo = getCompressionInfo(img->bufferHandle);
         VendorGraphicBufferMeta gmeta(img->bufferHandle);
         img->fullWidth = gmeta.stride;
         img->fullHeight = gmeta.vstride;
@@ -2382,7 +2393,7 @@ void ExynosMPP::getPPCIndex(const struct exynos_image &src,
     /* Compare SBWC, AFBC and 10bitYUV420 first! because can be overlapped with other format */
     if (isFormatSBWC(criteria.format) && hasPPC(mPhysicalType, PPC_FORMAT_SBWC, PPC_ROT_NO))
         formatIndex = PPC_FORMAT_SBWC;
-    else if (src.compressed == 1) {
+    else if (src.compressionInfo.type == COMP_TYPE_AFBC) {
         if ((isFormatRgb(criteria.format)) && hasPPC(mPhysicalType, PPC_FORMAT_AFBC_RGB, PPC_ROT_NO))
             formatIndex = PPC_FORMAT_AFBC_RGB;
         else if ((isFormatYUV(criteria.format)) && hasPPC(mPhysicalType, PPC_FORMAT_AFBC_YUV, PPC_ROT_NO))

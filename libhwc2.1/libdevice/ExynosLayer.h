@@ -150,7 +150,7 @@ class ExynosLayer : public ExynosMPPSource {
         /**
          * Source buffer's compression information
          */
-        bool mCompressed;
+        CompressionInfo mCompressionInfo;
 
         /**
          * Acquire fence

@@ -48,7 +48,7 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
         mOverlayPriority(ePriorityLow),
         mGeometryChanged(0x0),
         mWindowIndex(0),
-        mCompressed(false),
+        mCompressionInfo({COMP_TYPE_NONE, 0}),
         mAcquireFence(-1),
         mPrevAcquireFence(-1),
         mReleaseFence(-1),
@@ -442,10 +442,12 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
         fence_close(mAcquireFence);
     mAcquireFence = -1;
 #endif
-    bool compressed = isAFBCCompressed(mLayerBuffer);
-    if (mCompressed != compressed)
+
+    /* Set Compression Information from GraphicBuffer */
+    uint32_t prevCompressionType = mCompressionInfo.type;
+    mCompressionInfo = getCompressionInfo(mLayerBuffer);
+    if (mCompressionInfo.type != prevCompressionType)
         setGeometryChanged(GEOMETRY_LAYER_COMPRESSED_CHANGED);
-    mCompressed = compressed;
 
     if (buffer != NULL) {
         /*
@@ -459,9 +461,9 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
     }
 
     HDEBUGLOGD(eDebugFence,
-               "layers bufferHandle: %p, mDataSpace: 0x%8x, acquireFence: %d, afbc: %d, "
-               "internal_format: 0x%" PRIx64 "",
-               mLayerBuffer, mDataSpace, mAcquireFence, mCompressed, internal_format);
+               "layers bufferHandle: %p, mDataSpace: 0x%8x, acquireFence: %d, compressionType: "
+               "0x%x, internal_format: 0x%" PRIx64 "",
+               mLayerBuffer, mDataSpace, mAcquireFence, mCompressionInfo.type, internal_format);
 
     return 0;
 }
@@ -814,7 +816,7 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
         src_img->dataSpace = HAL_DATASPACE_V0_SRGB;
         src_img->blending = mBlending;
         src_img->transform = mTransform;
-        src_img->compressed = mCompressed;
+        src_img->compressionInfo = mCompressionInfo;
         src_img->planeAlpha = mPlaneAlpha;
         src_img->zOrder = mZOrder;
 
@@ -838,7 +840,12 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
             src_img->fullHeight = pixel_align_down((gmeta.vstride / 2), 2);
         } else {
             src_img->fullWidth = gmeta.stride;
-            src_img->fullHeight = gmeta.vstride;
+            // The BW VDEC will generate AFBC streams based on the initial requested height
+            // instead of the adjusted vstride from gralloc.
+            src_img->fullHeight = (isAFBC32x8(mCompressionInfo) &&
+                                   (gmeta.producer_usage & VendorGraphicBufferUsage::BW))
+                    ? gmeta.height
+                    : gmeta.vstride;
         }
         if (!mPreprocessedInfo.mUsePrivateFormat)
             src_img->format = gmeta.format;
@@ -869,7 +876,7 @@ int32_t ExynosLayer::setSrcExynosImage(exynos_image *src_img)
 
     src_img->blending = mBlending;
     src_img->transform = mTransform;
-    src_img->compressed = mCompressed;
+    src_img->compressionInfo = mCompressionInfo;
     src_img->planeAlpha = mPlaneAlpha;
     src_img->zOrder = mZOrder;
     /* Copy HDR metadata */
@@ -938,7 +945,7 @@ int32_t ExynosLayer::setDstExynosImage(exynos_image *dst_img)
     }
     dst_img->blending = mBlending;
     dst_img->transform = 0;
-    dst_img->compressed = 0;
+    dst_img->compressionInfo.type = COMP_TYPE_NONE;
     dst_img->planeAlpha = mPlaneAlpha;
     dst_img->zOrder = mZOrder;
 
@@ -1032,15 +1039,15 @@ void ExynosLayer::dump(String8& result)
             tb.add("color", std::vector<uint64_t>({mColor.r, mColor.g, mColor.b, mColor.a}), true);
         } else {
             tb.add("handle", mLayerBuffer)
-              .add("fd", std::vector<int>({fd, fd1, fd2}))
-              .add("AFBC", static_cast<bool>(mCompressed));
+                    .add("fd", std::vector<int>({fd, fd1, fd2}))
+                    .add("compression", getCompressionStr(mCompressionInfo).string());
         }
-        tb.add("format", getFormatStr(format, mCompressed ? AFBC : 0).string())
-          .add("dataSpace", mDataSpace, true)
-          .add("colorTr", mLayerColorTransform.enable)
-          .add("blend", mBlending, true)
-          .add("planeAlpha", mPlaneAlpha)
-          .add("fps", mFps);
+        tb.add("format", getFormatStr(format, mCompressionInfo.type).string())
+                .add("dataSpace", mDataSpace, true)
+                .add("colorTr", mLayerColorTransform.enable)
+                .add("blend", mBlending, true)
+                .add("planeAlpha", mPlaneAlpha)
+                .add("fps", mFps);
         result.append(tb.build().c_str());
     }
 
@@ -1118,8 +1125,11 @@ void ExynosLayer::printLayer()
         fd1 = -1;
         fd2 = -1;
     }
-    result.appendFormat("handle: %p [fd: %d, %d, %d], acquireFence: %d, tr: 0x%2x, AFBC: %1d, dataSpace: 0x%8x, format: %s\n",
-            mLayerBuffer, fd, fd1, fd2, mAcquireFence, mTransform, mCompressed, mDataSpace, getFormatStr(format, mCompressed? AFBC : 0).string());
+    result.appendFormat("handle: %p [fd: %d, %d, %d], acquireFence: %d, tr: 0x%2x, compression: "
+                        "%s, dataSpace: 0x%8x, format: %s\n",
+                        mLayerBuffer, fd, fd1, fd2, mAcquireFence, mTransform,
+                        getCompressionStr(mCompressionInfo).string(), mDataSpace,
+                        getFormatStr(format, mCompressionInfo.type).string());
     result.appendFormat("\tblend: 0x%4x, planeAlpha: %3.1f, zOrder: %d, color[0x%2x, 0x%2x, 0x%2x, 0x%2x]\n",
             mBlending, mPlaneAlpha, mZOrder, mColor.r, mColor.g, mColor.b, mColor.a);
     result.appendFormat("\tfps: %.2f, priority: %d, windowIndex: %d\n", mFps, mOverlayPriority,

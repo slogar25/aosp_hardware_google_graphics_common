@@ -442,13 +442,14 @@ public:
      * - ATTR_SOLIDCOLOR : The image buffer is empty and should be filled with one RGBA value by H/W.
      */
     enum layer_attr_t {
-        ATTR_NONE       = 0,
-        ATTR_PROTECTED  = 1,
+        ATTR_NONE = 0,
+        ATTR_PROTECTED = 1,
         ATTR_COMPRESSED = 2,
-        ATTR_UORDER     = 4,
-        ATTR_OTF        = 8,
+        ATTR_UORDER = 4,
+        ATTR_OTF = 8,
         ATTR_SOLIDCOLOR = 16,
-        ATTR_ALL_MASK   = 0x1F
+        ATTR_COMPRESSED_WIDEBLK = 32,
+        ATTR_ALL_MASK = 0x3F
     };
     /*
      * Describes how the buffer of the image is identified.
@@ -569,6 +570,10 @@ public:
      * Determine if the image in the buffer is or should be in a compressed form.
      */
     bool isCompressed() { return !!(mAttributes & ATTR_COMPRESSED); }
+
+    /*Check if the AFBC 32x8 format size is being used*/
+    bool isCompressedWideblk() { return !!(mAttributes & ATTR_COMPRESSED_WIDEBLK); }
+
     /*
      * Study if the image is or should be written in U-Order for accelerated
      * graphic processing instead of raster-scan order.
