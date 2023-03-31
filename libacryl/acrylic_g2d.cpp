@@ -701,6 +701,13 @@ bool AcrylicCompositorG2D::prepareImage(AcrylicCanvas &layer, struct g2d_layer &
             cmd[G2DSFR_IMG_COLORMODE] = G2D_FMT_BGR565;
         cmd[G2DSFR_IMG_COLORMODE] |= G2D_DATAFORMAT_AFBC;
         cmd[G2DSFR_IMG_STRIDE] = 0;
+    } else if (layer.isCompressedWideblk()) {
+        if (g2dfmt->g2dfmt == G2D_FMT_RGB565) cmd[G2DSFR_IMG_COLORMODE] = G2D_FMT_BGR565;
+        cmd[G2DSFR_IMG_COLORMODE] |= G2D_DATAFORMAT_AFBC;
+        cmd[G2DSFR_IMG_STRIDE] = 0;
+
+        /*Add AFBC image flags for 32x8 block size*/
+        image.flags |= G2D_LAYERFLAG_AFBC_WIDEBLK;
     } else if (g2dfmt->g2dfmt & G2D_DATAFORMAT_SBWC) {
         cmd[G2DSFR_IMG_STRIDE] = 0;
     } else {
@@ -889,7 +896,7 @@ bool AcrylicCompositorG2D::prepareSource(AcrylicLayer &layer, struct g2d_layer &
     cmd[G2DSFR_SRC_DSTRIGHT]  = window.size.hori + window.pos.hori;
     cmd[G2DSFR_SRC_DSTBOTTOM] = window.size.vert + window.pos.vert;
 
-    if (layer.isCompressed()) {
+    if (layer.isCompressed() || layer.isCompressedWideblk()) {
         cmd[G2DSFR_IMG_WIDTH]--;
         cmd[G2DSFR_IMG_HEIGHT]--;
     }
