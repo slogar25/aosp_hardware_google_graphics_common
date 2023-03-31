@@ -1779,6 +1779,7 @@ int32_t ExynosMPP::getDstImageInfo(exynos_image *img)
         return -EFAULT;
     } else {
         img->bufferHandle = mDstImgs[mCurrentDstBuf].bufferHandle;
+        img->compressionInfo = getCompressionInfo(img->bufferHandle);
         VendorGraphicBufferMeta gmeta(img->bufferHandle);
         img->fullWidth = gmeta.stride;
         img->fullHeight = gmeta.vstride;
