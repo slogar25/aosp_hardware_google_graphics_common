@@ -171,13 +171,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     if (config.state == config.WIN_STATE_BUFFER || config.state == config.WIN_STATE_RCD) {
         bufWidth = config.src.f_w;
         bufHeight = config.src.f_h;
-        uint32_t compressType = 0;
-        if (config.compression)
-            compressType = AFBC;
-        else if (isFormatSBWC(config.format)) // TODO: b/175381083, change to new API
-            compressType = COMP_ANY;
 
-        auto exynosFormat = halFormatToExynosFormat(config.format, compressType);
+        auto exynosFormat = halFormatToExynosFormat(config.format, config.compressionInfo.type);
         if (exynosFormat == nullptr) {
             ALOGE("%s:: unknown HAL format (%d)", __func__, config.format);
             return -EINVAL;
@@ -208,8 +203,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
             return NO_ERROR;
         }
 
-        if (config.compression) {
-            uint64_t compressed_modifier = AFBC_FORMAT_MOD_BLOCK_SIZE_16x16;
+        if (config.compressionInfo.type == COMP_TYPE_AFBC) {
+            uint64_t compressed_modifier = config.compressionInfo.modifier;
             switch (config.comp_src) {
                 case DPP_COMP_SRC_G2D:
                     compressed_modifier |= AFBC_FORMAT_MOD_SOURCE_G2D;
@@ -221,14 +216,8 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
                     break;
             }
             modifiers[0] |= DRM_FORMAT_MOD_ARM_AFBC(compressed_modifier);
-        } else {
-            if (isFormatSBWC(config.format)) {
-                if (isFormat10BitYUV420(config.format)) {
-                    modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLOCK_SIZE_32x5);
-                } else {
-                    modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SBWC(SBWC_FORMAT_MOD_BLOCK_SIZE_32x4);
-                }
-            }
+        } else if (config.compressionInfo.type == COMP_TYPE_SBWC) {
+            modifiers[0] |= DRM_FORMAT_MOD_SAMSUNG_SBWC(config.compressionInfo.modifier);
         }
 
         for (uint32_t bufferIndex = 0; bufferIndex < bufferNum; bufferIndex++) {

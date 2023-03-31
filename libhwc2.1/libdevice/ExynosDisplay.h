@@ -219,7 +219,7 @@ struct exynos_win_config_data
     struct decon_frame src = {0, 0, 0, 0, 0, 0};
     struct decon_frame dst = {0, 0, 0, 0, 0, 0};
     bool protection = false;
-    bool compression = false;
+    CompressionInfo compressionInfo;
     bool needColorTransform = false;
 
     void reset(){
@@ -323,13 +323,12 @@ class ExynosCompositionInfo : public ExynosMPPSource {
         exynos_win_config_data mLastWinConfigData;
 
         int32_t mWindowIndex;
-        bool mCompressed;
+        CompressionInfo mCompressionInfo;
 
         void initializeInfos(ExynosDisplay *display);
         void setTargetBuffer(ExynosDisplay *display, buffer_handle_t handle,
                 int32_t acquireFence, android_dataspace dataspace);
-        void setCompressed(bool compressed);
-        bool getCompressed();
+        void setCompressionType(uint32_t compressionType);
         void dump(String8& result);
         String8 getTypeStr();
 };
