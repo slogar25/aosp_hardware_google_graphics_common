@@ -49,10 +49,10 @@ private:
     size_t GetLength(unsigned char *addr);
     bool ParseFrame(unsigned char *addr);
 
-    off_t GetOffset(unsigned char *addr) {
+    ptrdiff_t GetOffset(unsigned char *addr) {
         unsigned long beg = reinterpret_cast<unsigned long>(m_pStreamBase);
         unsigned long cur = reinterpret_cast<unsigned long>(addr);
-        return static_cast<off_t>(cur - beg);
+        return static_cast<ptrdiff_t>(cur - beg);
     }
 
 public:
@@ -130,7 +130,7 @@ bool CJpegStreamParser::Parse(unsigned char *streambase, size_t length) {
             return true;             // this is the successful exit point
         } else if (marker == 0xD9) { // EOI
             // This will not meet.
-            ALOGE("Unexpected EOI found at %lu\n", GetOffset(addr - 2));
+            ALOGE("Unexpected EOI found at %td\n", GetOffset(addr - 2));
             return false;
         } else {
             if ((marker == 0xCC) || (marker == 0xDC)) { // DAC and DNL
@@ -145,7 +145,7 @@ bool CJpegStreamParser::Parse(unsigned char *streambase, size_t length) {
         }
 
         if (filelen < 2 || GetLength(addr) == 0) {
-            ALOGE("Invalid length 0 is read at offset %lu", GetOffset(addr));
+            ALOGE("Invalid length 0 is read at offset %td", GetOffset(addr));
             return false;
         }
 
