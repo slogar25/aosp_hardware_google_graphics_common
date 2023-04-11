@@ -92,8 +92,18 @@ class ExynosLayer : public ExynosMPPSource {
 
         /**
          * Layer's compositionType
+         *
+         * If acceptDisplayChanges() is called, it will be set to the validated type
+         * since SF may update their state and doesn't call back into HWC
          */
         int32_t mCompositionType;
+
+        /**
+         * Composition type that is originally requested by SF only using setLayerComposisionType()
+         *
+         * It will not be changed if applyDisplayChanges() is called.
+         */
+        int32_t mRequestedCompositionType;
 
         /**
          * Composition type that is used by HAL
