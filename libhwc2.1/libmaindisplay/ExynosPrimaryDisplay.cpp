@@ -78,10 +78,13 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
       : ExynosDisplay(HWC_DISPLAY_PRIMARY, index, device, displayName),
         mUseBlockingZoneForMinIdleRefreshRate(false),
         mMinIdleRefreshRate(0),
+        mVrrThrottleFps{0},
+        mVrrThrottleNanos{0},
         mRefreshRateDelayNanos(0),
         mLastRefreshRateAppliedNanos(0),
         mAppliedActiveConfig(0),
         mDisplayIdleTimerEnabled(false),
+        mDisplayIdleTimerNanos{0},
         mDisplayNeedHandleIdleExit(false) {
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
