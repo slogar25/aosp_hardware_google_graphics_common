@@ -580,7 +580,7 @@ void ExynosDisplayDrmInterface::updateMountOrientation()
 
     for (auto &e : orientationEnums) {
         uint64_t enumValue;
-        std::tie(enumValue, err) = orientation.GetEnumValueWithName(e.second);
+        std::tie(enumValue, err) = orientation.getEnumValueWithName(e.second);
         if (!err && enumValue == drmOrientation) {
             mExynosDisplay->mMountOrientation = e.first;
             return;
@@ -675,7 +675,7 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
         auto &plane = mDrmDevice->planes().at(i);
         uint32_t plane_id = plane->id();
 
-        if (!plane->zpos_property().is_immutable()) {
+        if (!plane->zpos_property().isImmutable()) {
             /* Plane can be used for composition */
             ExynosMPP *exynosMPP =
                 mExynosDisplay->mResourceManager->getOtfMPPWithChannel(i);
@@ -1409,13 +1409,13 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     }
 
     uint32_t typeBit;
-    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("Dolby Vision");
+    std::tie(typeBit, ret) = prop_hdr_formats.getEnumValueWithName("Dolby Vision");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_DOLBY_VISION);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.string(), HAL_HDR_DOLBY_VISION);
     }
-    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HDR10");
+    std::tie(typeBit, ret) = prop_hdr_formats.getEnumValueWithName("HDR10");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10);
         if (mExynosDisplay->mDevice->mResourceManager->hasHDR10PlusMPP()) {
@@ -1424,7 +1424,7 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.string(), HAL_HDR_HDR10);
     }
-    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HLG");
+    std::tie(typeBit, ret) = prop_hdr_formats.getEnumValueWithName("HLG");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HLG);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
@@ -1519,12 +1519,11 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
                     plane->blend_property(), drmEnum, true)) < 0)
         return ret;
 
-    if (plane->zpos_property().id() &&
-        !plane->zpos_property().is_immutable()) {
+    if (plane->zpos_property().id() && !plane->zpos_property().isImmutable()) {
         uint64_t min_zpos = 0;
 
         // Ignore ret and use min_zpos as 0 by default
-        std::tie(std::ignore, min_zpos) = plane->zpos_property().range_min();
+        std::tie(std::ignore, min_zpos) = plane->zpos_property().rangeMin();
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                 plane->zpos_property(), configIndex + min_zpos)) < 0)
@@ -1534,8 +1533,8 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
     if (plane->alpha_property().id()) {
         uint64_t min_alpha = 0;
         uint64_t max_alpha = 0;
-        std::tie(std::ignore, min_alpha) = plane->alpha_property().range_min();
-        std::tie(std::ignore, max_alpha) = plane->alpha_property().range_max();
+        std::tie(std::ignore, min_alpha) = plane->alpha_property().rangeMin();
+        std::tie(std::ignore, max_alpha) = plane->alpha_property().rangeMax();
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                 plane->alpha_property(),
                 (uint64_t)(((max_alpha - min_alpha) * config.plane_alpha) + 0.5) + min_alpha, true)) < 0)
@@ -2171,7 +2170,7 @@ int32_t ExynosDisplayDrmInterface::DrmModeAtomicReq::atomicAddProperty(
         return -EINVAL;
     }
 
-    if (property.id()) {
+    if (property.id() && property.validateChange(value)) {
         int ret = drmModeAtomicAddProperty(mPset, id,
                 property.id(), value);
         if (ret < 0) {

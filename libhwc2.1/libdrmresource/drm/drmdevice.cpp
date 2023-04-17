@@ -484,14 +484,14 @@ int DrmDevice::GetProperty(uint32_t obj_id, uint32_t obj_type,
   for (int i = 0; !found && (size_t)i < props->count_props; ++i) {
     drmModePropertyPtr p = drmModeGetProperty(fd(), props->props[i]);
     if (!strcmp(p->name, prop_name)) {
-      property->Init(p, props->prop_values[i]);
+      property->init(p, props->prop_values[i]);
       found = true;
     }
     drmModeFreeProperty(p);
   }
 
   if (!found)
-      property->SetName(prop_name);
+    property->setName(prop_name);
 
   drmModeFreeObjectProperties(props);
   return found ? 0 : -ENOENT;
@@ -525,7 +525,7 @@ int DrmDevice::UpdateObjectProperty(int id, int type, DrmProperty *property) {
     for (int i = 0; !found && (size_t)i < props->count_props; ++i) {
         drmModePropertyPtr p = drmModeGetProperty(fd(), props->props[i]);
         if (props->props[i] == property->id()) {
-            property->UpdateValue(props->prop_values[i]);
+            property->updateValue(props->prop_values[i]);
             found = true;
         }
         drmModeFreeProperty(p);
