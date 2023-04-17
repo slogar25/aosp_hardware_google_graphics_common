@@ -69,6 +69,7 @@ enum {
     IGNORE_DISPLAY_BRIGHTNESS_UPDATE_REQUESTS = 1012,
     SET_DISPLAY_BRIGHTNESS_NITS = 1013,
     SET_DISPLAY_BRIGHTNESS_DBV = 1014,
+    DUMP_BUFFERS = 1015,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -520,6 +521,17 @@ public:
                  result);
         return result;
     }
+
+    virtual int32_t dumpBuffers(uint32_t displayId, int32_t count) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(displayId);
+        data.writeInt32(count);
+
+        auto result = remote()->transact(DUMP_BUFFERS, data, &reply);
+        ALOGE_IF(result != NO_ERROR, "DUMP_BUFFERS transact error(%d)", result);
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -815,6 +827,13 @@ status_t BnExynosHWCService::onTransact(
             int32_t error = setDisplayBrightnessDbv(displayId, dbv);
             reply->writeInt32(error);
             return NO_ERROR;
+        } break;
+
+        case DUMP_BUFFERS: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t displayId = data.readUint32();
+            int32_t count = data.readInt32();
+            return dumpBuffers(displayId, count);
         } break;
 
         default:

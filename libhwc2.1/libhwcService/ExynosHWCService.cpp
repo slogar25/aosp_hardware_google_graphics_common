@@ -551,4 +551,15 @@ int32_t ExynosHWCService::triggerRefreshRateIndicatorUpdate(uint32_t displayId,
     return NO_ERROR;
 }
 
+int32_t ExynosHWCService::dumpBuffers(uint32_t displayId, int32_t count) {
+    auto display = mHWCCtx->device->getDisplay(displayId);
+
+    if (display == nullptr) return -EINVAL;
+
+    ALOGD("ExynosHWCService::%s() displayID(%u) count(%u)", __func__, displayId, count);
+    display->mBufferDumpCount = count;
+    display->mBufferDumpNum = 0;
+    return NO_ERROR;
+}
+
 } //namespace android

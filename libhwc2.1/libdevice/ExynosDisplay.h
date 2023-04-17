@@ -576,6 +576,8 @@ class ExynosDisplay {
 
         /* For debugging */
         hwc_display_contents_1_t *mHWC1LayerList;
+        int mBufferDumpCount = 0;
+        int mBufferDumpNum = 0;
 
         /* Support Multi-resolution scheme */
         int mOldScalerMode;
@@ -1217,6 +1219,8 @@ class ExynosDisplay {
         int32_t setReadbackBufferAcqFence(int32_t acqFence);
 
         virtual void dump(String8& result);
+        void dumpLocked(String8& result) REQUIRES(mDisplayMutex);
+        void dumpAllBuffers() REQUIRES(mDisplayMutex);
 
         virtual int32_t startPostProcessing();
 

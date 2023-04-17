@@ -18,6 +18,8 @@
 //#include <linux/fb.h>
 #include "ExynosDisplay.h"
 
+#include <aidl/android/hardware/graphics/common/Transform.h>
+#include <aidl/android/hardware/graphics/composer3/ColorMode.h>
 #include <aidl/android/hardware/power/IPower.h>
 #include <aidl/google/hardware/power/extension/pixel/IPowerExt.h>
 #include <android-base/parsebool.h>
@@ -53,9 +55,13 @@ using namespace std::chrono_literals;
 
 using ::aidl::android::hardware::power::IPower;
 using ::aidl::google::hardware::power::extension::pixel::IPowerExt;
+namespace AidlComposer3 = ::aidl::android::hardware::graphics::composer3;
+namespace AidlCommon = ::aidl::android::hardware::graphics::common;
 
 extern struct exynos_hwc_control exynosHWCControl;
 extern struct update_time_info updateTimeInfo;
+
+constexpr const char* kBufferDumpPath = "/data/vendor/log/hwc";
 
 constexpr float kDynamicRecompFpsThreshold = 1.0 / 5.0; // 1 frame update per 5 second
 
@@ -3413,6 +3419,203 @@ bool ExynosDisplay::isFullScreenComposition() {
     return true;
 }
 
+void dumpBuffer(const String8& prefix, const exynos_image& image, std::ofstream& configFile) {
+    ATRACE_NAME(prefix.c_str());
+    if (image.bufferHandle == nullptr) {
+        ALOGE("%s: Buffer handle for %s is NULL", __func__, prefix.c_str());
+        return;
+    }
+    ALOGI("%s: dumping buffer for %s", __func__, prefix.c_str());
+
+    bool failFenceSync = false;
+    String8 infoDump;
+    if (image.acquireFenceFd > 0 && sync_wait(image.acquireFenceFd, 1000) < 0) {
+        infoDump.appendFormat("Failed to sync acquire fence\n");
+        ALOGE("%s: Failed to wait acquire fence %d, errno=(%d, %s)", __func__, image.acquireFenceFd,
+              errno, strerror(errno));
+        failFenceSync = true;
+    }
+    if (image.releaseFenceFd > 0 && sync_wait(image.releaseFenceFd, 1000) < 0) {
+        infoDump.appendFormat("Failed to sync release fence\n");
+
+        ALOGE("%s: Failed to wait release fence %d, errno=(%d, %s)", __func__, image.releaseFenceFd,
+              errno, strerror(errno));
+        failFenceSync = true;
+    }
+
+    VendorGraphicBufferMeta gmeta(image.bufferHandle);
+    String8 infoPath = String8::format("%s/%s-info.txt", kBufferDumpPath, prefix.c_str());
+    std::ofstream infoFile(infoPath.c_str());
+    if (!infoFile) {
+        ALOGE("%s: failed to open file %s", __func__, infoPath.c_str());
+        return;
+    }
+
+    // TODO(b/261232489): Fix fence sync errors
+    // We currently ignore the fence errors and just dump the buffers
+
+    // dump buffer info
+    dumpExynosImage(infoDump, image);
+    infoDump.appendFormat("\nfd[%d, %d, %d] size[%d, %d, %d]\n", gmeta.fd, gmeta.fd1, gmeta.fd2,
+                          gmeta.size, gmeta.size1, gmeta.size2);
+    infoDump.appendFormat(" offset[%d, %d, %d] format:%d framework_format:%d\n", gmeta.offset,
+                          gmeta.offset1, gmeta.offset2, gmeta.format, gmeta.frameworkFormat);
+    infoDump.appendFormat(" width:%d height:%d stride:%d vstride:%d\n", gmeta.width, gmeta.height,
+                          gmeta.stride, gmeta.vstride);
+    infoDump.appendFormat(" producer: 0x%" PRIx64 " consumer: 0x%" PRIx64 " flags: 0x%" PRIx32 "\n",
+                          gmeta.producer_usage, gmeta.consumer_usage, gmeta.flags);
+    infoFile << infoDump << std::endl;
+
+    String8 bufferPath =
+            String8::format("%s/%s-%s.raw", kBufferDumpPath, prefix.c_str(),
+                            getFormatStr(image.format, image.compressionInfo.type).c_str());
+    std::ofstream bufferFile(bufferPath.c_str(), std::ios::binary);
+    if (!bufferFile) {
+        ALOGE("%s: failed to open file %s", __func__, bufferPath.c_str());
+        return;
+    }
+
+    // dump info that can be loaded by hwc-tester
+    configFile << "buffers {\n";
+    configFile << "    key: \"" << prefix << "\"\n";
+    configFile << "    format: " << getFormatStr(image.format, image.compressionInfo.type) << "\n";
+    configFile << "    width: " << gmeta.width << "\n";
+    configFile << "    height: " << gmeta.height << "\n";
+    auto usage = gmeta.producer_usage | gmeta.consumer_usage;
+    configFile << "    usage: 0x" << std::hex << usage << std::dec << "\n";
+    configFile << "    filepath: \"" << bufferPath << "\"\n";
+    configFile << "}\n" << std::endl;
+
+    int bufferNumber = getBufferNumOfFormat(image.format, image.compressionInfo.type);
+    for (int i = 0; i < bufferNumber; ++i) {
+        if (gmeta.fds[i] <= 0) {
+            ALOGE("%s: gmeta.fds[%d]=%d is invalid", __func__, i, gmeta.fds[i]);
+            continue;
+        }
+        if (gmeta.sizes[i] <= 0) {
+            ALOGE("%s: gmeta.sizes[%d]=%d is invalid", __func__, i, gmeta.sizes[i]);
+            continue;
+        }
+        auto addr = mmap(0, gmeta.sizes[i], PROT_READ | PROT_WRITE, MAP_SHARED, gmeta.fds[i], 0);
+        if (addr != MAP_FAILED && addr != NULL) {
+            bufferFile.write(static_cast<char*>(addr), gmeta.sizes[i]);
+            munmap(addr, gmeta.sizes[i]);
+        } else {
+            ALOGE("%s: failed to mmap fds[%d]:%d for %s", __func__, i, gmeta.fds[i]);
+        }
+    }
+}
+
+void ExynosDisplay::dumpAllBuffers() {
+    ATRACE_CALL();
+    // dump layers info
+    String8 infoPath = String8::format("%s/%03d-display-info.txt", kBufferDumpPath, mBufferDumpNum);
+    std::ofstream infoFile(infoPath.c_str());
+    if (!infoFile) {
+        DISPLAY_LOGE("%s: failed to open file %s", __func__, infoPath.c_str());
+        ++mBufferDumpNum;
+        return;
+    }
+    String8 displayDump;
+    dumpLocked(displayDump);
+    infoFile << displayDump << std::endl;
+
+    // dump buffer contents & infos
+    std::vector<String8> allLayerKeys;
+    String8 testerConfigPath =
+            String8::format("%s/%03d-hwc-tester-config.textproto", kBufferDumpPath, mBufferDumpNum);
+    std::ofstream configFile(testerConfigPath.c_str());
+    configFile << std::string(15, '#')
+               << " You can load this config file using hwc-tester to reproduce this frame "
+               << std::string(15, '#') << std::endl;
+    {
+        std::scoped_lock lock(mDRMutex);
+        for (int i = 0; i < mLayers.size(); ++i) {
+            String8 prefix = String8::format("%03d-%d-src", mBufferDumpNum, i);
+            dumpBuffer(prefix, mLayers[i]->mSrcImg, configFile);
+            if (mLayers[i]->mM2mMPP != nullptr) {
+                String8 midPrefix = String8::format("%03d-%d-mid", mBufferDumpNum, i);
+                exynos_image image = mLayers[i]->mMidImg;
+                mLayers[i]->mM2mMPP->getDstImageInfo(&image);
+                dumpBuffer(midPrefix, image, configFile);
+            }
+            configFile << "layers {\n";
+            configFile << "    key: \"" << prefix << "\"\n";
+            configFile << "    composition: "
+                       << AidlComposer3::toString(static_cast<AidlComposer3::Composition>(
+                                  mLayers[i]->mRequestedCompositionType))
+                       << "\n";
+            configFile << "    source_crop: {\n";
+            configFile << "        left: " << mLayers[i]->mPreprocessedInfo.sourceCrop.left << "\n";
+            configFile << "        top: " << mLayers[i]->mPreprocessedInfo.sourceCrop.top << "\n";
+            configFile << "        right: " << mLayers[i]->mPreprocessedInfo.sourceCrop.right
+                       << "\n";
+            configFile << "        bottom: " << mLayers[i]->mPreprocessedInfo.sourceCrop.bottom
+                       << "\n";
+            configFile << "    }\n";
+            configFile << "    display_frame: {\n";
+            configFile << "        left: " << mLayers[i]->mPreprocessedInfo.displayFrame.left
+                       << "\n";
+            configFile << "        top: " << mLayers[i]->mPreprocessedInfo.displayFrame.top << "\n";
+            configFile << "        right: " << mLayers[i]->mPreprocessedInfo.displayFrame.right
+                       << "\n";
+            configFile << "        bottom: " << mLayers[i]->mPreprocessedInfo.displayFrame.bottom
+                       << "\n";
+            configFile << "    }\n";
+            configFile << "    dataspace: "
+                       << AidlCommon::toString(
+                                  static_cast<AidlCommon::Dataspace>(mLayers[i]->mDataSpace))
+                       << "\n";
+            configFile << "    blend: "
+                       << AidlCommon::toString(
+                                  static_cast<AidlCommon::BlendMode>(mLayers[i]->mBlending))
+                       << "\n";
+            configFile << "    transform: "
+                       << AidlCommon::toString(
+                                  static_cast<AidlCommon::Transform>(mLayers[i]->mTransform))
+                       << "\n";
+            configFile << "    plane_alpha: " << mLayers[i]->mPlaneAlpha << "\n";
+            configFile << "    z_order: " << mLayers[i]->mZOrder << "\n";
+            if (mLayers[i]->mRequestedCompositionType == HWC2_COMPOSITION_SOLID_COLOR) {
+                configFile << "    color: {\n";
+                configFile << "        r: " << mLayers[i]->mColor.r << "\n";
+                configFile << "        g: " << mLayers[i]->mColor.g << "\n";
+                configFile << "        b: " << mLayers[i]->mColor.b << "\n";
+                configFile << "        a: " << mLayers[i]->mColor.a << "\n";
+                configFile << "    }\n";
+            } else if (mLayers[i]->mSrcImg.bufferHandle != nullptr) {
+                configFile << "    buffer_key: \"" << prefix << "\"\n";
+            }
+            configFile << "}\n" << std::endl;
+            allLayerKeys.push_back(prefix);
+        }
+    }
+
+    if (mClientCompositionInfo.mHasCompositionLayer) {
+        String8 prefix = String8::format("%03d-client-target", mBufferDumpNum);
+        exynos_image src, dst;
+        setCompositionTargetExynosImage(COMPOSITION_CLIENT, &src, &dst);
+        dumpBuffer(prefix, src, configFile);
+    }
+
+    configFile << "timelines {\n";
+    configFile << "    display_id: " << mDisplayId << "\n";
+    configFile << "    width: " << mXres << "\n";
+    configFile << "    height: " << mYres << "\n";
+    configFile << "    color_mode: "
+               << AidlComposer3::toString(static_cast<AidlComposer3::ColorMode>(mColorMode))
+               << "\n";
+    configFile << std::endl;
+    for (auto& layerKey : allLayerKeys) {
+        configFile << "    layers: {\n";
+        configFile << "        layer_key: \"" << layerKey << "\"\n";
+        configFile << "    }\n";
+    }
+    configFile << "}" << std::endl;
+
+    ++mBufferDumpNum;
+}
+
 int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     DISPLAY_ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastPresentTime, NULL);
@@ -3661,6 +3864,10 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     }
 
     setReleaseFences();
+
+    if (mBufferDumpNum < mBufferDumpCount) {
+        dumpAllBuffers();
+    }
 
     if (mDpuData.retire_fence != -1) {
 #ifdef DISABLE_FENCE
@@ -4862,9 +5069,12 @@ void ExynosDisplay::dumpConfig(const exynos_win_config_data &c)
     }
 }
 
-void ExynosDisplay::dump(String8& result)
-{
+void ExynosDisplay::dump(String8& result) {
     Mutex::Autolock lock(mDisplayMutex);
+    dumpLocked(result);
+}
+
+void ExynosDisplay::dumpLocked(String8& result) {
     result.appendFormat("[%s] display information size: %d x %d, vsyncState: %d, colorMode: %d, "
                         "colorTransformHint: %d, orientation %d\n",
                         mDisplayName.c_str(), mXres, mYres, mVsyncState, mColorMode,

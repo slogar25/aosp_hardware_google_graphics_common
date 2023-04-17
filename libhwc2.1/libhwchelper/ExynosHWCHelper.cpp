@@ -554,8 +554,7 @@ void dumpExynosImage(uint32_t type, exynos_image &img)
     ALOGD("%s", result.c_str());
 }
 
-void dumpExynosImage(String8& result, exynos_image &img)
-{
+void dumpExynosImage(String8& result, const exynos_image& img) {
     result.appendFormat("\tbufferHandle: %p, fullWidth: %d, fullHeight: %d, x: %d, y: %d, w: %d, "
                         "h: %d, format: %s\n",
                         img.bufferHandle, img.fullWidth, img.fullHeight, img.x, img.y, img.w, img.h,

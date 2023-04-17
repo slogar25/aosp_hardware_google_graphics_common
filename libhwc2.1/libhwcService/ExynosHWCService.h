@@ -86,6 +86,7 @@ public:
                                                    const bool& enable) override;
     virtual int32_t triggerRefreshRateIndicatorUpdate(uint32_t displayId,
                                                       uint32_t refreshRate) override;
+    virtual int32_t dumpBuffers(uint32_t displayId, int32_t count) override;
 
 private:
     friend class Singleton<ExynosHWCService>;
