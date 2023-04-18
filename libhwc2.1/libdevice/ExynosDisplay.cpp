@@ -6168,6 +6168,11 @@ void ExynosDisplay::invalidate() {
 }
 
 bool ExynosDisplay::checkHotplugEventUpdated(bool &hpdStatus) {
+    if (mDisplayInterface == nullptr) {
+        ALOGW("%s: mDisplayInterface == nullptr", __func__);
+        return false;
+    }
+
     hpdStatus = mDisplayInterface->readHotplugStatus();
 
     DISPLAY_LOGI("[%s] mDisplayId(%d), mIndex(%d), HPD Status(previous :%d, current : %d)",
