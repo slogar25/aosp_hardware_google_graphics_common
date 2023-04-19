@@ -280,6 +280,10 @@ int DrmConnector::UpdateModes() {
   return 0;
 }
 
+int DrmConnector::UpdateEdidProperty() {
+  return drm_->UpdateConnectorProperty(*this, &edid_property_);
+}
+
 const DrmMode &DrmConnector::active_mode() const {
   return active_mode_;
 }

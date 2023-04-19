@@ -2925,3 +2925,17 @@ void ExynosMPP::updateAttr()
     }
 }
 
+void ExynosMPP::updatePreassignedDisplay(uint32_t fromDisplayBit, uint32_t toDisplayBit)
+{
+    /*
+     * If the pre-assigned resources are required to changed,
+     * this function will modify PreAssign table.
+     */
+    for (uint32_t i = 0; i < DISPLAY_MODE_NUM; i++) {
+        if (mPreAssignDisplayList[i] == fromDisplayBit)
+            mPreAssignDisplayList[i] = toDisplayBit;
+    }
+
+    if (mPreAssignDisplayInfo == fromDisplayBit)
+        mPreAssignDisplayInfo = toDisplayBit;
+}

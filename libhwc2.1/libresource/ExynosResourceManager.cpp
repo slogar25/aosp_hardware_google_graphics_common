@@ -2585,16 +2585,34 @@ void ExynosResourceManager::updateRestrictions() {
         }
     }
 
+    ExynosDisplay *display = NULL;
+    bool isExistSecondaryDisplay = false;
+
+    for (size_t i = 1; i < mDevice->mDisplays.size(); i++) {
+        display = mDevice->mDisplays[i];
+        if ((display->mType == HWC_DISPLAY_PRIMARY) && (display->mIndex == 1))
+            isExistSecondaryDisplay = true;
+    }
+
     for (uint32_t i = 0; i < mOtfMPPs.size(); i++) {
         // mAttr should be updated with updated feature_table
         mOtfMPPs[i]->updateAttr();
         mOtfMPPs[i]->setupRestriction();
+        if (!isExistSecondaryDisplay) {
+            /*
+             * If there is no Secondary Display, the pre-assigned resources for Secondary Display
+             * are pre-assigned to Primary Display.
+             */
+            mOtfMPPs[i]->updatePreassignedDisplay(HWC_DISPLAY_SECONDARY_BIT, HWC_DISPLAY_PRIMARY_BIT);
+        }
     }
 
     for (uint32_t i = 0; i < mM2mMPPs.size(); i++) {
         // mAttr should be updated with updated feature_table
         mM2mMPPs[i]->updateAttr();
         mM2mMPPs[i]->setupRestriction();
+        if (!isExistSecondaryDisplay)
+            mM2mMPPs[i]->updatePreassignedDisplay(HWC_DISPLAY_SECONDARY_BIT, HWC_DISPLAY_PRIMARY_BIT);
     }
 }
 

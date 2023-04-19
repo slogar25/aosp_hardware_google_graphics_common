@@ -81,6 +81,9 @@ class ExynosDisplayInterface {
         }
 
         virtual int32_t waitVBlank() { return 0; };
+
+        virtual bool readHotplugStatus() { return true; };
+
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

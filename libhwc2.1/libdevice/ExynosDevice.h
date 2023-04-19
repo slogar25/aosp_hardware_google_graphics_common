@@ -351,6 +351,7 @@ class ExynosDevice {
         void initDeviceInterface(uint32_t interfaceType);
     protected:
         uint32_t mInterfaceType;
+        Mutex mHotPlugMutex;
     private:
         Mutex mCaptureMutex;
         Condition mCaptureCondition;
@@ -366,6 +367,9 @@ class ExynosDevice {
     private:
         bool mIsInTUI;
         bool mDisplayOffAsync;
+
+    public:
+        void handleHotplug();
 };
 
 #endif //_EXYNOSDEVICE_H
