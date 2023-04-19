@@ -1602,6 +1602,13 @@ class ExynosDisplay {
         std::unique_ptr<OperationRateManager> mOperationRateManager;
         bool isOperationRateSupported() { return mOperationRateManager != nullptr; }
 
+        bool mHpdStatus;
+
+        void invalidate();
+        virtual bool checkHotplugEventUpdated(bool &hpdStatus);
+        virtual void handleHotplugEvent(bool hpdStatus);
+        virtual void hotplug();
+
         class RefreshRateIndicatorHandler : public DrmSysfsEventHandler {
         public:
             RefreshRateIndicatorHandler(ExynosDisplay* display);

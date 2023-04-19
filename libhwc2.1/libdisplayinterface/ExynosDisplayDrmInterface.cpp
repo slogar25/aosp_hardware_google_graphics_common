@@ -611,9 +611,15 @@ void ExynosDisplayDrmInterface::parseRCDId(const DrmProperty &property) {
         static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId = rcd_id;
 }
 
-uint32_t ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
+int ExynosDisplayDrmInterface::getDrmDisplayId(uint32_t type, uint32_t index)
 {
-    return type+index;
+    for (auto &conn: mDrmDevice->connectors()) {
+        if ((((type == HWC_DISPLAY_PRIMARY) && conn->internal()) && (index == conn->display())) ||
+             ((type == HWC_DISPLAY_EXTERNAL) && conn->external()))
+            return conn->display();
+    }
+
+    return -1;
 }
 
 int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
@@ -629,18 +635,33 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     mFBManager.init(mDrmDevice->fd());
 
-    uint32_t drmDisplayId = getDrmDisplayId(mExynosDisplay->mType, mExynosDisplay->mIndex);
+    int drmDisplayId = getDrmDisplayId(mExynosDisplay->mType, mExynosDisplay->mIndex);
+    if (drmDisplayId < 0) {
+        ALOGE("getDrmDisplayId is failed");
+        return -EINVAL;
+    }
 
-    mReadbackInfo.init(mDrmDevice, drmDisplayId);
+    if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL)
+        mReadbackInfo.init(mDrmDevice, drmDisplayId);
+
     if ((mDrmCrtc = mDrmDevice->GetCrtcForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetCrtcForDisplay is NULL (id: %d)",
                 mExynosDisplay->mDisplayName.string(), drmDisplayId);
         return -EINVAL;
     }
+
     if ((mDrmConnector = mDrmDevice->GetConnectorForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetConnectorForDisplay is NULL (id: %d)",
                 mExynosDisplay->mDisplayName.string(), drmDisplayId);
         return -EINVAL;
+    }
+
+    /* Check CRTC and Connector are matched with Display Type */
+    if (((mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) && mDrmConnector->external()) ||
+         ((mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL) && mDrmConnector->internal())) {
+         ALOGE("%s:: Display(id: %u) is not matched with Connector(id: %u)",
+                 mExynosDisplay->mDisplayName.string(), drmDisplayId, mDrmConnector->id());
+         return -EINVAL;
     }
 
     ALOGD("%s:: display type: %d, index: %d, drmDisplayId: %d, "
@@ -900,9 +921,18 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
         }
-        if (mDrmConnector->state() == DRM_MODE_CONNECTED)
+
+        if (mDrmConnector->state() == DRM_MODE_CONNECTED) {
+            /*
+             * EDID property for External Display is created during initialization,
+             * but it is not complete. It will be completed after Hot Plug Detection
+             * & DRM Mode update.
+             */
+            if (mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL)
+                mDrmConnector->UpdateEdidProperty();
+
             mExynosDisplay->mPlugState = true;
-        else
+        } else
             mExynosDisplay->mPlugState = false;
 
         dumpDisplayConfigs();
@@ -1754,11 +1784,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         dqeEnable = 0;
     }
 
-    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
-                    mDrmCrtc->dqe_enabled_property(), dqeEnable)) < 0) {
-        HWC_LOGE(mExynosDisplay, "%s: Fail to dqe_enable setting",
-                __func__);
-        return ret;
+    if ((mDrmCrtc->dqe_enabled_property().id()) &&
+        ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
+                                         mDrmCrtc->dqe_enabled_property(), dqeEnable)) < 0)) {
+            HWC_LOGE(mExynosDisplay, "%s: Fail to dqe_enable setting", __func__);
+            return ret;
     }
 
     // Update of color settings could change layer's solid color. So it should
@@ -1825,6 +1855,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
 
             if ((exynosMPP == NULL) && (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) &&
                 (plane->id() != static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId))
+                continue;
+
+            /* If this plane is not supported by the CRTC binded with ExynosDisplay,
+             * it should be disabled by this ExynosDisplay */
+            if (!plane->GetCrtcSupported(*mDrmCrtc))
                 continue;
 
             if ((ret = drmReq.atomicAddProperty(plane->id(),
@@ -1970,6 +2005,11 @@ int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
         if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
             (exynosMPP->mAssignedState & MPP_ASSIGN_STATE_RESERVED) &&
             (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mDisplayId))
+            continue;
+
+        /* If this plane is not supported by the CRTC binded with ExynosDisplay,
+         * it should be disabled by this ExynosDisplay */
+        if (!plane->GetCrtcSupported(*mDrmCrtc))
             continue;
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
@@ -2495,4 +2535,15 @@ int32_t ExynosDisplayDrmInterface::getSpecialChannelId(uint32_t planeId) {
     ALOGE("%s: Failed to get RCD planeId.", __func__);
 
     return -EINVAL;
+}
+
+bool ExynosDisplayDrmInterface::readHotplugStatus() {
+    if (mDrmConnector == nullptr) {
+        return false;
+    }
+
+    uint32_t numConfigs;
+    getDisplayConfigs(&numConfigs, NULL);
+
+    return (mDrmConnector->state() == DRM_MODE_CONNECTED);
 }

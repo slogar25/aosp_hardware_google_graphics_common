@@ -1209,6 +1209,33 @@ void ExynosDevice::onVsyncIdle(hwc2_display_t displayId) {
     callbackFunc(callbackInfo.callbackData, displayId);
 }
 
+void ExynosDevice::handleHotplug() {
+    bool hpdStatus = false;
+    uint32_t displayIndex = UINT32_MAX;
+
+    {
+        Mutex::Autolock lock(mHotPlugMutex);
+
+        for (size_t i = 0; i < mDisplays.size(); i++) {
+            if (mDisplays[i] == nullptr)
+                continue;
+
+            if (mDisplays[i]->checkHotplugEventUpdated(hpdStatus)) {
+                if (mDisplays[i]->mType == HWC_DISPLAY_EXTERNAL)
+                    ALOGD("This HPD event is for External Display");
+                mDisplays[i]->handleHotplugEvent(hpdStatus);
+                displayIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (displayIndex != UINT32_MAX) {
+        mDisplays[displayIndex]->hotplug();
+        mDisplays[displayIndex]->invalidate();
+    }
+}
+
 void ExynosDevice::onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod) {
     Mutex::Autolock lock(mDeviceCallbackMutex);
     const auto &refreshRateCallback =

@@ -281,7 +281,7 @@ class ExynosDisplayDrmInterface :
         virtual int32_t setForcePanic();
         virtual int getDisplayFd() { return mDrmDevice->fd(); };
         virtual int32_t initDrmDevice(DrmDevice *drmDevice);
-        virtual uint32_t getDrmDisplayId(uint32_t type, uint32_t index);
+        virtual int getDrmDisplayId(uint32_t type, uint32_t index);
         virtual uint32_t getMaxWindowNum() { return mMaxWindowNum; };
         virtual int32_t getReadbackBufferAttributes(int32_t* /*android_pixel_format_t*/ outFormat,
                 int32_t* /*android_dataspace_t*/ outDataspace);
@@ -506,6 +506,9 @@ class ExynosDisplayDrmInterface :
         int32_t mFrameCounter = 0;
         int32_t mPanelResolutionHsize = 0;
         int32_t mPanelResolutionVsize = 0;
+
+    public:
+        virtual bool readHotplugStatus();
 };
 
 #endif

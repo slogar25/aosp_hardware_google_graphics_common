@@ -755,6 +755,15 @@ int32_t ExynosLayer::setLayerGenericMetadata(hwc2_layer_t __unused layer,
 }
 
 int32_t ExynosLayer::setLayerBrightness(float brightness) {
+    if (mDisplay->mType == HWC_DISPLAY_EXTERNAL && mDisplay->mBrightnessController == nullptr) {
+        if (brightness == 1.0f) {
+            return HWC2_ERROR_NONE;
+        } else {
+            HWC_LOGE(mDisplay, "[ExternalDisplay layer] setLayerBrightness != 1.0");
+            return HWC2_ERROR_BAD_PARAMETER;
+        }
+    }
+
     if (mDisplay->mBrightnessController == nullptr ||
         !mDisplay->mBrightnessController->validateLayerBrightness(brightness)) {
         return HWC2_ERROR_BAD_PARAMETER;
