@@ -70,6 +70,7 @@ public:
     int processEnhancedHbm(bool on);
     int processDisplayBrightness(float bl, const nsecs_t vsyncNs, bool waitPresent = false);
     int ignoreBrightnessUpdateRequests(bool ignore);
+    int setBrightnessNits(float nits, const nsecs_t vsyncNs);
     int processLocalHbm(bool on);
     int processDimBrightness(bool on);
     bool isDbmSupported() { return mDbmSupported; }
@@ -257,6 +258,7 @@ private:
             return mBrightnessRanges.at(bm);
         }
         std::optional<float> BrightnessToNits(float brightness, BrightnessMode& bm) const override;
+        std::optional<float> NitsToBrightness(float nits) const override;
         std::optional<uint32_t> NitsToDbv(BrightnessMode bm, float nits) const override;
         std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const override;
 
@@ -270,6 +272,16 @@ private:
             }
             // return BM_MAX if there is no matching range
             return BrightnessMode::BM_MAX;
+        }
+
+        BrightnessMode GetBrightnessModeForNits(float nits) const {
+            for (const auto& [mode, range] : mBrightnessRanges) {
+                if (nits >= range.nits_min && nits <= range.nits_max) {
+                    return mode;
+                }
+            }
+            // return BM_INVALID if there is no matching range
+            return BrightnessMode::BM_INVALID;
         }
 
     private:
