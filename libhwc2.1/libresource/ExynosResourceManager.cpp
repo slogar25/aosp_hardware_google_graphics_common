@@ -2232,7 +2232,7 @@ int32_t ExynosResourceManager::deliverPerformanceInfo()
                             mppSource->mSrcImg.w, mppSource->mSrcImg.h,
                             mppSource->mSrcImg.format);
 
-                    if (mppSource->mSrcImg.compressionInfo.type != COMP_TYPE_NONE)
+                    if (mppSource->mSrcImg.compressionInfo.type == COMP_TYPE_AFBC)
                         frame->setAttribute(j, AcrylicCanvas::ATTR_COMPRESSED);
 
                     hwc_rect_t src_area;
