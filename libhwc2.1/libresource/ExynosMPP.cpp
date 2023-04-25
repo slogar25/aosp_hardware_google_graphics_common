@@ -49,6 +49,16 @@ int ExynosMPP::mainDisplayWidth = 0;
 int ExynosMPP::mainDisplayHeight = 0;
 extern struct exynos_hwc_control exynosHWCControl;
 
+std::unordered_map<tdm_attr_t, TDMInfo_t> HWAttrs = {
+    {TDM_ATTR_SRAM_AMOUNT, {String8("SRAM"),  LS_DPUF}},
+    {TDM_ATTR_AFBC,        {String8("AFBC"),  LS_DPUF}},
+    {TDM_ATTR_SBWC,        {String8("SBWC"),  LS_DPUF}},
+    {TDM_ATTR_ITP,         {String8("CSC"),   LS_DPUF}},
+    {TDM_ATTR_ROT_90,      {String8("ROT"),   LS_DPUF}},
+    {TDM_ATTR_SCALE,       {String8("SCALE"), LS_DPUF}},
+    {TDM_ATTR_WCG,         {String8("WCG"),   LS_DPUF_AXI}},
+};
+
 void dumpExynosMPPImgInfo(uint32_t type, exynos_mpp_img_info &imgInfo)
 {
     HDEBUGLOGD(type, "\tbuffer: %p, bufferType: %d",
