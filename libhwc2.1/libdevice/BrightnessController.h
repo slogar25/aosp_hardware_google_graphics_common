@@ -180,7 +180,7 @@ public:
         return nodeName.c_str();
     }
 
-    void updateBrightnessTable(const IBrightnessTable* table);
+    void updateBrightnessTable(std::unique_ptr<const IBrightnessTable>& table);
     const BrightnessRangeMap& getBrightnessRanges() const {
         return mKernelBrightnessTable.GetBrightnessRangeMap();
     }
@@ -374,7 +374,7 @@ private:
     bool mBrightnessIntfSupported = false;
     LinearBrightnessTable mKernelBrightnessTable;
     // External object from libdisplaycolor
-    const IBrightnessTable* mBrightnessTable = nullptr;
+    std::unique_ptr<const IBrightnessTable> mBrightnessTable;
 
     int32_t mPanelIndex;
     DrmEnumParser::MapHal2DrmEnum mHbmModeEnums;
