@@ -6309,3 +6309,16 @@ void ExynosDisplay::updateRefreshRateIndicator() {
         return;
     mRefreshRateIndicatorHandler->handleSysfsEvent();
 }
+
+VsyncPeriodNanos ExynosDisplay::getVsyncPeriod(const int32_t config) {
+    const auto &it = mDisplayConfigs.find(config);
+    if (it == mDisplayConfigs.end()) return 0;
+    return mDisplayConfigs[config].vsyncPeriod;
+}
+
+uint32_t ExynosDisplay::getRefreshRate(const int32_t config) {
+    VsyncPeriodNanos period = getVsyncPeriod(config);
+    if (!period) return 0;
+    constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
+    return round(nsecsPerSec / period * 0.1f) * 10;
+}
