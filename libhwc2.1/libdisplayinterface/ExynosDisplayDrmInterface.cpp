@@ -757,6 +757,30 @@ void ExynosDisplayDrmInterface::Callback(
         if (!mExynosDisplay->mPlugState || !mVsyncCallback.getVSyncEnabled()) {
             return;
         }
+
+        // Refresh rate during enabling LHBM might be different from the one SF expects.
+        // HWC just reports the SF expected Vsync to make UI smoothness consistent even if
+        // HWC runs at different refresh rate temporarily.
+        if (!mExynosDisplay->isConfigSettingEnabled()) {
+            int64_t pendingPeriodNs =
+                    mExynosDisplay->getVsyncPeriod(mExynosDisplay->mPendingConfig);
+            int64_t activePeriodNs = mExynosDisplay->getVsyncPeriod(mExynosDisplay->mActiveConfig);
+            if (pendingPeriodNs && mExynosDisplay->mLastVsyncTimestamp) {
+                if (activePeriodNs > pendingPeriodNs) {
+                    DISPLAY_DRM_LOGW("wrong vsync period: %" PRId64 "us (active), %" PRId64
+                                     "us (pending)",
+                                     activePeriodNs / 1000, pendingPeriodNs / 1000);
+                } else if (activePeriodNs != pendingPeriodNs) {
+                    int64_t deltaNs = timestamp - mExynosDisplay->mLastVsyncTimestamp;
+                    if (deltaNs < (pendingPeriodNs - ms2ns(2))) {
+                        DISPLAY_DRM_LOGI("skip mismatching Vsync callback, delta=%" PRId64 "us",
+                                         deltaNs / 1000);
+                        return;
+                    }
+                }
+            }
+        }
+        mExynosDisplay->mLastVsyncTimestamp = timestamp;
     }
 
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
@@ -1171,6 +1195,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
             if (mExynosDisplay->mOperationRateManager) {
                 mExynosDisplay->mOperationRateManager->onConfig(config);
             }
+            DISPLAY_DRM_LOGI("%s: config(%d)", __func__, config);
         } else {
             ALOGD("%s:: same desired mode %d", __func__, config);
         }
@@ -1262,9 +1287,9 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
 
     mExynosDisplay->updateAppliedActiveConfig(config, systemTime(SYSTEM_TIME_MONOTONIC));
     if (!setActiveDrmMode(*mode)) {
-        ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
+        DISPLAY_DRM_LOGI("%s: config(%d)", __func__, config);
     } else {
-        ALOGE("%s:: %s config(%d) failed", __func__, mExynosDisplay->mDisplayName.string(), config);
+        DISPLAY_DRM_LOGE("%s: config(%d) failed", __func__, config);
     }
 
     return 0;
