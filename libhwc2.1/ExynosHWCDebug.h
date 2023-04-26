@@ -114,6 +114,13 @@ int32_t saveFenceTrace(ExynosDisplay *display);
         saveErrorLog(saveString, this); \
     }
 
+#define DISPLAY_DRM_LOGI(msg, ...) \
+    ALOGI("[%s] " msg, mExynosDisplay->mDisplayName.string(), ##__VA_ARGS__)
+#define DISPLAY_DRM_LOGW(msg, ...) \
+    ALOGW("[%s] " msg, mExynosDisplay->mDisplayName.string(), ##__VA_ARGS__)
+#define DISPLAY_DRM_LOGE(msg, ...) \
+    ALOGE("[%s] " msg, mExynosDisplay->mDisplayName.string(), ##__VA_ARGS__)
+
 #define MPP_LOGV(msg, ...) ALOGV("[%s][%d] " msg, mName.string(), mLogicalIndex, ##__VA_ARGS__)
 #define MPP_LOGI(msg, ...) ALOGI("[%s][%d] " msg, mName.string(), mLogicalIndex, ##__VA_ARGS__)
 #define MPP_LOGW(msg, ...) ALOGW("[%s][%d] " msg, mName.string(), mLogicalIndex, ##__VA_ARGS__)
