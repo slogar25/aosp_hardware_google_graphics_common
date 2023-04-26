@@ -562,6 +562,8 @@ class ExynosDisplay {
         hwc2_config_t mDesiredConfig;
 
         hwc2_config_t mActiveConfig = UINT_MAX;
+        hwc2_config_t mPendingConfig = UINT_MAX;
+        int64_t mLastVsyncTimestamp = 0;
 
         void initDisplay();
 
@@ -1282,14 +1284,17 @@ class ExynosDisplay {
         virtual void updateAppliedActiveConfig(const hwc2_config_t /*newConfig*/,
                                                const int64_t /*ts*/) {}
 
+        virtual bool isConfigSettingEnabled() { return true; }
+        virtual void enableConfigSetting(bool /*en*/) {}
+
         // is the hint session both enabled and supported
         bool usePowerHintSession();
 
         void setPeakRefreshRate(float rr) { mPeakRefreshRate = rr; }
-        uint32_t getPeakRefreshRate() {
-            float opRate = mOperationRateManager ? mOperationRateManager->getOperationRate() : 0;
-            return static_cast<uint32_t>(std::round(opRate ?: mPeakRefreshRate));
-        }
+        uint32_t getPeakRefreshRate();
+        VsyncPeriodNanos getVsyncPeriod(const int32_t config);
+        uint32_t getRefreshRate(const int32_t config);
+        uint32_t getConfigId(const int32_t refreshRate, const int32_t width, const int32_t height);
 
         // check if there are any dimmed layers
         bool isMixedComposition();

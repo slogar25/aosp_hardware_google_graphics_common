@@ -4086,6 +4086,12 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
 
     if (isBadConfig(config)) return HWC2_ERROR_BAD_CONFIG;
 
+    if (!isConfigSettingEnabled()) {
+        mPendingConfig = config;
+        DISPLAY_LOGI("%s: config setting disabled, set pending config=%d", __func__, config);
+        return HWC2_ERROR_NONE;
+    }
+
     if (mDisplayConfigs[mActiveConfig].groupId != mDisplayConfigs[config].groupId) {
         if (vsyncPeriodChangeConstraints->seamlessRequired) {
             DISPLAY_LOGD(eDebugDisplayConfig, "Case : Seamless is not allowed");
@@ -6283,4 +6289,35 @@ void ExynosDisplay::updateRefreshRateIndicator() {
     if (!mRefreshRateIndicatorHandler || !mRefreshRateIndicatorHandler->isIgnoringLastUpdate())
         return;
     mRefreshRateIndicatorHandler->handleSysfsEvent();
+}
+
+uint32_t ExynosDisplay::getPeakRefreshRate() {
+    float opRate = mOperationRateManager ? mOperationRateManager->getOperationRate() : 0;
+    return static_cast<uint32_t>(std::round(opRate ?: mPeakRefreshRate));
+}
+
+VsyncPeriodNanos ExynosDisplay::getVsyncPeriod(const int32_t config) {
+    const auto &it = mDisplayConfigs.find(config);
+    if (it == mDisplayConfigs.end()) return 0;
+    return mDisplayConfigs[config].vsyncPeriod;
+}
+
+uint32_t ExynosDisplay::getRefreshRate(const int32_t config) {
+    VsyncPeriodNanos period = getVsyncPeriod(config);
+    if (!period) return 0;
+    constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
+    return round(nsecsPerSec / period * 0.1f) * 10;
+}
+
+uint32_t ExynosDisplay::getConfigId(const int32_t refreshRate, const int32_t width,
+                                    const int32_t height) {
+    for (auto entry : mDisplayConfigs) {
+        auto config = entry.first;
+        auto displayCfg = entry.second;
+        if (getRefreshRate(config) == refreshRate && displayCfg.width == width &&
+            displayCfg.height == height) {
+            return config;
+        }
+    }
+    return UINT_MAX;
 }
