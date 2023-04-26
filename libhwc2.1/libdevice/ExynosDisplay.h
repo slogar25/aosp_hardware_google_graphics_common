@@ -1293,6 +1293,8 @@ class ExynosDisplay {
             float opRate = mOperationRateManager ? mOperationRateManager->getOperationRate() : 0;
             return static_cast<uint32_t>(std::round(opRate ?: mPeakRefreshRate));
         }
+        VsyncPeriodNanos getVsyncPeriod(const int32_t config);
+        uint32_t getRefreshRate(const int32_t config);
 
         // check if there are any dimmed layers
         bool isMixedComposition();
