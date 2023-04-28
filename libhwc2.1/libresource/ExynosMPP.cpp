@@ -1218,7 +1218,7 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
     if (srcImgInfo->bufferType == MPP_BUFFER_SECURE_DRM)
         attribute |= AcrylicCanvas::ATTR_PROTECTED;
     /*Change AFBC attribute on the basis of the modifier*/
-    if (src.compressionInfo.type != COMP_TYPE_NONE) {
+    if (src.compressionInfo.type == COMP_TYPE_AFBC) {
         if ((src.compressionInfo.modifier & AFBC_FORMAT_MOD_BLOCK_SIZE_MASK) ==
             AFBC_FORMAT_MOD_BLOCK_SIZE_32x8) {
             attribute |= AcrylicCanvas::ATTR_COMPRESSED_WIDEBLK;
