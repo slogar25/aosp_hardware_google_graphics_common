@@ -39,6 +39,7 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
       : ExynosMPPSource(MPP_SOURCE_LAYER, this),
         mDisplay(display),
         mCompositionType(HWC2_COMPOSITION_INVALID),
+        mRequestedCompositionType(HWC2_COMPOSITION_INVALID),
         mExynosCompositionType(HWC2_COMPOSITION_INVALID),
         mValidateCompositionType(HWC2_COMPOSITION_INVALID),
         mValidateExynosCompositionType(HWC2_COMPOSITION_INVALID),
@@ -514,11 +515,12 @@ int32_t ExynosLayer::setLayerCompositionType(int32_t /*hwc2_composition_t*/ type
             type = HWC2_COMPOSITION_DEVICE;
 #endif
 
-    if (type != mCompositionType) {
+    if (type != mCompositionType && type != mRequestedCompositionType) {
         setGeometryChanged(GEOMETRY_LAYER_TYPE_CHANGED);
     }
 
     mCompositionType = type;
+    mRequestedCompositionType = type;
 
     return HWC2_ERROR_NONE;
 }
