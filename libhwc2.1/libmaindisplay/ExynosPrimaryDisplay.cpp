@@ -1081,6 +1081,7 @@ void ExynosPrimaryDisplay::checkBtsReassignResource(const uint32_t vsyncPeriod,
     ATRACE_CALL();
     uint32_t refreshRate = static_cast<uint32_t>(round(nsecsPerSec / vsyncPeriod * 0.1f) * 10);
 
+    Mutex::Autolock lock(mDRMutex);
     if (vsyncPeriod < btsVsyncPeriod) {
         for (size_t i = 0; i < mLayers.size(); i++) {
             if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP == nullptr &&
