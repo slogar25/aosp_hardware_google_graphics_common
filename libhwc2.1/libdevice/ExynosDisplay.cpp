@@ -1172,6 +1172,7 @@ int32_t ExynosDisplay::destroyLayer(hwc2_layer_t outLayer) {
     }
 
     mDisplayInterface->destroyLayer(layer);
+    layer->resetAssignedResource();
 
     delete layer;
 
