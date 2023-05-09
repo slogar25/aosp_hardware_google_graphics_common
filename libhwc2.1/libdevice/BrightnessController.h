@@ -68,6 +68,7 @@ public:
 
     int processEnhancedHbm(bool on);
     int processDisplayBrightness(float bl, const nsecs_t vsyncNs, bool waitPresent = false);
+    int ignoreBrightnessUpdateRequests(bool ignore);
     int processLocalHbm(bool on);
     int processDimBrightness(bool on);
     bool isDbmSupported() { return mDbmSupported; }
@@ -367,6 +368,9 @@ private:
 
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
+
+    // Indicating if brightness updates are ignored
+    bool mIgnoreBrightnessUpdateRequests = false;
 
     std::function<void(void)> mFrameRefresh;
     CtrlValue<HdrLayerState> mHdrLayerState;
