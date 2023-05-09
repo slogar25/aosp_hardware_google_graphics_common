@@ -1258,6 +1258,9 @@ class ExynosDisplay {
         int32_t getRCDLayerSupport(bool& outSupport) const;
         int32_t setDebugRCDLayerEnabled(bool enable);
 
+        /* ignore / accept brightness update requests */
+        virtual int32_t ignoreBrightnessUpdateRequests(bool ignore);
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
