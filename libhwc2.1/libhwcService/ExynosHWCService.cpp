@@ -408,6 +408,17 @@ int32_t ExynosHWCService::setDisplayBrightness(int32_t display_id, float brightn
     return -EINVAL;
 }
 
+int32_t ExynosHWCService::ignoreDisplayBrightnessUpdateRequests(int32_t displayId, bool ignore) {
+    ALOGD("ExynosHWCService::%s() displayId(%u) ignore(%u)", __func__, displayId, ignore);
+
+    auto display = mHWCCtx->device->getDisplay(displayId);
+
+    if (display != nullptr)
+        return display->ignoreBrightnessUpdateRequests(ignore);
+
+    return -EINVAL;
+}
+
 int32_t ExynosHWCService::setDisplayLhbm(int32_t display_id, uint32_t on) {
     if (on > 1) return -EINVAL;
 
