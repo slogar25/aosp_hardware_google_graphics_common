@@ -4011,6 +4011,13 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
     return HWC2_ERROR_UNSUPPORTED;
 }
 
+int32_t ExynosDisplay::ignoreBrightnessUpdateRequests(bool ignore) {
+    if (mBrightnessController)
+        return mBrightnessController->ignoreBrightnessUpdateRequests(ignore);
+
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
 int32_t ExynosDisplay::getDisplayConnectionType(uint32_t* outType)
 {
     if (mType == HWC_DISPLAY_PRIMARY)
