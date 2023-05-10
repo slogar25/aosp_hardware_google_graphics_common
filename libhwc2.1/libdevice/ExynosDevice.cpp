@@ -276,6 +276,17 @@ bool ExynosDevice::isLastValidate(ExynosDisplay *display)
     return true;
 }
 
+bool ExynosDevice::hasOtherDisplayOn(ExynosDisplay *display) {
+    for (uint32_t i = 0; i < mDisplays.size(); i++) {
+        if (mDisplays[i] == display) continue;
+        if ((mDisplays[i]->mType != HWC_DISPLAY_VIRTUAL) &&
+            mDisplays[i]->mPowerModeState.has_value() &&
+            (mDisplays[i]->mPowerModeState.value() != (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
+            return true;
+    }
+    return false;
+}
+
 bool ExynosDevice::isDynamicRecompositionThreadAlive()
 {
     android_atomic_acquire_load(&mDRThreadStatus);
