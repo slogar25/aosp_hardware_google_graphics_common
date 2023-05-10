@@ -2025,7 +2025,8 @@ int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
 int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
 {
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
-    const bool isAsyncOff = needModeClear && exynosDevice->isDispOffAsyncSupported();
+    const bool isAsyncOff = needModeClear && exynosDevice->isDispOffAsyncSupported() &&
+            !exynosDevice->hasOtherDisplayOn(mExynosDisplay);
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);
 
