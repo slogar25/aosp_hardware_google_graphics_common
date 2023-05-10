@@ -341,6 +341,7 @@ class ExynosDevice {
                                      hwc2_function_pointer_t point);
         void onVsyncIdle(hwc2_display_t displayId);
         bool isDispOffAsyncSupported() { return mDisplayOffAsync; };
+        bool hasOtherDisplayOn(ExynosDisplay *display);
         virtual int32_t getOverlaySupport([[maybe_unused]] OverlayProperties* caps){
             return HWC2_ERROR_UNSUPPORTED;
         }
