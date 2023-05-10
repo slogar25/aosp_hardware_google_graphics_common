@@ -152,6 +152,8 @@ public:
 
     int updateCabcMode();
 
+    int updateAclMode(bool on);
+
     const std::string GetPanelSysfileByIndex(const char *file_pattern) {
         String8 nodeName;
         nodeName.appendFormat(file_pattern, mPanelIndex);
@@ -322,6 +324,8 @@ private:
             "vendor.display.%d.brightness.dimming.usage";
     static constexpr const char* kDimmingHbmTimePropName =
             "vendor.display.%d.brightness.dimming.hbm_time";
+    static constexpr const char* kGlobalAclModeFileNode =
+            "/sys/class/backlight/panel%d-backlight/acl_mode";
 
     int queryBrightness(float brightness, bool* ghbm = nullptr, uint32_t* level = nullptr,
                         float *nits = nullptr);
@@ -407,6 +411,9 @@ private:
     float mPrevDisplayWhitePointNits = 0;
 
     std::function<void(void)> mUpdateDcLhbm;
+
+    std::ofstream mAclModeOfs;
+    CtrlValue<bool> mAclMode;
 
     // state for control CABC state
     enum class CabcMode {
