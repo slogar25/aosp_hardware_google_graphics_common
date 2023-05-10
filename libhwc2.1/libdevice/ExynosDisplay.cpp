@@ -4844,6 +4844,7 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
         else
             src_img->zOrder = 1000;
     }
+    src_img->needPreblending = compositionInfo->mNeedPreblending;
 
     dst_img->fullWidth = mXres;
     dst_img->fullHeight = mYres;

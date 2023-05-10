@@ -1545,7 +1545,7 @@ class ExynosDisplay {
         virtual bool isEnabled() { return mPlugState; }
 
         // Resource TDM (Time-Division Multiplexing)
-        std::map<uint32_t, DisplayTDMInfo> mDisplayTDMInfo;
+        std::map<std::pair<int32_t, int32_t>, DisplayTDMInfo> mDisplayTDMInfo;
 
         class RotatingLogFileWriter {
         public:
