@@ -63,7 +63,7 @@ class FramebufferManager {
         // layer. Those fbIds will be cleaned up once the layer was destroyed.
         int32_t getBuffer(const exynos_win_config_data &config, uint32_t &fbId);
 
-        bool checkShrink();
+        void checkShrink();
 
         void cleanup(const ExynosLayer *layer);
 
@@ -71,7 +71,7 @@ class FramebufferManager {
         // layers after the previous fdIds were update successfully on the
         // screen.
         // This should be called after the frame update.
-        void flip(bool hasSecureFrameBuffer);
+        void flip(const bool hasSecureFrameBuffer, const bool hasM2mSecureLayerBuffer);
 
         // release all currently tracked buffers, this can be called for example when display is turned
         // off
@@ -112,7 +112,8 @@ class FramebufferManager {
         using FBList = std::list<std::unique_ptr<Framebuffer>>;
 
         template <class UnaryPredicate>
-        uint32_t findCachedFbId(const ExynosLayer *layer, UnaryPredicate predicate);
+        uint32_t findCachedFbId(const ExynosLayer *layer, const bool isM2mSecureLayer,
+                                UnaryPredicate predicate);
         int addFB2WithModifiers(uint32_t state, uint32_t width, uint32_t height, uint32_t drmFormat,
                                 const DrmArray<uint32_t> &handles,
                                 const DrmArray<uint32_t> &pitches,
@@ -126,15 +127,19 @@ class FramebufferManager {
         void freeBufHandle(uint32_t handle);
         void removeFBsThreadRoutine();
 
-        void markInuseLayerLocked(const ExynosLayer *layer) REQUIRES(mMutex);
+        void markInuseLayerLocked(const ExynosLayer *layer, const bool isM2mSecureLayer)
+                REQUIRES(mMutex);
         void destroyUnusedLayersLocked() REQUIRES(mMutex);
         void destroySecureFramebufferLocked() REQUIRES(mMutex);
+        void destroyM2mSecureLayerBufferLocked() REQUIRES(mMutex);
 
         int mDrmFd = -1;
 
-        // mCachedLayerBuffers map keep the relationship between Layer and
-        // FBList. The map entry will be deleted once the layer is destroyed.
+        // mCachedLayerBuffers map keep the relationship between Layer and FBList.
+        // mCachedM2mSecureLayerBuffers map keep the relationship between M2M secure
+        // Layer and FBList. The map entry will be deleted once the layer is destroyed.
         std::map<const ExynosLayer *, FBList> mCachedLayerBuffers;
+        std::map<const ExynosLayer *, FBList> mCachedM2mSecureLayerBuffers;
 
         // mCleanBuffers list keeps fbIds of destroyed layers. Those fbIds will
         // be destroyed in mRmFBThread thread.
@@ -143,11 +148,15 @@ class FramebufferManager {
         // mCacheShrinkPending is set when we want to clean up unused layers
         // in mCachedLayerBuffers. When the flag is set, mCachedLayersInuse will
         // keep in-use layers in this frame update. Those unused layers will be
-        // freed at the end of the update.
+        // freed at the end of the update. mCacheM2mSecureShrinkPending is same to
+        // mCacheShrinkPending but for mCachedM2mSecureLayerBuffers.
         // TODO: have a better way to maintain inuse layers
         bool mCacheShrinkPending = false;
+        bool mCacheM2mSecureShrinkPending = false;
         bool mHasSecureFramebuffer = false;
+        bool mHasM2mSecureLayerBuffer = false;
         std::set<const ExynosLayer *> mCachedLayersInuse;
+        std::set<const ExynosLayer *> mCachedM2mSecureLayersInuse;
 
         std::thread mRmFBThread;
         bool mRmFBThreadRunning = false;
@@ -155,8 +164,9 @@ class FramebufferManager {
         Mutex mMutex;
 
         static constexpr size_t MAX_CACHED_LAYERS = 16;
+        static constexpr size_t MAX_CACHED_M2M_SECURE_LAYERS = 1;
         static constexpr size_t MAX_CACHED_BUFFERS_PER_LAYER = 32;
-        static constexpr size_t MAX_CACHED_SECURE_BUFFERS_PER_G2D_LAYER = 3;
+        static constexpr size_t MAX_CACHED_M2M_SECURE_BUFFERS_PER_LAYER = 3;
 };
 
 inline bool isFramebuffer(const ExynosLayer *layer) {
@@ -164,10 +174,12 @@ inline bool isFramebuffer(const ExynosLayer *layer) {
 }
 
 template <class UnaryPredicate>
-uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer, UnaryPredicate predicate) {
+uint32_t FramebufferManager::findCachedFbId(const ExynosLayer *layer, const bool isM2mSecureLayer,
+                                            UnaryPredicate predicate) {
     Mutex::Autolock lock(mMutex);
-    markInuseLayerLocked(layer);
-    const auto &cachedBuffers = mCachedLayerBuffers[layer];
+    markInuseLayerLocked(layer, isM2mSecureLayer);
+    const auto &cachedBuffers =
+            (!isM2mSecureLayer) ? mCachedLayerBuffers[layer] : mCachedM2mSecureLayerBuffers[layer];
     const auto it = std::find_if(cachedBuffers.begin(), cachedBuffers.end(), predicate);
     return (it != cachedBuffers.end()) ? (*it)->fbId : 0;
 }
