@@ -103,6 +103,10 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice) {
     }
 }
 
+void ExynosDeviceDrmInterface::postInit() {
+    mDrmDevice->event_listener()->InitWorker();
+}
+
 int32_t ExynosDeviceDrmInterface::initDisplayInterface(
         std::unique_ptr<ExynosDisplayInterface> &dispInterface) {
     ExynosDisplayDrmInterface *displayInterface =

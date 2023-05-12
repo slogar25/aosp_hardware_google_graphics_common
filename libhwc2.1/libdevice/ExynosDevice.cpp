@@ -232,6 +232,8 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
             i++;
         }
     }
+
+    mDeviceInterface->postInit();
 }
 
 ExynosDevice::~ExynosDevice() {
