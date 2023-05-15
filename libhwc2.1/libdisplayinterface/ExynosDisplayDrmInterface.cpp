@@ -1863,6 +1863,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 (plane->id() != static_cast<ExynosPrimaryDisplay *>(mExynosDisplay)->mRcdId))
                 continue;
 
+            /* If this plane is not supported by the CRTC binded with ExynosDisplay,
+             * it should be disabled by this ExynosDisplay */
+            if (!plane->GetCrtcSupported(*mDrmCrtc))
+                continue;
+
             if ((ret = drmReq.atomicAddProperty(plane->id(),
                     plane->crtc_property(), 0)) < 0)
                 return ret;
@@ -1995,6 +2000,21 @@ int32_t ExynosDisplayDrmInterface::clearDisplayMode(DrmModeAtomicReq &drmReq)
     return NO_ERROR;
 }
 
+int32_t ExynosDisplayDrmInterface::triggerClearDisplayPlanes()
+{
+    ATRACE_CALL();
+    DrmModeAtomicReq drmReq(this);
+
+    clearDisplayPlanes(drmReq);
+    int ret = NO_ERROR;
+    if ((ret = drmReq.commit(0, true))) {
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=(%d)\n",
+                __func__, ret);
+        return ret;
+    }
+    return ret;
+}
+
 int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
 {
     int ret = NO_ERROR;
@@ -2006,6 +2026,11 @@ int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
         if ((exynosMPP != NULL) && (mExynosDisplay != NULL) &&
             (exynosMPP->mAssignedState & MPP_ASSIGN_STATE_RESERVED) &&
             (exynosMPP->mReservedDisplay != (int32_t)mExynosDisplay->mDisplayId))
+            continue;
+
+        /* If this plane is not supported by the CRTC binded with ExynosDisplay,
+         * it should not be disabled by this ExynosDisplay */
+        if (!plane->GetCrtcSupported(*mDrmCrtc))
             continue;
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
