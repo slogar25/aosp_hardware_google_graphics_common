@@ -2019,6 +2019,21 @@ int32_t ExynosDisplayDrmInterface::clearDisplayMode(DrmModeAtomicReq &drmReq)
     return NO_ERROR;
 }
 
+int32_t ExynosDisplayDrmInterface::triggerClearDisplayPlanes()
+{
+    ATRACE_CALL();
+    DrmModeAtomicReq drmReq(this);
+
+    clearDisplayPlanes(drmReq);
+    int ret = NO_ERROR;
+    if ((ret = drmReq.commit(0, true))) {
+        HWC_LOGE(mExynosDisplay, "%s:: Failed to commit pset ret=(%d)\n",
+                __func__, ret);
+        return ret;
+    }
+    return ret;
+}
+
 int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
 {
     int ret = NO_ERROR;
