@@ -277,6 +277,10 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
     updateAppliedActiveConfig(0, 0);
     int ret = NO_ERROR;
     if (mDisplayId != 0 || !mFirstPowerOn) {
+        if (mDevice->hasOtherDisplayOn(this)) {
+            // TODO: This is useful for cmd mode, and b/282094671 tries to handles video mode
+            mDisplayInterface->triggerClearDisplayPlanes();
+        }
         ret = applyPendingConfig();
     }
 

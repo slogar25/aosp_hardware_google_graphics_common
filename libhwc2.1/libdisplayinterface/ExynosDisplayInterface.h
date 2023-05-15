@@ -53,6 +53,7 @@ class ExynosDisplayInterface {
         virtual int32_t updateHdrCapabilities();
         virtual int32_t deliverWinConfigData() {return NO_ERROR;};
         virtual int32_t clearDisplay(bool __unused needModeClear = false) {return NO_ERROR;};
+        virtual int32_t triggerClearDisplayPlanes() { return NO_ERROR; }
         virtual int32_t disableSelfRefresh(uint32_t __unused disable) {return NO_ERROR;};
         virtual int32_t setForcePanic() {return NO_ERROR;};
         virtual int getDisplayFd() {return -1;};
