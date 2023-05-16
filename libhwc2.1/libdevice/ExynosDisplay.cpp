@@ -4631,6 +4631,7 @@ int32_t ExynosDisplay::validateDisplay(
 
 int32_t ExynosDisplay::startPostProcessing()
 {
+    ATRACE_CALL();
     int ret = NO_ERROR;
     String8 errString;
 
