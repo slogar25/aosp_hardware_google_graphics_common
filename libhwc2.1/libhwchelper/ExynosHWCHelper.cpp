@@ -713,6 +713,7 @@ void setFenceName(int fenceFd, HwcFenceType fenceType) {
     }
 }
 
+// TODO(b/273890355): remove this function and get buffer size from gralloc
 uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
 {
     switch (format) {
@@ -734,6 +735,8 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
     case HAL_PIXEL_FORMAT_YCBCR_P010:
         HDEBUGLOGD(eDebugMPP, "size(Y) : %d", P010_Y_SIZE(width, height));
         return P010_Y_SIZE(width, height);
+    case MALI_GRALLOC_FORMAT_INTERNAL_P010:
+        return 2 * __ALIGN_UP(width, 32) * __ALIGN_UP(height, 2);
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN:
         return NV12N_Y_SIZE(width, height);
     case HAL_PIXEL_FORMAT_EXYNOS_YCbCr_P010_SPN:
@@ -769,6 +772,7 @@ uint32_t getExynosBufferYLength(uint32_t width, uint32_t height, int format)
     return NV12M_Y_SIZE(width, height) + ((width % 128) == 0 ? 0 : 256);
 }
 
+// TODO(b/273890355): no one is using this function. It can be removed.
 uint32_t getExynosBufferCbCrLength(uint32_t width, uint32_t height, int format)
 {
     switch (format) {
