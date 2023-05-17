@@ -6096,7 +6096,8 @@ int ExynosDisplay::lookupDisplayConfigs(const int32_t &width,
 
     for (auto const& [config, mode] : mDisplayConfigs) {
         long delta = abs(vsyncPeriod - mode.vsyncPeriod);
-        if ((width == mode.width) && (height == mode.height) && (delta < nsecsPerMs)) {
+        if ((width == 0 || width == mode.width) && (height == 0 || height == mode.height) &&
+            (delta < nsecsPerMs)) {
             ALOGD("%s: found display config for mode: %dx%d@%d=%d",
                  __func__, width, height, fps, config);
             *outConfig = config;
