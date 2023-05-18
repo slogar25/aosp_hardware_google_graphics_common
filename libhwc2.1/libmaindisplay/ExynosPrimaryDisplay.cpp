@@ -43,7 +43,15 @@ static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
          {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}};
 
-static constexpr const char *PROPERTY_BOOT_MODE = "persist.vendor.display.primary.boot_config";
+static String8 getPropertyBootModeStr(const int32_t dispId) {
+    String8 str;
+    if (dispId == 0) {
+        str.appendFormat("persist.vendor.display.primary.boot_config");
+    } else {
+        str.appendFormat("persist.vendor.display.%d.primary.boot_config", dispId);
+    }
+    return str;
+}
 
 static std::string loadPanelGammaCalibration(const std::string &file) {
     std::ifstream ifs(file);
@@ -240,13 +248,13 @@ int32_t ExynosPrimaryDisplay::setBootDisplayConfig(int32_t config) {
 
     ALOGD("%s: mode=%s (%d) vsyncPeriod=%d", __func__, modeStr, config,
             mode.vsyncPeriod);
-    ret = property_set(PROPERTY_BOOT_MODE, modeStr);
+    ret = property_set(getPropertyBootModeStr(mDisplayId).string(), modeStr);
 
     return !ret ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_CONFIG;
 }
 
 int32_t ExynosPrimaryDisplay::clearBootDisplayConfig() {
-    auto ret = property_set(PROPERTY_BOOT_MODE, nullptr);
+    auto ret = property_set(getPropertyBootModeStr(mDisplayId).string(), nullptr);
 
     ALOGD("%s: clearing boot mode", __func__);
     return !ret ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_CONFIG;
@@ -254,7 +262,7 @@ int32_t ExynosPrimaryDisplay::clearBootDisplayConfig() {
 
 int32_t ExynosPrimaryDisplay::getPreferredDisplayConfigInternal(int32_t *outConfig) {
     char modeStr[PROPERTY_VALUE_MAX];
-    auto ret = property_get(PROPERTY_BOOT_MODE, modeStr, "");
+    auto ret = property_get(getPropertyBootModeStr(mDisplayId).string(), modeStr, "");
 
     if (ret <= 0) {
         return mDisplayInterface->getDefaultModeId(outConfig);
