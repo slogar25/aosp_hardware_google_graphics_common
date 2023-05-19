@@ -166,4 +166,12 @@ public:
                      value);                                                                  \
     }
 
+#define DISPLAY_LOGD_AND_ATRACE_NAME(debugFlag, fmt, ...)                    \
+    if (hwcCheckDebugMessages(debugFlag) || CC_UNLIKELY(ATRACE_ENABLED())) { \
+        String8 log;                                                         \
+        log.appendFormat((fmt), ##__VA_ARGS__);                              \
+        DISPLAY_LOGD(debugFlag, "%s", log.string());                         \
+        if (CC_UNLIKELY(ATRACE_ENABLED())) ATRACE_NAME(log.string());        \
+    }
+
 #endif
