@@ -1131,14 +1131,16 @@ bool AcrylicCompositorG2D::executeG2D(int fence[], unsigned int num_fences, bool
             return false;
         }
 
-        mHdrWriter.setLayerStaticMetadata(i, layer.getDataspace(),
-                                          layer.getMinMasteringLuminance(),
-                                          layer.getMaxMasteringLuminance());
+        if (layer.getLayerHDR()) {
+            mHdrWriter.setLayerStaticMetadata(i, layer.getDataspace(),
+                                              layer.getMinMasteringLuminance(),
+                                              layer.getMaxMasteringLuminance());
 
-        bool alpha_premult = (layer.getCompositingMode() == HWC_BLENDING_PREMULT)
-                             || (layer.getCompositingMode() == HWC2_BLEND_MODE_PREMULTIPLIED);
-        mHdrWriter.setLayerImageInfo(i, layer.getFormat(), alpha_premult);
-        mHdrWriter.setLayerOpaqueData(i, layer.getLayerData(), layer.getLayerDataLength());
+            bool alpha_premult = (layer.getCompositingMode() == HWC_BLENDING_PREMULT)
+                                 || (layer.getCompositingMode() == HWC2_BLEND_MODE_PREMULTIPLIED);
+            mHdrWriter.setLayerImageInfo(i, layer.getFormat(), alpha_premult);
+            mHdrWriter.setLayerOpaqueData(i, layer.getLayerData(), layer.getLayerDataLength());
+        }
     }
 
     mHdrWriter.setTargetInfo(getCanvas().getDataspace(), getTargetDisplayInfo());

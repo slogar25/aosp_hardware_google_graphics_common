@@ -129,10 +129,32 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
 
     int32_t ret = mDisplayInterface->getDisplayConfigs(outNumConfigs, outConfigs);
     if (ret)
-        DISPLAY_LOGE("%s:: failed to getDisplayConfigs, ret(%d)", __func__, ret);
+        DISPLAY_LOGE("%s: failed to getDisplayConfigs, ret(%d)", __func__, ret);
 
     if (outConfigs) {
-        mActiveConfig = outConfigs[0];
+        char modeStr[PROPERTY_VALUE_MAX] = "\0";
+        int32_t width, height, fps, config;
+        int32_t err = HWC2_ERROR_BAD_CONFIG;
+
+        if (property_get("vendor.display.external.preferred_mode", modeStr, "") > 0) {
+            if (sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
+                err = lookupDisplayConfigs(width, height, fps, &config);
+                if (err != HWC2_ERROR_NONE) {
+                    DISPLAY_LOGW("%s: display does not support preferred mode %dx%d@%d",
+                                 __func__, width, height, fps);
+                }
+            } else {
+                DISPLAY_LOGW("%s: vendor.display.external.preferred_mode: bad format",
+                             __func__);
+            }
+        }
+
+        if (err == HWC2_ERROR_NONE) {
+            mActiveConfig = config;
+        } else {
+            mActiveConfig = outConfigs[0];
+        }
+
         displayConfigs_t displayConfig = mDisplayConfigs[mActiveConfig];
         mXres = displayConfig.width;
         mYres = displayConfig.height;
@@ -141,7 +163,7 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
         if (mDisplayInterface->mType == INTERFACE_TYPE_DRM) {
             ret = mDisplayInterface->setActiveConfig(mActiveConfig);
             if (ret) {
-                DISPLAY_LOGE("%s:: failed to setActiveConfigs, ret(%d)", __func__, ret);
+                DISPLAY_LOGE("%s: failed to setActiveConfigs, ret(%d)", __func__, ret);
                 return ret;
             }
         }
