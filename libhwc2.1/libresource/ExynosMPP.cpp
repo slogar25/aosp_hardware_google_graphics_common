@@ -1218,7 +1218,10 @@ int32_t ExynosMPP::setupLayer(exynos_mpp_img_info *srcImgInfo, struct exynos_ima
         srcImgInfo->mppLayer->setMasterDisplayLuminance(min,max);
         MPP_LOGD(eDebugMPP, "HWC2: G2D luminance min %d, max %d", min, max);
         MPP_LOGD(eDebugMPP|eDebugFence, "G2D getting HDR source!");
-    }
+
+        srcImgInfo->mppLayer->setLayerHDR(true);
+    } else
+        srcImgInfo->mppLayer->setLayerHDR(false);
 
     /* Transfer MetaData */
     if (src.hasMetaParcel) {
