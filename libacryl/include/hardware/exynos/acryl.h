@@ -833,6 +833,8 @@ public:
         mLayerDataLen = data_len;
     }
 
+    void setLayerHDR(bool hdr_en) { mLayerHDR = hdr_en; }
+
     /*
      * Clears the configured layer data.
      */
@@ -905,6 +907,9 @@ public:
      */
     void *getLayerData() { return mLayerData; }
     size_t getLayerDataLength() { return mLayerDataLen; }
+
+    bool getLayerHDR() { return mLayerHDR; }
+
 private:
     AcrylicLayer(Acrylic *compositor);
 
@@ -920,6 +925,7 @@ private:
     uint16_t mMaxLuminance; // in nit
     uint16_t mMinLuminance; // in 0.0001 nit
     uint8_t mPlaneAlpha;
+    bool mLayerHDR;
 };
 
 class AcrylicPerformanceRequest;
