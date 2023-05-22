@@ -2020,6 +2020,16 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         return ret;
     }
 
+    /* For multichannel histogram */
+    if (dqeEnable && mExynosDisplay->mHistogramController) {
+        ret = mExynosDisplay->mHistogramController->prepareAtomicCommit(drmReq);
+
+        if (ret) {
+            HWC_LOGE(mExynosDisplay, "mHistogramController failed to set atomic commit (%d)", ret);
+            return ret;
+        }
+    }
+
     if (mDrmConnector->mipi_sync().id() && (mipi_sync_type != 0)) {
         // skip mipi sync in Doze mode
         bool inDoze = isDozeModeAvailable() && mDozeDrmMode.id() == mActiveModeState.mode.id();
@@ -2079,6 +2089,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 nsecsPerSec/mActiveModeState.mode.v_refresh());
         /* Enable vsync to check vsync period */
         mDrmVSyncWorker.VSyncControl(true);
+    }
+
+    /* For multichannel histogram */
+    if (dqeEnable && mExynosDisplay->mHistogramController) {
+        mExynosDisplay->mHistogramController->postAtomicCommit();
     }
 
     return NO_ERROR;
