@@ -825,8 +825,6 @@ int BrightnessController::queryBrightness(float brightness, bool *ghbm, uint32_t
     if (!dbv_value) {
         return -EINVAL;
     }
-    ALOGD("%s: brightness %f mode %d nits %f dbv %d", __func__, brightness, bm, nits_value.value(),
-          dbv_value.value());
 
     if (level) {
         if ((bm == BrightnessMode::BM_NOMINAL) && mDbmSupported &&
@@ -1047,8 +1045,9 @@ void BrightnessController::parseHbmModeEnums(const DrmProperty& property) {
  *   Historian team before modifying (b/239640926).
  */
 void BrightnessController::printBrightnessStates(const char* path) {
-    ALOGI("path=%s, id=%d, level=%d, DimmingOn=%d, Hbm=%d, LhbmOn=%d", path ?: "unknown",
-          mPanelIndex, mBrightnessLevel.get(), mDimming.get(), mGhbm.get(), mLhbm.get());
+    ALOGI("path=%s, id=%d, level=%d, nits=%f, brightness=%f, DimmingOn=%d, Hbm=%d, LhbmOn=%d",
+          path ?: "unknown", mPanelIndex, mBrightnessLevel.get(), mDisplayWhitePointNits,
+          mBrightnessFloatReq.get(), mDimming.get(), mGhbm.get(), mLhbm.get());
 }
 
 void BrightnessController::dump(String8& result) {
