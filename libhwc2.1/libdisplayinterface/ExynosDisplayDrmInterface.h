@@ -339,6 +339,7 @@ class ExynosDisplayDrmInterface :
         virtual int32_t setHistogramData(void *bin) { return NO_ERROR; }
         int32_t getActiveModeHDisplay() { return mActiveModeState.mode.h_display(); }
         int32_t getActiveModeVDisplay() { return mActiveModeState.mode.v_display(); }
+        uint32_t getActiveModeId() { return mActiveModeState.mode.id(); }
         int32_t panelHsize() { return mPanelResolutionHsize; }
         int32_t panelVsize() { return mPanelResolutionVsize; }
         int32_t getPanelResolution();
