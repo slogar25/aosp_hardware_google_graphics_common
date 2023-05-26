@@ -80,6 +80,7 @@ class ExynosDisplayInterface {
         virtual int32_t getDefaultModeId(int32_t* __unused modeId) {
             return HWC2_ERROR_UNSUPPORTED;
         }
+        virtual uint32_t getActiveModeId() { return UINT_MAX; }
 
         virtual int32_t waitVBlank() { return 0; };
 
