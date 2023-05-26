@@ -116,8 +116,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t setDisplayIdleDelayNanos(int32_t delayNanos,
                                          const DispIdleTimerRequester requester);
         void initDisplayHandleIdleExit();
-        void setLhbmDisplayConfig(uint32_t refreshRate);
-        void restoreLhbmDisplayConfig();
+        int32_t setLhbmDisplayConfigLocked(uint32_t peakRate);
+        void restoreLhbmDisplayConfigLocked();
 
         // LHBM
         FILE* mLhbmFd;
