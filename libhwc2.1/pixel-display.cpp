@@ -199,7 +199,7 @@ ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_retur
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
-bool Display::runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
+bool Display::runMediator(const RoiRect &roi, const Weight &weight, const HistogramPos &pos,
                             std::vector<char16_t> *histogrambuffer) {
     if (mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
         ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
