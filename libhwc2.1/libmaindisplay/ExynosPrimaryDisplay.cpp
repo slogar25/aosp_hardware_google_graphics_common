@@ -558,39 +558,44 @@ void ExynosPrimaryDisplay::enableConfigSetting(bool en) {
     mConfigSettingDisabled = false;
 }
 
-void ExynosPrimaryDisplay::setLhbmDisplayConfig(uint32_t refreshRate) {
-    auto config = getConfigId(refreshRate, mDisplayConfigs[mActiveConfig].width,
-                              mDisplayConfigs[mActiveConfig].height);
-
+int32_t ExynosPrimaryDisplay::setLhbmDisplayConfigLocked(uint32_t peakRate) {
+    auto hwConfig = mDisplayInterface->getActiveModeId();
+    auto config = getConfigId(peakRate, mDisplayConfigs[hwConfig].width,
+                              mDisplayConfigs[hwConfig].height);
     if (config == UINT_MAX) {
-        DISPLAY_LOGE("%s: failed to get config for rate=%d", __func__, refreshRate);
-        return;
+        DISPLAY_LOGE("%s: failed to get config for rate=%d", __func__, peakRate);
+        return -EINVAL;
     }
-    if (mPendingConfig == UINT_MAX) mPendingConfig = mActiveConfig;
 
-    if (ExynosDisplay::setActiveConfigInternal(config, true) == HWC2_ERROR_NONE) {
-        DISPLAY_LOGI("%s: succeeded to set config=%d rate=%d", __func__, config, refreshRate);
+    if (mPendingConfig == UINT_MAX && mActiveConfig != config) mPendingConfig = mActiveConfig;
+    if (config != hwConfig) {
+        if (ExynosDisplay::setActiveConfigInternal(config, true) == HWC2_ERROR_NONE) {
+            DISPLAY_LOGI("%s: succeeded to set config=%d rate=%d", __func__, config, peakRate);
+        } else {
+            DISPLAY_LOGW("%s: failed to set config=%d rate=%d", __func__, config, peakRate);
+        }
     } else {
-        DISPLAY_LOGW("%s: failed to set config=%d rate=%d", __func__, config, refreshRate);
+        DISPLAY_LOGI("%s: keep config=%d rate=%d", __func__, config, peakRate);
     }
+    enableConfigSetting(false);
+    return OK;
 }
 
-void ExynosPrimaryDisplay::restoreLhbmDisplayConfig() {
-    if (mPendingConfig == UINT_MAX) return;
-
-    hwc2_config_t pendingCfg = mPendingConfig;
-    if (mPendingConfig != mActiveConfig) {
+void ExynosPrimaryDisplay::restoreLhbmDisplayConfigLocked() {
+    enableConfigSetting(true);
+    hwc2_config_t pendingConfig = mPendingConfig;
+    auto hwConfig = mDisplayInterface->getActiveModeId();
+    if (pendingConfig != UINT_MAX && pendingConfig != hwConfig) {
         if (applyPendingConfig() == HWC2_ERROR_NONE) {
-            DISPLAY_LOGI("%s: succeeded to set config=%d rate=%d", __func__, pendingCfg,
-                         getRefreshRate(pendingCfg));
+            DISPLAY_LOGI("%s: succeeded to set config=%d rate=%d", __func__, pendingConfig,
+                         getRefreshRate(pendingConfig));
         } else {
-            DISPLAY_LOGE("%s: failed to set config=%d rate=%d", __func__, pendingCfg,
-                         getRefreshRate(pendingCfg));
+            DISPLAY_LOGE("%s: failed to set config=%d rate=%d", __func__, pendingConfig,
+                         getRefreshRate(pendingConfig));
         }
     } else {
         mPendingConfig = UINT_MAX;
-        DISPLAY_LOGI("%s: keep config=%d rate=%d", __func__, pendingCfg,
-                     getRefreshRate(pendingCfg));
+        DISPLAY_LOGI("%s: keep config=%d rate=%d", __func__, hwConfig, getRefreshRate(hwConfig));
     }
 }
 
@@ -638,10 +643,8 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     if (!enabled) {
         ATRACE_NAME("disable_lhbm");
         {
-            ATRACE_NAME("apply_pending_rate");
             Mutex::Autolock lock(mDisplayMutex);
-            enableConfigSetting(true);
-            restoreLhbmDisplayConfig();
+            restoreLhbmDisplayConfigLocked();
         }
         requestLhbm(false);
         {
@@ -662,7 +665,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     ATRACE_NAME("enable_lhbm");
     int64_t lhbmWaitForRrNanos, lhbmEnablingNanos, lhbmEnablingDoneNanos;
     bool enablingStateSupported = !mFramesToReachLhbmPeakBrightness;
-    uint32_t peakRate;
+    uint32_t peakRate = 0;
     auto rrSysfs = mBrightnessController->GetPanelRefreshRateSysfile();
     lhbmWaitForRrNanos = systemTime(SYSTEM_TIME_MONOTONIC);
     {
@@ -672,12 +675,10 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
             DISPLAY_LOGE("%s: invalid peak rate=%d", __func__, peakRate);
             return -EINVAL;
         }
-        if (getRefreshRate(mActiveConfig) != peakRate) {
-            ATRACE_NAME("request_peak_rate");
-            setLhbmDisplayConfig(peakRate);
-        }
-        enableConfigSetting(false);
+        ret = setLhbmDisplayConfigLocked(peakRate);
+        if (ret != OK) return ret;
     }
+
     if (mBrightnessController->fileExists(rrSysfs)) {
         ATRACE_NAME("wait_for_peak_rate_cmd");
         ret = mBrightnessController->checkSysfsStatus(rrSysfs, {std::to_string(peakRate)},
@@ -756,8 +757,7 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     return NO_ERROR;
 enable_err:
     Mutex::Autolock lock(mDisplayMutex);
-    enableConfigSetting(true);
-    restoreLhbmDisplayConfig();
+    restoreLhbmDisplayConfigLocked();
     return ret;
 }
 

@@ -56,12 +56,12 @@ histogram::HistogramErrorCode histogram::HistogramMediator::requestHist() {
     ExynosDisplayDrmInterface *moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
 
-    if (moduleDisplayInterface->setHistogramControl(
-                hidl_histogram_control_t::HISTOGRAM_CONTROL_REQUEST) != NO_ERROR) {
-        return histogram::HistogramErrorCode::ENABLE_HIST_ERROR;
-    }
     {
         std::unique_lock<std::mutex> lk(mIDLHistogram->mDataCollectingMutex);
+        if (moduleDisplayInterface->setHistogramControl(
+                hidl_histogram_control_t::HISTOGRAM_CONTROL_REQUEST) != NO_ERROR) {
+                return histogram::HistogramErrorCode::ENABLE_HIST_ERROR;
+        }
         mIDLHistogram->mHistReq_pending = true;
     }
     return histogram::HistogramErrorCode::NONE;
@@ -93,7 +93,7 @@ int histogram::HistogramMediator::calculateThreshold(const RoiRect &roi) {
 }
 
 histogram::HistogramErrorCode histogram::HistogramMediator::setRoiWeightThreshold(
-        const RoiRect roi, const Weight weight, const HistogramPos pos) {
+        const RoiRect &roi, const Weight &weight, const HistogramPos &pos) {
     int threshold = calculateThreshold(roi);
     mIDLHistogram->setHistogramROI((uint16_t)roi.left, (uint16_t)roi.top,
                                    (uint16_t)(roi.right - roi.left),
@@ -118,7 +118,7 @@ histogram::HistogramErrorCode histogram::HistogramMediator::collectRoiLuma(
     return histogram::HistogramErrorCode::NONE;
 }
 
-histogram::RoiRect histogram::HistogramMediator::calRoi(RoiRect roi) {
+histogram::RoiRect histogram::HistogramMediator::calRoi(const RoiRect &roi) {
     RoiRect roi_return = {-1, -1, -1, -1};
     ExynosDisplayDrmInterface *moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());

@@ -66,7 +66,7 @@ public:
     ndk::ScopedAStatus isOperationRateSupported(bool *_aidl_return) override;
 
 private:
-    bool runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
+    bool runMediator(const RoiRect &roi, const Weight &weight, const HistogramPos &pos,
                        std::vector<char16_t> *histogrambuffer);
     ExynosDisplay *mDisplay = nullptr;
     histogram::HistogramMediator mMediator;
