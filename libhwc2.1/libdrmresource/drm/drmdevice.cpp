@@ -85,10 +85,6 @@ std::tuple<int, int> DrmDevice::Init(const char *path, int num_displays) {
   max_resolution_ = std::pair<uint32_t, uint32_t>(res->max_width,
                                                   res->max_height);
 
-  // Assumes that the primary display will always be in the first
-  // drm_device opened.
-  bool found_primary = num_displays != 0;
-
   for (int i = 0; !ret && i < res->count_crtcs; ++i) {
     drmModeCrtcPtr c = drmModeGetCrtc(fd(), res->crtcs[i]);
     if (!c) {
@@ -177,31 +173,22 @@ std::tuple<int, int> DrmDevice::Init(const char *path, int num_displays) {
       connectors_.emplace_back(std::move(conn));
   }
 
-  // First look for primary amongst internal connectors
+  // First look for primary amongst internal connectors and for
+  // the others assign consecutive display_numbers.
   for (auto &conn : connectors_) {
-    if (conn->internal() && !found_primary) {
+    if (conn->internal() && conn->display() < 0) {
       conn->set_display(num_displays);
       displays_[num_displays] = num_displays;
       ++num_displays;
-      found_primary = true;
-      break;
     }
   }
 
-  // Then pick first available as primary and for the others assign
-  // consecutive display_numbers.
+  // Assign consecutive display_numbers for external connectors.
   for (auto &conn : connectors_) {
-    if (conn->external() || conn->internal()) {
-      if (!found_primary) {
-        conn->set_display(num_displays);
-        displays_[num_displays] = num_displays;
-        found_primary = true;
-        ++num_displays;
-      } else if (conn->display() < 0) {
-        conn->set_display(num_displays);
-        displays_[num_displays] = num_displays;
-        ++num_displays;
-      }
+    if (conn->external() && conn->display() < 0) {
+      conn->set_display(num_displays);
+      displays_[num_displays] = num_displays;
+      ++num_displays;
     }
   }
 
