@@ -150,8 +150,7 @@ ExynosDevice::ExynosDevice(bool vrrApiSupported)
         mDisplayMap.insert(std::make_pair(exynos_display->mDisplayId, exynos_display));
 
 #ifndef FORCE_DISABLE_DR
-        if (exynos_display->mDREnable)
-            exynosHWCControl.useDynamicRecomp = true;
+        if (exynos_display->mDRDefault) exynosHWCControl.useDynamicRecomp = true;
 #endif
     }
 
@@ -311,6 +310,7 @@ void ExynosDevice::checkDynamicRecompositionThread()
             if (mDisplays[i]->mDREnable)
                 return;
         }
+        ALOGI("Destroying dynamic recomposition thread");
         mDRLoopStatus = false;
         mDRWakeUpCondition.notify_one();
         mDRThread.join();
@@ -320,6 +320,7 @@ void ExynosDevice::checkDynamicRecompositionThread()
 void ExynosDevice::dynamicRecompositionThreadCreate()
 {
     if (exynosHWCControl.useDynamicRecomp == true) {
+        ALOGI("Creating dynamic recomposition thread");
         mDRLoopStatus = true;
         mDRThread = std::thread(&dynamicRecompositionThreadLoop, this);
     }

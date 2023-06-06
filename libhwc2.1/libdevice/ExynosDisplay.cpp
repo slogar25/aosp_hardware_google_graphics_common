@@ -1404,15 +1404,21 @@ int ExynosDisplay::checkDynamicReCompMode() {
     }
 
     unsigned int incomingPixels = 0;
+    hwc_rect_t dispRect = {INT_MAX, INT_MAX, 0, 0};
     for (size_t i = 0; i < mLayers.size(); i++) {
-        auto w = WIDTH(mLayers[i]->mPreprocessedInfo.displayFrame);
-        auto h = HEIGHT(mLayers[i]->mPreprocessedInfo.displayFrame);
+        auto& r = mLayers[i]->mPreprocessedInfo.displayFrame;
+        if (r.top < dispRect.top) dispRect.top = r.top;
+        if (r.left < dispRect.left) dispRect.left = r.left;
+        if (r.bottom > dispRect.bottom) dispRect.bottom = r.bottom;
+        if (r.right > dispRect.right) dispRect.right = r.right;
+        auto w = WIDTH(r);
+        auto h = HEIGHT(r);
         incomingPixels += w * h;
     }
 
     /* Mode Switch is not required if total pixels are not more than the threshold */
-    unsigned int lcdSize = mXres * mYres;
-    if (incomingPixels <= lcdSize) {
+    unsigned int mergedDisplayFrameSize = WIDTH(dispRect) * HEIGHT(dispRect);
+    if (incomingPixels <= mergedDisplayFrameSize) {
         auto ret = switchDynamicReCompMode(CLIENT_2_DEVICE);
         if (ret) {
             mUpdateCallCnt = 0;
@@ -4681,13 +4687,11 @@ int32_t ExynosDisplay::validateDisplay(
     tryUpdateBtsFromOperationRate(true);
     doPreProcessing();
     checkLayerFps();
-    if (exynosHWCControl.useDynamicRecomp == true && mDREnable)
+    if (exynosHWCControl.useDynamicRecomp == true && mDREnable) {
         checkDynamicReCompMode();
-
-    if (exynosHWCControl.useDynamicRecomp == true &&
-        mDevice->isDynamicRecompositionThreadAlive() == false &&
-        mDevice->mDRLoopStatus == false) {
-        mDevice->dynamicRecompositionThreadCreate();
+        if (mDevice->isDynamicRecompositionThreadAlive() == false &&
+            mDevice->mDRLoopStatus == false)
+            mDevice->dynamicRecompositionThreadCreate();
     }
 
     if ((ret = mResourceManager->assignResource(this)) != NO_ERROR) {

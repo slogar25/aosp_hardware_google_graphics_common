@@ -48,6 +48,9 @@ ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice* devic
     mIsSkipFrame = false;
     mVirtualDisplayState = 0;
 
+    mDRDefault = true;
+    mDREnable = false;
+
     //TODO : Hard coded currently
     mNumMaxPriorityAllowed = 1;
     mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
@@ -562,10 +565,13 @@ void ExynosExternalDisplay::handleHotplugEvent(bool hpdStatus)
             mHpdStatus = false;
             return;
         }
+        mDREnable = mDRDefault;
     } else {
         disable();
         closeExternalDisplay();
+        mDREnable = false;
     }
+    mDevice->checkDynamicRecompositionThread();
 
     ALOGI("HPD status changed to %s, mDisplayId %d, mDisplayFd %d", mHpdStatus ? "enabled" : "disabled", mDisplayId, mDisplayInterface->getDisplayFd());
 }
