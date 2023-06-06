@@ -46,6 +46,24 @@ void BrightnessController::LinearBrightnessTable::Init(const struct brightness_c
     mIsValid = true;
 }
 
+std::optional<float> BrightnessController::LinearBrightnessTable::NitsToBrightness(
+        float nits) const {
+    BrightnessMode mode = GetBrightnessModeForNits(nits);
+    if (mode == BrightnessMode::BM_INVALID) {
+        return std::nullopt;
+    }
+
+    const DisplayBrightnessRange& range = mBrightnessRanges.at(mode);
+    const float brightness = LinearInterpolation(nits,
+        range.nits_min, range.nits_max,
+        range.brightness_min, range.brightness_max);
+    if (isnan(brightness)) {
+        return std::nullopt;
+    }
+
+    return brightness;
+}
+
 std::optional<float> BrightnessController::LinearBrightnessTable::BrightnessToNits(
         float brightness, BrightnessMode& bm) const {
     bm = GetBrightnessMode(brightness);
@@ -395,6 +413,20 @@ int BrightnessController::ignoreBrightnessUpdateRequests(bool ignore) {
     mIgnoreBrightnessUpdateRequests = ignore;
 
     return NO_ERROR;
+}
+
+int BrightnessController::setBrightnessNits(float nits, const nsecs_t vsyncNs) {
+    ALOGI("%s set brightness to %f nits", __func__,  nits);
+
+    std::optional<float> brightness = mBrightnessTable ?
+        mBrightnessTable->NitsToBrightness(nits) : std::nullopt;
+
+    if (brightness == std::nullopt) {
+        ALOGI("%s could not find brightness for %f nits", __func__, nits);
+        return -EINVAL;
+    }
+
+    return processDisplayBrightness(brightness.value(), vsyncNs);
 }
 
 // In HWC3, brightness change could be applied via drm commit or sysfs path.
