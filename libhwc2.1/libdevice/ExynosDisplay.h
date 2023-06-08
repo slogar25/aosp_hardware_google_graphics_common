@@ -310,6 +310,7 @@ class ExynosCompositionInfo : public ExynosMPPSource {
         ExynosCompositionInfo(uint32_t type);
         uint32_t mType;
         bool mHasCompositionLayer;
+        bool mPrevHasCompositionLayer = false;
         int32_t mFirstIndex;
         int32_t mLastIndex;
         buffer_handle_t mTargetBuffer;
@@ -1207,6 +1208,7 @@ class ExynosDisplay {
         void increaseMPPDstBufIndex();
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t updateColorConversionInfo() { return NO_ERROR; };
+        virtual int32_t resetColorMappingInfo(ExynosMPPSource* /*mppSrc*/) { return NO_ERROR; }
         virtual int32_t updatePresentColorConversionInfo() { return NO_ERROR; };
         virtual bool checkRrCompensationEnabled() { return false; };
         virtual bool isColorCalibratedByDevice() { return false; };
@@ -1645,6 +1647,9 @@ class ExynosDisplay {
         void updateRefreshRateIndicator();
         nsecs_t getLastLayerUpdateTime();
         virtual void checkPreblendingRequirement(){};
+
+        void resetColorMappingInfoForClientComp();
+        void storePrevValidateCompositionType();
 };
 
 #endif //_EXYNOSDISPLAY_H

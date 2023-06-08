@@ -117,6 +117,11 @@ class ExynosLayer : public ExynosMPPSource {
         int32_t mValidateCompositionType;
 
         /**
+         * The last validated composition type
+         */
+        int32_t mPrevValidateCompositionType;
+
+        /**
          * Validated ExynosCompositionType
          */
         int32_t mValidateExynosCompositionType;

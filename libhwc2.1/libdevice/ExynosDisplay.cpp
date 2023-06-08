@@ -4615,6 +4615,9 @@ int32_t ExynosDisplay::validateDisplay(
         mResourceManager->assignWindow(this);
     }
 
+    resetColorMappingInfoForClientComp();
+    storePrevValidateCompositionType();
+
     int32_t displayRequests = 0;
     if ((ret = getChangedCompositionTypes(outNumTypes, NULL, NULL)) != NO_ERROR) {
         HWC_LOGE(this, "%s:: getChangedCompositionTypes() fail, display(%d), ret(%d)", __func__, mDisplayId, ret);
@@ -6360,4 +6363,40 @@ uint32_t ExynosDisplay::getConfigId(const int32_t refreshRate, const int32_t wid
         }
     }
     return UINT_MAX;
+}
+
+void ExynosDisplay::resetColorMappingInfoForClientComp() {
+    if (mType != HWC_DISPLAY_PRIMARY) return;
+
+    int32_t ret = NO_ERROR;
+    for (uint32_t i = 0; i < mLayers.size(); i++) {
+        ExynosLayer *layer = mLayers[i];
+        if (layer->mPrevValidateCompositionType != HWC2_COMPOSITION_CLIENT &&
+            layer->mValidateCompositionType == HWC2_COMPOSITION_CLIENT) {
+            if ((ret = resetColorMappingInfo(layer)) != NO_ERROR) {
+                DISPLAY_LOGE("%s:: resetColorMappingInfo() idx=%d error(%d)", __func__, i, ret);
+            }
+        }
+    }
+
+    // when no GPU composition, resets the mapping info of client composition info
+    if (mClientCompositionInfo.mPrevHasCompositionLayer &&
+        !mClientCompositionInfo.mHasCompositionLayer) {
+        if ((ret = resetColorMappingInfo(&mClientCompositionInfo)) != NO_ERROR) {
+            DISPLAY_LOGE("%s:: resetColorMappingInfo() for client target error(%d)", __func__, ret);
+        }
+    }
+}
+
+void ExynosDisplay::storePrevValidateCompositionType() {
+    for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
+        ExynosLayer *layer = mIgnoreLayers[i];
+        layer->mPrevValidateCompositionType = layer->mValidateCompositionType;
+    }
+
+    for (uint32_t i = 0; i < mLayers.size(); i++) {
+        ExynosLayer *layer = mLayers[i];
+        layer->mPrevValidateCompositionType = layer->mValidateCompositionType;
+    }
+    mClientCompositionInfo.mPrevHasCompositionLayer = mClientCompositionInfo.mHasCompositionLayer;
 }
