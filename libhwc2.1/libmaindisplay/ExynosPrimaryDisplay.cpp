@@ -987,12 +987,13 @@ int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
         fps = (level < mDbvThresholdForBlockingZone) ? mMinIdleRefreshRateForBlockingZone
                                                      : mDefaultMinIdleRefreshRate;
     }
-    if (fps == mMinIdleRefreshRate) return NO_ERROR;
+
+    std::lock_guard<std::mutex> lock(mMinIdleRefreshRateMutex);
+    if (fps == mVrrThrottleFps[toUnderlying(requester)]) return NO_ERROR;
 
     ALOGD("%s requester %u, fps %d", __func__, toUnderlying(requester), fps);
-    std::lock_guard<std::mutex> lock(mMinIdleRefreshRateMutex);
-    int maxMinIdleFps = 0;
     mVrrThrottleFps[toUnderlying(requester)] = fps;
+    int maxMinIdleFps = 0;
     for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
         if (mVrrThrottleFps[i] > maxMinIdleFps) {
             maxMinIdleFps = mVrrThrottleFps[i];
@@ -1018,17 +1019,18 @@ int ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
 int ExynosPrimaryDisplay::setRefreshRateThrottleNanos(const int64_t delayNanos,
                                                       const VrrThrottleRequester requester) {
     ATRACE_CALL();
-    ALOGI("%s() requester(%u) set delay to %" PRId64 "ns", __func__, toUnderlying(requester),
-          delayNanos);
     if (delayNanos < 0) {
         ALOGW("%s() set invalid delay(%" PRId64 ")", __func__, delayNanos);
         return BAD_VALUE;
     }
 
     std::lock_guard<std::mutex> lock(mIdleRefreshRateThrottleMutex);
+    if (delayNanos == mVrrThrottleNanos[toUnderlying(requester)]) return NO_ERROR;
 
-    int64_t maxDelayNanos = 0;
+    ALOGI("%s() requester(%u) set delay to %" PRId64 "ns", __func__, toUnderlying(requester),
+          delayNanos);
     mVrrThrottleNanos[toUnderlying(requester)] = delayNanos;
+    int64_t maxDelayNanos = 0;
     for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
         if (mVrrThrottleNanos[i] > maxDelayNanos) {
             maxDelayNanos = mVrrThrottleNanos[i];
@@ -1051,15 +1053,20 @@ void ExynosPrimaryDisplay::dump(String8 &result) {
     for (uint32_t i = 0; i < toUnderlying(DispIdleTimerRequester::MAX); i++) {
         result.appendFormat("\t[%u] vote to %" PRId64 " ns\n", i, mDisplayIdleTimerNanos[i]);
     }
-    result.appendFormat("Min idle refresh rate: %d, default: %d\n", mMinIdleRefreshRate,
+
+    result.appendFormat("Min idle refresh rate: %d, default: %d", mMinIdleRefreshRate,
                         mDefaultMinIdleRefreshRate);
     if (mUseBlockingZoneForMinIdleRefreshRate) {
-        result.appendFormat("\tblocking zone level: %d, min refresh rate: %d\n",
+        result.appendFormat(", blocking zone level: %d, min refresh rate: %d\n",
                             mDbvThresholdForBlockingZone, mMinIdleRefreshRateForBlockingZone);
-        for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
-            result.appendFormat("\t\t[%u] vote to %d\n", i, mVrrThrottleFps[i]);
-        }
+    } else {
+        result.appendFormat("\n");
     }
+
+    for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
+        result.appendFormat("\t[%u] vote to %d hz\n", i, mVrrThrottleFps[i]);
+    }
+
     result.appendFormat("Refresh rate delay: %" PRId64 " ns\n", mRefreshRateDelayNanos);
     for (uint32_t i = 0; i < toUnderlying(VrrThrottleRequester::MAX); i++) {
         result.appendFormat("\t[%u] vote to %" PRId64 " ns\n", i, mVrrThrottleNanos[i]);
