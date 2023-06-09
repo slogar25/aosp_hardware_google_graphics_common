@@ -42,6 +42,7 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
         mRequestedCompositionType(HWC2_COMPOSITION_INVALID),
         mExynosCompositionType(HWC2_COMPOSITION_INVALID),
         mValidateCompositionType(HWC2_COMPOSITION_INVALID),
+        mPrevValidateCompositionType(HWC2_COMPOSITION_INVALID),
         mValidateExynosCompositionType(HWC2_COMPOSITION_INVALID),
         mOverlayInfo(0x0),
         mSupportedMPPFlag(0x0),
