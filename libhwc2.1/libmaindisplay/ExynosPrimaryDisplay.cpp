@@ -661,10 +661,6 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     std::vector<std::string> checkingValue;
     if (!enabled) {
         ATRACE_NAME("disable_lhbm");
-        {
-            Mutex::Autolock lock(mDisplayMutex);
-            restoreLhbmDisplayConfigLocked();
-        }
         requestLhbm(false);
         {
             ATRACE_NAME("wait_for_lhbm_off_cmd");
@@ -675,6 +671,10 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
             if (ret != OK) {
                 DISPLAY_LOGW("%s: failed to send lhbm-off cmd", __func__);
             }
+        }
+        {
+            Mutex::Autolock lock(mDisplayMutex);
+            restoreLhbmDisplayConfigLocked();
         }
         setLHBMRefreshRateThrottle(0);
         mLhbmOn = false;
