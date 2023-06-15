@@ -1711,7 +1711,8 @@ int ExynosDisplay::skipStaticLayers(ExynosCompositionInfo& compositionInfo)
 bool ExynosDisplay::skipSignalIdle(void) {
     for (size_t i = 0; i < mLayers.size(); i++) {
         // Frame update for refresh rate overlay indicator layer can be ignored
-        if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) continue;
+        if (mLayers[i]->mRequestedCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+            continue;
         // Frame update for video layer can be ignored
         if (mLayers[i]->isLayerFormatYuv()) continue;
         if (mLayers[i]->mLastLayerBuffer != mLayers[i]->mLayerBuffer) {
@@ -6336,7 +6337,8 @@ nsecs_t ExynosDisplay::getLastLayerUpdateTime() {
     nsecs_t time = 0;
     for (size_t i = 0; i < mLayers.size(); ++i) {
         // The update from refresh rate indicator layer should be ignored
-        if (mLayers[i]->mCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) continue;
+        if (mLayers[i]->mRequestedCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+            continue;
         time = max(time, mLayers[i]->mLastUpdateTime);
     }
     return time;
