@@ -39,6 +39,7 @@ ExynosLayer::ExynosLayer(ExynosDisplay* display)
       : ExynosMPPSource(MPP_SOURCE_LAYER, this),
         mDisplay(display),
         mCompositionType(HWC2_COMPOSITION_INVALID),
+        mRequestedCompositionType(HWC2_COMPOSITION_INVALID),
         mExynosCompositionType(HWC2_COMPOSITION_INVALID),
         mValidateCompositionType(HWC2_COMPOSITION_INVALID),
         mValidateExynosCompositionType(HWC2_COMPOSITION_INVALID),
@@ -422,7 +423,7 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
         checkFps(mLastLayerBuffer != mLayerBuffer);
         if (mLayerBuffer != mLastLayerBuffer) {
             mLastUpdateTime = systemTime(CLOCK_MONOTONIC);
-            if (mCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+            if (mRequestedCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
                 mDisplay->mBufferUpdates++;
         }
     }
@@ -512,11 +513,12 @@ int32_t ExynosLayer::setLayerCompositionType(int32_t /*hwc2_composition_t*/ type
             type = HWC2_COMPOSITION_DEVICE;
 #endif
 
-    if (type != mCompositionType) {
+    if (type != mCompositionType && type != mRequestedCompositionType) {
         setGeometryChanged(GEOMETRY_LAYER_TYPE_CHANGED);
     }
 
     mCompositionType = type;
+    mRequestedCompositionType = type;
 
     return HWC2_ERROR_NONE;
 }
@@ -1166,7 +1168,7 @@ void ExynosLayer::setGeometryChanged(uint64_t changedBit)
 {
     mLastUpdateTime = systemTime(CLOCK_MONOTONIC);
     mGeometryChanged |= changedBit;
-    if (mCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+    if (mRequestedCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
         mDisplay->setGeometryChanged(changedBit);
 }
 
