@@ -423,7 +423,7 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
         checkFps(mLastLayerBuffer != mLayerBuffer);
         if (mLayerBuffer != mLastLayerBuffer) {
             mLastUpdateTime = systemTime(CLOCK_MONOTONIC);
-            if (mCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+            if (mRequestedCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
                 mDisplay->mBufferUpdates++;
         }
     }
@@ -1168,7 +1168,7 @@ void ExynosLayer::setGeometryChanged(uint64_t changedBit)
 {
     mLastUpdateTime = systemTime(CLOCK_MONOTONIC);
     mGeometryChanged |= changedBit;
-    if (mCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
+    if (mRequestedCompositionType != HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
         mDisplay->setGeometryChanged(changedBit);
 }
 
