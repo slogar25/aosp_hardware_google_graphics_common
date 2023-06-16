@@ -60,7 +60,7 @@ histogram::HistogramErrorCode histogram::HistogramMediator::requestHist() {
         std::unique_lock<std::mutex> lk(mIDLHistogram->mDataCollectingMutex);
         if (moduleDisplayInterface->setHistogramControl(
                 hidl_histogram_control_t::HISTOGRAM_CONTROL_REQUEST) != NO_ERROR) {
-                return histogram::HistogramErrorCode::ENABLE_HIST_ERROR;
+            return histogram::HistogramErrorCode::ENABLE_HIST_ERROR;
         }
         mIDLHistogram->mHistReq_pending = true;
     }
