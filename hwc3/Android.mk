@@ -32,7 +32,7 @@ LOCAL_CFLAGS += \
 	-Wthread-safety
 
 # hwc3 re-uses hwc2.2 ComposerResource and libexynosdisplay
-LOCAL_SHARED_LIBRARIES := android.hardware.graphics.composer3-V2-ndk \
+LOCAL_SHARED_LIBRARIES := android.hardware.graphics.composer3-V3-ndk \
 	android.hardware.graphics.composer@2.1-resources \
         android.hardware.graphics.composer@2.2-resources \
 	android.hardware.graphics.composer@2.4 \
