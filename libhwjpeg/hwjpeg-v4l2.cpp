@@ -71,10 +71,12 @@ CHWJpegV4L2Compressor::~CHWJpegV4L2Compressor() {
 }
 
 int CHWJpegV4L2Compressor::lock() {
+    mutex_.lock();
     return file_lock_.lock();
 }
 
 int CHWJpegV4L2Compressor::unlock() {
+    mutex_.unlock();
     return file_lock_.unlock();
 }
 
