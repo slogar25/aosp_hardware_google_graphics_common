@@ -250,6 +250,18 @@ int DrmConnector::UpdateModes() {
     return -ENODEV;
   }
 
+  if (state_ == DRM_MODE_CONNECTED &&
+      c->connection == DRM_MODE_CONNECTED && modes_.size() > 0) {
+    // no need to update modes
+    return 0;
+  }
+
+  if (state_ == DRM_MODE_DISCONNECTED &&
+      c->connection == DRM_MODE_DISCONNECTED && modes_.size() == 0) {
+    // no need to update modes
+    return 0;
+  }
+
   state_ = c->connection;
 
   bool preferred_mode_found = false;
@@ -264,10 +276,10 @@ int DrmConnector::UpdateModes() {
       }
     }
     if (!exists) {
-    DrmMode m(&c->modes[i]);
-    m.set_id(drm_->next_mode_id());
-    new_modes.push_back(m);
-  }
+      DrmMode m(&c->modes[i]);
+      m.set_id(drm_->next_mode_id());
+      new_modes.push_back(m);
+    }
     // Use only the first DRM_MODE_TYPE_PREFERRED mode found
     if (!preferred_mode_found &&
         (new_modes.back().type() & DRM_MODE_TYPE_PREFERRED)) {
@@ -279,7 +291,7 @@ int DrmConnector::UpdateModes() {
   if (!preferred_mode_found && modes_.size() != 0) {
     preferred_mode_id_ = modes_[0].id();
   }
-  return 0;
+  return 1;
 }
 
 int DrmConnector::UpdateEdidProperty() {
