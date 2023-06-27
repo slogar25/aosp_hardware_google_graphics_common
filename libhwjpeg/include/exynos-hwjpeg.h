@@ -221,7 +221,7 @@ public:
      * @return          : true if padding is congured successfully.
      *                    false, otherwise.
      */
-    virtual bool SetPadding(unsigned char padding[], unsigned int num_planes) = 0;
+    virtual bool SetPadding(const unsigned char padding[], unsigned int num_planes) = 0;
     /*
      * SetPadding2 - Configures padding per plane for thumbnail image
      * @padding[in]     : padding per plane
@@ -229,7 +229,8 @@ public:
      * @return          : true if padding is congured successfully.
      *                    false, otherwise.
      */
-    virtual bool SetPadding2(unsigned char __unused padding[], unsigned int __unused num_planes) {
+    virtual bool SetPadding2(const unsigned char __unused padding[],
+                             unsigned int __unused num_planes) {
         return false;
     }
     /*
@@ -624,8 +625,8 @@ public:
     virtual bool SetChromaSampFactor(unsigned int horizontal, unsigned int vertical);
     virtual bool SetQuality(unsigned int quality_factor, unsigned int quality_factor2 = 0);
     virtual bool SetQuality(const unsigned char qtable[]) REQUIRES(this);
-    virtual bool SetPadding(unsigned char padding[], unsigned int num_planes);
-    virtual bool SetPadding2(unsigned char padding[], unsigned int num_planes);
+    virtual bool SetPadding(const unsigned char padding[], unsigned int num_planes);
+    virtual bool SetPadding2(const unsigned char padding[], unsigned int num_planes);
 
     virtual bool SetImageFormat(unsigned int v4l2_fmt, unsigned int width, unsigned int height,
                                 unsigned int sec_width = 0, unsigned sec_height = 0);
