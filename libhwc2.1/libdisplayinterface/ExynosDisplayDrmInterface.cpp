@@ -989,9 +989,14 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
 
     if (!outConfigs) {
         int ret = mDrmConnector->UpdateModes();
-        if (ret) {
+        if (ret < 0) {
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
+        }
+
+        if (ret == 0) {
+            // no need to update mExynosDisplay->mDisplayConfigs
+            goto no_mode_changes;
         }
 
         if (mDrmConnector->state() == DRM_MODE_CONNECTED) {
@@ -1050,6 +1055,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         mExynosDisplay->setPeakRefreshRate(peakRr);
     }
 
+no_mode_changes:
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
     if (!outConfigs) {
         *outNumConfigs = num_modes;
