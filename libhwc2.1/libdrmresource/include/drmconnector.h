@@ -25,6 +25,7 @@
 #include <xf86drmMode.h>
 #include <string>
 #include <vector>
+#include <mutex>
 
 namespace android {
 
@@ -57,6 +58,9 @@ class DrmConnector {
 
   const std::vector<DrmMode> &modes() const {
     return modes_;
+  }
+  std::recursive_mutex &modesLock() {
+    return modes_lock_;
   }
   const DrmMode &active_mode() const;
   void set_active_mode(const DrmMode &mode);
@@ -119,6 +123,7 @@ class DrmConnector {
 
   DrmMode active_mode_;
   std::vector<DrmMode> modes_;
+  std::recursive_mutex modes_lock_;
   DrmMode lp_mode_;
 
   DrmProperty dpms_property_;

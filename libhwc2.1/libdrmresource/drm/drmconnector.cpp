@@ -240,6 +240,8 @@ std::string DrmConnector::name() const {
 }
 
 int DrmConnector::UpdateModes() {
+  std::lock_guard<std::recursive_mutex> lock(modes_lock_);
+
   int fd = drm_->fd();
 
   drmModeConnectorPtr c = drmModeGetConnector(fd, id_);
