@@ -4010,6 +4010,14 @@ int32_t ExynosDisplay::getDisplayBrightnessSupport(bool* outSupport)
     return HWC2_ERROR_NONE;
 }
 
+void ExynosDisplay::handleTargetOperationRate() {
+    int32_t targetOpRate = mOperationRateManager->getTargetOperationRate();
+    if (targetOpRate == mBrightnessController->getOperationRate()) return;
+
+    mDevice->onRefresh(mDisplayId);
+    mBrightnessController->processOperationRate(targetOpRate);
+}
+
 int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
 {
     if (mBrightnessController) {
@@ -4019,8 +4027,10 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
                                                               waitPresent);
         if (ret == NO_ERROR) {
             setMinIdleRefreshRate(0, VrrThrottleRequester::BRIGHTNESS);
-            if (mOperationRateManager)
+            if (mOperationRateManager) {
                 mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
+                handleTargetOperationRate();
+            }
         }
         return ret;
     }
@@ -5993,6 +6003,7 @@ int32_t ExynosDisplay::flushDisplayBrightnessChange() {
         setMinIdleRefreshRate(0, VrrThrottleRequester::BRIGHTNESS);
         if (mOperationRateManager) {
             mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
+            handleTargetOperationRate();
         }
         return mBrightnessController->applyPendingChangeViaSysfs(mVsyncPeriod);
     }
@@ -6372,7 +6383,7 @@ void ExynosDisplay::updateRefreshRateIndicator() {
 }
 
 uint32_t ExynosDisplay::getPeakRefreshRate() {
-    float opRate = mOperationRateManager ? mOperationRateManager->getOperationRate() : 0;
+    float opRate = mBrightnessController->getOperationRate();
     return static_cast<uint32_t>(std::round(opRate ?: mPeakRefreshRate));
 }
 
