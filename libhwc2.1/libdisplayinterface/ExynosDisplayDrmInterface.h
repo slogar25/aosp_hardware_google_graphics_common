@@ -352,6 +352,7 @@ class ExynosDisplayDrmInterface :
             HAL_MIPI_CMD_SYNC_LHBM,
             HAL_MIPI_CMD_SYNC_GHBM,
             HAL_MIPI_CMD_SYNC_BL,
+            HAL_MIPI_CMD_SYNC_OP_RATE,
         };
 
         struct ModeState {
