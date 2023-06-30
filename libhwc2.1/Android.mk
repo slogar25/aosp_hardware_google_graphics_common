@@ -139,6 +139,7 @@ LOCAL_CFLAGS += -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 
 LOCAL_MODULE := libexynosdisplay
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
@@ -196,6 +197,7 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_C_INCLUDES)
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-service\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 
 LOCAL_SRC_FILES := \
 	libhwcService/IExynosHWC.cpp \
@@ -236,6 +238,7 @@ LOCAL_HEADER_LIBRARIES += libgralloc_headers
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-2\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
 LOCAL_CFLAGS += -DUSES_HWC_SERVICES
