@@ -44,6 +44,7 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
 
 LOCAL_MODULE := libdrmresource
