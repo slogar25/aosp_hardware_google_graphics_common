@@ -4754,18 +4754,21 @@ void ExynosDisplay::dump(String8& result)
 
     result.appendFormat("PanelGammaSource (%d)\n\n", GetCurrentPanelGammaSource());
 
-    if (mLayers.size()) {
-        result.appendFormat("============================== dump layers ===========================================\n");
-        for (uint32_t i = 0; i < mLayers.size(); i++) {
-            ExynosLayer *layer = mLayers[i];
-            layer->dump(result);
+    {
+        Mutex::Autolock lock(mDRMutex);
+        if (mLayers.size()) {
+            result.appendFormat("============================== dump layers ===========================================\n");
+            for (uint32_t i = 0; i < mLayers.size(); i++) {
+                ExynosLayer *layer = mLayers[i];
+                layer->dump(result);
+            }
         }
-    }
-    if (mIgnoreLayers.size()) {
-        result.appendFormat("\n============================== dump ignore layers ===========================================\n");
-        for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
-            ExynosLayer *layer = mIgnoreLayers[i];
-            layer->dump(result);
+        if (mIgnoreLayers.size()) {
+            result.appendFormat("\n============================== dump ignore layers ===========================================\n");
+            for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
+                ExynosLayer *layer = mIgnoreLayers[i];
+                layer->dump(result);
+            }
         }
     }
     result.appendFormat("\n");
