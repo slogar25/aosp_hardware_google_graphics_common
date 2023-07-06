@@ -5340,6 +5340,22 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex, float tota
     return changeFlag;
 }
 
+bool ExynosDisplay::isPowerModeOff() const {
+    Mutex::Autolock lock(mDisplayMutex);
+    return mPowerModeState.has_value() && mPowerModeState.value() == HWC2_POWER_MODE_OFF;
+}
+
+bool ExynosDisplay::isSecureContentPresenting() const {
+    Mutex::Autolock lock(mDRMutex);
+    for (uint32_t i = 0; i < mLayers.size(); i++) {
+        ExynosLayer *layer = mLayers[i];
+        if (layer != NULL && layer->isDrm()) { /* there is some DRM layer */
+            return true;
+        }
+    }
+    return false;
+}
+
 bool ExynosDisplay::windowUpdateExceptions()
 {
 
