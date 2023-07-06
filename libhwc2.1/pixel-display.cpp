@@ -205,7 +205,7 @@ bool Display::runMediator(const RoiRect &roi, const Weight &weight, const Histog
     histogram::HistogramMediator::HistogramConfig pendingConfig(roi, weight, pos);
 
     {
-        std::unique_lock<std::mutex> lk(mMediator.mConfigMutex);
+        std::scoped_lock lock(mMediator.mConfigMutex);
         isConfigChanged = mMediator.mConfig != pendingConfig;
 
         if (isConfigChanged &&

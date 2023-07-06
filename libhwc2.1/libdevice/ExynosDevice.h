@@ -208,7 +208,7 @@ class ExynosDevice {
         uint32_t mDisplayMode;
 
         // Variable for fence tracer
-        std::map<int, HwcFenceInfo> mFenceInfos GUARDED_BY(mFenceMutex);
+        std::map<int, HwcFenceInfo> mFenceInfos; // GUARDED_BY(mFenceMutex)
         std::mutex mFenceMutex;
 
         /**
