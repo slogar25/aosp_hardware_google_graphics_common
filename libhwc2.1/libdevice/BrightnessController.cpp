@@ -218,8 +218,13 @@ void BrightnessController::initBrightnessSysfs() {
     mAclModeOfs.open(nodeName.string(), std::ofstream::out);
     if (mAclModeOfs.fail()) {
         ALOGI("%s %s not supported", __func__, nodeName.string());
-    } else
+    } else {
+        String8 propName;
+        propName.appendFormat(kAclModeDefaultPropName, mPanelIndex);
+
+        mAclModeDefault = static_cast<AclMode>(property_get_int32(propName, 0));
         mAclMode.set_dirty();
+    }
 }
 
 void BrightnessController::initCabcSysfs() {
@@ -294,18 +299,22 @@ void BrightnessController::processDimmingOff() {
     }
 }
 
-int BrightnessController::updateAclMode(bool on) {
+int BrightnessController::updateAclMode() {
     if (!mAclModeOfs.is_open()) return HWC2_ERROR_UNSUPPORTED;
 
-    mAclMode.store(on);
+    if (mColorRenderIntent.get() == ColorRenderIntent::COLORIMETRIC) {
+        mAclMode.store(AclMode::ACL_ENHANCED);
+    } else {
+        mAclMode.store(mAclModeDefault);
+    }
 
     if (!mAclMode.is_dirty()) return NO_ERROR;
 
     mAclModeOfs.seekp(std::ios_base::beg);
-    mAclModeOfs << std::to_string(on);
+    mAclModeOfs << std::to_string(static_cast<uint8_t>(mAclMode.get()));
     mAclModeOfs.flush();
     if (mAclModeOfs.fail()) {
-        ALOGW("%s write acl_mode to %d error = %s", __func__, on, strerror(errno));
+        ALOGW("%s write acl_mode to %d error = %s", __func__, mAclMode.get(), strerror(errno));
         mAclModeOfs.clear();
         return HWC2_ERROR_NO_RESOURCES;
     }
@@ -469,6 +478,14 @@ void BrightnessController::updateFrameStates(HdrLayerState hdrState, bool sdrDim
     mSdrDim.store(sdrDim);
     if (mSdrDim.is_dirty() || mPrevSdrDim.is_dirty()) {
         updateStates();
+    }
+}
+
+void BrightnessController::updateColorRenderIntent(int32_t intent) {
+    mColorRenderIntent.store(static_cast<ColorRenderIntent>(intent));
+    if (mColorRenderIntent.is_dirty()) {
+        updateAclMode();
+        ALOGI("%s Color Render Intent = %d", __func__, mColorRenderIntent.get());
     }
 }
 
