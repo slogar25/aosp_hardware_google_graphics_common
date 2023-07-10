@@ -90,6 +90,7 @@ enum BrightnessMode {
     BM_NOMINAL = 0,
     BM_HBM = 1,
     BM_MAX = 2,
+    BM_INVALID = BM_MAX,
 };
 
 enum class HdrLayerState {
@@ -136,6 +137,7 @@ public:
     virtual std::optional<float> BrightnessToNits(float brightness, BrightnessMode &bm) const = 0;
     virtual std::optional<uint32_t> NitsToDbv(BrightnessMode bm, float nits) const = 0;
     virtual std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const = 0;
+    virtual std::optional<float> NitsToBrightness(float nits) const = 0;
 };
 
 /**

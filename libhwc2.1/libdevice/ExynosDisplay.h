@@ -1263,6 +1263,9 @@ class ExynosDisplay {
         /* ignore / accept brightness update requests */
         virtual int32_t ignoreBrightnessUpdateRequests(bool ignore);
 
+        /* set brightness to specific nits value */
+        virtual int32_t setBrightnessNits(const float nits);
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
