@@ -327,6 +327,7 @@ class ExynosCompositionInfo : public ExynosMPPSource {
         CompressionInfo mCompressionInfo;
 
         void initializeInfos(ExynosDisplay *display);
+        void initializeInfosComplete(ExynosDisplay *display);
         void setTargetBuffer(ExynosDisplay *display, buffer_handle_t handle,
                 int32_t acquireFence, android_dataspace dataspace);
         void setCompressionType(uint32_t compressionType);
