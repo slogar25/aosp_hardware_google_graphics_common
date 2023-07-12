@@ -847,20 +847,35 @@ ExynosCompositionInfo::ExynosCompositionInfo(uint32_t type)
     mLastWinConfigData.rel_fence = -1;
 }
 
-void ExynosCompositionInfo::initializeInfos(ExynosDisplay *display)
+void ExynosCompositionInfo::initializeInfosComplete(ExynosDisplay *display)
 {
-    mHasCompositionLayer = false;
-    mFirstIndex = -1;
-    mLastIndex = -1;
     mTargetBuffer = NULL;
     mDataSpace = HAL_DATASPACE_UNKNOWN;
-
     if (mAcquireFence >= 0) {
         ALOGD("ExynosCompositionInfo(%d):: mAcquire is not initialized(%d)", mType, mAcquireFence);
         if (display != NULL)
             fence_close(mAcquireFence, display, FENCE_TYPE_UNDEFINED, FENCE_IP_UNDEFINED);
     }
     mAcquireFence = -1;
+    initializeInfos(display);
+}
+
+void ExynosCompositionInfo::initializeInfos(ExynosDisplay *display)
+{
+    mHasCompositionLayer = false;
+    mFirstIndex = -1;
+    mLastIndex = -1;
+
+    if (mType != COMPOSITION_CLIENT) {
+        mTargetBuffer = NULL;
+        mDataSpace = HAL_DATASPACE_UNKNOWN;
+        if (mAcquireFence >= 0) {
+            ALOGD("ExynosCompositionInfo(%d):: mAcquire is not initialized(%d)", mType, mAcquireFence);
+            if (display != NULL)
+                fence_close(mAcquireFence, display, FENCE_TYPE_UNDEFINED, FENCE_IP_UNDEFINED);
+        }
+        mAcquireFence = -1;
+    }
 
     if (mReleaseFence >= 0) {
         ALOGD("ExynosCompositionInfo(%d):: mReleaseFence is not initialized(%d)", mType, mReleaseFence);
