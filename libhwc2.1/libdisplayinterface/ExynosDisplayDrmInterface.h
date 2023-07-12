@@ -299,6 +299,7 @@ class ExynosDisplayDrmInterface :
                 int32_t* /*android_dataspace_t*/ outDataspace);
         virtual int32_t getDisplayIdentificationData(uint8_t* outPort,
                 uint32_t* outDataSize, uint8_t* outData);
+        virtual bool needRefreshOnLP();
 
         /* For HWC 2.4 APIs */
         virtual int32_t getDisplayVsyncPeriod(

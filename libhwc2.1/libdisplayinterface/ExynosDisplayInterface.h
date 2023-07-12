@@ -48,6 +48,7 @@ class ExynosDisplayInterface {
         {return NO_ERROR;};
         virtual int32_t getDisplayVsyncPeriod(hwc2_vsync_period_t* outVsyncPeriod);
         virtual int32_t getConfigChangeDuration() {return 0;};
+        virtual bool needRefreshOnLP() { return false; };
         virtual int32_t setCursorPositionAsync(uint32_t __unused x_pos,
                 uint32_t __unused y_pos) {return NO_ERROR;};
         virtual int32_t updateHdrCapabilities();

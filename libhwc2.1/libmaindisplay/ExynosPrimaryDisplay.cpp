@@ -429,8 +429,12 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     }
 
     switch (mode) {
-        case HWC2_POWER_MODE_DOZE_SUSPEND:
         case HWC2_POWER_MODE_DOZE:
+        case HWC2_POWER_MODE_DOZE_SUSPEND:
+            if (mode == HWC2_POWER_MODE_DOZE && mDisplayInterface->needRefreshOnLP()) {
+                ALOGI("Refresh before setting power doze.");
+                mDevice->onRefresh(mDisplayId);
+            }
             return setPowerDoze(static_cast<hwc2_power_mode_t>(mode));
         case HWC2_POWER_MODE_OFF:
             setPowerOff();
