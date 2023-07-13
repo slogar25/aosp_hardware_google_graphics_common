@@ -39,11 +39,13 @@ class ExynosDeviceDrmInterface : public ExynosDeviceInterface {
     protected:
         class ExynosDrmEventHandler : public DrmEventHandler,
                                       public DrmHistogramEventHandler,
+                                      public DrmHistogramChannelEventHandler,
                                       public DrmTUIEventHandler,
                                       public DrmPanelIdleEventHandler {
         public:
             void handleEvent(uint64_t timestamp_us) override;
             void handleHistogramEvent(uint32_t crtc_id, void *bin) override;
+            void handleHistogramChannelEvent(void *event) override;
             void handleTUIEvent() override;
             void handleIdleEnterEvent(char const *event) override;
             void init(ExynosDevice *exynosDevice, DrmDevice *drmDevice);
