@@ -73,6 +73,7 @@ public:
     int setBrightnessNits(float nits, const nsecs_t vsyncNs);
     int processLocalHbm(bool on);
     int processDimBrightness(bool on);
+    int processOperationRate(int32_t hz);
     bool isDbmSupported() { return mDbmSupported; }
     int applyPendingChangeViaSysfs(const nsecs_t vsyncNs);
     bool validateLayerBrightness(float brightness);
@@ -109,11 +110,10 @@ public:
      * apply brightness change on drm path.
      * Note: only this path can hold the lock for a long time
      */
-    int prepareFrameCommit(ExynosDisplay& display,
-                           const DrmConnector& connector,
+    int prepareFrameCommit(ExynosDisplay& display, const DrmConnector& connector,
                            ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
-                           const bool mixedComposition,
-                           bool& ghbmSync, bool& lhbmSync, bool& blSync);
+                           const bool mixedComposition, bool& ghbmSync, bool& lhbmSync,
+                           bool& blSync, bool& opRateSync);
 
     bool isGhbmSupported() { return mGhbmSupported; }
     bool isLhbmSupported() { return mLhbmSupported; }
@@ -147,6 +147,11 @@ public:
 
     HdrLayerState getHdrLayerState() {
         return mHdrLayerState.get();
+    }
+
+    uint32_t getOperationRate() {
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+        return mOperationRate.get();
     }
 
     bool isSupported() {
@@ -389,6 +394,7 @@ private:
     CtrlValue<bool> mSdrDim GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mPrevSdrDim GUARDED_BY(mBrightnessMutex);
     CtrlValue<bool> mDimBrightnessReq GUARDED_BY(mBrightnessMutex);
+    CtrlValue<uint32_t> mOperationRate GUARDED_BY(mBrightnessMutex);
 
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
