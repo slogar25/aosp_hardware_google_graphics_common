@@ -1609,12 +1609,13 @@ class ExynosDisplay {
             virtual int32_t onConfig(hwc2_config_t __unused cfg) { return 0; }
             virtual int32_t onBrightness(uint32_t __unused dbv) { return 0; }
             virtual int32_t onPowerMode(int32_t __unused mode) { return 0; }
-            virtual int32_t getOperationRate() { return 0; }
+            virtual int32_t getTargetOperationRate() { return 0; }
         };
 
     public:
         std::unique_ptr<OperationRateManager> mOperationRateManager;
         bool isOperationRateSupported() { return mOperationRateManager != nullptr; }
+        void handleTargetOperationRate();
 
         bool mHpdStatus;
 

@@ -160,6 +160,11 @@ int DrmConnector::Init() {
     ALOGE("Could not get vrr_switch_duration property\n");
   }
 
+  ret = drm_->GetConnectorProperty(*this, "operation_rate", &operation_rate_);
+  if (ret) {
+    ALOGE("Could not get operation_rate property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   properties_.push_back(&edid_property_);
@@ -182,6 +187,7 @@ int DrmConnector::Init() {
   properties_.push_back(&mipi_sync_);
   properties_.push_back(&panel_idle_support_);
   properties_.push_back(&vrr_switch_duration_);
+  properties_.push_back(&operation_rate_);
 
   return 0;
 }
@@ -376,6 +382,10 @@ const DrmProperty &DrmConnector::orientation() const {
 
 const DrmMode &DrmConnector::lp_mode() const {
     return lp_mode_;
+}
+
+const DrmProperty &DrmConnector::operation_rate() const {
+    return operation_rate_;
 }
 
 int DrmConnector::UpdateLpMode() {

@@ -591,11 +591,12 @@ void ExynosDisplayDrmInterface::parseColorModeEnums(const DrmProperty &property)
 }
 
 void ExynosDisplayDrmInterface::parseMipiSyncEnums(const DrmProperty &property) {
-    const std::vector<std::pair<uint32_t, const char*>> modeEnums = {
-        { toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_REFRESH_RATE), "sync_refresh_rate" },
-        { toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_LHBM), "sync_lhbm" },
-        { toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_GHBM), "sync_ghbm" },
-        { toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_BL), "sync_bl" },
+    const std::vector<std::pair<uint32_t, const char *>> modeEnums = {
+            {toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_REFRESH_RATE), "sync_refresh_rate"},
+            {toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_LHBM), "sync_lhbm"},
+            {toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_GHBM), "sync_ghbm"},
+            {toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_BL), "sync_bl"},
+            {toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_OP_RATE), "sync_op_rate"},
     };
     DrmEnumParser::parseEnums(property, modeEnums, mMipiSyncEnums);
     for (auto &e : mMipiSyncEnums) {
@@ -1252,6 +1253,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
             mDesiredModeState.setMode(*mode, modeBlob, drmReq);
             if (mExynosDisplay->mOperationRateManager) {
                 mExynosDisplay->mOperationRateManager->onConfig(config);
+                mExynosDisplay->handleTargetOperationRate();
             }
             DISPLAY_DRM_LOGI("%s: config(%d)", __func__, config);
         } else {
@@ -1343,6 +1345,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
 
     if (mExynosDisplay->mOperationRateManager) {
         mExynosDisplay->mOperationRateManager->onConfig(config);
+        mExynosDisplay->handleTargetOperationRate();
     }
 
     mExynosDisplay->updateAppliedActiveConfig(config, systemTime(SYSTEM_TIME_MONOTONIC));
@@ -1968,12 +1971,14 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     }
 
     if (mExynosDisplay->mBrightnessController) {
-        bool ghbmSync, lhbmSync, blSync;
+        bool ghbmSync, lhbmSync, blSync, opRateSync;
         bool mixedComposition = mExynosDisplay->isMixedComposition()
                                 || mExynosDisplay->isPriorFrameMixedCompostion();
         ret = mExynosDisplay->mBrightnessController->prepareFrameCommit(*mExynosDisplay,
-                                        *mDrmConnector, drmReq, mixedComposition,
-                                        ghbmSync, lhbmSync, blSync);
+                                                                        *mDrmConnector, drmReq,
+                                                                        mixedComposition, ghbmSync,
+                                                                        lhbmSync, blSync,
+                                                                        opRateSync);
         if (ret < 0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to config brightness", __func__);
         } else {
@@ -1988,6 +1993,10 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             if (blSync) {
                 mipi_sync_type |=
                     1 << mMipiSyncEnums[toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_BL)];
+            }
+            if (opRateSync) {
+                mipi_sync_type |= 1
+                        << mMipiSyncEnums[toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_OP_RATE)];
             }
         }
     }

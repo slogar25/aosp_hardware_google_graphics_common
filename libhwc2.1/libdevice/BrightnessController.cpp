@@ -123,6 +123,7 @@ BrightnessController::BrightnessController(int32_t panelIndex, std::function<voi
         mSdrDim(false),
         mPrevSdrDim(false),
         mDimBrightnessReq(false),
+        mOperationRate(0),
         mFrameRefresh(refresh),
         mHdrLayerState(HdrLayerState::kHdrNone),
         mUpdateDcLhbm(updateDcLhbm) {
@@ -465,6 +466,15 @@ int BrightnessController::applyPendingChangeViaSysfs(const nsecs_t vsyncNs) {
             return NO_ERROR;
         }
 
+        // there will be a drm commit to apply this brightness change if a operation rate change is
+        // pending.
+        if (mOperationRate.is_dirty()) {
+            ALOGI("%s standalone brightness change will be handled by next frame update for "
+                  "operation rate",
+                  __func__);
+            return NO_ERROR;
+        }
+
         level = mBrightnessLevel.get();
     }
 
@@ -579,6 +589,19 @@ float BrightnessController::getSdrDimRatioForInstantHbm() {
     return ratio;
 }
 
+int BrightnessController::processOperationRate(int32_t hz) {
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+    if (mOperationRate.get() != hz) {
+        ATRACE_CALL();
+        ALOGI("%s: store operation rate %d", __func__, hz);
+        mOperationRate.set_dirty();
+        mOperationRate.store(hz);
+        updateStates();
+    }
+
+    return NO_ERROR;
+}
+
 void BrightnessController::onClearDisplay(bool needModeClear) {
     resetLhbmState();
     mInstantHbmReq.reset(false);
@@ -600,21 +623,22 @@ void BrightnessController::onClearDisplay(bool needModeClear) {
     if (mBrightnessDimmingUsage == BrightnessDimmingUsage::NORMAL) {
         mDimming.store(true);
     }
+    mOperationRate.reset(0);
 
     std::lock_guard<std::recursive_mutex> lock1(mCabcModeMutex);
     mCabcMode.reset(CabcMode::OFF);
 }
 
-int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
-                              const DrmConnector& connector,
-                              ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
-                              const bool mixedComposition,
-                              bool& ghbmSync, bool& lhbmSync, bool& blSync) {
+int BrightnessController::prepareFrameCommit(ExynosDisplay& display, const DrmConnector& connector,
+                                             ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
+                                             const bool mixedComposition, bool& ghbmSync,
+                                             bool& lhbmSync, bool& blSync, bool& opRateSync) {
     int ret;
 
     ghbmSync = false;
     lhbmSync = false;
     blSync = false;
+    opRateSync = false;
 
     ATRACE_CALL();
     std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
@@ -725,6 +749,17 @@ int BrightnessController::prepareFrameCommit(ExynosDisplay& display,
     }
 
     mHdrLayerState.clear_dirty();
+
+    if (mOperationRate.is_dirty()) {
+        if ((ret = drmReq.atomicAddProperty(connector.id(), connector.operation_rate(),
+                                            mOperationRate.get())) < 0) {
+            ALOGE("%s: Fail to set operation_rate property", __func__);
+        } else {
+            opRateSync = sync;
+        }
+        mOperationRate.clear_dirty();
+    }
+
     return NO_ERROR;
 }
 
@@ -1094,9 +1129,11 @@ void BrightnessController::parseHbmModeEnums(const DrmProperty& property) {
  *   Historian team before modifying (b/239640926).
  */
 void BrightnessController::printBrightnessStates(const char* path) {
-    ALOGI("path=%s, id=%d, level=%d, nits=%f, brightness=%f, DimmingOn=%d, Hbm=%d, LhbmOn=%d",
+    ALOGI("path=%s, id=%d, level=%d, nits=%f, brightness=%f, DimmingOn=%d, Hbm=%d, LhbmOn=%d, "
+          "OpRate=%d",
           path ?: "unknown", mPanelIndex, mBrightnessLevel.get(), mDisplayWhitePointNits,
-          mBrightnessFloatReq.get(), mDimming.get(), mGhbm.get(), mLhbm.get());
+          mBrightnessFloatReq.get(), mDimming.get(), mGhbm.get(), mLhbm.get(),
+          mOperationRate.get());
 }
 
 void BrightnessController::dump(String8& result) {
@@ -1126,6 +1163,7 @@ void BrightnessController::dump(String8& result) {
     result.appendFormat("\tignore brightness update request %d\n", mIgnoreBrightnessUpdateRequests);
     result.appendFormat("\tacl mode supported %d, acl mode %d\n", mAclModeOfs.is_open(),
                         mAclMode.get());
+    result.appendFormat("\toperation rate %d\n", mOperationRate.get());
 
     result.appendFormat("\n");
 }
