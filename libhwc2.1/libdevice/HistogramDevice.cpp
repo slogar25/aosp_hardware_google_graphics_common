@@ -58,7 +58,8 @@ HistogramDevice::ChannelInfo::ChannelInfo()
         pid(-1),
         requestedRoi(),
         workingConfig(),
-        threshold(0) {}
+        threshold(0),
+        histDataCollecting(false) {}
 
 HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo &other) {
     std::scoped_lock lock(other.channelInfoMutex);
@@ -68,6 +69,7 @@ HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo &other) {
     requestedRoi = other.requestedRoi;
     workingConfig = other.workingConfig;
     threshold = other.threshold;
+    histDataCollecting = other.histDataCollecting;
 }
 
 HistogramDevice::HistogramDevice(ExynosDisplay *display, uint8_t channelCount,
@@ -176,6 +178,13 @@ ndk::ScopedAStatus HistogramDevice::queryHistogram(const ndk::SpAIBinder &token,
         }
     }
 
+    getHistogramData(channelId, histogramBuffer, histogramErrorCode);
+
+    /* Clear the histogramBuffer when error occurs */
+    if (*histogramErrorCode != HistogramErrorCode::NONE) {
+        histogramBuffer->assign(HISTOGRAM_BIN_COUNT, 0);
+    }
+
     return ndk::ScopedAStatus::ok();
 }
 
@@ -246,6 +255,36 @@ ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder &t
     mTokenInfoMap.erase(token.get());
 
     return ndk::ScopedAStatus::ok();
+}
+
+void HistogramDevice::handleDrmEvent(void *event) {
+    int ret = NO_ERROR;
+    uint8_t channelId;
+    char16_t *buffer;
+
+    if ((ret = parseDrmEvent(event, channelId, buffer))) {
+        ALOGE("%s: failed to parseDrmEvent, ret %d", __func__, ret);
+        return;
+    }
+
+    ATRACE_NAME(String8::format("handleHistogramDrmEvent #%u", channelId).string());
+    if (channelId >= mChannels.size()) {
+        ALOGE("%s: histogram channel #%u: invalid channelId", __func__, channelId);
+        return;
+    }
+
+    ChannelInfo &channel = mChannels[channelId];
+    std::unique_lock<std::mutex> lock(channel.histDataCollectingMutex);
+
+    /* Check if the histogram channel is collecting the histogram data */
+    if (channel.histDataCollecting == true) {
+        std::memcpy(channel.histData, buffer, HISTOGRAM_BIN_COUNT * sizeof(char16_t));
+        channel.histDataCollecting = false;
+    } else {
+        ALOGW("%s: histogram channel #%u: ignore the histogram channel event", __func__, channelId);
+    }
+
+    channel.histDataCollecting_cv.notify_all();
 }
 
 int HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
@@ -448,6 +487,101 @@ ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder &token
     }
 
     return ndk::ScopedAStatus::ok();
+}
+
+void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t> *histogramBuffer,
+                                       HistogramErrorCode *histogramErrorCode) {
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
+    int32_t ret;
+    ExynosDisplayDrmInterface *moduleDisplayInterface =
+            static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
+    if (!moduleDisplayInterface) {
+        *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
+        ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, moduleDisplayInterface is nullptr",
+              __func__, channelId);
+        return;
+    }
+
+    ChannelInfo &channel = mChannels[channelId];
+
+    std::unique_lock<std::mutex> lock(channel.histDataCollectingMutex);
+
+    /* Check if the previous queryHistogram is finished */
+    if (channel.histDataCollecting) {
+        *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
+        ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, previous %s not finished", __func__,
+              channelId, __func__);
+        return;
+    }
+
+    /* Send the ioctl request (histogram_channel_request_ioctl) which allocate the drm event and
+     * send back the drm event with data when available. */
+    if ((ret = moduleDisplayInterface->sendHistogramChannelIoctl(HistogramChannelIoctl_t::REQUEST,
+                                                                 channelId)) != NO_ERROR) {
+        *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
+        ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, sendHistogramChannelIoctl (REQUEST) "
+              "error "
+              "(%d)",
+              __func__, channelId, ret);
+        return;
+    }
+    channel.histDataCollecting = true;
+
+    {
+        ATRACE_NAME(String8::format("waitDrmEvent #%u", channelId).string());
+        /* Wait until the condition variable is notified or timeout. */
+        channel.histDataCollecting_cv.wait_for(lock, std::chrono::milliseconds(50),
+                                               [this, &channel]() {
+                                                   return (!mDisplay->isPowerModeOff() &&
+                                                           !channel.histDataCollecting);
+                                               });
+    }
+
+    /* If the histDataCollecting is not cleared, check the reason and clear the histogramBuffer.
+     */
+    if (channel.histDataCollecting) {
+        if (mDisplay->isPowerModeOff()) {
+            *histogramErrorCode = HistogramErrorCode::DISPLAY_POWEROFF;
+            ALOGW("%s: histogram channel #%u: DISPLAY_POWEROFF, histogram is not available "
+                  "when "
+                  "display is off",
+                  __func__, channelId);
+        } else {
+            *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
+            ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, no histogram channel event is "
+                  "handled",
+                  __func__, channelId);
+        }
+
+        /* Cancel the histogram data request */
+        ALOGI("%s: histogram channel #%u: cancel histogram data request", __func__, channelId);
+        if ((ret = moduleDisplayInterface
+                           ->sendHistogramChannelIoctl(HistogramChannelIoctl_t::CANCEL,
+                                                       channelId)) != NO_ERROR) {
+            ALOGE("%s: histogram channel #%u: sendHistogramChannelIoctl (CANCEL) error (%d)",
+                  __func__, channelId, ret);
+        }
+
+        channel.histDataCollecting = false;
+        return;
+    }
+
+    if (mDisplay->isSecureContentPresenting()) {
+        ALOGV("%s: histogram channel #%u: DRM_PLAYING, histogram is not available when secure "
+              "content is presenting",
+              __func__, channelId);
+        *histogramErrorCode = HistogramErrorCode::DRM_PLAYING;
+        return;
+    }
+
+    /* Copy the histogram data from histogram info to histogramBuffer */
+    histogramBuffer->assign(channel.histData, channel.histData + HISTOGRAM_BIN_COUNT);
+}
+
+int HistogramDevice::parseDrmEvent(void *event, uint8_t &channelId, char16_t *&buffer) const {
+    channelId = 0;
+    buffer = nullptr;
+    return INVALID_OPERATION;
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::acquireChannelLocked(
