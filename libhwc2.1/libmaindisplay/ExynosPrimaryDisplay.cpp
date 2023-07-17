@@ -376,6 +376,7 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
     int ret = NO_ERROR;
     if (mDisplayId != 0 || !mFirstPowerOn) {
         if (mDevice->hasOtherDisplayOn(this)) {
+            mResourceManager->prepareResources(mDisplayId);
             // TODO: This is useful for cmd mode, and b/282094671 tries to handles video mode
             mDisplayInterface->triggerClearDisplayPlanes();
         }

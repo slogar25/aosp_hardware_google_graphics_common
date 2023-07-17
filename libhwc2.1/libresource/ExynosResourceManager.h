@@ -156,7 +156,7 @@ class ExynosResourceManager {
                 ExynosLayer *layer, std::vector<exynos_image> &image_lists);
         int32_t setResourcePriority(ExynosDisplay *display);
         int32_t deliverPerformanceInfo();
-        int32_t prepareResources();
+        int32_t prepareResources(const int32_t willOnDispId = -1);
         int32_t finishAssignResourceWork();
         int32_t initResourcesState(ExynosDisplay *display);
 
@@ -238,12 +238,19 @@ class ExynosResourceManager {
                                            ExynosMPPSource __unused *mppSrc) {
             return true;
         }
-        virtual uint32_t setDisplaysTDMInfo() { return 0; }
-        virtual uint32_t initDisplaysTDMInfo() { return 0; }
+        virtual uint32_t setDisplaysTDMInfo(__unused ExynosDisplay* mainDisp,
+                                            __unused ExynosDisplay* minorDisp) {
+            return 0;
+        }
         virtual uint32_t calculateHWResourceAmount(ExynosDisplay __unused *display,
                                                    ExynosMPPSource __unused *mppSrc) {
             return 0;
         }
+
+        std::pair<ExynosDisplay*, ExynosDisplay*> decideMainAndMinorDisplay(
+                const int32_t willOnDispId) const;
+        void updatePreAssignDisplayList(const ExynosDisplay* mainDisp,
+                                        const ExynosDisplay* minorDisp);
 };
 
 #endif //_EXYNOSRESOURCEMANAGER_H

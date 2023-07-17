@@ -1299,7 +1299,7 @@ class ExynosDisplay {
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
-        inline uint32_t getDisplayPreAssignBit() {
+        inline uint32_t getDisplayPreAssignBit() const {
             uint32_t type = SECOND_DISPLAY_START_BIT * mIndex + mType;
             return 1 << type;
         }

@@ -181,7 +181,6 @@ ExynosDevice::ExynosDevice(bool vrrApiSupported)
     // registerRestrictions();
     mResourceManager->updateRestrictions();
     mResourceManager->initDisplays(mDisplays, mDisplayMap);
-    mResourceManager->initDisplaysTDMInfo();
 
     if (mInterfaceType == INTERFACE_TYPE_DRM) {
         setVBlankOffDelay(1);
