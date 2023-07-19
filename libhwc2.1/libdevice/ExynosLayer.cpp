@@ -516,7 +516,7 @@ int32_t ExynosLayer::setLayerCompositionType(int32_t /*hwc2_composition_t*/ type
             type = HWC2_COMPOSITION_DEVICE;
 #endif
 
-    if (type != mCompositionType && type != mRequestedCompositionType) {
+    if (type != mCompositionType) {
         setGeometryChanged(GEOMETRY_LAYER_TYPE_CHANGED);
     }
 
