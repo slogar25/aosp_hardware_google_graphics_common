@@ -1498,10 +1498,6 @@ void ExynosDisplay::clearGeometryChanged()
     }
 }
 
-bool ExynosDisplay::isFrameUpdate() {
-    return mGeometryChanged > 0 || mBufferUpdates > 0;
-}
-
 int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
 {
     if (compositionInfo.mType != COMPOSITION_CLIENT)
@@ -3633,7 +3629,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         mPowerHalHint.signalIdle();
     }
 
-    if (isFrameUpdate()) {
+    if (needUpdateRRIndicator()) {
         updateRefreshRateIndicator();
     }
 
@@ -6380,6 +6376,11 @@ void ExynosDisplay::updateRefreshRateIndicator() {
     if (!mRefreshRateIndicatorHandler || !mRefreshRateIndicatorHandler->isIgnoringLastUpdate())
         return;
     mRefreshRateIndicatorHandler->handleSysfsEvent();
+}
+
+bool ExynosDisplay::needUpdateRRIndicator() {
+    uint64_t exclude = GEOMETRY_LAYER_TYPE_CHANGED;
+    return (mGeometryChanged & ~exclude) > 0 || mBufferUpdates > 0;
 }
 
 uint32_t ExynosDisplay::getPeakRefreshRate() {
