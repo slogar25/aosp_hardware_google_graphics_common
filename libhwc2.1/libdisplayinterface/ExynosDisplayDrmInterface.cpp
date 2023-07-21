@@ -1108,6 +1108,16 @@ int32_t ExynosDisplayDrmInterface::getConfigChangeDuration()
     return 2;
 };
 
+bool ExynosDisplayDrmInterface::needRefreshOnLP() {
+    const auto [ret, refresh_on_lp] = mDrmConnector->refresh_on_lp().value();
+
+    if (!ret) {
+        return refresh_on_lp;
+    }
+
+    return false;
+};
+
 int32_t ExynosDisplayDrmInterface::getVsyncAppliedTime(
         hwc2_config_t config, int64_t* actualChangeTime)
 {
