@@ -22,7 +22,6 @@ histogram::HistogramMediator::HistogramMediator(ExynosDisplay *display) {
     mIDLHistogram = std::make_shared<HistogramReceiver>();
 
     moduleDisplayInterface->registerHistogramInfo(mIDLHistogram);
-    moduleDisplayInterface->getPanelResolution();
 }
 uint32_t histogram::HistogramMediator::getFrameCount() {
     ExynosDisplayDrmInterface *moduleDisplayInterface =
@@ -104,12 +103,12 @@ histogram::RoiRect histogram::HistogramMediator::calRoi(const RoiRect &roi) {
     ExynosDisplayDrmInterface *moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
     roi_return.left = roi.left * moduleDisplayInterface->getActiveModeHDisplay() /
-            moduleDisplayInterface->panelHsize();
+            moduleDisplayInterface->getPanelFullResolutionHSize();
     roi_return.top = roi.top * moduleDisplayInterface->getActiveModeVDisplay() /
-            moduleDisplayInterface->panelVsize();
+            moduleDisplayInterface->getPanelFullResolutionVSize();
     roi_return.right = roi.right * moduleDisplayInterface->getActiveModeHDisplay() /
-            moduleDisplayInterface->panelHsize();
+            moduleDisplayInterface->getPanelFullResolutionHSize();
     roi_return.bottom = roi.bottom * moduleDisplayInterface->getActiveModeVDisplay() /
-            moduleDisplayInterface->panelVsize();
+            moduleDisplayInterface->getPanelFullResolutionVSize();
     return roi_return;
 }

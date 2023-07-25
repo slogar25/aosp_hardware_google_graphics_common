@@ -761,6 +761,12 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
 
     chosePreferredConfig();
 
+    // After chosePreferredConfig, the mDrmConnector->modes array is initialized, get the panel full
+    // resolution information here.
+    if (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) {
+        retrievePanelFullResolution();
+    }
+
     parseColorModeEnums(mDrmCrtc->color_mode_property());
     parseMipiSyncEnums(mDrmConnector->mipi_sync());
     updateMountOrientation();
@@ -1365,18 +1371,6 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
         DISPLAY_DRM_LOGE("%s: config(%d) failed", __func__, config);
     }
 
-    return 0;
-}
-
-int32_t ExynosDisplayDrmInterface::getPanelResolution() {
-    std::lock_guard<std::recursive_mutex> lock(mDrmConnector->modesLock());
-
-    for (auto it = mDrmConnector->modes().begin(); it != mDrmConnector->modes().end(); it++) {
-        if (it->h_display() * it->v_display() > mPanelResolutionHsize * mPanelResolutionVsize) {
-            mPanelResolutionHsize = it->h_display();
-            mPanelResolutionVsize = it->v_display();
-        }
-    }
     return 0;
 }
 
@@ -2672,4 +2666,24 @@ bool ExynosDisplayDrmInterface::readHotplugStatus() {
     getDisplayConfigs(&numConfigs, NULL);
 
     return (mDrmConnector->state() == DRM_MODE_CONNECTED);
+}
+
+void ExynosDisplayDrmInterface::retrievePanelFullResolution() {
+    std::lock_guard<std::recursive_mutex> lock(mDrmConnector->modesLock());
+
+    // The largest resolution in the modes of mDrmConnector is the panel full resolution.
+    for (auto it = mDrmConnector->modes().begin(); it != mDrmConnector->modes().end(); it++) {
+        if (it->h_display() * it->v_display() >
+            mPanelFullResolutionHSize * mPanelFullResolutionVSize) {
+            mPanelFullResolutionHSize = it->h_display();
+            mPanelFullResolutionVSize = it->v_display();
+        }
+    }
+
+    if (mPanelFullResolutionHSize <= 0 || mPanelFullResolutionVSize <= 0) {
+        ALOGE("%s: failed to get panel full resolution", __func__);
+    } else {
+        ALOGI("%s: panel full resolution: (%dx%d)", __func__, mPanelFullResolutionHSize,
+              mPanelFullResolutionVSize);
+    }
 }
