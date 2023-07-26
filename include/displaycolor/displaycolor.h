@@ -59,6 +59,10 @@ constexpr struct DisplayColorIntfVer {
             patch == rhs.patch;
     }
 
+    bool operator!=(const DisplayColorIntfVer &rhs) const {
+        return !operator==(rhs);
+    }
+
     bool Compatible(const DisplayColorIntfVer &rhs) const {
         return major == rhs.major &&
             minor == rhs.minor;
@@ -129,11 +133,11 @@ struct DisplayBrightnessRange {
 typedef std::map<BrightnessMode, DisplayBrightnessRange> BrightnessRangeMap;
 
 class IBrightnessTable {
-public:
+   public:
     virtual ~IBrightnessTable(){};
 
     virtual std::optional<std::reference_wrapper<const DisplayBrightnessRange>> GetBrightnessRange(
-            BrightnessMode bm) const = 0;
+        BrightnessMode bm) const = 0;
     virtual std::optional<float> BrightnessToNits(float brightness, BrightnessMode &bm) const = 0;
     virtual std::optional<uint32_t> NitsToDbv(BrightnessMode bm, float nits) const = 0;
     virtual std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const = 0;
@@ -292,6 +296,12 @@ struct LayerColorData {
      * @brief color for solid color layer
      */
     Color solid_color;
+
+    /**
+     * @brief indicates if the layer is client target
+     *
+     */
+    bool is_client_target = false;
 };
 
 /**
@@ -308,9 +318,12 @@ struct DisplayScene {
                force_hdr == rhs.force_hdr &&
                bm == rhs.bm &&
                lhbm_on == rhs.lhbm_on &&
-               (lhbm_on && dbv == rhs.dbv) &&
+               (lhbm_on ? dbv == rhs.dbv : true) &&
                refresh_rate == rhs.refresh_rate &&
                hdr_layer_state == rhs.hdr_layer_state;
+    }
+    bool operator!=(const DisplayScene &rhs) const {
+        return !(*this == rhs);
     }
 
     /// A vector of layer color data.
@@ -332,29 +345,29 @@ struct DisplayScene {
     // clang-format on
     /// When this bit is set, process hdr layers and the layer matrix even if
     //it's in native color mode.
-    bool force_hdr;
+    bool force_hdr = false;
 
     /// display brightness mode
-    BrightnessMode bm;
+    BrightnessMode bm = BrightnessMode::BM_NOMINAL;
 
     /// dbv level
-    uint32_t dbv;
+    uint32_t dbv = 0;
 
     /// lhbm status
-    bool lhbm_on;
+    bool lhbm_on = false;
 
     /// refresh rate
-    float refresh_rate;
+    float refresh_rate = 60.0f;
 
     /// hdr layer state on screen
-    HdrLayerState hdr_layer_state;
+    HdrLayerState hdr_layer_state = HdrLayerState::kHdrNone;
 };
 
 struct CalibrationInfo {
-    bool factory_cal_loaded;
-    bool golden_cal_loaded;
-    bool common_cal_loaded;
-    bool dev_cal_loaded;
+    bool factory_cal_loaded = false;
+    bool golden_cal_loaded = false;
+    bool common_cal_loaded = false;
+    bool dev_cal_loaded = false;
 };
 
 /// An interface specifying functions that are HW-agnostic.
