@@ -318,7 +318,7 @@ struct DisplayScene {
                force_hdr == rhs.force_hdr &&
                bm == rhs.bm &&
                lhbm_on == rhs.lhbm_on &&
-               (lhbm_on ? dbv == rhs.dbv : true) &&
+               dbv == rhs.dbv &&
                refresh_rate == rhs.refresh_rate &&
                hdr_layer_state == rhs.hdr_layer_state;
     }
