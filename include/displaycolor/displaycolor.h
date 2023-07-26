@@ -296,6 +296,12 @@ struct LayerColorData {
      * @brief color for solid color layer
      */
     Color solid_color;
+
+    /**
+     * @brief indicates if the layer is client target
+     *
+     */
+    bool is_client_target = false;
 };
 
 /**
