@@ -320,6 +320,33 @@ ndk::ScopedAStatus Display::setDbmState(bool enabled) {
     return ndk::ScopedAStatus::ok();
 }
 
+ndk::ScopedAStatus Display::getHistogramCapability(HistogramCapability *_aidl_return) {
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus Display::registerHistogram(const ndk::SpAIBinder &token,
+                                              const HistogramConfig &histogramConfig,
+                                              HistogramErrorCode *_aidl_return) {
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus Display::queryHistogram(const ndk::SpAIBinder &token,
+                                           std::vector<char16_t> *histogramBuffer,
+                                           HistogramErrorCode *_aidl_return) {
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus Display::reconfigHistogram(const ndk::SpAIBinder &token,
+                                              const HistogramConfig &histogramConfig,
+                                              HistogramErrorCode *_aidl_return) {
+    return ndk::ScopedAStatus::ok();
+}
+
+ndk::ScopedAStatus Display::unregisterHistogram(const ndk::SpAIBinder &token,
+                                                HistogramErrorCode *_aidl_return) {
+    return ndk::ScopedAStatus::ok();
+}
+
 } // namespace display
 } // namespace pixel
 } // namespace hardware
