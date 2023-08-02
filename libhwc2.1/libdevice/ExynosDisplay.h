@@ -1639,6 +1639,7 @@ class ExynosDisplay {
             int mLastRefreshRate GUARDED_BY(mMutex);
             nsecs_t mLastCallbackTime GUARDED_BY(mMutex);
             std::atomic_bool mIgnoringLastUpdate = false;
+            bool mCanIgnoreIncreaseUpdate GUARDED_BY(mMutex) = false;
             UniqueFd mFd;
             std::mutex mMutex;
 
