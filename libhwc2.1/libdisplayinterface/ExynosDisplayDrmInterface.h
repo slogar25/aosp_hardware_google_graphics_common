@@ -328,6 +328,12 @@ class ExynosDisplayDrmInterface :
 
         virtual int32_t waitVBlank();
         float getDesiredRefreshRate() { return mDesiredModeState.mode.v_refresh(); }
+        int32_t getOperationRate() {
+            if (mExynosDisplay->mOperationRateManager) {
+                    return mExynosDisplay->mOperationRateManager->getTargetOperationRate();
+            }
+            return 0;
+        }
 
         /* For Histogram */
         virtual int32_t setDisplayHistogramSetting(

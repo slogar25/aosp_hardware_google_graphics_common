@@ -320,6 +320,7 @@ struct DisplayScene {
                lhbm_on == rhs.lhbm_on &&
                dbv == rhs.dbv &&
                refresh_rate == rhs.refresh_rate &&
+               operation_rate == rhs.operation_rate &&
                hdr_layer_state == rhs.hdr_layer_state;
     }
     bool operator!=(const DisplayScene &rhs) const {
@@ -358,6 +359,9 @@ struct DisplayScene {
 
     /// refresh rate
     float refresh_rate = 60.0f;
+
+    /// operation rate to switch between hs/ns mode
+    uint32_t operation_rate;
 
     /// hdr layer state on screen
     HdrLayerState hdr_layer_state = HdrLayerState::kHdrNone;
