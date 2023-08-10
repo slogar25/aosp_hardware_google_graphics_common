@@ -1029,6 +1029,7 @@ void ExynosLayer::dump(String8& result)
 {
     int format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     int32_t fd, fd1, fd2;
+    uint64_t unique_id;
     if (mLayerBuffer != NULL)
     {
         VendorGraphicBufferMeta gmeta(mLayerBuffer);
@@ -1036,11 +1037,13 @@ void ExynosLayer::dump(String8& result)
         fd = gmeta.fd;
         fd1 = gmeta.fd1;
         fd2 = gmeta.fd2;
+        unique_id = gmeta.unique_id;
     } else {
         format = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
         fd = -1;
         fd1 = -1;
         fd2 = -1;
+        unique_id = 0;
     }
 
     {
@@ -1083,6 +1086,7 @@ void ExynosLayer::dump(String8& result)
                           .add("exynosType", mExynosCompositionType)
                           .add("validateType", mValidateCompositionType)
                           .add("overlayInfo", mOverlayInfo, true)
+                          .add("GrallocBufferId", unique_id)
                           .build()
                           .c_str());
 
