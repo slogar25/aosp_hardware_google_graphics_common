@@ -347,9 +347,8 @@ class ExynosDisplayDrmInterface :
         int32_t getActiveModeHDisplay() { return mActiveModeState.mode.h_display(); }
         int32_t getActiveModeVDisplay() { return mActiveModeState.mode.v_display(); }
         uint32_t getActiveModeId() { return mActiveModeState.mode.id(); }
-        int32_t panelHsize() { return mPanelResolutionHsize; }
-        int32_t panelVsize() { return mPanelResolutionVsize; }
-        int32_t getPanelResolution();
+        int32_t getPanelFullResolutionHSize() { return mPanelFullResolutionHSize; }
+        int32_t getPanelFullResolutionVSize() { return mPanelFullResolutionVSize; }
         uint32_t getCrtcId() { return mDrmCrtc->id(); }
         int32_t triggerClearDisplayPlanes();
 
@@ -526,8 +525,19 @@ class ExynosDisplayDrmInterface :
         DrmMode mDozeDrmMode;
         uint32_t mMaxWindowNum = 0;
         int32_t mFrameCounter = 0;
-        int32_t mPanelResolutionHsize = 0;
-        int32_t mPanelResolutionVsize = 0;
+        int32_t mPanelFullResolutionHSize = 0;
+        int32_t mPanelFullResolutionVSize = 0;
+
+        /**
+         * retrievePanelFullResolution
+         *
+         * Retrieve the panel full resolution by looking into the modes of the mDrmConnector
+         * and store the full resolution info in mPanelFullResolutionHSize (x component) and
+         * mPanelFullResolutionVSize (y component).
+         *
+         * Note: this function will be called only once in initDrmDevice()
+         */
+        void retrievePanelFullResolution();
 
     public:
         virtual bool readHotplugStatus();
