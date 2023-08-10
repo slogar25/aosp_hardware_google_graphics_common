@@ -30,27 +30,8 @@ uint32_t histogram::HistogramMediator::getFrameCount() {
     return moduleDisplayInterface->getFrameCount();
 }
 
-bool histogram::HistogramMediator::isDisplayPowerOff() {
-    if (!mDisplay->mPowerModeState.has_value() ||
-        ((mDisplay->mPowerModeState.value() == HWC2_POWER_MODE_OFF) ||
-         (mDisplay->mPowerModeState.value() == HWC2_POWER_MODE_DOZE))) {
-        return true;
-    }
-    return false;
-}
-
-bool histogram::HistogramMediator::isSecureContentPresenting() {
-    Mutex::Autolock lock(mDisplay->mDRMutex);
-    for (uint32_t i = 0; i < mDisplay->mLayers.size(); i++) {
-        ExynosLayer *layer = mDisplay->mLayers[i];
-        if (layer != NULL && layer->isDrm()) { /* there is some DRM layer */
-            return true;
-        }
-    }
-    return false;
-}
 histogram::HistogramErrorCode histogram::HistogramMediator::requestHist() {
-    if (isSecureContentPresenting()) { /* there is some DRM layer */
+    if (mDisplay->isSecureContentPresenting()) {
         return histogram::HistogramErrorCode::DRM_PLAYING;
     }
     ExynosDisplayDrmInterface *moduleDisplayInterface =
@@ -110,7 +91,7 @@ histogram::HistogramErrorCode histogram::HistogramMediator::collectRoiLuma(
     std::unique_lock<std::mutex> lk(mIDLHistogram->mDataCollectingMutex);
 
     mIDLHistogram->mHistData_cv.wait_for(lk, std::chrono::milliseconds(50), [this]() {
-        return (!isDisplayPowerOff() && !mIDLHistogram->mHistReq_pending);
+        return (!mDisplay->isPowerModeOff() && !mIDLHistogram->mHistReq_pending);
     });
     if (mIDLHistogram->mHistReq_pending == false) setSampleFrameCounter(getFrameCount());
     buf->assign(mIDLHistogram->mHistData, mIDLHistogram->mHistData + HISTOGRAM_BINS_SIZE);

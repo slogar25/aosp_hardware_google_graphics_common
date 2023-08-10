@@ -418,7 +418,7 @@ class ExynosDisplay {
         const String8 mDisplayName;
         const String8 mDisplayTraceName;
         HwcMountOrientation mMountOrientation = HwcMountOrientation::ROT_0;
-        Mutex mDisplayMutex;
+        mutable Mutex mDisplayMutex;
 
         /** State variables */
         bool mPlugState;
@@ -486,7 +486,7 @@ class ExynosDisplay {
         dynamic_recomp_mode mDynamicReCompMode;
         bool mDREnable;
         bool mDRDefault;
-        Mutex mDRMutex;
+        mutable Mutex mDRMutex;
 
         nsecs_t  mLastFpsTime;
         uint64_t mFrameCount;
@@ -577,6 +577,9 @@ class ExynosDisplay {
         int32_t addClientCompositionLayer(uint32_t layerIndex);
         int32_t removeClientCompositionLayer(uint32_t layerIndex);
         int32_t addExynosCompositionLayer(uint32_t layerIndex, float totalUsedCapa);
+
+        bool isPowerModeOff() const;
+        bool isSecureContentPresenting() const;
 
         /**
          * Dynamic AFBC Control solution : To get the prepared information is applied to current or not.
