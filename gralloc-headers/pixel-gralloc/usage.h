@@ -1,16 +1,16 @@
 #pragma once
 
 #include <aidl/android/hardware/graphics/common/BufferUsage.h>
+
 #include <cstdint>
 
 namespace pixel::graphics {
 
 using FrameworkUsage = aidl::android::hardware::graphics::common::BufferUsage;
 
-#define MapUsage(f) \
-   f = static_cast<uint32_t>(FrameworkUsage::f)
+#define MapUsage(f) f = static_cast<uint32_t>(FrameworkUsage::f)
 
-enum Usage: uint64_t {
+enum Usage : uint64_t {
     MapUsage(CPU_READ_MASK),
     MapUsage(CPU_READ_NEVER),
     MapUsage(CPU_READ_RARELY),
@@ -45,4 +45,4 @@ enum Usage: uint64_t {
 
 #undef MapUsage
 
-}
+} // namespace pixel::graphics
