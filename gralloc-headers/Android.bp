@@ -11,6 +11,7 @@ cc_library_headers {
     ],
     shared_libs: [
         "android.hardware.graphics.common-V4-ndk",
+        "libgralloctypes",
     ],
     visibility: [
         "//visibility:public",
