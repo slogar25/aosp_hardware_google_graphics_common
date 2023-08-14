@@ -114,8 +114,12 @@ public:
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mLhbm.get();
     }
-    int checkSysfsStatus(const char *file, const std::vector<std::string>& expectedValue,
+    int checkSysfsStatus(const std::string& file, const std::vector<std::string>& expectedValue,
                          const nsecs_t timeoutNs);
+    bool fileExists(const std::string& file) {
+        struct stat sb;
+        return stat(file.c_str(), &sb) == 0;
+    }
     void resetLhbmState();
 
     uint32_t getBrightnessLevel() {
@@ -142,6 +146,21 @@ public:
     void setOutdoorVisibility(LbeState state);
 
     int updateCabcMode();
+
+    const std::string GetPanelSysfileByIndex(const char *file_pattern) {
+        String8 nodeName;
+        nodeName.appendFormat(file_pattern, mPanelIndex);
+        return nodeName.c_str();
+    }
+
+    const std::string GetPanelRefreshRateSysfile() {
+        String8 nodeName;
+        nodeName.appendFormat(kRefreshrateFileNode,
+                              mPanelIndex == 0           ? "primary"
+                                      : mPanelIndex == 1 ? "secondary"
+                                                         : "unknown");
+        return nodeName.c_str();
+    }
 
     struct BrightnessTable {
         float mBriStart;
@@ -217,6 +236,8 @@ public:
                 "/sys/class/backlight/panel%d-backlight/local_hbm_mode";
     static constexpr const char* kDimBrightnessFileNode =
             "/sys/class/backlight/panel%d-backlight/dim_brightness";
+    static constexpr const char* kRefreshrateFileNode =
+            "/sys/devices/platform/exynos-drm/%s-panel/refresh_rate";
 
 private:
     // sync brightness change for mixed composition when there is more than 50% luminance change.
