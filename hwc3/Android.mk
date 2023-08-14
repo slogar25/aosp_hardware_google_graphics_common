@@ -31,6 +31,11 @@ LOCAL_CFLAGS += \
 	-DLOG_TAG=\"hwc-3\" \
 	-Wthread-safety
 
+ifeq ($(CLANG_COVERAGE),true)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -fprofile-instr-generate
+endif
+
 # hwc3 re-uses hwc2.2 ComposerResource and libexynosdisplay
 LOCAL_SHARED_LIBRARIES := android.hardware.graphics.composer3-V3-ndk \
 	android.hardware.graphics.composer@2.1-resources \

@@ -42,6 +42,11 @@ ifdef BOARD_LIBACRYL_G2D_HDR_PLUGIN
     LOCAL_CFLAGS += -DLIBACRYL_G2D_HDR_PLUGIN
 endif
 
+ifeq ($(CLANG_COVERAGE),true)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -fprofile-instr-generate
+endif
+
 LOCAL_HEADER_LIBRARIES += google_libacryl_hdrplugin_headers
 LOCAL_HEADER_LIBRARIES += google_hal_headers
 LOCAL_HEADER_LIBRARIES += libgralloc_headers

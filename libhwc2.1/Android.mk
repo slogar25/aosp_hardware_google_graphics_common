@@ -47,6 +47,11 @@ LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
 
+ifeq ($(CLANG_COVERAGE),true)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -fprofile-instr-generate
+endif
+
 LOCAL_MODULE := libdrmresource
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
 LOCAL_LICENSE_CONDITIONS := notice
@@ -142,6 +147,11 @@ LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 
+ifeq ($(CLANG_COVERAGE),true)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -fprofile-instr-generate
+endif
+
 LOCAL_MODULE := libexynosdisplay
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
 LOCAL_LICENSE_CONDITIONS := notice
@@ -200,6 +210,11 @@ LOCAL_CFLAGS += -DLOG_TAG=\"hwc-service\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 
+ifeq ($(CLANG_COVERAGE),true)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -fprofile-instr-generate
+endif
+
 LOCAL_SRC_FILES := \
 	libhwcService/IExynosHWC.cpp \
 	libhwcService/ExynosHWCService.cpp
@@ -240,6 +255,11 @@ LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-2\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
+
+ifeq ($(CLANG_COVERAGE),true)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -fprofile-instr-generate
+endif
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
 LOCAL_CFLAGS += -DUSES_HWC_SERVICES
