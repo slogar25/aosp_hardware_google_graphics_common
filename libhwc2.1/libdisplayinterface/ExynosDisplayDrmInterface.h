@@ -587,6 +587,8 @@ class ExynosDisplayDrmInterface :
 
     public:
         virtual bool readHotplugStatus();
+        virtual int readHotplugErrorCode();
+        virtual void resetHotplugErrorCode();
 };
 
 #endif

@@ -2789,3 +2789,20 @@ int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoc
 bool ExynosDisplayDrmInterface::isVrrModeSupported() const {
     return (mVrrHsVsyncPeriodNs != 0 || mVrrNsVsyncPeriodNs != 0);
 }
+
+static constexpr auto kDpHotplugErrorCodeSysfsPath =
+        "/sys/devices/platform/110f0000.drmdp/drm-displayport/dp_hotplug_error_code";
+
+int ExynosDisplayDrmInterface::readHotplugErrorCode() {
+    if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL) return 0;
+    int hotplug_error_code = 0;
+    std::ifstream ifs(kDpHotplugErrorCodeSysfsPath);
+    if (ifs.is_open()) ifs >> hotplug_error_code;
+    return hotplug_error_code;
+}
+
+void ExynosDisplayDrmInterface::resetHotplugErrorCode() {
+    if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL) return;
+    std::ofstream ofs(kDpHotplugErrorCodeSysfsPath);
+    if (ofs.is_open()) ofs << "0";
+}

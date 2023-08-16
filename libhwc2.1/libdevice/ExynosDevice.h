@@ -280,7 +280,7 @@ class ExynosDevice {
         int32_t registerCallback (
                 int32_t descriptor, hwc2_callback_data_t callbackData, hwc2_function_pointer_t point);
         bool isCallbackAvailable(int32_t descriptor);
-        void onHotPlug(uint32_t displayId, bool status);
+        void onHotPlug(uint32_t displayId, bool status, int hotplugErrorCode);
         void onRefresh(uint32_t displayId);
         void onRefreshDisplays();
 

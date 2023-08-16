@@ -520,7 +520,7 @@ bool ExynosDevice::isCallbackAvailable(int32_t descriptor) {
     return isCallbackRegisteredLocked(descriptor);
 }
 
-void ExynosDevice::onHotPlug(uint32_t displayId, bool status) {
+void ExynosDevice::onHotPlug(uint32_t displayId, bool status, int hotplugErrorCode) {
     Mutex::Autolock lock(mDeviceCallbackMutex);
 
     if (!isCallbackRegisteredLocked(HWC2_CALLBACK_HOTPLUG)) return;

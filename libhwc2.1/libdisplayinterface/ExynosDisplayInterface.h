@@ -90,6 +90,8 @@ class ExynosDisplayInterface {
         virtual int32_t waitVBlank() { return 0; };
 
         virtual bool readHotplugStatus() { return true; };
+        virtual int readHotplugErrorCode() { return 0; };
+        virtual void resetHotplugErrorCode(){};
 
         virtual void setVrrVsync(const VrrVsyncHz_t& vrrVsyncHz);
 

@@ -6288,10 +6288,13 @@ bool ExynosDisplay::checkHotplugEventUpdated(bool &hpdStatus) {
 
     hpdStatus = mDisplayInterface->readHotplugStatus();
 
-    DISPLAY_LOGI("[%s] mDisplayId(%d), mIndex(%d), HPD Status(previous :%d, current : %d)",
-                                       __func__, mDisplayId, mIndex, mHpdStatus, hpdStatus);
+    int hotplugErrorCode = mDisplayInterface->readHotplugErrorCode();
 
-    return (mHpdStatus != hpdStatus);
+    DISPLAY_LOGI("[%s] mDisplayId(%d), mIndex(%d), HPD Status(previous :%d, current : %d), "
+                 "hotplugErrorCode=%d",
+                 __func__, mDisplayId, mIndex, mHpdStatus, hpdStatus, hotplugErrorCode);
+
+    return (mHpdStatus != hpdStatus) || (hotplugErrorCode != 0);
 }
 
 void ExynosDisplay::handleHotplugEvent(bool hpdStatus) {
@@ -6299,9 +6302,11 @@ void ExynosDisplay::handleHotplugEvent(bool hpdStatus) {
 }
 
 void ExynosDisplay::hotplug() {
-    mDevice->onHotPlug(mDisplayId, mHpdStatus);
-    ALOGI("HPD callback(%s, mDisplayId %d) was called",
-                            mHpdStatus ? "connection" : "disconnection", mDisplayId);
+    int hotplugErrorCode = mDisplayInterface->readHotplugErrorCode();
+    mDisplayInterface->resetHotplugErrorCode();
+    mDevice->onHotPlug(mDisplayId, mHpdStatus, hotplugErrorCode);
+    ALOGI("HPD callback(%s, mDisplayId %d, hotplugErrorCode=%d) was called",
+          mHpdStatus ? "connection" : "disconnection", mDisplayId, hotplugErrorCode);
 }
 
 ExynosDisplay::RefreshRateIndicatorHandler::RefreshRateIndicatorHandler(ExynosDisplay *display)
