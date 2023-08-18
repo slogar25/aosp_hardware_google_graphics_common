@@ -1498,10 +1498,6 @@ void ExynosDisplay::clearGeometryChanged()
     }
 }
 
-bool ExynosDisplay::isFrameUpdate() {
-    return mGeometryChanged > 0 || mBufferUpdates > 0;
-}
-
 int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
 {
     if (compositionInfo.mType != COMPOSITION_CLIENT)
@@ -3633,7 +3629,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         mPowerHalHint.signalIdle();
     }
 
-    if (isFrameUpdate()) {
+    if (needUpdateRRIndicator()) {
         updateRefreshRateIndicator();
     }
 
@@ -6279,7 +6275,11 @@ void ExynosDisplay::hotplug() {
 }
 
 ExynosDisplay::RefreshRateIndicatorHandler::RefreshRateIndicatorHandler(ExynosDisplay *display)
-      : mDisplay(display), mLastRefreshRate(0), mLastCallbackTime(0) {}
+      : mDisplay(display),
+        mLastRefreshRate(0),
+        mLastCallbackTime(0),
+        mIgnoringLastUpdate(false),
+        mCanIgnoreIncreaseUpdate(false) {}
 
 int32_t ExynosDisplay::RefreshRateIndicatorHandler::init() {
     auto path = String8::format(kRefreshRateStatePathFormat, mDisplay->mIndex);
@@ -6296,11 +6296,12 @@ int32_t ExynosDisplay::RefreshRateIndicatorHandler::init() {
 void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRateLocked(int refreshRate) {
     ATRACE_CALL();
     ATRACE_INT("Refresh rate indicator event", refreshRate);
-    auto lastUpdate = mDisplay->getLastLayerUpdateTime();
     // Ignore refresh rate increase that is caused by refresh rate indicator update but there's
     // no update for the other layers
-    if (refreshRate > mLastRefreshRate && mLastRefreshRate > 0 && lastUpdate < mLastCallbackTime) {
+    if (mCanIgnoreIncreaseUpdate && refreshRate > mLastRefreshRate && mLastRefreshRate > 0 &&
+        mDisplay->getLastLayerUpdateTime() < mLastCallbackTime) {
         mIgnoringLastUpdate = true;
+        mCanIgnoreIncreaseUpdate = false;
         return;
     }
     mIgnoringLastUpdate = false;
@@ -6311,6 +6312,7 @@ void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRateLocked(int ref
     mLastCallbackTime = systemTime(CLOCK_MONOTONIC);
     ATRACE_INT("Refresh rate indicator callback", mLastRefreshRate);
     mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId, s2ns(1) / mLastRefreshRate);
+    mCanIgnoreIncreaseUpdate = true;
 }
 
 void ExynosDisplay::RefreshRateIndicatorHandler::handleSysfsEvent() {
@@ -6396,6 +6398,11 @@ void ExynosDisplay::updateRefreshRateIndicator() {
     if (!mRefreshRateIndicatorHandler || !mRefreshRateIndicatorHandler->isIgnoringLastUpdate())
         return;
     mRefreshRateIndicatorHandler->handleSysfsEvent();
+}
+
+bool ExynosDisplay::needUpdateRRIndicator() {
+    uint64_t exclude = GEOMETRY_LAYER_TYPE_CHANGED;
+    return (mGeometryChanged & ~exclude) > 0 || mBufferUpdates > 0;
 }
 
 uint32_t ExynosDisplay::getPeakRefreshRate() {

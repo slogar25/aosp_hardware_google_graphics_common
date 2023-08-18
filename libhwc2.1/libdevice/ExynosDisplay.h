@@ -1205,7 +1205,6 @@ class ExynosDisplay {
         void setHWCControl(uint32_t ctrl, int32_t val);
         void setGeometryChanged(uint64_t changedBit);
         void clearGeometryChanged();
-        bool isFrameUpdate();
 
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
@@ -1643,6 +1642,7 @@ class ExynosDisplay {
             int mLastRefreshRate GUARDED_BY(mMutex);
             nsecs_t mLastCallbackTime GUARDED_BY(mMutex);
             std::atomic_bool mIgnoringLastUpdate = false;
+            bool mCanIgnoreIncreaseUpdate GUARDED_BY(mMutex) = false;
             UniqueFd mFd;
             std::mutex mMutex;
 
@@ -1654,6 +1654,7 @@ class ExynosDisplay {
         int32_t setRefreshRateChangedCallbackDebugEnabled(bool enabled);
         void updateRefreshRateIndicator();
         nsecs_t getLastLayerUpdateTime();
+        bool needUpdateRRIndicator();
         virtual void checkPreblendingRequirement(){};
 
         void resetColorMappingInfoForClientComp();
