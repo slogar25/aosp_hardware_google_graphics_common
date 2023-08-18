@@ -918,14 +918,22 @@ String8 getLocalTimeStr(struct timeval tv) {
                            ((tv.tv_sec * 1000) + (tv.tv_usec / 1000)));
 }
 
-void setFenceInfo(uint32_t fd, ExynosDisplay* display, HwcFdebugFenceType type, HwcFdebugIpType ip,
-                  HwcFenceDirection direction, bool pendingAllowed, int32_t dupFrom) {
+void setFenceInfo(uint32_t fd, const ExynosDisplay *display, HwcFdebugFenceType type,
+                  HwcFdebugIpType ip, HwcFenceDirection direction, bool pendingAllowed,
+                  int32_t dupFrom) {
     if (!fence_valid(fd) || display == NULL) return;
 
     ExynosDevice* device = display->mDevice;
+    device->mFenceTracker.updateFenceInfo(fd, display, type, ip, direction, pendingAllowed,
+                                          dupFrom);
+}
 
-    std::scoped_lock lock(device->mFenceMutex);
-    HwcFenceInfo& info = device->mFenceInfos[fd];
+void FenceTracker::updateFenceInfo(uint32_t fd, const ExynosDisplay *display,
+                                   HwcFdebugFenceType type, HwcFdebugIpType ip,
+                                   HwcFenceDirection direction, bool pendingAllowed,
+                                   int32_t dupFrom) {
+    std::scoped_lock lock(mFenceMutex);
+    HwcFenceInfo &info = mFenceInfos[fd];
     info.displayId = display->mDisplayId;
 
     if (info.leaking) {
@@ -955,11 +963,11 @@ void setFenceInfo(uint32_t fd, ExynosDisplay* display, HwcFdebugFenceType type, 
     }
 
     if (info.usage == 0) {
-        device->mFenceInfos.erase(fd);
+        mFenceInfos.erase(fd);
         return;
     } else if (info.usage < 0) {
         ALOGE("%s : Invalid negative usage (%d) for Fence FD:%d", __func__, info.usage, fd);
-        printLastFenceInfo(fd, display);
+        printLastFenceInfoLocked(fd);
     }
 
     HwcFenceTrace trace = {.direction = direction, .type = type, .ip = ip, .time = {0, 0}};
@@ -975,45 +983,39 @@ void setFenceInfo(uint32_t fd, ExynosDisplay* display, HwcFdebugFenceType type, 
     info.pendingAllowed = pendingAllowed;
 }
 
-void printLastFenceInfo(uint32_t fd, ExynosDisplay* display) {
+void FenceTracker::printLastFenceInfoLocked(uint32_t fd) {
     if (!fence_valid(fd)) return;
 
-    ExynosDevice* device = display->mDevice;
-
-    auto it = device->mFenceInfos.find(fd);
-    if (it == device->mFenceInfos.end()) return;
-    HwcFenceInfo& info = it->second;
+    auto it = mFenceInfos.find(fd);
+    if (it == mFenceInfos.end()) return;
+    HwcFenceInfo &info = it->second;
     FT_LOGD("---- Fence FD : %d, Display(%d) ----", fd, info.displayId);
     FT_LOGD("usage: %d, dupFrom: %d, pendingAllowed: %d, leaking: %d", info.usage, info.dupFrom,
             info.pendingAllowed, info.leaking);
 
-    for (const auto& trace : info.traces) {
+    for (const auto &trace : info.traces) {
         FT_LOGD("> dir: %d, type: %d, ip: %d, time:%s", trace.direction, trace.type, trace.ip,
                 getLocalTimeStr(trace.time).string());
     }
 }
 
-void dumpFenceInfo(ExynosDisplay* display, int32_t count) {
-    ExynosDevice* device = display->mDevice;
-
+void FenceTracker::dumpFenceInfoLocked(int32_t count) {
     FT_LOGD("Dump fence (up to %d fences) ++", count);
-    for (const auto& [fd, info] : device->mFenceInfos) {
+    for (const auto &[fd, info] : mFenceInfos) {
         if (info.pendingAllowed) continue;
         if (count-- <= 0) break;
-        printLastFenceInfo(fd, display);
+        printLastFenceInfoLocked(fd);
     }
     FT_LOGD("Dump fence --");
 }
 
-void printLeakFds(ExynosDisplay* display) {
-    ExynosDevice* device = display->mDevice;
-
-    auto reportLeakFds = [&fenceInfos = device->mFenceInfos](int sign) {
+void FenceTracker::printLeakFdsLocked() {
+    auto reportLeakFdsLocked = [&fenceInfos = mFenceInfos](int sign) REQUIRES(mFenceMutex) {
         String8 errString;
         errString.appendFormat("Leak Fds (%d) :\n", sign);
 
         int cnt = 0;
-        for (const auto& [fd, info] : fenceInfos) {
+        for (const auto &[fd, info] : fenceInfos) {
             if (!info.leaking) continue;
             if (info.usage * sign > 0) {
                 errString.appendFormat("%d,", fd);
@@ -1026,52 +1028,48 @@ void printLeakFds(ExynosDisplay* display) {
         FT_LOGW("%s", errString.string());
     };
 
-    reportLeakFds(+1);
-    reportLeakFds(-1);
+    reportLeakFdsLocked(+1);
+    reportLeakFdsLocked(-1);
 }
 
-void dumpNCheckLeak(ExynosDisplay* display, int32_t __unused depth) {
-    ExynosDevice* device = display->mDevice;
-
+void FenceTracker::dumpNCheckLeakLocked() {
     FT_LOGD("Dump leaking fence ++");
-    for (auto& [fd, info] : device->mFenceInfos) {
+    for (auto &[fd, info] : mFenceInfos) {
         if (!info.pendingAllowed) {
-            // leak is occured in this frame first
+            // leak is occurred in this frame first
             if (!info.leaking) {
                 info.leaking = true;
-                printLastFenceInfo(fd, display);
+                printLastFenceInfoLocked(fd);
             }
         }
     }
 
     int priv = exynosHWCControl.fenceTracer;
     exynosHWCControl.fenceTracer = 3;
-    printLeakFds(display);
+    printLeakFdsLocked();
     exynosHWCControl.fenceTracer = priv;
 
     FT_LOGD("Dump leaking fence --");
 }
 
-bool fenceWarn(ExynosDisplay* display, uint32_t threshold) {
-    ExynosDevice* device = display->mDevice;
-    uint32_t cnt = device->mFenceInfos.size();
+bool FenceTracker::fenceWarnLocked(uint32_t threshold) {
+    uint32_t cnt = mFenceInfos.size();
 
     if (cnt > threshold) {
         ALOGE("Fence leak! -- the number of fences(%d) exceeds threshold(%d)", cnt, threshold);
         int priv = exynosHWCControl.fenceTracer;
         exynosHWCControl.fenceTracer = 3;
-        dumpFenceInfo(display, 10);
+        dumpFenceInfoLocked(10);
         exynosHWCControl.fenceTracer = priv;
     }
 
     return (cnt > threshold);
 }
 
-bool validateFencePerFrame(ExynosDisplay* display) {
-    ExynosDevice* device = display->mDevice;
+bool FenceTracker::validateFencePerFrameLocked(const ExynosDisplay *display) {
     bool ret = true;
 
-    for (const auto& [fd, info] : device->mFenceInfos) {
+    for (const auto &[fd, info] : mFenceInfos) {
         if (info.displayId != display->mDisplayId) continue;
         if ((!info.pendingAllowed) && (!info.leaking)) {
             ret = false;
@@ -1082,10 +1080,64 @@ bool validateFencePerFrame(ExynosDisplay* display) {
     if (!ret) {
         int priv = exynosHWCControl.fenceTracer;
         exynosHWCControl.fenceTracer = 3;
-        dumpNCheckLeak(display, 0);
+        dumpNCheckLeakLocked();
         exynosHWCControl.fenceTracer = priv;
     }
 
+    return ret;
+}
+
+bool FenceTracker::validateFences(ExynosDisplay *display) {
+    std::scoped_lock lock(mFenceMutex);
+
+    if (!validateFencePerFrameLocked(display)) {
+        ALOGE("You should doubt fence leak!");
+        saveFenceTraceLocked(display);
+        return false;
+    }
+
+    if (fenceWarnLocked(MAX_FENCE_THRESHOLD)) {
+        printLeakFdsLocked();
+        saveFenceTraceLocked(display);
+        return false;
+    }
+
+    if (exynosHWCControl.doFenceFileDump) {
+        ALOGD("Fence file dump !");
+        saveFenceTraceLocked(display);
+        exynosHWCControl.doFenceFileDump = false;
+    }
+
+    return true;
+}
+
+int32_t FenceTracker::saveFenceTraceLocked(ExynosDisplay *display) {
+    int32_t ret = NO_ERROR;
+    auto &fileWriter = display->mFenceFileWriter;
+
+    if (!fileWriter.chooseOpenedFile()) {
+        return -1;
+    }
+
+    String8 saveString;
+
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    saveString.appendFormat("\n====== Fences at time:%s ======\n", getLocalTimeStr(tv).string());
+
+    for (const auto &[fd, info] : mFenceInfos) {
+        saveString.appendFormat("---- Fence FD : %d, Display(%d) ----\n", fd, info.displayId);
+        saveString.appendFormat("usage: %d, dupFrom: %d, pendingAllowed: %d, leaking: %d\n",
+                                info.usage, info.dupFrom, info.pendingAllowed, info.leaking);
+
+        for (const auto &trace : info.traces) {
+            saveString.appendFormat("> dir: %d, type: %d, ip: %d, time:%s\n", trace.direction,
+                                    trace.type, trace.ip, getLocalTimeStr(trace.time).string());
+        }
+    }
+
+    fileWriter.write(saveString);
+    fileWriter.flush();
     return ret;
 }
 
