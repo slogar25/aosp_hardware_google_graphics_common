@@ -2032,7 +2032,22 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         /* TODO: don't pass expected present time before we can provide accurate time that desire
          * refresh rate take effect (b/202346402)
          */
-        if (!mVsyncCallback.getDesiredVsyncPeriod()) {
+        bool ignoreExpectedPresentTime = false;
+        if (mVsyncCallback.getDesiredVsyncPeriod()) {
+            ignoreExpectedPresentTime = true;
+
+            /* limit the condition to avoid unexpected early present */
+            auto desiredVsyncPeriod = mVsyncCallback.getDesiredVsyncPeriod();
+            auto currentVsyncPeriod = mExynosDisplay->mVsyncPeriod;
+            constexpr auto nsecsPerMs = std::chrono::nanoseconds(1ms).count();
+            if (currentVsyncPeriod > desiredVsyncPeriod &&
+                (((currentVsyncPeriod % desiredVsyncPeriod) < nsecsPerMs) ||
+                 (desiredVsyncPeriod - (currentVsyncPeriod % desiredVsyncPeriod)) < nsecsPerMs)) {
+                ignoreExpectedPresentTime = false;
+            }
+        }
+
+        if (!ignoreExpectedPresentTime) {
             if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
                                                 mDrmCrtc->expected_present_time_property(),
                                                 expectedPresentTime)) < 0) {
