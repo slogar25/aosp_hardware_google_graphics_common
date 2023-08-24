@@ -35,8 +35,6 @@ ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice* devic
       : ExynosDisplay(HWC_DISPLAY_EXTERNAL, index, device, displayName) {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
-    mDisplayControl.cursorSupport = true;
-
     mEnabled = false;
     mBlanked = false;
 
