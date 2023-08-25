@@ -32,6 +32,7 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosLayer.h"
 #include "ExynosPrimaryDisplay.h"
+#include "HistogramController.h"
 
 using namespace std::chrono_literals;
 using namespace SOC_VERSION;
@@ -776,6 +777,10 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     if (mExynosDisplay->mBrightnessController &&
             mExynosDisplay->mBrightnessController->initDrm(*mDrmDevice, *mDrmConnector)) {
         ALOGW("%s failed to init brightness controller", __func__);
+    }
+
+    if (mExynosDisplay->mHistogramController) {
+        mExynosDisplay->mHistogramController->initDrm(*mDrmCrtc);
     }
 
     return NO_ERROR;

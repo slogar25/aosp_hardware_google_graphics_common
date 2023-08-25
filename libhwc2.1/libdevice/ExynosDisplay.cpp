@@ -38,6 +38,7 @@
 #include "BrightnessController.h"
 #include "ExynosExternalDisplay.h"
 #include "ExynosLayer.h"
+#include "HistogramController.h"
 #include "VendorGraphicBuffer.h"
 #include "exynos_format.h"
 #include "utils/Timers.h"
@@ -4796,6 +4797,9 @@ void ExynosDisplay::dump(String8& result)
     if (mBrightnessController) {
         mBrightnessController->dump(result);
     }
+    if (mHistogramController) {
+        mHistogramController->dump(result);
+    }
 }
 
 void ExynosDisplay::dumpConfig(String8 &result, const exynos_win_config_data &c)
@@ -5337,11 +5341,13 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex, float tota
 }
 
 bool ExynosDisplay::isPowerModeOff() const {
+    ATRACE_CALL();
     Mutex::Autolock lock(mDisplayMutex);
     return mPowerModeState.has_value() && mPowerModeState.value() == HWC2_POWER_MODE_OFF;
 }
 
 bool ExynosDisplay::isSecureContentPresenting() const {
+    ATRACE_CALL();
     Mutex::Autolock lock(mDRMutex);
     for (uint32_t i = 0; i < mLayers.size(); i++) {
         ExynosLayer *layer = mLayers[i];

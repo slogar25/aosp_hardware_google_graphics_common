@@ -33,6 +33,7 @@
 #include "ExynosHWCDebug.h"
 #include "ExynosHWCHelper.h"
 #include "ExynosLayer.h"
+#include "HistogramController.h"
 
 extern struct exynos_hwc_control exynosHWCControl;
 
@@ -155,6 +156,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
     mBrightnessController = std::make_unique<BrightnessController>(
             mIndex, [this]() { mDevice->onRefresh(mDisplayId); },
             [this]() { updatePresentColorConversionInfo(); });
+    mHistogramController = std::make_unique<HistogramController>(this);
 
     mDisplayControl.multiThreadedPresent = true;
 }
