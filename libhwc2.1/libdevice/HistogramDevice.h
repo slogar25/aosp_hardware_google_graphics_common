@@ -23,6 +23,7 @@
 #include <aidl/com/google/hardware/pixel/display/HistogramSamplePos.h>
 #include <aidl/com/google/hardware/pixel/display/Weight.h>
 #include <android-base/thread_annotations.h>
+#include <drm/samsung_drm.h>
 #include <utils/String8.h>
 
 #include <mutex>
@@ -30,6 +31,7 @@
 #include <unordered_map>
 
 #include "ExynosDisplay.h"
+#include "ExynosDisplayDrmInterface.h"
 #include "drmcrtc.h"
 
 using namespace android;
@@ -57,8 +59,17 @@ public:
         /* channel config is ready and requires to be added into an atomic commit */
         CONFIG_PENDING,
 
+        /* channel config (blob) is added to an atomic commit but not committed yet */
+        CONFIG_BLOB_ADDED,
+
+        /* channel config is committed to drm driver successfully */
+        CONFIG_COMMITTED,
+
         /* channel is released and requires an atomic commit to cleanup completely */
         DISABLE_PENDING,
+
+        /* channel is released and the cleanup blob is added but not committed yet */
+        DISABLE_BLOB_ADDED,
     };
 
     struct ChannelInfo {
@@ -217,6 +228,26 @@ public:
                                            HistogramErrorCode *histogramErrorCode);
 
     /**
+     * prepareAtomicCommit
+     *
+     * Prepare the histogram atomic commit for each channel (see prepareChannelCommit).
+     *
+     * @drmReq drm atomic request object
+     * @return NO_ERROR on success, else otherwise.
+     */
+    int prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq);
+
+    /**
+     * postAtomicCommit
+     *
+     * After the atomic commit is done, update the channel status as below.
+     * Channel_Status:
+     *     CONFIG_BLOB_ADDED  -> CONFIG_COMMITTED
+     *     DISABLE_BLOB_ADDED -> DISABLED
+     */
+    void postAtomicCommit();
+
+    /**
      * dump
      *
      * Dump every histogram channel information.
@@ -338,6 +369,60 @@ private:
      */
     void fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder &token,
                            const HistogramConfig &histogramConfig, int threshold);
+
+    /**
+     * prepareChannelCommit
+     *
+     * For the histogram channel needed to be configured, prepare the histogram channel config into
+     * the struct histogram_channel_config which will be used to creating the drm blob in
+     * setDisplayHistogramChannelSetting.
+     * ChannelStatus_t:
+     *     CONFIG_PENDING -> CONFIG_BLOB_ADDED
+     *     CONFIG_DONE (detect roi needs update due to resolution change) -> CONFIG_BLOB_ADDED
+     *
+     * For the histogram channel needed to be disabled, call clearDisplayHistogramChannelSetting to
+     * disable.
+     * ChannelStatus_t:
+     *     DISABLE_PENDING -> DISABLE_BLOB_ADDED
+     *
+     * @drmReq drm atomic request object
+     * @channelId histogram channel id
+     * @return NO_ERROR on success, else otherwise
+     */
+    int prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq,
+                             uint8_t channelId);
+
+    /**
+     * createHistogramDrmConfigLocked
+     *
+     * Allocate and initialize the histogram config for the drm driver. Composer would trigger
+     * setDisplayHistogramChannelSetting and create the property blob with this config. The
+     * allcoated config should be deleted via deleteHistogramDrmConfig after the property blob
+     * is created. This function should be called with channelInfoMutex hold.
+     *
+     * @channel histogram channel.
+     * @configPtr shared pointer to the allocated histogram config struct.
+     * @length size of the histogram config.
+     * @return NO_ERROR on success, else otherwise
+     */
+    virtual int createHistogramDrmConfigLocked(const ChannelInfo &channel,
+                                               std::shared_ptr<void> &configPtr,
+                                               size_t &length) const
+            REQUIRES(channel.channelInfoMutex);
+
+    /**
+     * convertRoiLocked
+     *
+     * Linear transform the requested roi (based on panel full resolution) into the working roi
+     * (active resolution).
+     *
+     * @moduleDisplayInterface the displayInterface which contains the full resolution info
+     * @requestedRoi requested roi
+     * @workingRoi converted roi from the requested roi
+     * @return NO_ERROR on success, else otherwise
+     */
+    int convertRoiLocked(ExynosDisplayDrmInterface *moduleDisplayInterface,
+                         const HistogramRoiRect &requestedRoi, HistogramRoiRect &workingRoi) const;
 
     void dumpHistogramCapability(String8 &result) const;
 
