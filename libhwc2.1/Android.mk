@@ -113,6 +113,7 @@ LOCAL_SRC_FILES := \
 	libdevice/ExynosDisplay.cpp \
 	libdevice/ExynosDevice.cpp \
 	libdevice/ExynosLayer.cpp \
+	libdevice/HistogramDevice.cpp \
 	libmaindisplay/ExynosPrimaryDisplay.cpp \
 	libresource/ExynosMPP.cpp \
 	libresource/ExynosResourceManager.cpp \
