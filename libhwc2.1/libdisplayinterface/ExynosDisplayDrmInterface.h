@@ -340,6 +340,23 @@ class ExynosDisplayDrmInterface :
                 ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
             return NO_ERROR;
         }
+
+        /* For Histogram Multi Channel support */
+        int32_t setDisplayHistogramChannelSetting(
+                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId,
+                void *blobData, size_t blobLength);
+        int32_t clearDisplayHistogramChannelSetting(
+                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId);
+        enum class HistogramChannelIoctl_t {
+            /* send the histogram data request by calling histogram_channel_request_ioctl */
+            REQUEST = 0,
+
+            /* cancel the histogram data request by calling histogram_channel_cancel_ioctl */
+            CANCEL,
+        };
+        virtual int32_t sendHistogramChannelIoctl(HistogramChannelIoctl_t control,
+                                                  uint8_t channelId) const;
+
         int32_t getFrameCount() { return mFrameCounter; }
         virtual void registerHistogramInfo(const std::shared_ptr<IDLHistogram> &info) { return; }
         virtual int32_t setHistogramControl(hidl_histogram_control_t enabled) { return NO_ERROR; }

@@ -32,6 +32,7 @@
 #include "ExynosHWCHelper.h"
 #include "ExynosLayer.h"
 #include "ExynosPrimaryDisplay.h"
+#include "HistogramController.h"
 
 using namespace std::chrono_literals;
 using namespace SOC_VERSION;
@@ -776,6 +777,10 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     if (mExynosDisplay->mBrightnessController &&
             mExynosDisplay->mBrightnessController->initDrm(*mDrmDevice, *mDrmConnector)) {
         ALOGW("%s failed to init brightness controller", __func__);
+    }
+
+    if (mExynosDisplay->mHistogramController) {
+        mExynosDisplay->mHistogramController->initDrm(*mDrmCrtc);
     }
 
     return NO_ERROR;
@@ -2014,6 +2019,16 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         return ret;
     }
 
+    /* For multichannel histogram */
+    if (dqeEnable && mExynosDisplay->mHistogramController) {
+        ret = mExynosDisplay->mHistogramController->prepareAtomicCommit(drmReq);
+
+        if (ret) {
+            HWC_LOGE(mExynosDisplay, "mHistogramController failed to set atomic commit (%d)", ret);
+            return ret;
+        }
+    }
+
     if (mDrmConnector->mipi_sync().id() && (mipi_sync_type != 0)) {
         // skip mipi sync in Doze mode
         bool inDoze = isDozeModeAvailable() && mDozeDrmMode.id() == mActiveModeState.mode.id();
@@ -2088,6 +2103,11 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 nsecsPerSec/mActiveModeState.mode.v_refresh());
         /* Enable vsync to check vsync period */
         mDrmVSyncWorker.VSyncControl(true);
+    }
+
+    /* For multichannel histogram */
+    if (dqeEnable && mExynosDisplay->mHistogramController) {
+        mExynosDisplay->mHistogramController->postAtomicCommit();
     }
 
     return NO_ERROR;
@@ -2700,4 +2720,58 @@ void ExynosDisplayDrmInterface::retrievePanelFullResolution() {
         ALOGI("%s: panel full resolution: (%dx%d)", __func__, mPanelFullResolutionHSize,
               mPanelFullResolutionVSize);
     }
+}
+
+int32_t ExynosDisplayDrmInterface::setDisplayHistogramChannelSetting(
+        ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId, void *blobData,
+        size_t blobLength) {
+    int ret = NO_ERROR;
+    uint32_t blobId = 0;
+
+    const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
+    if (!prop.id()) {
+        ALOGE("Unsupported multi-channel histrogram for channel:%d", channelId);
+        return -ENOTSUP;
+    }
+
+    ret = mDrmDevice->CreatePropertyBlob(blobData, blobLength, &blobId);
+    if (ret) {
+        HWC_LOGE(mExynosDisplay, "Failed to create histogram channel(%d) blob %d", channelId, ret);
+        return ret;
+    }
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(), prop, blobId)) < 0) {
+        HWC_LOGE(mExynosDisplay, "%s: Failed to add property", __func__);
+        return ret;
+    }
+
+    // TODO: b/295794044 - Clear the old histogram channel blob
+
+    return ret;
+}
+
+int32_t ExynosDisplayDrmInterface::clearDisplayHistogramChannelSetting(
+        ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId) {
+    int ret = NO_ERROR;
+
+    const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
+    if (!prop.id()) {
+        ALOGE("Unsupported multi-channel histrogram for channel:%d", channelId);
+        return -ENOTSUP;
+    }
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(), prop, 0)) < 0) {
+        HWC_LOGE(mExynosDisplay, "%s: Failed to add property", __func__);
+        return ret;
+    }
+
+    // TODO: b/295794044 - Clear the old histogram channel blob
+
+    return ret;
+}
+
+int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoctl_t control,
+                                                             uint8_t channelId) const {
+    ALOGE("%s: kernel doesn't support multi channel histogram ioctl", __func__);
+    return INVALID_OPERATION;
 }

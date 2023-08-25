@@ -57,6 +57,7 @@ class ExynosLayer;
 class ExynosDevice;
 class ExynosMPP;
 class ExynosMPPSource;
+class HistogramController;
 
 namespace aidl {
 namespace google {
@@ -539,6 +540,9 @@ class ExynosDisplay {
         float mMinLuminance;
 
         std::unique_ptr<BrightnessController> mBrightnessController;
+
+        /* For histogram */
+        std::unique_ptr<HistogramController> mHistogramController;
 
         /* For debugging */
         hwc_display_contents_1_t *mHWC1LayerList;
