@@ -14,15 +14,18 @@
  * limitations under the License.
  */
 
-#include <drm/drm_mode.h>
 #include "ExynosDeviceDrmInterface.h"
-#include "ExynosDisplayDrmInterface.h"
-#include "ExynosHWCDebug.h"
+
+#include <drm/drm_mode.h>
+#include <drm/samsung_drm.h>
+#include <hardware/hwcomposer_defs.h>
+
 #include "ExynosDevice.h"
 #include "ExynosDisplay.h"
+#include "ExynosDisplayDrmInterface.h"
 #include "ExynosExternalDisplayModule.h"
-#include <hardware/hwcomposer_defs.h>
-#include <drm/samsung_drm.h>
+#include "ExynosHWCDebug.h"
+#include "HistogramController.h"
 
 void set_hwc_dpp_size_range(hwc_dpp_size_range &hwc_dpp_range, dpp_size_range &dpp_range) {
     hwc_dpp_range.min = dpp_range.min;
@@ -72,6 +75,8 @@ ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface() {
             static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterHistogramHandler(
             static_cast<DrmHistogramEventHandler *>(&mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->UnRegisterHistogramChannelHandler(
+            static_cast<DrmHistogramChannelEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterTUIHandler(
             static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterPanelIdleHandler(
@@ -92,6 +97,8 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice) {
             static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->RegisterHistogramHandler(
             static_cast<DrmHistogramEventHandler *>(&mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->RegisterHistogramChannelHandler(
+            static_cast<DrmHistogramChannelEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->RegisterTUIHandler(
             static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->RegisterPanelIdleHandler(
@@ -239,6 +246,32 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleHistogramEvent(uint3
         }
     }
 }
+
+#if defined(EXYNOS_DRM_HISTOGRAM_CHANNEL_EVENT)
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleHistogramChannelEvent(void *event) {
+    struct exynos_drm_histogram_channel_event *histogram_channel_event =
+            (struct exynos_drm_histogram_channel_event *)event;
+
+    for (auto display : mExynosDevice->mDisplays) {
+        ExynosDisplayDrmInterface *displayInterface =
+                static_cast<ExynosDisplayDrmInterface *>(display->mDisplayInterface.get());
+        if (histogram_channel_event->crtc_id == displayInterface->getCrtcId()) {
+            if (display->mHistogramController) {
+                display->mHistogramController->handleDrmEvent(histogram_channel_event);
+            } else {
+                ALOGE("%s: no valid mHistogramController for crtc_id (%u)", __func__,
+                      histogram_channel_event->crtc_id);
+            }
+
+            return;
+        }
+    }
+
+    ALOGE("%s: no display with crtc_id (%u)", __func__, histogram_channel_event->crtc_id);
+}
+#else
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleHistogramChannelEvent(void *event) {}
+#endif
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleTUIEvent() {
     if (mDrmDevice->event_listener()->IsDrmInTUI()) {
