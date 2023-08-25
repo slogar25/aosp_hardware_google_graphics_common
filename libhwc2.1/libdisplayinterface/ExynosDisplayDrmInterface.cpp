@@ -2705,3 +2705,51 @@ void ExynosDisplayDrmInterface::retrievePanelFullResolution() {
               mPanelFullResolutionVSize);
     }
 }
+
+int32_t ExynosDisplayDrmInterface::setDisplayHistogramChannelSetting(
+        ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId, void *blobData,
+        size_t blobLength) {
+    int ret = NO_ERROR;
+    uint32_t blobId = 0;
+
+    const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
+    if (!prop.id()) {
+        ALOGE("Unsupported multi-channel histrogram for channel:%d", channelId);
+        return -ENOTSUP;
+    }
+
+    ret = mDrmDevice->CreatePropertyBlob(blobData, blobLength, &blobId);
+    if (ret) {
+        HWC_LOGE(mExynosDisplay, "Failed to create histogram channel(%d) blob %d", channelId, ret);
+        return ret;
+    }
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(), prop, blobId)) < 0) {
+        HWC_LOGE(mExynosDisplay, "%s: Failed to add property", __func__);
+        return ret;
+    }
+
+    // TODO: b/295794044 - Clear the old histogram channel blob
+
+    return ret;
+}
+
+int32_t ExynosDisplayDrmInterface::clearDisplayHistogramChannelSetting(
+        ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId) {
+    int ret = NO_ERROR;
+
+    const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
+    if (!prop.id()) {
+        ALOGE("Unsupported multi-channel histrogram for channel:%d", channelId);
+        return -ENOTSUP;
+    }
+
+    if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(), prop, 0)) < 0) {
+        HWC_LOGE(mExynosDisplay, "%s: Failed to add property", __func__);
+        return ret;
+    }
+
+    // TODO: b/295794044 - Clear the old histogram channel blob
+
+    return ret;
+}
