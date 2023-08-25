@@ -26,6 +26,7 @@
 #include <drm/samsung_drm.h>
 #include <utils/String8.h>
 
+#include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <unordered_map>
@@ -44,6 +45,7 @@ public:
     using HistogramRoiRect = aidl::android::hardware::graphics::common::Rect;
     using HistogramSamplePos = aidl::com::google::hardware::pixel::display::HistogramSamplePos;
     using HistogramWeights = aidl::com::google::hardware::pixel::display::Weight;
+    using HistogramChannelIoctl_t = ExynosDisplayDrmInterface::HistogramChannelIoctl_t;
 
     /* Histogram weight constraint: weightR + weightG + weightB = WEIGHT_SUM */
     static constexpr size_t WEIGHT_SUM = 1024;
@@ -76,6 +78,9 @@ public:
         /* protect the channel info fields */
         mutable std::mutex channelInfoMutex;
 
+        /* protect histDataCollecting variable */
+        mutable std::mutex histDataCollectingMutex;
+
         /* track the channel status */
         ChannelStatus_t status GUARDED_BY(channelInfoMutex);
 
@@ -98,6 +103,8 @@ public:
 
         /* histogram data would be stored as part of the channel info */
         uint16_t histData[HISTOGRAM_BIN_COUNT];
+        bool histDataCollecting; // GUARDED_BY(histDataCollectingMutex);
+        std::condition_variable histDataCollecting_cv;
 
         ChannelInfo();
         ChannelInfo(const ChannelInfo &other);
@@ -228,6 +235,16 @@ public:
                                            HistogramErrorCode *histogramErrorCode);
 
     /**
+     * handleDrmEvent
+     *
+     * Handle the histogram channel drm event (EXYNOS_DRM_HISTOGRAM_CHANNEL_EVENT) and copy the
+     * histogram data from event struct to channel info.
+     *
+     * @event histogram channel drm event pointer (struct exynos_drm_histogram_channel_event *)
+     */
+    void handleDrmEvent(void *event);
+
+    /**
      * prepareAtomicCommit
      *
      * Prepare the histogram atomic commit for each channel (see prepareChannelCommit).
@@ -310,6 +327,34 @@ private:
     ndk::ScopedAStatus configHistogram(const ndk::SpAIBinder &token,
                                        const HistogramConfig &histogramConfig,
                                        HistogramErrorCode *histogramErrorCode, bool isReconfig);
+
+    /**
+     * getHistogramData
+     *
+     * Get the histogram data by sending ioctl request which will allocate the drm event for
+     * histogram, and wait on the condition variable histDataCollecting_cv until the drm event is
+     * handled or timeout. Copy the histogram data from channel info to histogramBuffer.
+     *
+     * @channelId histogram channel id.
+     * @histogramBuffer AIDL created buffer which will be sent back to the client.
+     * @histogramErrorCode::NONE when success, or else otherwise.
+     */
+    void getHistogramData(uint8_t channelId, std::vector<char16_t> *histogramBuffer,
+                          HistogramErrorCode *histogramErrorCode);
+
+    /**
+     * parseDrmEvent
+     *
+     * Parse the histogram drm event (struct may vary between different platform), need to be
+     * overrided in the derived HistogramController class if needed. This function should get the
+     * histogram channel id and the histogram buffer address from the event struct.
+     *
+     * @event histogram drm event struct.
+     * @channelId stores the extracted channel id from the event.
+     * @buffer stores the extracted buffer address from the event.
+     * @return NO_ERROR on success, else otherwise.
+     */
+    virtual int parseDrmEvent(void *event, uint8_t &channelId, char16_t *&buffer) const;
 
     /**
      * acquireChannelLocked
