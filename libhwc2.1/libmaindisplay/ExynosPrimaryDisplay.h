@@ -170,6 +170,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         std::ofstream mDisplayNeedHandleIdleExitOfs;
         int64_t mDisplayIdleDelayNanos;
         bool mDisplayNeedHandleIdleExit;
+
+        VrrVsyncHz_t mVrrVsync;
 };
 
 #endif

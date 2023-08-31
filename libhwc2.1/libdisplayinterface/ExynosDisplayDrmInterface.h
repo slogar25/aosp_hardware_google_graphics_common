@@ -51,6 +51,28 @@ class ExynosDevice;
 template <typename T>
 using DrmArray = std::array<T, HWC_DRM_BO_MAX_PLANES>;
 
+class DisplayConfigGroupIdGenerator {
+public:
+    DisplayConfigGroupIdGenerator() = default;
+    ~DisplayConfigGroupIdGenerator() = default;
+
+    // Vrr will utilize the last two parameters. In the case of non-vrr, they are automatically set
+    // to 0. Avoid using this class with a mix of Vrr and non-Vrr settings, as doing so may yield
+    // unexpected results.
+    int getGroupId(int width, int height, int minFrameInterval = 0, int vsyncPeriod = 0) {
+        const auto &key = std::make_tuple(width, height, minFrameInterval, vsyncPeriod);
+        if (groups_.count(key) > 0) {
+            return groups_[key];
+        }
+        size_t last_id = groups_.size();
+        groups_[key] = last_id;
+        return last_id;
+    }
+
+private:
+    std::map<std::tuple<int, int, int, int>, int> groups_;
+};
+
 class FramebufferManager {
     public:
         FramebufferManager(){};
@@ -369,6 +391,8 @@ class ExynosDisplayDrmInterface :
         uint32_t getCrtcId() { return mDrmCrtc->id(); }
         int32_t triggerClearDisplayPlanes();
 
+        virtual void setVrrVsync(const VrrVsyncHz_t &vrrVsyncHz) override;
+
     protected:
         enum class HalMipiSyncType : uint32_t {
             HAL_MIPI_CMD_SYNC_REFRESH_RATE = 0,
@@ -538,12 +562,17 @@ class ExynosDisplayDrmInterface :
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
 
+        bool isVrrModeSupported() const;
+
         String8 mDisplayTraceName;
         DrmMode mDozeDrmMode;
         uint32_t mMaxWindowNum = 0;
         int32_t mFrameCounter = 0;
         int32_t mPanelFullResolutionHSize = 0;
         int32_t mPanelFullResolutionVSize = 0;
+
+        int32_t mVrrHsVsyncPeriodNs = 0;
+        int32_t mVrrNsVsyncPeriodNs = 0;
 
         /**
          * retrievePanelFullResolution

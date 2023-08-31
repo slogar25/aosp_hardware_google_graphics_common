@@ -21,6 +21,11 @@
 #include <xf86drmMode.h>
 #include <string>
 
+// Alternative definitions(alias) of DRM modes and flags for VRR.
+// The kernel contains corresponding defines that MUST align with those specified here..
+#define DRM_MODE_TYPE_VRR DRM_MODE_TYPE_USERDEF
+#define DRM_MODE_FLAG_NS DRM_MODE_FLAG_CLKDIV2
+
 namespace android {
 
 class DrmMode {
@@ -30,6 +35,9 @@ class DrmMode {
 
   bool operator==(const drmModeModeInfo &m) const;
   void ToDrmModeModeInfo(drm_mode_modeinfo *m) const;
+
+  inline bool is_vrr_mode() const { return (type_ & DRM_MODE_TYPE_VRR); };
+  inline bool is_ns_mode() const { return (flags_ & DRM_MODE_FLAG_NS); };
 
   uint32_t id() const;
   void set_id(uint32_t id);

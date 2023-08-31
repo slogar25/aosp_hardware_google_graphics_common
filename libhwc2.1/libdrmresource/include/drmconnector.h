@@ -53,7 +53,7 @@ class DrmConnector {
 
   std::string name() const;
 
-  int UpdateModes();
+  int UpdateModes(bool is_vrr_mode = false);
   int UpdateEdidProperty();
 
   const std::vector<DrmMode> &modes() const {

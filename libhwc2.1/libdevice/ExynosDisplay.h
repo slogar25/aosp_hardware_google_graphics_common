@@ -350,6 +350,27 @@ struct ResolutionInfo {
     int      nPanelType[3];
 };
 
+typedef struct VrrVsyncHz {
+    int nsHz;
+    int hsHz;
+} VrrVsyncHz_t;
+
+typedef struct FrameIntervalPowerHint {
+    int frameIntervalNs;
+    int averageRefreshPeriodNs;
+} FrameIntervalPowerHint_t;
+
+typedef struct NotifyExpectedPresentConfig {
+    int HeadsUpNs;
+    int TimeoutNs;
+} NotifyExpectedPresentConfig_t;
+
+typedef struct VrrConfig {
+    int minFrameIntervalNs;
+    std::vector<FrameIntervalPowerHint_t> frameIntervalPowerHint;
+    NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
+} VrrConfig_t;
+
 typedef struct displayConfigs {
     // HWC2_ATTRIBUTE_VSYNC_PERIOD
     VsyncPeriodNanos vsyncPeriod;
@@ -363,6 +384,8 @@ typedef struct displayConfigs {
     uint32_t Ydpi;
     // HWC2_ATTRIBUTE_CONFIG_GROUP
     uint32_t groupId;
+
+    std::optional<VrrConfig_t> vrrConfig;
 } displayConfigs_t;
 
 struct DisplayControl {
@@ -1143,6 +1166,15 @@ class ExynosDisplay {
          *
          */
         int32_t getMountOrientation(HwcMountOrientation *orientation);
+
+        /*
+         * HWC3
+         *
+         * Retrieve the vrrConfig for the corresponding display configuration.
+         * If the configuration doesn't exist, return a nullptr.
+         *
+         */
+        std::optional<VrrConfig_t> getVrrConfigs(hwc2_config_t config);
 
         /* setActiveConfig MISCs */
         bool isBadConfig(hwc2_config_t config);
