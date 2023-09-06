@@ -1,16 +1,16 @@
 #pragma once
 
 #include <aidl/android/hardware/graphics/common/PixelFormat.h>
+
 #include <cstdint>
 
 namespace pixel::graphics {
 
 using FrameworkFormat = aidl::android::hardware::graphics::common::PixelFormat;
 
-#define MapFormat(f) \
-   f = static_cast<uint32_t>(FrameworkFormat::f)
+#define MapFormat(f) f = static_cast<uint32_t>(FrameworkFormat::f)
 
-enum class Format: uint32_t {
+enum class Format : uint32_t {
     MapFormat(UNSPECIFIED),
     MapFormat(RGBA_8888),
     MapFormat(RGBX_8888),
@@ -51,4 +51,4 @@ enum class Format: uint32_t {
 
 #undef MapFormat
 
-}
+} // namespace pixel::graphics
