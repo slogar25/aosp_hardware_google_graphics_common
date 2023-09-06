@@ -664,10 +664,11 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     {
         ATRACE_NAME("wait_for_power_on");
         std::unique_lock<std::mutex> lock(mPowerModeMutex);
-        if (mPowerModeState != HWC2_POWER_MODE_ON) {
+        if (!mPowerModeState.has_value() || (*mPowerModeState != HWC2_POWER_MODE_ON)) {
             mNotifyPowerOn = true;
             if (!mPowerOnCondition.wait_for(lock, std::chrono::milliseconds(2000), [this]() {
-                    return (mPowerModeState == HWC2_POWER_MODE_ON);
+                    return (mPowerModeState.has_value() &&
+                            (*mPowerModeState == HWC2_POWER_MODE_ON));
                 })) {
                 DISPLAY_LOGW("%s: wait for power mode on timeout !", __func__);
                 return TIMED_OUT;
@@ -809,6 +810,18 @@ int32_t ExynosPrimaryDisplay::setLhbmState(bool enabled) {
     }
     return NO_ERROR;
 enable_err:
+    {
+        // We may receive LHBM request during the power off sequence due to the
+        // race condition between display and sensor. If the failure happens
+        // after requestLhbm(), we will get a wrong LHBM state in the 1st commit
+        // after power on. We should reset the state in this case.
+        std::unique_lock<std::mutex> lock(mPowerModeMutex);
+        if (!mPowerModeState.has_value() || (*mPowerModeState == HWC2_POWER_MODE_OFF)) {
+            DISPLAY_LOGW("%s: request lhbm during power off sequence, reset the state", __func__);
+            mBrightnessController->resetLhbmState();
+        }
+    }
+
     Mutex::Autolock lock(mDisplayMutex);
     restoreLhbmDisplayConfigLocked();
     return ret;
