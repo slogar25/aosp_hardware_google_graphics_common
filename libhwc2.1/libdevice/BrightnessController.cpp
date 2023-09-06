@@ -528,6 +528,7 @@ void BrightnessController::updateColorRenderIntent(int32_t intent) {
     if (mColorRenderIntent.is_dirty()) {
         updateAclMode();
         ALOGI("%s Color Render Intent = %d", __func__, mColorRenderIntent.get());
+        mColorRenderIntent.clear_dirty();
     }
 }
 
