@@ -908,27 +908,7 @@ bool ExynosDevice::canSkipValidate()
 }
 
 bool ExynosDevice::validateFences(ExynosDisplay *display) {
-    std::scoped_lock lock(display->mDevice->mFenceMutex);
-
-    if (!validateFencePerFrame(display)) {
-        ALOGE("You should doubt fence leak!");
-        saveFenceTrace(display);
-        return false;
-    }
-
-    if (fenceWarn(display, MAX_FENCE_THRESHOLD)) {
-        printLeakFds(display);
-        saveFenceTrace(display);
-        return false;
-    }
-
-    if (exynosHWCControl.doFenceFileDump) {
-        ALOGD("Fence file dump !");
-        saveFenceTrace(display);
-        exynosHWCControl.doFenceFileDump = false;
-    }
-
-    return true;
+    return mFenceTracker.validateFences(display);
 }
 
 void ExynosDevice::compareVsyncPeriod() {
