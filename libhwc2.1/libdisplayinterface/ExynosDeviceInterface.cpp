@@ -99,7 +99,7 @@ int32_t ExynosDeviceInterface::makeDPURestrictions() {
             queried_format.format = format;
             queried_format.reserved = 0;
             resourceManager->makeFormatRestrictions(queried_format);
-            HDEBUGLOGD(eDebugAttrSetting, "%s : %d", getMPPStr(hwType).string(), format);
+            HDEBUGLOGD(eDebugAttrSetting, "%s : %d", getMPPStr(hwType).c_str(), format);
         }
     }
 

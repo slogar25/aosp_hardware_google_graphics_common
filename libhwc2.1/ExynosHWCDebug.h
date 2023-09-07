@@ -94,38 +94,38 @@ int32_t saveErrorLog(const android::String8 &errString, ExynosDisplay *display =
 #define DISPLAY_LOGD(type, msg, ...) \
     {\
         if (hwcCheckDebugMessages(type)) \
-            ALOGD("%s:: [%s] " msg, __func__, mDisplayName.string(), ##__VA_ARGS__); \
+            ALOGD("%s:: [%s] " msg, __func__, mDisplayName.c_str(), ##__VA_ARGS__); \
     }
 #define MPP_LOGD(type, msg, ...) \
     {\
     if (hwcCheckDebugMessages(type)) \
-        ALOGD("%s:: [%s][%d] " msg, __func__, mName.string(), mLogicalIndex, ##__VA_ARGS__); \
+        ALOGD("%s:: [%s][%d] " msg, __func__, mName.c_str(), mLogicalIndex, ##__VA_ARGS__); \
     }
 #endif
-#define DISPLAY_LOGV(msg, ...) ALOGV("[%s] " msg, mDisplayName.string(), ##__VA_ARGS__)
-#define DISPLAY_LOGI(msg, ...) ALOGI("[%s] " msg, mDisplayName.string(), ##__VA_ARGS__)
-#define DISPLAY_LOGW(msg, ...) ALOGW("[%s] " msg, mDisplayName.string(), ##__VA_ARGS__)
+#define DISPLAY_LOGV(msg, ...) ALOGV("[%s] " msg, mDisplayName.c_str(), ##__VA_ARGS__)
+#define DISPLAY_LOGI(msg, ...) ALOGI("[%s] " msg, mDisplayName.c_str(), ##__VA_ARGS__)
+#define DISPLAY_LOGW(msg, ...) ALOGW("[%s] " msg, mDisplayName.c_str(), ##__VA_ARGS__)
 #define DISPLAY_LOGE(msg, ...) \
     {\
-        ALOGE("[%s] " msg, mDisplayName.string(), ##__VA_ARGS__); \
+        ALOGE("[%s] " msg, mDisplayName.c_str(), ##__VA_ARGS__); \
         String8 saveString; \
         saveString.appendFormat(msg, ##__VA_ARGS__); \
         saveErrorLog(saveString, this); \
     }
 
 #define DISPLAY_DRM_LOGI(msg, ...) \
-    ALOGI("[%s] " msg, mExynosDisplay->mDisplayName.string(), ##__VA_ARGS__)
+    ALOGI("[%s] " msg, mExynosDisplay->mDisplayName.c_str(), ##__VA_ARGS__)
 #define DISPLAY_DRM_LOGW(msg, ...) \
-    ALOGW("[%s] " msg, mExynosDisplay->mDisplayName.string(), ##__VA_ARGS__)
+    ALOGW("[%s] " msg, mExynosDisplay->mDisplayName.c_str(), ##__VA_ARGS__)
 #define DISPLAY_DRM_LOGE(msg, ...) \
-    ALOGE("[%s] " msg, mExynosDisplay->mDisplayName.string(), ##__VA_ARGS__)
+    ALOGE("[%s] " msg, mExynosDisplay->mDisplayName.c_str(), ##__VA_ARGS__)
 
-#define MPP_LOGV(msg, ...) ALOGV("[%s][%d] " msg, mName.string(), mLogicalIndex, ##__VA_ARGS__)
-#define MPP_LOGI(msg, ...) ALOGI("[%s][%d] " msg, mName.string(), mLogicalIndex, ##__VA_ARGS__)
-#define MPP_LOGW(msg, ...) ALOGW("[%s][%d] " msg, mName.string(), mLogicalIndex, ##__VA_ARGS__)
+#define MPP_LOGV(msg, ...) ALOGV("[%s][%d] " msg, mName.c_str(), mLogicalIndex, ##__VA_ARGS__)
+#define MPP_LOGI(msg, ...) ALOGI("[%s][%d] " msg, mName.c_str(), mLogicalIndex, ##__VA_ARGS__)
+#define MPP_LOGW(msg, ...) ALOGW("[%s][%d] " msg, mName.c_str(), mLogicalIndex, ##__VA_ARGS__)
 #define MPP_LOGE(msg, ...) \
     {\
-        ALOGE("[%s][%d] " msg, mName.string(), mLogicalIndex, ##__VA_ARGS__); \
+        ALOGE("[%s][%d] " msg, mName.c_str(), mLogicalIndex, ##__VA_ARGS__); \
         String8 saveString; \
         saveString.appendFormat(msg, ##__VA_ARGS__); \
         saveErrorLog(saveString, mAssignedDisplay); \
@@ -148,29 +148,29 @@ public:
     if (CC_UNLIKELY(ATRACE_ENABLED())) {            \
         String8 traceName;                          \
         traceName.appendFormat(fmt, ##__VA_ARGS__); \
-        ATRACE_BEGIN(traceName.string());           \
+        ATRACE_BEGIN(traceName.c_str());            \
     }                                               \
     ScopedTraceEnder traceEnder
 
-#define DISPLAY_ATRACE_NAME(name) ATRACE_FORMAT("%s for %s", name, mDisplayTraceName.string())
+#define DISPLAY_ATRACE_NAME(name) ATRACE_FORMAT("%s for %s", name, mDisplayTraceName.c_str())
 #define DISPLAY_ATRACE_CALL() DISPLAY_ATRACE_NAME(__func__)
-#define DISPLAY_ATRACE_INT(name, value)                                                     \
-    if (CC_UNLIKELY(ATRACE_ENABLED())) {                                                    \
-        ATRACE_INT(String8::format("%s for %s", name, mDisplayTraceName.string()).string(), \
-                   value);                                                                  \
+#define DISPLAY_ATRACE_INT(name, value)                                                   \
+    if (CC_UNLIKELY(ATRACE_ENABLED())) {                                                  \
+        ATRACE_INT(String8::format("%s for %s", name, mDisplayTraceName.c_str()).c_str(), \
+                   value);                                                                \
     }
-#define DISPLAY_ATRACE_INT64(name, value)                                                     \
-    if (CC_UNLIKELY(ATRACE_ENABLED())) {                                                      \
-        ATRACE_INT64(String8::format("%s for %s", name, mDisplayTraceName.string()).string(), \
-                     value);                                                                  \
+#define DISPLAY_ATRACE_INT64(name, value)                                                   \
+    if (CC_UNLIKELY(ATRACE_ENABLED())) {                                                    \
+        ATRACE_INT64(String8::format("%s for %s", name, mDisplayTraceName.c_str()).c_str(), \
+                     value);                                                                \
     }
 
 #define DISPLAY_LOGD_AND_ATRACE_NAME(debugFlag, fmt, ...)                    \
     if (hwcCheckDebugMessages(debugFlag) || CC_UNLIKELY(ATRACE_ENABLED())) { \
         String8 log;                                                         \
         log.appendFormat((fmt), ##__VA_ARGS__);                              \
-        DISPLAY_LOGD(debugFlag, "%s", log.string());                         \
-        if (CC_UNLIKELY(ATRACE_ENABLED())) ATRACE_NAME(log.string());        \
+        DISPLAY_LOGD(debugFlag, "%s", log.c_str());                          \
+        if (CC_UNLIKELY(ATRACE_ENABLED())) ATRACE_NAME(log.c_str());         \
     }
 
 #endif

@@ -551,7 +551,7 @@ void dumpExynosImage(uint32_t type, exynos_image &img)
     String8 result;
     dumpExynosImage(result, img);
 
-    ALOGD("%s", result.string());
+    ALOGD("%s", result.c_str());
 }
 
 void dumpExynosImage(String8& result, exynos_image &img)
@@ -559,12 +559,12 @@ void dumpExynosImage(String8& result, exynos_image &img)
     result.appendFormat("\tbufferHandle: %p, fullWidth: %d, fullHeight: %d, x: %d, y: %d, w: %d, "
                         "h: %d, format: %s\n",
                         img.bufferHandle, img.fullWidth, img.fullHeight, img.x, img.y, img.w, img.h,
-                        getFormatStr(img.format, img.compressionInfo.type).string());
+                        getFormatStr(img.format, img.compressionInfo.type).c_str());
     result.appendFormat("\tusageFlags: 0x%" PRIx64 ", layerFlags: 0x%8x, acquireFenceFd: %d, releaseFenceFd: %d\n",
             img.usageFlags, img.layerFlags, img.acquireFenceFd, img.releaseFenceFd);
     result.appendFormat("\tdataSpace(%d), blending(%d), transform(0x%2x), compression: %s\n",
                         img.dataSpace, img.blending, img.transform,
-                        getCompressionStr(img.compressionInfo).string());
+                        getCompressionStr(img.compressionInfo).c_str());
     if (img.bufferHandle != NULL) {
         VendorGraphicBufferMeta gmeta(img.bufferHandle);
         result.appendFormat("\tbuffer's stride: %d, %d\n", gmeta.stride, gmeta.vstride);
@@ -995,7 +995,7 @@ void FenceTracker::printLastFenceInfoLocked(uint32_t fd) {
 
     for (const auto &trace : info.traces) {
         FT_LOGD("> dir: %d, type: %d, ip: %d, time:%s", trace.direction, trace.type, trace.ip,
-                getLocalTimeStr(trace.time).string());
+                getLocalTimeStr(trace.time).c_str());
     }
 }
 
@@ -1025,7 +1025,7 @@ void FenceTracker::printLeakFdsLocked() {
             }
         }
 
-        FT_LOGW("%s", errString.string());
+        FT_LOGW("%s", errString.c_str());
     };
 
     reportLeakFdsLocked(+1);
@@ -1123,7 +1123,7 @@ int32_t FenceTracker::saveFenceTraceLocked(ExynosDisplay *display) {
 
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    saveString.appendFormat("\n====== Fences at time:%s ======\n", getLocalTimeStr(tv).string());
+    saveString.appendFormat("\n====== Fences at time:%s ======\n", getLocalTimeStr(tv).c_str());
 
     for (const auto &[fd, info] : mFenceInfos) {
         saveString.appendFormat("---- Fence FD : %d, Display(%d) ----\n", fd, info.displayId);
@@ -1132,7 +1132,7 @@ int32_t FenceTracker::saveFenceTraceLocked(ExynosDisplay *display) {
 
         for (const auto &trace : info.traces) {
             saveString.appendFormat("> dir: %d, type: %d, ip: %d, time:%s\n", trace.direction,
-                                    trace.type, trace.ip, getLocalTimeStr(trace.time).string());
+                                    trace.type, trace.ip, getLocalTimeStr(trace.time).c_str());
         }
     }
 

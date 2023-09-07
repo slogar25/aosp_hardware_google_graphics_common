@@ -32,8 +32,8 @@ int32_t saveErrorLog(const String8 &errString, ExynosDisplay *display) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    saveString.appendFormat("%s errFrameNumber %" PRIu64 ": %s\n", getLocalTimeStr(tv).string(),
-                            display->mErrorFrameCount, errString.string());
+    saveString.appendFormat("%s errFrameNumber %" PRIu64 ": %s\n", getLocalTimeStr(tv).c_str(),
+                            display->mErrorFrameCount, errString.c_str());
 
     fileWriter.write(saveString);
     fileWriter.flush();

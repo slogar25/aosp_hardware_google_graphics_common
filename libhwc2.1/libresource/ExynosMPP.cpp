@@ -815,7 +815,7 @@ bool ExynosMPP::ResourceManageThread::threadLoop()
     if (mExynosMPP == NULL)
         return false;
 
-    ALOGI("%s threadLoop is started", mExynosMPP->mName.string());
+    ALOGI("%s threadLoop is started", mExynosMPP->mName.c_str());
     while(mRunning) {
         Mutex::Autolock lock(mMutex);
         while((mFreedBuffers.size() == 0) &&
@@ -832,7 +832,7 @@ bool ExynosMPP::ResourceManageThread::threadLoop()
             if ((mStateFences.size() != 0) &&
                     (mExynosMPP->mHWState != MPP_HW_STATE_RUNNING)) {
                 ALOGW("%s, mHWState(%d) but mStateFences size(%zu)",
-                        mExynosMPP->mName.string(), mExynosMPP->mHWState,
+                        mExynosMPP->mName.c_str(), mExynosMPP->mHWState,
                         mStateFences.size());
                 checkStateFences();
             }
@@ -860,14 +860,14 @@ void ExynosMPP::ResourceManageThread::freeBuffers()
         dumpExynosMPPImgInfo(eDebugMPP|eDebugFence|eDebugBuf, freeBuffer);
         if (fence_valid(freeBuffer.acrylicAcquireFenceFd)) {
             if (sync_wait(freeBuffer.acrylicAcquireFenceFd, 1000) < 0)
-                HWC_LOGE(NULL, "%s:: acquire fence sync_wait error", mExynosMPP->mName.string());
+                HWC_LOGE(NULL, "%s:: acquire fence sync_wait error", mExynosMPP->mName.c_str());
             freeBuffer.acrylicAcquireFenceFd =
                 fence_close(freeBuffer.acrylicAcquireFenceFd, mExynosMPP->mAssignedDisplay,
                         FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_ALL);
         }
         if (fence_valid(freeBuffer.acrylicReleaseFenceFd)) {
             if (sync_wait(freeBuffer.acrylicReleaseFenceFd, 1000) < 0)
-                HWC_LOGE(NULL, "%s:: release fence sync_wait error", mExynosMPP->mName.string());
+                HWC_LOGE(NULL, "%s:: release fence sync_wait error", mExynosMPP->mName.c_str());
             freeBuffer.acrylicReleaseFenceFd =
                 fence_close(freeBuffer.acrylicReleaseFenceFd, mExynosMPP->mAssignedDisplay,
                         FENCE_TYPE_SRC_RELEASE, FENCE_IP_ALL);
@@ -893,7 +893,7 @@ bool ExynosMPP::ResourceManageThread::checkStateFences()
         if (fence_valid(fence)) {
             if (sync_wait(fence, 5000) < 0) {
                 HWC_LOGE(NULL, "%s::[%s][%d] sync_wait(%d) error(%s)", __func__,
-                        mExynosMPP->mName.string(), mExynosMPP->mLogicalIndex, fence, strerror(errno));
+                        mExynosMPP->mName.c_str(), mExynosMPP->mLogicalIndex, fence, strerror(errno));
                 ret = false;
             }
             fence = fence_close(fence, mExynosMPP->mAssignedDisplay,
@@ -2898,7 +2898,7 @@ void ExynosMPP::dump(String8& result)
         assignedDisplayType = mAssignedDisplay->mType;
 
     result.appendFormat("%s: types mppType(%d), (p:%d, l:0x%2x), indexs(p:%d, l:%d), preAssignDisplay(0x%2x)\n",
-            mName.string(), mMPPType, mPhysicalType, mLogicalType, mPhysicalIndex, mLogicalIndex, mPreAssignDisplayInfo);
+            mName.c_str(), mMPPType, mPhysicalType, mLogicalType, mPhysicalIndex, mLogicalIndex, mPreAssignDisplayInfo);
     result.appendFormat("\tEnable: %d, HWState: %d, AssignedState: %d, assignedDisplay(%d)\n",
             mEnable, mHWState, mAssignedState, assignedDisplayType);
     result.appendFormat("\tPrevAssignedState: %d, PrevAssignedDisplayType: %d, ReservedDisplay: %d\n",

@@ -168,12 +168,12 @@ ExynosDevice::ExynosDevice()
     }
 
     for (auto it : mDisplays) {
-        std::string displayName = std::string(it->mDisplayName.string());
+        std::string displayName = std::string(it->mDisplayName.c_str());
         it->mErrLogFileWriter.setPrefixName(displayName + "_hwc_error_log");
         it->mDebugDumpFileWriter.setPrefixName(displayName + "_hwc_debug");
         it->mFenceFileWriter.setPrefixName(displayName + "_hwc_fence_state");
         String8 saveString;
-        saveString.appendFormat("ExynosDisplay %s is initialized", it->mDisplayName.string());
+        saveString.appendFormat("ExynosDisplay %s is initialized", it->mDisplayName.c_str());
         saveErrorLog(saveString, it);
     }
 
@@ -409,7 +409,7 @@ void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
         size_t copySize = min(static_cast<size_t>(*outSize), result.size());
         ALOGI("HWC dump:: resultSize(%zu), outSize(%d), copySize(%zu)", result.size(), *outSize,
               copySize);
-        strlcpy(outBuffer, result.string(), copySize);
+        strlcpy(outBuffer, result.c_str(), copySize);
     }
 }
 
@@ -989,7 +989,7 @@ void  ExynosDevice::captureReadbackClass::saveToFile(const String8 &fileName)
     VendorGraphicBufferMeta gmeta(mBuffer);
 
     snprintf(filePath, MAX_DEV_NAME,
-            "%s/%s", WRITEBACK_CAPTURE_PATH, fileName.string());
+            "%s/%s", WRITEBACK_CAPTURE_PATH, fileName.c_str());
     FILE *fp = fopen(filePath, "w");
     if (fp) {
         uint32_t writeSize =
