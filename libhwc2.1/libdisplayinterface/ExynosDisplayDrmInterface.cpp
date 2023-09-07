@@ -1110,7 +1110,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayVsyncPeriod(hwc2_vsync_period_t* ou
 
 int32_t ExynosDisplayDrmInterface::getConfigChangeDuration()
 {
-    const auto [ret, duration] = mDrmConnector->vrr_switch_duration().value();
+    const auto [ret, duration] = mDrmConnector->rr_switch_duration().value();
 
     if (!ret && duration > 0) {
         return duration;

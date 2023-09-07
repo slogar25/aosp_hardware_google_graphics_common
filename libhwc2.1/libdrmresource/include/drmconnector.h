@@ -86,7 +86,7 @@ class DrmConnector {
   const DrmProperty &lhbm_on() const;
   const DrmProperty &mipi_sync() const;
   const DrmProperty &panel_idle_support() const;
-  const DrmProperty &vrr_switch_duration() const;
+  const DrmProperty &rr_switch_duration() const;
   const DrmProperty &operation_rate() const;
   const DrmProperty &refresh_on_lp() const;
 
@@ -147,7 +147,7 @@ class DrmConnector {
   DrmProperty lhbm_on_;
   DrmProperty mipi_sync_;
   DrmProperty panel_idle_support_;
-  DrmProperty vrr_switch_duration_;
+  DrmProperty rr_switch_duration_;
   DrmProperty operation_rate_;
   DrmProperty refresh_on_lp_;
   std::vector<DrmProperty *> properties_;

@@ -4023,7 +4023,7 @@ int32_t ExynosDisplay::setDisplayBrightness(float brightness, bool waitPresent)
         ret = mBrightnessController->processDisplayBrightness(brightness, mVsyncPeriod,
                                                               waitPresent);
         if (ret == NO_ERROR) {
-            setMinIdleRefreshRate(0, VrrThrottleRequester::BRIGHTNESS);
+            setMinIdleRefreshRate(0, RrThrottleRequester::BRIGHTNESS);
             if (mOperationRateManager) {
                 mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
                 handleTargetOperationRate();
@@ -4048,7 +4048,7 @@ int32_t ExynosDisplay::setBrightnessNits(const float nits)
         int32_t ret = mBrightnessController->setBrightnessNits(nits, mVsyncPeriod);
 
         if (ret == NO_ERROR) {
-            setMinIdleRefreshRate(0, VrrThrottleRequester::BRIGHTNESS);
+            setMinIdleRefreshRate(0, RrThrottleRequester::BRIGHTNESS);
             if (mOperationRateManager)
                 mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
         }
@@ -6018,7 +6018,7 @@ void ExynosDisplay::cleanupAfterClientDeath() {
 
 int32_t ExynosDisplay::flushDisplayBrightnessChange() {
     if (mBrightnessController) {
-        setMinIdleRefreshRate(0, VrrThrottleRequester::BRIGHTNESS);
+        setMinIdleRefreshRate(0, RrThrottleRequester::BRIGHTNESS);
         if (mOperationRateManager) {
             mOperationRateManager->onBrightness(mBrightnessController->getBrightnessLevel());
             handleTargetOperationRate();
