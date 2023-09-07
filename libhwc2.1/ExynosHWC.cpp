@@ -520,10 +520,10 @@ int32_t exynos_presentDisplay(hwc2_device_t *dev, hwc2_display_t display,
 
         if (exynosDisplay->mHWCRenderingState == RENDERING_STATE_VALIDATED) {
             ALOGI("%s:: acceptDisplayChanges was not called",
-                    exynosDisplay->mDisplayName.string());
+                    exynosDisplay->mDisplayName.c_str());
             if (exynosDisplay->acceptDisplayChanges() != HWC2_ERROR_NONE) {
                 ALOGE("%s:: acceptDisplayChanges is failed",
-                        exynosDisplay->mDisplayName.string());
+                        exynosDisplay->mDisplayName.c_str());
             }
         }
         int32_t ret = exynosDisplay->presentDisplay(outRetireFence);

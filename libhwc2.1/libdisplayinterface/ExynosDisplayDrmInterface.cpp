@@ -620,12 +620,12 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     mReadbackInfo.init(mDrmDevice, drmDisplayId);
     if ((mDrmCrtc = mDrmDevice->GetCrtcForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetCrtcForDisplay is NULL (id: %d)",
-                mExynosDisplay->mDisplayName.string(), drmDisplayId);
+                mExynosDisplay->mDisplayName.c_str(), drmDisplayId);
         return -EINVAL;
     }
     if ((mDrmConnector = mDrmDevice->GetConnectorForDisplay(drmDisplayId)) == NULL) {
         ALOGE("%s:: GetConnectorForDisplay is NULL (id: %d)",
-                mExynosDisplay->mDisplayName.string(), drmDisplayId);
+                mExynosDisplay->mDisplayName.c_str(), drmDisplayId);
         return -EINVAL;
     }
 
@@ -954,7 +954,7 @@ void ExynosDisplayDrmInterface::dumpDisplayConfigs()
     for (uint32_t i = 0; i < num_modes; i++) {
         auto mode = mDrmConnector->modes().at(i);
         ALOGD("%s display config[%d] %s:: id(%d), clock(%d), flags(%d), type(%d)",
-                mExynosDisplay->mDisplayName.string(), i, mode.name().c_str(), mode.id(), mode.clock(), mode.flags(), mode.type());
+                mExynosDisplay->mDisplayName.c_str(), i, mode.name().c_str(), mode.id(), mode.clock(), mode.flags(), mode.type());
         ALOGD("\th_display(%d), h_sync_start(%d), h_sync_end(%d), h_total(%d), h_skew(%d)",
                 mode.h_display(), mode.h_sync_start(), mode.h_sync_end(), mode.h_total(), mode.h_skew());
         ALOGD("\tv_display(%d), v_sync_start(%d), v_sync_end(%d), v_total(%d), v_scan(%d), v_refresh(%f)",
@@ -1081,7 +1081,7 @@ int32_t ExynosDisplayDrmInterface::setColorMode(int32_t mode)
 int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
         hwc2_config_t config, bool test)
 {
-    ALOGD("%s:: %s config(%d) test(%d)", __func__, mExynosDisplay->mDisplayName.string(), config,
+    ALOGD("%s:: %s config(%d) test(%d)", __func__, mExynosDisplay->mDisplayName.c_str(), config,
           test);
     auto mode = std::find_if(mDrmConnector->modes().begin(), mDrmConnector->modes().end(),
             [config](DrmMode const &m) { return m.id() == config;});
@@ -1206,9 +1206,9 @@ int32_t ExynosDisplayDrmInterface::setActiveConfig(hwc2_config_t config) {
 
     mExynosDisplay->updateAppliedActiveConfig(config, systemTime(SYSTEM_TIME_MONOTONIC));
     if (!setActiveDrmMode(*mode)) {
-        ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.string(), config);
+        ALOGI("%s:: %s config(%d)", __func__, mExynosDisplay->mDisplayName.c_str(), config);
     } else {
-        ALOGE("%s:: %s config(%d) failed", __func__, mExynosDisplay->mDisplayName.string(), config);
+        ALOGE("%s:: %s config(%d) failed", __func__, mExynosDisplay->mDisplayName.c_str(), config);
     }
 
     return 0;
@@ -1332,7 +1332,7 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_DOLBY_VISION);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
-                mExynosDisplay->mDisplayName.string(), HAL_HDR_DOLBY_VISION);
+                mExynosDisplay->mDisplayName.c_str(), HAL_HDR_DOLBY_VISION);
     }
     std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HDR10");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
@@ -1341,23 +1341,23 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
             mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10_PLUS);
         }
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
-                mExynosDisplay->mDisplayName.string(), HAL_HDR_HDR10);
+                mExynosDisplay->mDisplayName.c_str(), HAL_HDR_HDR10);
     }
     std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HLG");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HLG);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
-                mExynosDisplay->mDisplayName.string(), HAL_HDR_HLG);
+                mExynosDisplay->mDisplayName.c_str(), HAL_HDR_HLG);
     }
 
     ALOGI("%s: get hdrCapabilities info max_luminance(%" PRId64 "), "
             "max_avg_luminance(%" PRId64 "), min_luminance(%" PRId64 "), "
             "hdr_formats(0x%" PRIx64 ")",
-            mExynosDisplay->mDisplayName.string(),
+            mExynosDisplay->mDisplayName.c_str(),
             max_luminance, max_avg_luminance, min_luminance, hdr_formats);
 
     ALOGI("%s: mHdrTypes size(%zu), maxLuminance(%f), maxAverageLuminance(%f), minLuminance(%f)",
-            mExynosDisplay->mDisplayName.string(), mExynosDisplay->mHdrTypes.size(), mExynosDisplay->mMaxLuminance,
+            mExynosDisplay->mDisplayName.c_str(), mExynosDisplay->mHdrTypes.size(), mExynosDisplay->mMaxLuminance,
             mExynosDisplay->mMaxAverageLuminance, mExynosDisplay->mMinLuminance);
 
     return 0;
@@ -1579,7 +1579,7 @@ int32_t ExynosDisplayDrmInterface::setupPartialRegion(DrmModeAtomicReq &drmReq)
 
         HDEBUGLOGD(eDebugWindowUpdate,
                 "%s: partial region updated [%d, %d, %d, %d] -> [%d, %d, %d, %d] blob(%d)",
-                mExynosDisplay->mDisplayName.string(),
+                mExynosDisplay->mDisplayName.c_str(),
                 mPartialRegionState.partial_rect.x1,
                 mPartialRegionState.partial_rect.y1,
                 mPartialRegionState.partial_rect.x2,
@@ -2050,7 +2050,7 @@ ExynosDisplayDrmInterface::DrmModeAtomicReq::~DrmModeAtomicReq()
         result.appendFormat("atomic commit error\n");
         if (hwcCheckDebugMessages(eDebugDisplayInterfaceConfig) == false)
             dumpAtomicCommitInfo(result);
-        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.string());
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "%s", result.c_str());
     }
 
     if(mPset)
@@ -2093,7 +2093,7 @@ String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
         return result;
 
     if (debugPrint)
-        ALOGD("%s atomic config ++++++++++++", mDrmDisplayInterface->mExynosDisplay->mDisplayName.string());
+        ALOGD("%s atomic config ++++++++++++", mDrmDisplayInterface->mExynosDisplay->mDisplayName.c_str());
 
     for (int i = 0; i < drmModeAtomicGetCursor(mPset); i++) {
         const DrmProperty *property = NULL;
@@ -2155,10 +2155,10 @@ String8& ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpAtomicCommitInfo(
 
         if (debugPrint)
             ALOGD("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
-                    i, objectName.string(), mPset->items[i].object_id, mPset->items[i].property_id, property->name().c_str(), mPset->items[i].value);
+                    i, objectName.c_str(), mPset->items[i].object_id, mPset->items[i].property_id, property->name().c_str(), mPset->items[i].value);
         else
             result.appendFormat("property[%d] %s object_id: %d, property_id: %d, name: %s,  value: %" PRId64 ")\n",
-                i,  objectName.string(), mPset->items[i].object_id, mPset->items[i].property_id, property->name().c_str(), mPset->items[i].value);
+                i,  objectName.c_str(), mPset->items[i].object_id, mPset->items[i].property_id, property->name().c_str(), mPset->items[i].value);
     }
     return result;
 }
@@ -2397,14 +2397,14 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
 {
     if ((mDrmDevice == nullptr) || (mDrmConnector == nullptr)) {
         ALOGE("%s: display(%s) mDrmDevice(%p), mDrmConnector(%p)",
-                __func__, mExynosDisplay->mDisplayName.string(),
+                __func__, mExynosDisplay->mDisplayName.c_str(),
                 mDrmDevice, mDrmConnector);
         return HWC2_ERROR_UNSUPPORTED;
     }
 
     if (mDrmConnector->edid_property().id() == 0) {
         ALOGD("%s: edid_property is not supported",
-                mExynosDisplay->mDisplayName.string());
+                mExynosDisplay->mDisplayName.c_str());
         return HWC2_ERROR_UNSUPPORTED;
     }
 
@@ -2421,14 +2421,14 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     }
     if (blobId == 0) {
         ALOGD("%s: edid_property is supported but blob is not valid",
-                mExynosDisplay->mDisplayName.string());
+                mExynosDisplay->mDisplayName.c_str());
         return getDisplayFakeEdid(*outPort, *outDataSize, outData);
     }
 
     blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId);
     if (blob == nullptr) {
         ALOGD("%s: Failed to get blob",
-                mExynosDisplay->mDisplayName.string());
+                mExynosDisplay->mDisplayName.c_str());
         return HWC2_ERROR_UNSUPPORTED;
     }
 

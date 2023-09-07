@@ -558,10 +558,10 @@ int32_t HalImpl::presentDisplay(int64_t display, ndk::ScopedFileDescriptor& fenc
 
    // TODO: not expect acceptDisplayChanges if there are no changes to accept
     if (halDisplay->mRenderingState == RENDERING_STATE_VALIDATED) {
-        LOG(INFO) << halDisplay->mDisplayName.string()
+        LOG(INFO) << halDisplay->mDisplayName.c_str()
                    << ": acceptDisplayChanges was not called";
         if (halDisplay->acceptDisplayChanges() != HWC2_ERROR_NONE) {
-            LOG(ERROR) << halDisplay->mDisplayName.string()
+            LOG(ERROR) << halDisplay->mDisplayName.c_str()
             << ": acceptDisplayChanges is failed";
         }
     }

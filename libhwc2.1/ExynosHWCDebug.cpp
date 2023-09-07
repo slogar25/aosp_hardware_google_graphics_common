@@ -53,15 +53,15 @@ int32_t saveErrorLog(const String8 &errString, ExynosDisplay *display)
     gettimeofday(&tv, NULL);
 
     if (display != NULL) {
-        saveString.appendFormat("%s %s %" PRIu64 ": %s\n", getLocalTimeStr(tv).string(),
-                                display->mDisplayName.string(), display->mErrorFrameCount,
-                                errString.string());
+        saveString.appendFormat("%s %s %" PRIu64 ": %s\n", getLocalTimeStr(tv).c_str(),
+                                display->mDisplayName.c_str(), display->mErrorFrameCount,
+                                errString.c_str());
     } else {
-        saveString.appendFormat("%s : %s\n", getLocalTimeStr(tv).string(), errString.string());
+        saveString.appendFormat("%s : %s\n", getLocalTimeStr(tv).c_str(), errString.c_str());
     }
 
     if (pFile != NULL) {
-        fwrite(saveString.string(), 1, saveString.size(), pFile);
+        fwrite(saveString.c_str(), 1, saveString.size(), pFile);
         mErrLogSize = (uint32_t)ftell(pFile);
         ret = mErrLogSize;
         fclose(pFile);
@@ -102,7 +102,7 @@ int32_t saveFenceTrace(ExynosDisplay *display) {
 
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    saveString.appendFormat("\n====== Fences at time:%s ======\n", getLocalTimeStr(tv).string());
+    saveString.appendFormat("\n====== Fences at time:%s ======\n", getLocalTimeStr(tv).c_str());
 
     if (device != NULL) {
         for (const auto &[fd, info] : device->mFenceInfos) {
@@ -112,13 +112,13 @@ int32_t saveFenceTrace(ExynosDisplay *display) {
 
             for (const auto &trace : info.traces) {
                 saveString.appendFormat("> dir: %d, type: %d, ip: %d, time:%s\n", trace.direction,
-                                        trace.type, trace.ip, getLocalTimeStr(trace.time).string());
+                                        trace.type, trace.ip, getLocalTimeStr(trace.time).c_str());
             }
         }
     }
 
     if (pFile != NULL) {
-        fwrite(saveString.string(), 1, saveString.size(), pFile);
+        fwrite(saveString.c_str(), 1, saveString.size(), pFile);
         mFenceLogSize = (uint32_t)ftell(pFile);
         ret = mFenceLogSize;
         fclose(pFile);

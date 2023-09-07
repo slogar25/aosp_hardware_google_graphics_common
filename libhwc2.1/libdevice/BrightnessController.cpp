@@ -89,9 +89,9 @@ void BrightnessController::initDimmingUsage() {
 void BrightnessController::initBrightnessSysfs() {
     String8 nodeName;
     nodeName.appendFormat(BRIGHTNESS_SYSFS_NODE, mPanelIndex);
-    mBrightnessOfs.open(nodeName.string(), std::ofstream::out);
+    mBrightnessOfs.open(nodeName.c_str(), std::ofstream::out);
     if (mBrightnessOfs.fail()) {
-        ALOGE("%s %s fail to open", __func__, nodeName.string());
+        ALOGE("%s %s fail to open", __func__, nodeName.c_str());
         mBrightnessOfs.close();
         return;
     }
@@ -99,9 +99,9 @@ void BrightnessController::initBrightnessSysfs() {
     nodeName.clear();
     nodeName.appendFormat(MAX_BRIGHTNESS_SYSFS_NODE, mPanelIndex);
 
-    std::ifstream ifsMaxBrightness(nodeName.string());
+    std::ifstream ifsMaxBrightness(nodeName.c_str());
     if (ifsMaxBrightness.fail()) {
-        ALOGE("%s fail to open %s", __func__, nodeName.string());
+        ALOGE("%s fail to open %s", __func__, nodeName.c_str());
         return;
     }
 
@@ -116,9 +116,9 @@ void BrightnessController::initCabcSysfs() {
     String8 nodeName;
     nodeName.appendFormat(kLocalCabcModeFileNode, mPanelIndex);
 
-    mCabcModeOfs.open(nodeName.string(), std::ofstream::out);
+    mCabcModeOfs.open(nodeName.c_str(), std::ofstream::out);
     if (mCabcModeOfs.fail()) {
-        ALOGE("%s %s fail to open", __func__, nodeName.string());
+        ALOGE("%s %s fail to open", __func__, nodeName.c_str());
         mCabcModeOfs.close();
         return;
     }
@@ -165,9 +165,9 @@ void BrightnessController::initBrightnessTable(const DrmDevice& drmDevice,
     String8 nodeName;
     nodeName.appendFormat(kDimBrightnessFileNode, mPanelIndex);
 
-    std::ifstream ifsDimBrightness(nodeName.string());
+    std::ifstream ifsDimBrightness(nodeName.c_str());
     if (ifsDimBrightness.fail()) {
-        ALOGW("%s fail to open %s", __func__, nodeName.string());
+        ALOGW("%s fail to open %s", __func__, nodeName.c_str());
     } else {
         ifsDimBrightness >> mDimBrightness;
         ifsDimBrightness.close();
@@ -707,7 +707,7 @@ int BrightnessController::checkSysfsStatus(const char* file,
     char buf[16];
     String8 nodeName;
     nodeName.appendFormat(file, mPanelIndex);
-    UniqueFd fd = open(nodeName.string(), O_RDONLY);
+    UniqueFd fd = open(nodeName.c_str(), O_RDONLY);
 
     int size = read(fd.get(), buf, sizeof(buf));
     if (size <= 0) {

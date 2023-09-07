@@ -464,7 +464,7 @@ void dumpExynosImage(uint32_t type, exynos_image &img)
     String8 result;
     dumpExynosImage(result, img);
 
-    ALOGD("%s", result.string());
+    ALOGD("%s", result.c_str());
 }
 
 void dumpExynosImage(String8& result, exynos_image &img)
@@ -472,7 +472,7 @@ void dumpExynosImage(String8& result, exynos_image &img)
     result.appendFormat("\tbufferHandle: %p, fullWidth: %d, fullHeight: %d, x: %d, y: %d, w: %d, "
                         "h: %d, format: %s\n",
                         img.bufferHandle, img.fullWidth, img.fullHeight, img.x, img.y, img.w, img.h,
-                        getFormatStr(img.format, img.compressed ? AFBC : 0).string());
+                        getFormatStr(img.format, img.compressed ? AFBC : 0).c_str());
     result.appendFormat("\tusageFlags: 0x%" PRIx64 ", layerFlags: 0x%8x, acquireFenceFd: %d, releaseFenceFd: %d\n",
             img.usageFlags, img.layerFlags, img.acquireFenceFd, img.releaseFenceFd);
     result.appendFormat("\tdataSpace(%d), blending(%d), transform(0x%2x), afbc(%d)\n",
@@ -891,7 +891,7 @@ void printLastFenceInfo(uint32_t fd, ExynosDisplay* display) {
 
     for (const auto& trace : info.traces) {
         FT_LOGD("> dir: %d, type: %d, ip: %d, time:%s", trace.direction, trace.type, trace.ip,
-                getLocalTimeStr(trace.time).string());
+                getLocalTimeStr(trace.time).c_str());
     }
 }
 
@@ -925,7 +925,7 @@ void printLeakFds(ExynosDisplay* display) {
             }
         }
 
-        FT_LOGW("%s", errString.string());
+        FT_LOGW("%s", errString.c_str());
     };
 
     reportLeakFds(+1);

@@ -399,7 +399,7 @@ void ExynosDevice::dump(uint32_t *outSize, char *outBuffer) {
         size_t copySize = min(static_cast<size_t>(*outSize), result.size());
         ALOGI("HWC dump:: resultSize(%zu), outSize(%d), copySize(%zu)", result.size(), *outSize,
               copySize);
-        strlcpy(outBuffer, result.string(), copySize);
+        strlcpy(outBuffer, result.c_str(), copySize);
     }
 }
 
@@ -981,7 +981,7 @@ void  ExynosDevice::captureReadbackClass::saveToFile(const String8 &fileName)
     VendorGraphicBufferMeta gmeta(mBuffer);
 
     snprintf(filePath, MAX_DEV_NAME,
-            "%s/%s", WRITEBACK_CAPTURE_PATH, fileName.string());
+            "%s/%s", WRITEBACK_CAPTURE_PATH, fileName.c_str());
     FILE *fp = fopen(filePath, "w");
     if (fp) {
         uint32_t writeSize =
