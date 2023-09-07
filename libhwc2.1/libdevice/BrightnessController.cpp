@@ -64,6 +64,21 @@ std::optional<float> BrightnessController::LinearBrightnessTable::NitsToBrightne
     return brightness;
 }
 
+std::optional<float> BrightnessController::LinearBrightnessTable::DbvToBrightness(
+        uint32_t dbv) const {
+    BrightnessMode bm = getBrightnessModeForDbv(dbv);
+    if (bm == BrightnessMode::BM_INVALID) {
+        return std::nullopt;
+    }
+
+    std::optional<float> nits = DbvToNits(bm, dbv);
+    if (nits == std::nullopt) {
+        return std::nullopt;
+    }
+
+    return NitsToBrightness(nits.value());
+}
+
 std::optional<float> BrightnessController::LinearBrightnessTable::BrightnessToNits(
         float brightness, BrightnessMode& bm) const {
     bm = GetBrightnessMode(brightness);
@@ -433,6 +448,20 @@ int BrightnessController::setBrightnessNits(float nits, const nsecs_t vsyncNs) {
 
     if (brightness == std::nullopt) {
         ALOGI("%s could not find brightness for %f nits", __func__, nits);
+        return -EINVAL;
+    }
+
+    return processDisplayBrightness(brightness.value(), vsyncNs);
+}
+
+int BrightnessController::setBrightnessDbv(uint32_t dbv, const nsecs_t vsyncNs) {
+    ALOGI("%s set brightness to %u dbv", __func__, dbv);
+
+    std::optional<float> brightness =
+            mBrightnessTable ? mBrightnessTable->DbvToBrightness(dbv) : std::nullopt;
+
+    if (brightness == std::nullopt) {
+        ALOGI("%s could not find brightness for %d dbv", __func__, dbv);
         return -EINVAL;
     }
 
