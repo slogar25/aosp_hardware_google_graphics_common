@@ -540,23 +540,41 @@ struct HwcFenceInfo {
 };
 
 class funcReturnCallback {
-    public:
-        funcReturnCallback(const std::function<void(void)> cb) : mCb(cb) {}
-        ~funcReturnCallback() { mCb(); }
-    private:
-        const std::function<void(void)> mCb;
+public:
+    funcReturnCallback(const std::function<void(void)> cb) : mCb(cb) {}
+    ~funcReturnCallback() { mCb(); }
+
+private:
+    const std::function<void(void)> mCb;
 };
 
 String8 getLocalTimeStr(struct timeval tv);
 
 void setFenceName(int fenceFd, HwcFenceType fenceType);
-void setFenceInfo(uint32_t fd, ExynosDisplay *display, HwcFdebugFenceType type, HwcFdebugIpType ip,
-                  HwcFenceDirection direction, bool pendingAllowed = false, int32_t dupFrom = -1);
-void printLastFenceInfo(uint32_t fd, ExynosDisplay *display);
-void dumpFenceInfo(ExynosDisplay *display, int32_t count);
-bool fenceWarn(ExynosDisplay *display, uint32_t threshold);
-void printLeakFds(ExynosDisplay *display);
-bool validateFencePerFrame(ExynosDisplay *display);
+void setFenceInfo(uint32_t fd, const ExynosDisplay *display, HwcFdebugFenceType type,
+                  HwcFdebugIpType ip, HwcFenceDirection direction, bool pendingAllowed = false,
+                  int32_t dupFrom = -1);
+
+class FenceTracker {
+public:
+    void updateFenceInfo(uint32_t fd, const ExynosDisplay *display, HwcFdebugFenceType type,
+                         HwcFdebugIpType ip, HwcFenceDirection direction,
+                         bool pendingAllowed = false, int32_t dupFrom = -1);
+    bool validateFences(ExynosDisplay *display);
+
+private:
+    void printLastFenceInfoLocked(uint32_t fd) REQUIRES(mFenceMutex);
+    void dumpFenceInfoLocked(int32_t count) REQUIRES(mFenceMutex);
+    void printLeakFdsLocked() REQUIRES(mFenceMutex);
+    void dumpNCheckLeakLocked() REQUIRES(mFenceMutex);
+    bool fenceWarnLocked(uint32_t threshold) REQUIRES(mFenceMutex);
+    bool validateFencePerFrameLocked(const ExynosDisplay *display) REQUIRES(mFenceMutex);
+    int32_t saveFenceTraceLocked(ExynosDisplay *display) REQUIRES(mFenceMutex);
+
+    std::map<int, HwcFenceInfo> mFenceInfos GUARDED_BY(mFenceMutex);
+    mutable std::mutex mFenceMutex;
+};
+
 android_dataspace colorModeToDataspace(android_color_mode_t mode);
 bool hasPPC(uint32_t physicalType, uint32_t formatIndex, uint32_t rotIndex);
 
