@@ -431,6 +431,18 @@ int32_t ExynosHWCService::setDisplayBrightnessNits(const int32_t display_id, con
     return -EINVAL;
 }
 
+int32_t ExynosHWCService::setDisplayBrightnessDbv(int32_t display_id, uint32_t dbv) {
+    auto display = mHWCCtx->device->getDisplay(display_id);
+
+    if (display != nullptr) {
+        return display->setBrightnessDbv(dbv);
+    } else {
+        ALOGE("ExynosHWCService::%s() invalid display id: %d\n", __func__, display_id);
+    }
+
+    return -EINVAL;
+}
+
 int32_t ExynosHWCService::setDisplayLhbm(int32_t display_id, uint32_t on) {
     if (on > 1) return -EINVAL;
 

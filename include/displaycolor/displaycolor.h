@@ -142,6 +142,7 @@ class IBrightnessTable {
     virtual std::optional<uint32_t> NitsToDbv(BrightnessMode bm, float nits) const = 0;
     virtual std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const = 0;
     virtual std::optional<float> NitsToBrightness(float nits) const = 0;
+    virtual std::optional<float> DbvToBrightness(uint32_t dbv) const = 0;
 };
 
 /**
