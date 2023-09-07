@@ -166,9 +166,9 @@ void BrightnessController::updateBrightnessTable(const IBrightnessTable* table) 
     String8 nodeName;
     nodeName.appendFormat(kDimBrightnessFileNode, mPanelIndex);
 
-    std::ifstream ifsDimBrightness(nodeName.string());
+    std::ifstream ifsDimBrightness(nodeName.c_str());
     if (ifsDimBrightness.fail()) {
-        ALOGW("%s fail to open %s", __func__, nodeName.string());
+        ALOGW("%s fail to open %s", __func__, nodeName.c_str());
     } else {
         ifsDimBrightness >> mDimBrightness;
         ifsDimBrightness.close();
@@ -214,18 +214,18 @@ void BrightnessController::initDimmingUsage() {
 void BrightnessController::initBrightnessSysfs() {
     String8 nodeName;
     nodeName.appendFormat(BRIGHTNESS_SYSFS_NODE, mPanelIndex);
-    mBrightnessOfs.open(nodeName.string(), std::ofstream::out);
+    mBrightnessOfs.open(nodeName.c_str(), std::ofstream::out);
     if (mBrightnessOfs.fail()) {
-        ALOGE("%s %s fail to open", __func__, nodeName.string());
+        ALOGE("%s %s fail to open", __func__, nodeName.c_str());
         return;
     }
 
     nodeName.clear();
     nodeName.appendFormat(MAX_BRIGHTNESS_SYSFS_NODE, mPanelIndex);
 
-    std::ifstream ifsMaxBrightness(nodeName.string());
+    std::ifstream ifsMaxBrightness(nodeName.c_str());
     if (ifsMaxBrightness.fail()) {
-        ALOGE("%s fail to open %s", __func__, nodeName.string());
+        ALOGE("%s fail to open %s", __func__, nodeName.c_str());
         return;
     }
 
@@ -234,9 +234,9 @@ void BrightnessController::initBrightnessSysfs() {
 
     nodeName.clear();
     nodeName.appendFormat(kGlobalAclModeFileNode, mPanelIndex);
-    mAclModeOfs.open(nodeName.string(), std::ofstream::out);
+    mAclModeOfs.open(nodeName.c_str(), std::ofstream::out);
     if (mAclModeOfs.fail()) {
-        ALOGI("%s %s not supported", __func__, nodeName.string());
+        ALOGI("%s %s not supported", __func__, nodeName.c_str());
     } else {
         String8 propName;
         propName.appendFormat(kAclModeDefaultPropName, mPanelIndex);
@@ -253,9 +253,9 @@ void BrightnessController::initCabcSysfs() {
     String8 nodeName;
     nodeName.appendFormat(kLocalCabcModeFileNode, mPanelIndex);
 
-    mCabcModeOfs.open(nodeName.string(), std::ofstream::out);
+    mCabcModeOfs.open(nodeName.c_str(), std::ofstream::out);
     if (mCabcModeOfs.fail()) {
-        ALOGE("%s %s fail to open", __func__, nodeName.string());
+        ALOGE("%s %s fail to open", __func__, nodeName.c_str());
         return;
     }
 }
