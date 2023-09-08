@@ -5790,6 +5790,13 @@ int32_t ExynosDisplay::getMountOrientation(HwcMountOrientation *orientation)
     return HWC2_ERROR_NONE;
 }
 
+std::optional<VrrConfig_t> ExynosDisplay::getVrrConfigs(hwc2_config_t config) {
+    if (isBadConfig(config)) {
+        return std::nullopt;
+    }
+    return mDisplayConfigs[config].vrrConfig;
+}
+
 // Support DDI scalser
 void ExynosDisplay::setDDIScalerEnable(int __unused width, int __unused height) {
 }

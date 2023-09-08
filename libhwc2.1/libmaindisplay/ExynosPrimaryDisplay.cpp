@@ -117,6 +117,9 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
               mDbvThresholdForBlockingZone);
     }
 
+    mVrrVsync.hsHz = property_get_int32("ro.vendor.primarydisplay.vrr.hs.vsync_hz", 0);
+    mVrrVsync.nsHz = property_get_int32("ro.vendor.primarydisplay.vrr.ns.vsync_hz", 0);
+
     // Allow to enable dynamic recomposition after every power on
     // since it will always be disabled for every power off
     // TODO(b/268474771): to enable DR by default if video mode panel is detected
@@ -473,6 +476,8 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
         LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
                 __func__, interfaceType);
     mDisplayInterface->init(this);
+
+    mDisplayInterface->setVrrVsync(mVrrVsync);
 
     mDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));
     mLastDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));

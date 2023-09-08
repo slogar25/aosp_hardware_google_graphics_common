@@ -17,17 +17,18 @@
 #define LOG_TAG "hwc-drm-connector"
 
 #include "drmconnector.h"
-#include "drmdevice.h"
 
+#include <cutils/properties.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <log/log.h>
 #include <stdint.h>
+#include <xf86drmMode.h>
 
 #include <array>
 #include <sstream>
 
-#include <log/log.h>
-#include <xf86drmMode.h>
+#include "drmdevice.h"
 
 #ifndef DRM_MODE_CONNECTOR_WRITEBACK
 #define DRM_MODE_CONNECTOR_WRITEBACK 18
@@ -251,7 +252,7 @@ std::string DrmConnector::name() const {
   }
 }
 
-int DrmConnector::UpdateModes() {
+int DrmConnector::UpdateModes(bool is_vrr_mode) {
   std::lock_guard<std::recursive_mutex> lock(modes_lock_);
 
   int fd = drm_->fd();
@@ -288,6 +289,10 @@ int DrmConnector::UpdateModes() {
       }
     }
     if (!exists) {
+      // Remove modes that mismatch with the VRR setting..
+      if (is_vrr_mode != ((c->modes[i].type & DRM_MODE_TYPE_VRR) != 0)) {
+        continue;
+      }
       DrmMode m(&c->modes[i]);
       m.set_id(drm_->next_mode_id());
       new_modes.push_back(m);
