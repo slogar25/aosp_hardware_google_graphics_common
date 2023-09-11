@@ -272,13 +272,13 @@ int32_t ExynosPrimaryDisplay::setBootDisplayConfig(int32_t config) {
 
     ALOGD("%s: mode=%s (%d) vsyncPeriod=%d", __func__, modeStr, config,
             mode.vsyncPeriod);
-    ret = property_set(getPropertyBootModeStr(mDisplayId).string(), modeStr);
+    ret = property_set(getPropertyBootModeStr(mDisplayId).c_str(), modeStr);
 
     return !ret ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_CONFIG;
 }
 
 int32_t ExynosPrimaryDisplay::clearBootDisplayConfig() {
-    auto ret = property_set(getPropertyBootModeStr(mDisplayId).string(), nullptr);
+    auto ret = property_set(getPropertyBootModeStr(mDisplayId).c_str(), nullptr);
 
     ALOGD("%s: clearing boot mode", __func__);
     return !ret ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_CONFIG;
@@ -286,7 +286,7 @@ int32_t ExynosPrimaryDisplay::clearBootDisplayConfig() {
 
 int32_t ExynosPrimaryDisplay::getPreferredDisplayConfigInternal(int32_t *outConfig) {
     char modeStr[PROPERTY_VALUE_MAX];
-    auto ret = property_get(getPropertyBootModeStr(mDisplayId).string(), modeStr, "");
+    auto ret = property_get(getPropertyBootModeStr(mDisplayId).c_str(), modeStr, "");
 
     if (ret <= 0) {
         return mDisplayInterface->getDefaultModeId(outConfig);

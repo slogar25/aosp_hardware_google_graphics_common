@@ -267,7 +267,7 @@ void HistogramDevice::handleDrmEvent(void *event) {
         return;
     }
 
-    ATRACE_NAME(String8::format("handleHistogramDrmEvent #%u", channelId).string());
+    ATRACE_NAME(String8::format("handleHistogramDrmEvent #%u", channelId).c_str());
     if (channelId >= mChannels.size()) {
         ALOGE("%s: histogram channel #%u: invalid channelId", __func__, channelId);
         return;
@@ -491,7 +491,7 @@ ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder &token
 
 void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t> *histogramBuffer,
                                        HistogramErrorCode *histogramErrorCode) {
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
     int32_t ret;
     ExynosDisplayDrmInterface *moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
@@ -528,7 +528,7 @@ void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t> 
     channel.histDataCollecting = true;
 
     {
-        ATRACE_NAME(String8::format("waitDrmEvent #%u", channelId).string());
+        ATRACE_NAME(String8::format("waitDrmEvent #%u", channelId).c_str());
         /* Wait until the condition variable is notified or timeout. */
         channel.histDataCollecting_cv.wait_for(lock, std::chrono::milliseconds(50),
                                                [this, &channel]() {
@@ -625,7 +625,7 @@ HistogramDevice::HistogramErrorCode HistogramDevice::getChannelIdByTokenLocked(
 }
 
 void HistogramDevice::cleanupChannelInfo(uint8_t channelId) {
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
     ChannelInfo &channel = mChannels[channelId];
     std::scoped_lock lock(channel.channelInfoMutex);
     channel.status = ChannelStatus_t::DISABLE_PENDING;
@@ -645,7 +645,7 @@ void HistogramDevice::cleanupChannelInfo(uint8_t channelId) {
 
 void HistogramDevice::fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder &token,
                                         const HistogramConfig &histogramConfig, int threshold) {
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
     ChannelInfo &channel = mChannels[channelId];
     std::scoped_lock lock(channel.channelInfoMutex);
     channel.status = ChannelStatus_t::CONFIG_PENDING;

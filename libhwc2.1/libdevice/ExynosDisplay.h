@@ -1611,7 +1611,7 @@ class ExynosDisplay {
             bool chooseOpenedFile();
             void write(const String8& content) {
                 if (mFile) {
-                    fwrite(content.string(), 1, content.size(), mFile);
+                    fwrite(content.c_str(), 1, content.size(), mFile);
                 }
             }
             void flush() {

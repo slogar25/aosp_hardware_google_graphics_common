@@ -939,9 +939,9 @@ void ExynosCompositionInfo::dump(String8& result)
         if ((mOtfMPP == NULL) && (mM2mMPP == NULL))
             result.appendFormat("\tresource is not assigned\n");
         if (mOtfMPP != NULL)
-            result.appendFormat("\tassignedMPP: %s\n", mOtfMPP->mName.string());
+            result.appendFormat("\tassignedMPP: %s\n", mOtfMPP->mName.c_str());
         if (mM2mMPP != NULL)
-            result.appendFormat("\t%s\n", mM2mMPP->mName.string());
+            result.appendFormat("\t%s\n", mM2mMPP->mName.c_str());
     }
     if (mTargetBuffer != NULL) {
         uint64_t internal_format = 0;
@@ -1554,7 +1554,7 @@ int ExynosDisplay::handleStaticLayers(ExynosCompositionInfo& compositionInfo)
                     android::String8 result;
                     result.appendFormat("config[%zu]\n", i);
                     dumpConfig(result, mLastDpuData.configs[i]);
-                    DISPLAY_LOGE("%s", result.string());
+                    DISPLAY_LOGE("%s", result.c_str());
                 }
                 DISPLAY_LOGE("compositionInfo.mLastWinConfigData config [%d, %d, %d]",
                         compositionInfo.mLastWinConfigData.fd_idma[0],
@@ -2439,8 +2439,8 @@ void ExynosDisplay::printDebugInfos(String8 &reason) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
     reason.appendFormat("errFrameNumber: %" PRId64 " time:%s\n", mErrorFrameCount,
-                        getLocalTimeStr(tv).string());
-    ALOGD("%s", reason.string());
+                        getLocalTimeStr(tv).c_str());
+    ALOGD("%s", reason.c_str());
 
     bool fileOpened = mDebugDumpFileWriter.chooseOpenedFile();
     mDebugDumpFileWriter.write(reason);
@@ -2454,13 +2454,13 @@ void ExynosDisplay::printDebugInfos(String8 &reason) {
     ExynosCompositionInfo exynosCompInfo = mExynosCompositionInfo;
     clientCompInfo.dump(result);
     exynosCompInfo.dump(result);
-    ALOGD("%s", result.string());
+    ALOGD("%s", result.c_str());
     mDebugDumpFileWriter.write(result);
     result.clear();
 
     result.appendFormat("=======================  dump exynos layers (%zu)  ================================\n",
             mLayers.size());
-    ALOGD("%s", result.string());
+    ALOGD("%s", result.c_str());
     mDebugDumpFileWriter.write(result);
     result.clear();
     for (uint32_t i = 0; i < mLayers.size(); i++) {
@@ -2476,7 +2476,7 @@ void ExynosDisplay::printDebugInfos(String8 &reason) {
     if (mIgnoreLayers.size()) {
         result.appendFormat("=======================  dump ignore layers (%zu)  ================================\n",
                             mIgnoreLayers.size());
-        ALOGD("%s", result.string());
+        ALOGD("%s", result.c_str());
         mDebugDumpFileWriter.write(result);
         result.clear();
         for (uint32_t i = 0; i < mIgnoreLayers.size(); i++) {
@@ -2491,7 +2491,7 @@ void ExynosDisplay::printDebugInfos(String8 &reason) {
     }
 
     result.appendFormat("=============================  dump win configs  ===================================\n");
-    ALOGD("%s", result.string());
+    ALOGD("%s", result.c_str());
     mDebugDumpFileWriter.write(result);
     result.clear();
     for (size_t i = 0; i < mDpuData.configs.size(); i++) {
@@ -2524,7 +2524,7 @@ int32_t ExynosDisplay::validateWinConfigData()
                     if ((config.assignedMPP != NULL) &&
                         (config.assignedMPP == compare_config.assignedMPP)) {
                         DISPLAY_LOGE("WIN_CONFIG error: duplicated assignedMPP(%s) between win%zu, win%zu",
-                                config.assignedMPP->mName.string(), i, j);
+                                config.assignedMPP->mName.c_str(), i, j);
                         compare_config.state = compare_config.WIN_STATE_DISABLED;
                         flagValidConfig = false;
                         continue;
@@ -2566,7 +2566,7 @@ int32_t ExynosDisplay::validateWinConfigData()
                 {
                     DISPLAY_LOGE("WIN_CONFIG error: invalid src alignment : %zu, "\
                             "assignedMPP: %s, mppType:%d, format(%d), s_x: %d(%d), s_y: %d(%d), s_w : %d(%d), s_h : %d(%d)", i,
-                            config.assignedMPP->mName.string(), exynosMPP->mLogicalType, config.format, config.src.x, srcXAlign,
+                            config.assignedMPP->mName.c_str(), exynosMPP->mLogicalType, config.format, config.src.x, srcXAlign,
                             config.src.y, srcYAlign, config.src.w, srcWidthAlign, config.src.h, srcHeightAlign);
                     configInvalid = true;
                 }
@@ -3677,7 +3677,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
                     mLayers[i]->mExynosCompositionType,
                     mLayers[i]->mValidateCompositionType);
             if (mLayers[i]->mM2mMPP != NULL)
-                DISPLAY_LOGE("\t%s is assigned", mLayers[i]->mM2mMPP->mName.string());
+                DISPLAY_LOGE("\t%s is assigned", mLayers[i]->mM2mMPP->mName.c_str());
             if (mLayers[i]->mAcquireFence > 0)
                 fence_close(mLayers[i]->mAcquireFence, this,
                         FENCE_TYPE_SRC_ACQUIRE, FENCE_IP_LAYER);
@@ -3860,7 +3860,7 @@ int32_t ExynosDisplay::setClientTarget(
             for (size_t i = 0; i < mLastDpuData.configs.size(); i++) {
                 errString.appendFormat("config[%zu]\n", i);
                 dumpConfig(errString, mLastDpuData.configs[i]);
-                DISPLAY_LOGE("\t%s", errString.string());
+                DISPLAY_LOGE("\t%s", errString.c_str());
                 errString.clear();
             }
             errString.appendFormat("%s:: skip flag is enabled but buffer is updated\n",
@@ -4769,7 +4769,7 @@ void ExynosDisplay::dump(String8& result)
     Mutex::Autolock lock(mDisplayMutex);
     result.appendFormat("[%s] display information size: %d x %d, vsyncState: %d, colorMode: %d, "
                         "colorTransformHint: %d, orientation %d\n",
-                        mDisplayName.string(), mXres, mYres, mVsyncState, mColorMode,
+                        mDisplayName.c_str(), mXres, mYres, mVsyncState, mColorMode,
                         mColorTransformHint, mMountOrientation);
     mClientCompositionInfo.dump(result);
     mExynosCompositionInfo.dump(result);
@@ -5199,7 +5199,7 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex, float tota
             if ((ret = m2mMPP->assignMPP(this, layer)) != NO_ERROR)
             {
                 HWC_LOGE(this, "%s:: %s MPP assignMPP() error (%d)",
-                        __func__, m2mMPP->mName.string(), ret);
+                        __func__, m2mMPP->mName.c_str(), ret);
                 return ret;
             }
             if (layer->mValidateCompositionType == HWC2_COMPOSITION_DEVICE) mWindowNumUsed--;
@@ -5240,7 +5240,7 @@ int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex, float tota
                 if ((ret = m2mMPP->assignMPP(this, mLayers[maxPriorityIndex])) != NO_ERROR)
                 {
                     ALOGE("%s:: %s MPP assignMPP() error (%d)",
-                            __func__, m2mMPP->mName.string(), ret);
+                            __func__, m2mMPP->mName.c_str(), ret);
                     return ret;
                 }
             }
