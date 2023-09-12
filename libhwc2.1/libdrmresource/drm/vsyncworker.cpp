@@ -55,8 +55,8 @@ int VSyncWorker::Init(DrmDevice *drm, int display, const String8 &display_trace_
     drm_ = drm;
     display_ = display;
     display_trace_name_ = display_trace_name;
-    hw_vsync_period_tag_.appendFormat("HWVsyncPeriod for %s", display_trace_name.string());
-    hw_vsync_enabled_tag_.appendFormat("HWCVsync for %s", display_trace_name.string());
+    hw_vsync_period_tag_.appendFormat("HWVsyncPeriod for %s", display_trace_name.c_str());
+    hw_vsync_enabled_tag_.appendFormat("HWCVsync for %s", display_trace_name.c_str());
 
     return InitWorker();
 }
@@ -73,8 +73,8 @@ void VSyncWorker::VSyncControl(bool enabled) {
     last_timestamp_ = -1;
     Unlock();
 
-    ATRACE_INT(hw_vsync_enabled_tag_.string(), static_cast<int32_t>(enabled));
-    ATRACE_INT64(hw_vsync_period_tag_.string(), 0);
+    ATRACE_INT(hw_vsync_enabled_tag_.c_str(), static_cast<int32_t>(enabled));
+    ATRACE_INT64(hw_vsync_period_tag_.c_str(), 0);
     Signal();
 }
 
@@ -213,8 +213,8 @@ void VSyncWorker::Routine() {
 
     if (last_timestamp_ >= 0) {
         int64_t period = timestamp - last_timestamp_;
-        ATRACE_INT64(hw_vsync_period_tag_.string(), period);
-        ALOGV("HW vsync period %" PRId64 "ns for %s", period, display_trace_name_.string());
+        ATRACE_INT64(hw_vsync_period_tag_.c_str(), period);
+        ALOGV("HW vsync period %" PRId64 "ns for %s", period, display_trace_name_.c_str());
     }
 
     last_timestamp_ = timestamp;

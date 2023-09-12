@@ -32,8 +32,8 @@ int32_t saveErrorLog(const String8 &errString, ExynosDisplay *display) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    saveString.appendFormat("%s errFrameNumber %" PRIu64 ": %s\n", getLocalTimeStr(tv).string(),
-                            display->mErrorFrameCount, errString.string());
+    saveString.appendFormat("%s errFrameNumber %" PRIu64 ": %s\n", getLocalTimeStr(tv).c_str(),
+                            display->mErrorFrameCount, errString.c_str());
 
     fileWriter.write(saveString);
     fileWriter.flush();
@@ -54,7 +54,7 @@ int32_t saveFenceTrace(ExynosDisplay *display) {
 
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    saveString.appendFormat("\n====== Fences at time:%s ======\n", getLocalTimeStr(tv).string());
+    saveString.appendFormat("\n====== Fences at time:%s ======\n", getLocalTimeStr(tv).c_str());
 
     if (device != NULL) {
         for (const auto &[fd, info] : device->mFenceInfos) {
@@ -64,7 +64,7 @@ int32_t saveFenceTrace(ExynosDisplay *display) {
 
             for (const auto &trace : info.traces) {
                 saveString.appendFormat("> dir: %d, type: %d, ip: %d, time:%s\n", trace.direction,
-                                        trace.type, trace.ip, getLocalTimeStr(trace.time).string());
+                                        trace.type, trace.ip, getLocalTimeStr(trace.time).c_str());
             }
         }
     }
