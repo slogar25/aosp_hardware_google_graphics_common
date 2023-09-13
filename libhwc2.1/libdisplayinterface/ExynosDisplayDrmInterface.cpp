@@ -2023,19 +2023,14 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
         flags |= DRM_MODE_ATOMIC_ALLOW_MODESET;
 
     /* For Histogram */
+    // TODO: b/300026478 - Skip setDisplayHistogramSetting when multi channel is enabled
     if (dqeEnable && (ret = setDisplayHistogramSetting(drmReq)) != 0) {
         HWC_LOGE(mExynosDisplay, "Failed to set display histogram setting (%d)", ret);
-        return ret;
     }
 
     /* For multichannel histogram */
     if (dqeEnable && mExynosDisplay->mHistogramController) {
-        ret = mExynosDisplay->mHistogramController->prepareAtomicCommit(drmReq);
-
-        if (ret) {
-            HWC_LOGE(mExynosDisplay, "mHistogramController failed to set atomic commit (%d)", ret);
-            return ret;
-        }
+        mExynosDisplay->mHistogramController->prepareAtomicCommit(drmReq);
     }
 
     if (mDrmConnector->mipi_sync().id() && (mipi_sync_type != 0)) {
@@ -2742,6 +2737,8 @@ int32_t ExynosDisplayDrmInterface::setDisplayHistogramChannelSetting(
     int ret = NO_ERROR;
     uint32_t blobId = 0;
 
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
+
     const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
     if (!prop.id()) {
         ALOGE("Unsupported multi-channel histrogram for channel:%d", channelId);
@@ -2767,6 +2764,8 @@ int32_t ExynosDisplayDrmInterface::setDisplayHistogramChannelSetting(
 int32_t ExynosDisplayDrmInterface::clearDisplayHistogramChannelSetting(
         ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId) {
     int ret = NO_ERROR;
+
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
 
     const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
     if (!prop.id()) {
