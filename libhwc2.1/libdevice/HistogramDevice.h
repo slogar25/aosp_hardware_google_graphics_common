@@ -67,11 +67,17 @@ public:
         /* channel config is committed to drm driver successfully */
         CONFIG_COMMITTED,
 
+        /* channel config has error */
+        CONFIG_ERROR,
+
         /* channel is released and requires an atomic commit to cleanup completely */
         DISABLE_PENDING,
 
         /* channel is released and the cleanup blob is added but not committed yet */
         DISABLE_BLOB_ADDED,
+
+        /* channel disable has error */
+        DISABLE_ERROR,
     };
 
     struct ChannelInfo {
@@ -250,9 +256,8 @@ public:
      * Prepare the histogram atomic commit for each channel (see prepareChannelCommit).
      *
      * @drmReq drm atomic request object
-     * @return NO_ERROR on success, else otherwise.
      */
-    int prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq);
+    void prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq);
 
     /**
      * postAtomicCommit
