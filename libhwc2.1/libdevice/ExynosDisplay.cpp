@@ -3515,8 +3515,6 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             DISPLAY_LOGD(eDebugSkipValidate, "validate is skipped");
         }
 
-        updateBrightnessState();
-
         if (updateColorConversionInfo() != NO_ERROR) {
             ALOGE("%s:: updateColorConversionInfo() fail, ret(%d)",
                     __func__, ret);
@@ -4602,8 +4600,6 @@ int32_t ExynosDisplay::validateDisplay(
         printDebugInfos(errString);
         mDisplayInterface->setForcePanic();
     }
-
-    updateBrightnessState();
 
     if ((ret = skipStaticLayers(mClientCompositionInfo)) != NO_ERROR) {
         validateError = true;
@@ -5978,6 +5974,8 @@ void ExynosDisplay::updateBrightnessState() {
 
     for (size_t i = 0; i < mLayers.size(); i++) {
         if (mLayers[i]->mIsHdrLayer) {
+            // TODO(longling): Below code block for RGB HDR is obsolete also
+            // need some fix (mExynosCompositionType is invalid at this time)
             if (mLayers[i]->isLayerFormatRgb()) {
                 auto meta = mLayers[i]->getMetaParcel();
                 if ((meta != nullptr) && (meta->eType & VIDEO_INFO_TYPE_HDR_STATIC) &&
