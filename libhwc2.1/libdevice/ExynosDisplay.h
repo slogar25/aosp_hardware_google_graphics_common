@@ -1362,7 +1362,7 @@ class ExynosDisplay {
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
 
-        bool skipSignalIdle();
+        bool shouldSignalNonIdle();
 
         /// minimum possible dim rate in the case hbm peak is 1000 nits and norml
         // display brightness is 2 nits
@@ -1388,7 +1388,7 @@ class ExynosDisplay {
             int Init();
 
             void signalRefreshRate(hwc2_power_mode_t powerMode, uint32_t vsyncPeriod);
-            void signalIdle();
+            void signalNonIdle();
             void signalActualWorkDuration(nsecs_t actualDurationNanos);
             void signalTargetWorkDuration(nsecs_t targetDurationNanos);
 

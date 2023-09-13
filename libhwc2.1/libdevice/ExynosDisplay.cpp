@@ -519,7 +519,7 @@ void ExynosDisplay::PowerHalHintWorker::signalRefreshRate(hwc2_power_mode_t powe
     Signal();
 }
 
-void ExynosDisplay::PowerHalHintWorker::signalIdle() {
+void ExynosDisplay::PowerHalHintWorker::signalNonIdle() {
     ATRACE_CALL();
 
     Lock();
@@ -1719,18 +1719,26 @@ int ExynosDisplay::skipStaticLayers(ExynosCompositionInfo& compositionInfo)
     return NO_ERROR;
 }
 
-bool ExynosDisplay::skipSignalIdle(void) {
+bool ExynosDisplay::shouldSignalNonIdle(void) {
+    // Some cases such that we can skip calling mPowerHalHint.signalNonIdle():
+    // 1. Updating source crop or buffer for video layer
+    // 2. Updating refresh rate indicator layer
+    uint64_t exclude = GEOMETRY_LAYER_SOURCECROP_CHANGED;
+    if ((mGeometryChanged & ~exclude) != 0) {
+        return true;
+    }
     for (size_t i = 0; i < mLayers.size(); i++) {
         // Frame update for refresh rate overlay indicator layer can be ignored
         if (mLayers[i]->mRequestedCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR)
             continue;
         // Frame update for video layer can be ignored
         if (mLayers[i]->isLayerFormatYuv()) continue;
-        if (mLayers[i]->mLastLayerBuffer != mLayers[i]->mLayerBuffer) {
-            return false;
+        if (mLayers[i]->mLastLayerBuffer != mLayers[i]->mLayerBuffer ||
+            mLayers[i]->mGeometryChanged != 0) {
+            return true;
         }
     }
-    return true;
+    return false;
 }
 
 /**
@@ -3624,8 +3632,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         goto err;
     }
 
-    if (mGeometryChanged != 0 || !skipSignalIdle()) {
-        mPowerHalHint.signalIdle();
+    if (shouldSignalNonIdle()) {
+        mPowerHalHint.signalNonIdle();
     }
 
     if (needUpdateRRIndicator()) {

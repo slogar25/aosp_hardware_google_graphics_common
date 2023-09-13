@@ -606,7 +606,6 @@ int32_t ExynosLayer::setLayerSidebandStream(const native_handle_t* __unused stre
 }
 
 int32_t ExynosLayer::setLayerSourceCrop(hwc_frect_t crop) {
-
     if ((crop.left != mSourceCrop.left) ||
         (crop.top != mSourceCrop.top) ||
         (crop.right != mSourceCrop.right) ||
