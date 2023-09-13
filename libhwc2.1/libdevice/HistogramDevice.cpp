@@ -287,19 +287,19 @@ void HistogramDevice::handleDrmEvent(void *event) {
     channel.histDataCollecting_cv.notify_all();
 }
 
-int HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
+void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
+    ATRACE_NAME("HistogramAtomicCommit");
+
     /* Loop through every channel and call prepareChannelCommit */
     for (uint8_t channelId = 0; channelId < mChannels.size(); ++channelId) {
-        int ret = prepareChannelCommit(drmReq, channelId);
+        int channelRet = prepareChannelCommit(drmReq, channelId);
 
-        if (ret) {
+        /* Every channel is independent, no early return when the channel commit fails. */
+        if (channelRet) {
             ALOGE("%s: histogram channel #%u: failed to prepare atomic commit: %d", __func__,
-                  channelId, ret);
-            return ret;
+                  channelId, channelRet);
         }
     }
-
-    return NO_ERROR;
 }
 
 void HistogramDevice::postAtomicCommit() {
@@ -675,10 +675,16 @@ int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtom
         HistogramRoiRect workingRoi;
 
         /* calculate the roi based on the current active resolution */
-        if ((ret = convertRoiLocked(moduleDisplayInterface, channel.requestedRoi, workingRoi))) {
-            HWC_LOGE(mDisplay,
-                     "%s: histogram channel #%u: failed to convert to workingRoi, ret: %d",
-                     __func__, channelId, ret);
+        ret = convertRoiLocked(moduleDisplayInterface, channel.requestedRoi, workingRoi);
+        if (ret == -EAGAIN) {
+            /* postpone the histogram config to next atomic commit */
+            ALOGD("%s: histogram channel #%u: set status (CONFIG_PENDING)", __func__, channelId);
+            channel.status = ChannelStatus_t::CONFIG_PENDING;
+            return NO_ERROR;
+        } else if (ret) {
+            ALOGE("%s: histogram channel #%u: failed to convert to workingRoi, ret: %d", __func__,
+                  channelId, ret);
+            channel.status = ChannelStatus_t::CONFIG_ERROR;
             return ret;
         }
 
@@ -700,21 +706,32 @@ int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtom
         std::shared_ptr<void> blobData;
         size_t blobLength = 0;
         if ((ret = createHistogramDrmConfigLocked(channel, blobData, blobLength))) {
-            HWC_LOGE(mDisplay,
-                     "%s: histogram channel #%u: failed to createHistogramDrmConfig, ret: %d",
-                     __func__, channelId, ret);
+            ALOGE("%s: histogram channel #%u: failed to createHistogramDrmConfig, ret: %d",
+                  __func__, channelId, ret);
+            channel.status = ChannelStatus_t::CONFIG_ERROR;
             return ret;
         }
 
+        /* Add histogram blob to atomic commit */
         ret = moduleDisplayInterface->setDisplayHistogramChannelSetting(drmReq, channelId,
                                                                         blobData.get(), blobLength);
         if (ret == NO_ERROR) {
-            channel.status = ChannelStatus_t::CONFIG_COMMITTED;
+            channel.status = ChannelStatus_t::CONFIG_BLOB_ADDED;
+        } else {
+            ALOGE("%s: histogram channel #%u: failed to setDisplayHistogramChannelSetting, ret: %d",
+                  __func__, channelId, ret);
+            channel.status = ChannelStatus_t::CONFIG_ERROR;
+            return ret;
         }
     } else if (channel.status == ChannelStatus_t::DISABLE_PENDING) {
         ret = moduleDisplayInterface->clearDisplayHistogramChannelSetting(drmReq, channelId);
         if (ret == NO_ERROR) {
             channel.status = ChannelStatus_t::DISABLE_BLOB_ADDED;
+        } else {
+            ALOGE("%s: histogram channel #%u: failed to clearDisplayHistogramChannelSetting, ret: "
+                  "%d",
+                  __func__, channelId, ret);
+            channel.status = ChannelStatus_t::DISABLE_ERROR;
         }
     }
 
@@ -741,10 +758,16 @@ int HistogramDevice::convertRoiLocked(ExynosDisplayDrmInterface *moduleDisplayIn
 
     ALOGV("%s: active: (%dx%d), panel: (%dx%d)", __func__, activeH, activeV, panelH, panelV);
 
-    if (panelH < activeH || activeH <= 0 || panelV < activeV || activeV <= 0) {
-        HWC_LOGE(mDisplay, "%s: failed to convert roi, active: (%dx%d), panel: (%dx%d)", __func__,
-                 activeH, activeV, panelH, panelV);
+    if (panelH < activeH || activeH < 0 || panelV < activeV || activeV < 0) {
+        ALOGE("%s: failed to convert roi, active: (%dx%d), panel: (%dx%d)", __func__, activeH,
+              activeV, panelH, panelV);
         return -EINVAL;
+    } else if (activeH == 0 || activeV == 0) {
+        /* mActiveModeState is not initialized, postpone histogram config to next atomic commit */
+        ALOGW("%s: mActiveModeState is not initialized, active: (%dx%d), postpone histogram config "
+              "to next atomic commit",
+              __func__, activeH, activeV);
+        return -EAGAIN;
     }
 
     /* Linear transform from full resolution to active resolution */
@@ -844,10 +867,14 @@ std::string HistogramDevice::toString(const ChannelStatus_t &status) {
             return "CONFIG_BLOB_ADDED";
         case ChannelStatus_t::CONFIG_COMMITTED:
             return "CONFIG_COMMITTED";
+        case ChannelStatus_t::CONFIG_ERROR:
+            return "CONFIG_ERROR";
         case ChannelStatus_t::DISABLE_PENDING:
             return "DISABLE_PENDING";
         case ChannelStatus_t::DISABLE_BLOB_ADDED:
             return "DISABLE_BLOB_ADDED";
+        case ChannelStatus_t::DISABLE_ERROR:
+            return "DISABLE_ERROR";
     }
 
     return "UNDEFINED";
