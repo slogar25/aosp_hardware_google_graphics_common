@@ -41,6 +41,8 @@ enum Usage : uint64_t {
 
     // Pixel specific usage
     NO_COMPRESSION = 1ULL << 29,
+    // Used for the camera ISP image heap of the dual PD buffer.
+    TPU_INPUT = 1ULL << 62,
 };
 
 #undef MapUsage
