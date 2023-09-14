@@ -5092,6 +5092,10 @@ int32_t ExynosDisplay::removeClientCompositionLayer(uint32_t layerIndex)
     return ret;
 }
 
+bool ExynosDisplay::hasClientComposition() {
+    return mClientCompositionInfo.mHasCompositionLayer;
+}
+
 int32_t ExynosDisplay::addExynosCompositionLayer(uint32_t layerIndex, float totalUsedCapa) {
     bool invalidFlag = false;
     int32_t changeFlag = NO_ERROR;

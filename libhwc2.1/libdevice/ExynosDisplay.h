@@ -580,6 +580,7 @@ class ExynosDisplay {
         int32_t initializeValidateInfos();
         int32_t addClientCompositionLayer(uint32_t layerIndex);
         int32_t removeClientCompositionLayer(uint32_t layerIndex);
+        bool hasClientComposition();
         int32_t addExynosCompositionLayer(uint32_t layerIndex, float totalUsedCapa);
 
         bool isPowerModeOff() const;
