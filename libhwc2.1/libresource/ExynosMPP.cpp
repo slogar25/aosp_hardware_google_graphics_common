@@ -125,14 +125,12 @@ ExynosMPPSource::ExynosMPPSource(uint32_t sourceType, void *source)
     mMidImg.releaseFenceFd = -1;
 }
 
-void ExynosMPPSource::setExynosImage(exynos_image src_img, exynos_image dst_img)
-{
+void ExynosMPPSource::setExynosImage(const exynos_image& src_img, const exynos_image& dst_img) {
     mSrcImg = src_img;
     mDstImg = dst_img;
 }
 
-void ExynosMPPSource::setExynosMidImage(exynos_image mid_img)
-{
+void ExynosMPPSource::setExynosMidImage(const exynos_image& mid_img) {
     mMidImg = mid_img;
 }
 

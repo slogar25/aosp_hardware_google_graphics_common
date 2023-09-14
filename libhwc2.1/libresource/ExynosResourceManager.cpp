@@ -808,9 +808,11 @@ int32_t ExynosResourceManager::updateExynosComposition(ExynosDisplay *display)
     return ret;
 }
 
-int32_t ExynosResourceManager::changeLayerFromClientToDevice(ExynosDisplay *display, ExynosLayer *layer,
-        uint32_t layer_index, exynos_image m2m_out_img, ExynosMPP *m2mMPP, ExynosMPP *otfMPP)
-{
+int32_t ExynosResourceManager::changeLayerFromClientToDevice(ExynosDisplay* display,
+                                                             ExynosLayer* layer,
+                                                             uint32_t layer_index,
+                                                             const exynos_image& m2m_out_img,
+                                                             ExynosMPP* m2mMPP, ExynosMPP* otfMPP) {
     int ret = NO_ERROR;
     if ((ret = display->removeClientCompositionLayer(layer_index)) != NO_ERROR) {
         ALOGD("removeClientCompositionLayer return error(%d)", ret);
