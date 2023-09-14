@@ -884,7 +884,8 @@ bool ExynosDevice::canSkipValidate()
          * All display's validateDisplay should be skipped or all display's validateDisplay
          * should not be skipped.
          */
-        if (mDisplays[i]->mPlugState) {
+        if (mDisplays[i]->mPlugState && mDisplays[i]->mPowerModeState.has_value() &&
+            mDisplays[i]->mPowerModeState.value() != HWC2_POWER_MODE_OFF) {
             /*
              * presentDisplay is called without validateDisplay.
              * Call functions that should be called in validateDiplay
@@ -893,9 +894,11 @@ bool ExynosDevice::canSkipValidate()
             mDisplays[i]->checkLayerFps();
 
             if ((ret = mDisplays[i]->canSkipValidate()) != NO_ERROR) {
-                HDEBUGLOGD(eDebugSkipValidate, "Display[%d] can't skip validate (%d), renderingState(%d), geometryChanged(0x%" PRIx64 ")",
-                        mDisplays[i]->mDisplayId, ret,
-                        mDisplays[i]->mRenderingState, mGeometryChanged);
+                ALOGD_AND_ATRACE_NAME(eDebugSkipValidate,
+                                      "Display[%d] can't skip validate (%d), renderingState(%d), "
+                                      "geometryChanged(0x%" PRIx64 ")",
+                                      mDisplays[i]->mDisplayId, ret, mDisplays[i]->mRenderingState,
+                                      mGeometryChanged);
                 return false;
             } else {
                 HDEBUGLOGD(eDebugSkipValidate, "Display[%d] can skip validate (%d), renderingState(%d), geometryChanged(0x%" PRIx64 ")",
