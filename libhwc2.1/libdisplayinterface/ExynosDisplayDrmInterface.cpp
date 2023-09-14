@@ -2723,7 +2723,7 @@ int32_t ExynosDisplayDrmInterface::setDisplayHistogramChannelSetting(
     int ret = NO_ERROR;
     uint32_t blobId = 0;
 
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
 
     const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
     if (!prop.id()) {
@@ -2751,7 +2751,7 @@ int32_t ExynosDisplayDrmInterface::clearDisplayHistogramChannelSetting(
         ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId) {
     int ret = NO_ERROR;
 
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).string());
+    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
 
     const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
     if (!prop.id()) {

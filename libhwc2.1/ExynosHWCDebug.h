@@ -76,8 +76,8 @@ int32_t saveErrorLog(const android::String8 &errString, ExynosDisplay *display =
     if (hwcCheckDebugMessages(debugFlag) || CC_UNLIKELY(ATRACE_ENABLED())) { \
         String8 log;                                                         \
         log.appendFormat((fmt), ##__VA_ARGS__);                              \
-        ALOGD("%s", log.string());                                           \
-        if (CC_UNLIKELY(ATRACE_ENABLED())) ATRACE_NAME(log.string());        \
+        ALOGD("%s", log.c_str());                                            \
+        if (CC_UNLIKELY(ATRACE_ENABLED())) ATRACE_NAME(log.c_str());         \
     }
 #endif
 
