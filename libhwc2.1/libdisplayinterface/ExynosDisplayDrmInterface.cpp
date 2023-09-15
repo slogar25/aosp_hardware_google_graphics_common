@@ -1253,17 +1253,14 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
         return HWC2_ERROR_BAD_CONFIG;
     }
 
-    if ((mActiveModeState.blob_id != 0) &&
-        (mActiveModeState.mode.id() == config)) {
+    if (mDesiredModeState.needsModeSet()) {
+        ALOGI("Previous mode change %d request is not applied", mDesiredModeState.mode.id());
+    } else if ((mActiveModeState.blob_id != 0) && (mActiveModeState.mode.id() == config)) {
         ALOGD("%s:: same mode %d", __func__, config);
         /* trigger resetConfigRequestStateLocked() */
         mVsyncCallback.setDesiredVsyncPeriod(nsecsPerSec / mActiveModeState.mode.v_refresh());
         mDrmVSyncWorker.VSyncControl(true);
         return HWC2_ERROR_NONE;
-    }
-
-    if (mDesiredModeState.needsModeSet()) {
-        ALOGD("Previous mode change request is not applied");
     }
 
     int32_t ret = HWC2_ERROR_NONE;

@@ -3548,6 +3548,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     if ((mLayers.size() == 0) &&
         (mType != HWC_DISPLAY_VIRTUAL)) {
+        ALOGI("%s:: layer size is 0", __func__);
         clearDisplay();
         *outRetireFence = -1;
         mLastRetireFence = fence_close(mLastRetireFence, this,
@@ -3558,6 +3559,7 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     }
 
     if (!checkFrameValidation()) {
+        ALOGW("%s: checkFrameValidation fail", __func__);
         clearDisplay();
         *outRetireFence = -1;
         mLastRetireFence = fence_close(mLastRetireFence, this,
@@ -4192,8 +4194,8 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
             mXres, mYres, mVsyncPeriod, mXdpi, mYdpi);
 
     if (mConfigRequestState == hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
-        DISPLAY_LOGI("%s, previous request config is processing (mDesiredConfig: %d)", __func__,
-                     mDesiredConfig);
+        DISPLAY_LOGI("%s, previous request config is processing (desird %d, new request %d)",
+                     __func__, mDesiredConfig, config);
     }
     /* Config would be requested on present time */
     mConfigRequestState = hwc_request_state_t::SET_CONFIG_STATE_PENDING;
@@ -4425,7 +4427,7 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
             current, actualChangeTime,
             mVsyncPeriodChangeConstraints.desiredTimeNanos);
     if (actualChangeTime >= mVsyncPeriodChangeConstraints.desiredTimeNanos) {
-        DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig");
+        DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig %d", mDesiredConfig);
         needSetActiveConfig = true;
         DISPLAY_ATRACE_INT("Pending ActiveConfig", 0);
         DISPLAY_ATRACE_INT64("TimeToChangeConfig", 0);
