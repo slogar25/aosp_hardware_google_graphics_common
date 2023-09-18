@@ -925,8 +925,7 @@ void ExynosCompositionInfo::setCompressionType(uint32_t compressionType) {
     mCompressionInfo.type = compressionType;
 }
 
-void ExynosCompositionInfo::dump(String8& result)
-{
+void ExynosCompositionInfo::dump(String8& result) const {
     result.appendFormat("CompositionInfo (%d)\n", mType);
     result.appendFormat("mHasCompositionLayer(%d)\n", mHasCompositionLayer);
     if (mHasCompositionLayer) {
@@ -2450,8 +2449,8 @@ void ExynosDisplay::printDebugInfos(String8 &reason) {
     result.appendFormat("Device mGeometryChanged(%" PRIx64 "), mGeometryChanged(%" PRIx64 "), mRenderingState(%d)\n",
             mDevice->mGeometryChanged, mGeometryChanged, mRenderingState);
     result.appendFormat("=======================  dump composition infos  ================================\n");
-    ExynosCompositionInfo clientCompInfo = mClientCompositionInfo;
-    ExynosCompositionInfo exynosCompInfo = mExynosCompositionInfo;
+    const ExynosCompositionInfo& clientCompInfo = mClientCompositionInfo;
+    const ExynosCompositionInfo& exynosCompInfo = mExynosCompositionInfo;
     clientCompInfo.dump(result);
     exynosCompInfo.dump(result);
     ALOGD("%s", result.string());
@@ -4853,14 +4852,11 @@ void ExynosDisplay::printConfig(exynos_win_config_data &c)
 
 int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exynos_image *src_img, exynos_image *dst_img)
 {
-    std::optional<ExynosCompositionInfo> compositionInfo;
-
-    if (targetType == COMPOSITION_CLIENT)
-        compositionInfo = mClientCompositionInfo;
-    else if (targetType == COMPOSITION_EXYNOS)
-        compositionInfo = mExynosCompositionInfo;
-
-    if (!compositionInfo) return -EINVAL;
+    if (targetType != COMPOSITION_CLIENT && targetType != COMPOSITION_EXYNOS) {
+        return -EINVAL;
+    }
+    const ExynosCompositionInfo& compositionInfo =
+            (targetType == COMPOSITION_CLIENT) ? mClientCompositionInfo : mExynosCompositionInfo;
 
     src_img->fullWidth = mXres;
     src_img->fullHeight = mYres;
@@ -4871,10 +4867,10 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
     src_img->w = mXres;
     src_img->h = mYres;
 
-    if (compositionInfo->mTargetBuffer != NULL) {
-        src_img->bufferHandle = compositionInfo->mTargetBuffer;
+    if (compositionInfo.mTargetBuffer != NULL) {
+        src_img->bufferHandle = compositionInfo.mTargetBuffer;
 
-        VendorGraphicBufferMeta gmeta(compositionInfo->mTargetBuffer);
+        VendorGraphicBufferMeta gmeta(compositionInfo.mTargetBuffer);
         src_img->format = gmeta.format;
         src_img->usageFlags = gmeta.producer_usage;
     } else {
@@ -4883,21 +4879,21 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
         src_img->usageFlags = 0;
     }
     src_img->layerFlags = 0x0;
-    src_img->acquireFenceFd = compositionInfo->mAcquireFence;
+    src_img->acquireFenceFd = compositionInfo.mAcquireFence;
     src_img->releaseFenceFd = -1;
-    src_img->dataSpace = compositionInfo->mDataSpace;
+    src_img->dataSpace = compositionInfo.mDataSpace;
     src_img->blending = HWC2_BLEND_MODE_PREMULTIPLIED;
     src_img->transform = 0;
-    src_img->compressionInfo = compositionInfo->mCompressionInfo;
+    src_img->compressionInfo = compositionInfo.mCompressionInfo;
     src_img->planeAlpha = 1;
     src_img->zOrder = 0;
     if ((targetType == COMPOSITION_CLIENT) && (mType == HWC_DISPLAY_VIRTUAL)) {
-        if (compositionInfo->mLastIndex < mExynosCompositionInfo.mLastIndex)
+        if (compositionInfo.mLastIndex < mExynosCompositionInfo.mLastIndex)
             src_img->zOrder = 0;
         else
             src_img->zOrder = 1000;
     }
-    src_img->needPreblending = compositionInfo->mNeedPreblending;
+    src_img->needPreblending = compositionInfo.mNeedPreblending;
 
     dst_img->fullWidth = mXres;
     dst_img->fullHeight = mYres;
@@ -4920,7 +4916,7 @@ int32_t ExynosDisplay::setCompositionTargetExynosImage(uint32_t targetType, exyn
         dst_img->dataSpace = colorModeToDataspace(mColorMode);
     dst_img->blending = HWC2_BLEND_MODE_NONE;
     dst_img->transform = 0;
-    dst_img->compressionInfo = compositionInfo->mCompressionInfo;
+    dst_img->compressionInfo = compositionInfo.mCompressionInfo;
     dst_img->planeAlpha = 1;
     dst_img->zOrder = src_img->zOrder;
 
