@@ -362,7 +362,7 @@ struct DisplayScene {
     float refresh_rate = 60.0f;
 
     /// operation rate to switch between hs/ns mode
-    uint32_t operation_rate;
+    uint32_t operation_rate = 120;
 
     /// hdr layer state on screen
     HdrLayerState hdr_layer_state = HdrLayerState::kHdrNone;
@@ -483,7 +483,9 @@ class IDisplayColorGeneric {
      * @param table Return brightness table if successful, nullptr if the table is not valid.
      * @return OK if successful, error otherwise.
      */
-    virtual int GetBrightnessTable(DisplayType display, const IBrightnessTable *&table) const = 0;
+    virtual int GetBrightnessTable(DisplayType display,
+                                   std::unique_ptr<const IBrightnessTable> &table) const = 0;
+
 };
 
 extern "C" {

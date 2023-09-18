@@ -156,10 +156,10 @@ BrightnessController::~BrightnessController() {
     }
 }
 
-void BrightnessController::updateBrightnessTable(const IBrightnessTable* table) {
+void BrightnessController::updateBrightnessTable(std::unique_ptr<const IBrightnessTable>& table) {
     if (table && table->GetBrightnessRange(BrightnessMode::BM_NOMINAL)) {
         ALOGI("%s: apply brightness table from libdisplaycolor", __func__);
-        mBrightnessTable = table;
+        mBrightnessTable = std::move(table);
     } else {
         ALOGW("%s: table is not valid!", __func__);
     }
@@ -303,7 +303,7 @@ void BrightnessController::initBrightnessTable(const DrmDevice& drmDevice,
             reinterpret_cast<struct brightness_capability *>(blob->data);
     mKernelBrightnessTable.Init(cap);
     if (mKernelBrightnessTable.IsValid()) {
-        mBrightnessTable = &mKernelBrightnessTable;
+        mBrightnessTable = std::make_unique<LinearBrightnessTable>(mKernelBrightnessTable);
     }
 
     parseHbmModeEnums(connector.hbm_mode());
