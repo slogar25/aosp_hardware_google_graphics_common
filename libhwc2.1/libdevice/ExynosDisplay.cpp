@@ -1823,8 +1823,8 @@ int ExynosDisplay::doExynosComposition() {
             return -EINVAL;
         }
 
-        if ((ret = mExynosCompositionInfo.mM2mMPP->doPostProcessing(mExynosCompositionInfo.mSrcImg,
-                mExynosCompositionInfo.mDstImg)) != NO_ERROR) {
+        if ((ret = mExynosCompositionInfo.mM2mMPP->doPostProcessing(
+                     mExynosCompositionInfo.mDstImg)) != NO_ERROR) {
             DISPLAY_LOGE("exynosComposition doPostProcessing fail ret(%d)", ret);
             return ret;
         }
@@ -3596,11 +3596,10 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
             if ((mDisplayControl.earlyStartMPP == false) &&
                 (mLayers[i]->mExynosCompositionType == HWC2_COMPOSITION_DEVICE) &&
                 (mLayers[i]->mM2mMPP != NULL)) {
-                ExynosMPP *m2mMpp = mLayers[i]->mM2mMPP;
-                srcImg = mLayers[i]->mSrcImg;
+                ExynosMPP* m2mMpp = mLayers[i]->mM2mMPP;
                 midImg = mLayers[i]->mMidImg;
                 m2mMpp->requestHWStateChange(MPP_HW_STATE_RUNNING);
-                if ((ret = m2mMpp->doPostProcessing(srcImg, midImg)) != NO_ERROR) {
+                if ((ret = m2mMpp->doPostProcessing(midImg)) != NO_ERROR) {
                     HWC_LOGE(this, "%s:: doPostProcessing() failed, layer(%zu), ret(%d)",
                             __func__, i, ret);
                     errString.appendFormat("%s:: doPostProcessing() failed, layer(%zu), ret(%d)\n",
@@ -4722,11 +4721,10 @@ int32_t ExynosDisplay::startPostProcessing()
             mLayers[i]->setSrcExynosImage(&srcImg);
             mLayers[i]->setDstExynosImage(&dstImg);
             mLayers[i]->setExynosImage(srcImg, dstImg);
-            ExynosMPP *m2mMpp = mLayers[i]->mM2mMPP;
-            srcImg = mLayers[i]->mSrcImg;
+            ExynosMPP* m2mMpp = mLayers[i]->mM2mMPP;
             midImg = mLayers[i]->mMidImg;
             m2mMpp->requestHWStateChange(MPP_HW_STATE_RUNNING);
-            if ((ret = m2mMpp->doPostProcessing(srcImg, midImg)) != NO_ERROR) {
+            if ((ret = m2mMpp->doPostProcessing(midImg)) != NO_ERROR) {
                 DISPLAY_LOGE("%s:: doPostProcessing() failed, layer(%zu), ret(%d)",
                         __func__, i, ret);
                 errString.appendFormat("%s:: doPostProcessing() failed, layer(%zu), ret(%d)\n",

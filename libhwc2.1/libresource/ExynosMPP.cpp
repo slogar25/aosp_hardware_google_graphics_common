@@ -1669,12 +1669,10 @@ bool ExynosMPP::canSkipProcessing()
 }
 
 /**
- * @param src
  * @param dst
- * @return int32_t releaseFenceFd of src buffer
+ * @return int32_t 0 on success, or a negative error code on failure.
  */
-int32_t ExynosMPP::doPostProcessing(struct exynos_image &src, struct exynos_image &dst)
-{
+int32_t ExynosMPP::doPostProcessing(struct exynos_image& dst) {
     ATRACE_CALL();
     MPP_LOGD(eDebugMPP, "total assigned sources (%zu)++++++++", mAssignedSources.size());
 
