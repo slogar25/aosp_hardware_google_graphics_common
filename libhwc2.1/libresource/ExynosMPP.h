@@ -451,8 +451,8 @@ class ExynosMPPSource {
         ExynosMPPSource();
         ExynosMPPSource(uint32_t sourceType, void *source);
         ~ExynosMPPSource(){};
-        void setExynosImage(exynos_image src_img, exynos_image dst_img);
-        void setExynosMidImage(exynos_image mid_img);
+        void setExynosImage(const exynos_image& src_img, const exynos_image& dst_img);
+        void setExynosMidImage(const exynos_image& mid_img);
 
         uint32_t mSourceType;
         void *mSource;
