@@ -68,4 +68,4 @@ bool ExynosDisplayInterface::isPrimary()
             (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY));
 }
 
-void ExynosDisplayInterface::setVrrVsync(const VrrVsyncHz_t& vrrVsyncHz) {}
+void ExynosDisplayInterface::setVrrSettings(const VrrSettings_t& vrrSettings) {}

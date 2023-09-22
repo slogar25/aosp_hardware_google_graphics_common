@@ -38,11 +38,19 @@
 extern struct exynos_hwc_control exynosHWCControl;
 
 using namespace SOC_VERSION;
+
+namespace {
 constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
+
+inline constexpr int kDefaultNotifyExpectedPresentConfigHeadsUpNs =
+        std::chrono::nanoseconds(33ms).count();
+inline constexpr int kDefaultNotifyExpectedPresentConfigTimeoutNs =
+        std::chrono::nanoseconds(500ms).count();
 
 static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
          {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}};
+} // namespace
 
 static String8 getPropertyBootModeStr(const int32_t dispId) {
     String8 str;
@@ -117,8 +125,16 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
               mDbvThresholdForBlockingZone);
     }
 
-    mVrrVsync.hsHz = property_get_int32("ro.vendor.primarydisplay.vrr.hs.vsync_hz", 0);
-    mVrrVsync.nsHz = property_get_int32("ro.vendor.primarydisplay.vrr.ns.vsync_hz", 0);
+    mVrrSettings.vrrVsync.hsHz = property_get_int32("ro.vendor.primarydisplay.vrr.hs.vsync_hz", 0);
+    mVrrSettings.vrrVsync.nsHz = property_get_int32("ro.vendor.primarydisplay.vrr.ns.vsync_hz", 0);
+    if (mVrrSettings.isValid()) {
+        mVrrSettings.notifyExpectedPresentConfig.HeadsUpNs =
+                property_get_int32("ro.vendor.primarydisplay.vrr.expected_present.headsup_ns",
+                                   kDefaultNotifyExpectedPresentConfigHeadsUpNs);
+        mVrrSettings.notifyExpectedPresentConfig.TimeoutNs =
+                property_get_int32("ro.vendor.primarydisplay.vrr.expected_present.timeout_ns",
+                                   kDefaultNotifyExpectedPresentConfigTimeoutNs);
+    }
 
     // Allow to enable dynamic recomposition after every power on
     // since it will always be disabled for every power off
@@ -477,7 +493,9 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
                 __func__, interfaceType);
     mDisplayInterface->init(this);
 
-    mDisplayInterface->setVrrVsync(mVrrVsync);
+    if (mVrrSettings.isValid()) {
+        mDisplayInterface->setVrrSettings(mVrrSettings);
+    }
 
     mDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));
     mLastDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));

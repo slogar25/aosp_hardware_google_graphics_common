@@ -171,7 +171,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int64_t mDisplayIdleDelayNanos;
         bool mDisplayNeedHandleIdleExit;
 
-        VrrVsyncHz_t mVrrVsync;
+        // Vrr related settings.
+        VrrSettings_t mVrrSettings;
 };
 
 #endif

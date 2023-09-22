@@ -391,7 +391,7 @@ class ExynosDisplayDrmInterface :
         uint32_t getCrtcId() { return mDrmCrtc->id(); }
         int32_t triggerClearDisplayPlanes();
 
-        virtual void setVrrVsync(const VrrVsyncHz_t &vrrVsyncHz) override;
+        virtual void setVrrSettings(const VrrSettings_t& vrrSettings) override;
 
     protected:
         enum class HalMipiSyncType : uint32_t {
@@ -571,8 +571,11 @@ class ExynosDisplayDrmInterface :
         int32_t mPanelFullResolutionHSize = 0;
         int32_t mPanelFullResolutionVSize = 0;
 
+        // Vrr related settings.
         int32_t mVrrHsVsyncPeriodNs = 0;
         int32_t mVrrNsVsyncPeriodNs = 0;
+        int32_t mNotifyExpectedPresentHeadsUpNs = 0;
+        int32_t mNotifyExpectedPresentTimeoutNs = 0;
 
         /**
          * retrievePanelFullResolution

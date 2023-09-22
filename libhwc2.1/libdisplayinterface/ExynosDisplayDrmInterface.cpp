@@ -1050,6 +1050,11 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             if (mode.is_vrr_mode()) {
                 VrrConfig_t vrrConfig;
                 vrrConfig.minFrameIntervalNs = static_cast<int>(std::nano::den / rr);
+                // TODO(b/290843234): FrameIntervalPowerHint is currently optional and omitted.
+                // Supply initial values for notifyExpectedPresentConfig; potential changes may come
+                // later.
+                vrrConfig.notifyExpectedPresentConfig.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs;
+                vrrConfig.notifyExpectedPresentConfig.TimeoutNs = mNotifyExpectedPresentTimeoutNs;
                 configs.vrrConfig = std::make_optional(vrrConfig);
                 if (mode.is_ns_mode()) {
                     configs.vsyncPeriod = mVrrNsVsyncPeriodNs;
@@ -2148,9 +2153,17 @@ int32_t ExynosDisplayDrmInterface::triggerClearDisplayPlanes()
     return ret;
 }
 
-void ExynosDisplayDrmInterface::setVrrVsync(const VrrVsyncHz_t &vrrVsyncHz) {
-    mVrrHsVsyncPeriodNs = static_cast<int32_t>(std::nano::den / vrrVsyncHz.hsHz);
-    mVrrNsVsyncPeriodNs = static_cast<int32_t>(std::nano::den / vrrVsyncHz.nsHz);
+void ExynosDisplayDrmInterface::setVrrSettings(const VrrSettings_t& vrrSettings) {
+    mVrrHsVsyncPeriodNs = vrrSettings.vrrVsync.hsHz > 0
+            ? static_cast<int32_t>(std::nano::den / vrrSettings.vrrVsync.hsHz)
+            : 0;
+    mVrrNsVsyncPeriodNs = vrrSettings.vrrVsync.nsHz > 0
+            ? static_cast<int32_t>(std::nano::den / vrrSettings.vrrVsync.nsHz)
+            : 0;
+    if (isVrrModeSupported()) {
+        mNotifyExpectedPresentHeadsUpNs = vrrSettings.notifyExpectedPresentConfig.HeadsUpNs;
+        mNotifyExpectedPresentTimeoutNs = vrrSettings.notifyExpectedPresentConfig.TimeoutNs;
+    }
 }
 
 int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)

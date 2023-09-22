@@ -351,25 +351,32 @@ struct ResolutionInfo {
 };
 
 typedef struct VrrVsyncHz {
-    int nsHz;
-    int hsHz;
+    int nsHz = 0;
+    int hsHz = 0;
+    inline bool isValid() const { return (nsHz > 0) || (hsHz > 0); }
 } VrrVsyncHz_t;
 
 typedef struct FrameIntervalPowerHint {
-    int frameIntervalNs;
-    int averageRefreshPeriodNs;
+    int frameIntervalNs = 0;
+    int averageRefreshPeriodNs = 0;
 } FrameIntervalPowerHint_t;
 
 typedef struct NotifyExpectedPresentConfig {
-    int HeadsUpNs;
-    int TimeoutNs;
+    int HeadsUpNs = 0;
+    int TimeoutNs = 0;
 } NotifyExpectedPresentConfig_t;
 
 typedef struct VrrConfig {
-    int minFrameIntervalNs;
+    int minFrameIntervalNs = 0;
     std::vector<FrameIntervalPowerHint_t> frameIntervalPowerHint;
     NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
 } VrrConfig_t;
+
+typedef struct VrrSettings {
+    VrrVsyncHz_t vrrVsync;
+    NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
+    inline bool isValid() const { return vrrVsync.isValid(); }
+} VrrSettings_t;
 
 typedef struct displayConfigs {
     // HWC2_ATTRIBUTE_VSYNC_PERIOD

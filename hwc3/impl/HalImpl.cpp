@@ -407,7 +407,14 @@ int32_t HalImpl::getDisplayConfigurations(int64_t display, int32_t,
         if (vrrConfig.has_value()) {
             // TODO(b/290843234): complete the remaining values within vrrConfig.
             VrrConfig hwc3VrrConfig;
+            VrrConfig::NotifyExpectedPresentConfig notifyExpectedPresentConfig;
             hwc3VrrConfig.minFrameIntervalNs = vrrConfig->minFrameIntervalNs;
+            notifyExpectedPresentConfig.notifyExpectedPresentHeadsUpNs =
+                    vrrConfig->notifyExpectedPresentConfig.HeadsUpNs;
+            notifyExpectedPresentConfig.notifyExpectedPresentTimeoutNs =
+                    vrrConfig->notifyExpectedPresentConfig.TimeoutNs;
+            hwc3VrrConfig.notifyExpectedPresentConfig =
+                    std::make_optional(notifyExpectedPresentConfig);
             config.vrrConfig = std::make_optional(hwc3VrrConfig);
         }
         outConfigs->push_back(config);

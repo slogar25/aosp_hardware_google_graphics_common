@@ -25,8 +25,8 @@
 
 class ExynosDisplay;
 
-struct VrrVsyncHz;
-typedef struct VrrVsyncHz VrrVsyncHz_t;
+struct VrrSettings;
+typedef struct VrrSettings VrrSettings_t;
 
 using namespace android;
 class ExynosDisplayInterface {
@@ -93,7 +93,7 @@ class ExynosDisplayInterface {
         virtual int readHotplugErrorCode() { return 0; };
         virtual void resetHotplugErrorCode(){};
 
-        virtual void setVrrVsync(const VrrVsyncHz_t& vrrVsyncHz);
+        virtual void setVrrSettings(const VrrSettings_t& vrrSettings);
 
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
