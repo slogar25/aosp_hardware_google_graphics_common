@@ -256,6 +256,8 @@ class ExynosDisplayDrmInterface :
                     mOldBlobs.clear();
                     return NO_ERROR;
                 };
+                void dumpDrmAtomicCommitMessage(int err);
+
             private:
                 drmModeAtomicReqPtr mPset;
                 drmModeAtomicReqPtr mSavedPset;
@@ -264,6 +266,13 @@ class ExynosDisplayDrmInterface :
                 /* Destroy old blobs after commit */
                 std::vector<uint32_t> mOldBlobs;
                 int drmFd() const { return mDrmDisplayInterface->mDrmDevice->fd(); }
+
+                static constexpr uint32_t kAllowDumpDrmAtomicMessageTimeMs = 5000U;
+                static constexpr const char* kDrmModuleParametersDebugNode =
+                        "/sys/module/drm/parameters/debug";
+                static constexpr const int kEnableDrmAtomicMessage = 16;
+                static constexpr const int kDisableDrmDebugMessage = 0;
+
         };
         class ExynosVsyncCallback {
             public:
@@ -558,6 +567,7 @@ class ExynosDisplayDrmInterface :
         DrmReadbackInfo mReadbackInfo;
         FramebufferManager mFBManager;
         std::array<uint8_t, MONITOR_DESCRIPTOR_DATA_LENGTH> mMonitorDescription;
+        nsecs_t mLastDumpDrmAtomicMessageTime;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);

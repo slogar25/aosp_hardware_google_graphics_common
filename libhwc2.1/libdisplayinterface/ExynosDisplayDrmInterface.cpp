@@ -62,6 +62,19 @@ using namespace vendor::graphics;
 extern struct exynos_hwc_control exynosHWCControl;
 static const int32_t kUmPerInch = 25400;
 
+int writeIntToKernelFile(const char* path, const int value) {
+    std::ofstream ofs(path);
+
+    if (!ofs.is_open()) {
+        ALOGW("%s(): unable to open %s (%s)", __func__, path, strerror(errno));
+        return -1;
+    }
+
+    ofs << value << std::endl;
+
+    return 0;
+}
+
 FramebufferManager::~FramebufferManager()
 {
     {
@@ -2428,11 +2441,38 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
         ALOGV("skip atomic commit error handling as kernel is in TUI");
         ret = NO_ERROR;
     } else if (ret < 0) {
+        if (ret == -EINVAL) {
+            dumpDrmAtomicCommitMessage(ret);
+        }
         HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "commit error: %d", ret);
         setError(ret);
     }
 
     return ret;
+}
+
+void ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpDrmAtomicCommitMessage(int err) {
+    const nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+    const nsecs_t diffMs = ns2ms(now - mDrmDisplayInterface->mLastDumpDrmAtomicMessageTime);
+    if (diffMs < kAllowDumpDrmAtomicMessageTimeMs) {
+        return;
+    }
+
+    if (writeIntToKernelFile(kDrmModuleParametersDebugNode, kEnableDrmAtomicMessage)) {
+        return;
+    }
+
+    HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+             "commit error, enable atomic message and test again");
+    int ret = drmModeAtomicCommit(mDrmDisplayInterface->mDrmDevice->fd(), mPset,
+                                  DRM_MODE_ATOMIC_TEST_ONLY, mDrmDisplayInterface->mDrmDevice);
+    if (ret != err) {
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                 "re-try commit error(%d) is different from %d", ret, err);
+    }
+
+    writeIntToKernelFile(kDrmModuleParametersDebugNode, kDisableDrmDebugMessage);
+    mDrmDisplayInterface->mLastDumpDrmAtomicMessageTime = systemTime(SYSTEM_TIME_MONOTONIC);
 }
 
 int32_t ExynosDisplayDrmInterface::getReadbackBufferAttributes(
