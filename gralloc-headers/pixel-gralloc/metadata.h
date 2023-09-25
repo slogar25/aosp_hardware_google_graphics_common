@@ -56,8 +56,34 @@ enum class MetadataType : int64_t {
     // TODO(b/289448426#comment2): ROIINFO is probably not being used. Remove this after
     // confirmation.
     VIDEO_ROI,
+
+    // This metadata just refers to the same fd contained in buffer handle and not a clone.
+    // So the client should not attempt to close these fds.
+    PLANE_DMA_BUFS,
 };
 
 #undef MapMetadataType
+
+namespace util {
+
+template<typename T>
+static android::hardware::hidl_vec<uint8_t> encodeVector(const std::vector<T>& input) {
+    const size_t kVecSize = sizeof(T) * input.size();
+    android::hardware::hidl_vec<uint8_t> output(kVecSize);
+    std::memcpy(output.data(), input.data(), kVecSize);
+
+    return output;
+}
+
+template<typename T>
+std::vector<T> decodeVector (const android::hardware::hidl_vec<uint8_t>& input) {
+    const size_t kVecSize = input.size();
+    assert(kVecSize % sizeof(T) == 0);
+    std::vector<T> output(kVecSize / sizeof(T));
+    std::memcpy(output.data(), input.data(), kVecSize);
+
+    return output;
+}
+} // namespace util
 
 } // namespace pixel::graphics
