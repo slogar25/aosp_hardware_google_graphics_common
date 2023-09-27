@@ -583,8 +583,7 @@ public:
     int32_t allocOutBuf(uint32_t w, uint32_t h, uint32_t format, uint64_t usage, uint32_t index);
     int32_t setOutBuf(buffer_handle_t outbuf, int32_t fence);
     int32_t freeOutBuf(exynos_mpp_img_info dst);
-    int32_t doPostProcessing(struct exynos_image &src, struct exynos_image &dst);
-    int32_t doPostProcessing(uint32_t totalImags, uint32_t imageIndex, struct exynos_image &src, struct exynos_image &dst);
+    int32_t doPostProcessing(struct exynos_image& dst);
     int32_t setupRestriction();
     int32_t getSrcReleaseFence(uint32_t srcIndex);
     int32_t resetSrcReleaseFence();
