@@ -68,6 +68,7 @@ enum {
     TRIGGER_REFRESH_RATE_INDICATOR_UPDATE = 1011,
     IGNORE_DISPLAY_BRIGHTNESS_UPDATE_REQUESTS = 1012,
     SET_DISPLAY_BRIGHTNESS_NITS = 1013,
+    SET_DISPLAY_BRIGHTNESS_DBV = 1014,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -419,6 +420,18 @@ public:
         data.writeFloat(nits);
         int result = remote()->transact(SET_DISPLAY_BRIGHTNESS_NITS, data, &reply);
         if (result) ALOGE("SET_DISPLAY_BRIGHTNESS_NITS transact error(%d)", result);
+        return result;
+    }
+
+    virtual int32_t setDisplayBrightnessDbv(int32_t displayId, uint32_t dbv) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(displayId);
+        data.writeUint32(dbv);
+        int result = remote()->transact(SET_DISPLAY_BRIGHTNESS_DBV, data, &reply);
+        if (result) {
+            ALOGE("SET_DISPLAY_BRIGHTNESS_DBV transact error(%d)", result);
+        }
         return result;
     }
 
@@ -791,6 +804,15 @@ status_t BnExynosHWCService::onTransact(
             int32_t displayId = data.readInt32();
             float nits = data.readFloat();
             int32_t error = setDisplayBrightnessNits(displayId, nits);
+            reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+
+        case SET_DISPLAY_BRIGHTNESS_DBV: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            int32_t displayId = data.readInt32();
+            uint32_t dbv = data.readUint32();
+            int32_t error = setDisplayBrightnessDbv(displayId, dbv);
             reply->writeInt32(error);
             return NO_ERROR;
         } break;

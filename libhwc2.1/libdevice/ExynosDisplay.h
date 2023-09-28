@@ -1274,6 +1274,9 @@ class ExynosDisplay {
         /* set brightness to specific nits value */
         virtual int32_t setBrightnessNits(const float nits);
 
+        /* set brightness by dbv value */
+        virtual int32_t setBrightnessDbv(const uint32_t dbv);
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);

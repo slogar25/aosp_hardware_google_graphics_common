@@ -70,6 +70,7 @@ public:
     virtual int32_t setDisplayBrightness(int32_t display_id, float brightness) = 0;
     virtual int32_t ignoreDisplayBrightnessUpdateRequests(int32_t displayId, bool ignore) = 0;
     virtual int32_t setDisplayBrightnessNits(int32_t displayId, float nits) = 0;
+    virtual int32_t setDisplayBrightnessDbv(int32_t displayId, uint32_t dbv) = 0;
     virtual int32_t setDisplayLhbm(int32_t display_id, uint32_t on) = 0;
     virtual int32_t setMinIdleRefreshRate(uint32_t display_id, int32_t refresh_rate) = 0;
     virtual int32_t setRefreshRateThrottle(uint32_t display_id, int32_t throttle) = 0;
