@@ -64,6 +64,10 @@ enum class MetadataType : int64_t {
     // Returns: std::vector<int>
     PLANE_DMA_BUFS,
 
+    // PLANE_LAYOUTS from gralloc reply with the actual offset of the plane by considering the
+    // header if any. But some IPs require the offset starting from the header of a plane.
+    RAW_OFFSET_PLANE_LAYOUTS,
+
     // This is a experimental feature
     VIDEO_GMV,
 };
