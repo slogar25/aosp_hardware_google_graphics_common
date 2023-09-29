@@ -872,20 +872,28 @@ void ExynosPrimaryDisplay::setEarlyWakeupDisplay() {
     }
 }
 
-void ExynosPrimaryDisplay::setExpectedPresentTime(uint64_t timestamp) {
-    mExpectedPresentTime.store(timestamp);
+void ExynosPrimaryDisplay::setExpectedPresentTime(uint64_t timestamp, int frameIntervalNs) {
+    mExpectedPresentTimeAndInterval.store(std::make_tuple(timestamp, frameIntervalNs));
 }
 
 uint64_t ExynosPrimaryDisplay::getPendingExpectedPresentTime() {
-    if (mExpectedPresentTime.is_dirty()) {
-        return mExpectedPresentTime.get();
+    if (mExpectedPresentTimeAndInterval.is_dirty()) {
+        return std::get<0>(mExpectedPresentTimeAndInterval.get());
+    }
+
+    return 0;
+}
+
+int ExynosPrimaryDisplay::getPendingFrameInterval() {
+    if (mExpectedPresentTimeAndInterval.is_dirty()) {
+        return std::get<1>(mExpectedPresentTimeAndInterval.get());
     }
 
     return 0;
 }
 
 void ExynosPrimaryDisplay::applyExpectedPresentTime() {
-    mExpectedPresentTime.clear_dirty();
+    mExpectedPresentTimeAndInterval.clear_dirty();
 }
 
 int32_t ExynosPrimaryDisplay::setDisplayIdleTimer(const int32_t timeoutMs) {

@@ -1270,8 +1270,10 @@ class ExynosDisplay {
         virtual int32_t setLhbmState(bool __unused enabled) { return NO_ERROR; }
         virtual bool getLhbmState() { return false; };
         virtual void setEarlyWakeupDisplay() {}
-        virtual void setExpectedPresentTime(uint64_t __unused timestamp) {}
+        virtual void setExpectedPresentTime(uint64_t __unused timestamp,
+                                            int __unused frameIntervalNs) {}
         virtual uint64_t getPendingExpectedPresentTime() { return 0; }
+        virtual int getPendingFrameInterval() { return 0; }
         virtual void applyExpectedPresentTime() {}
         virtual int32_t getDisplayIdleTimerSupport(bool& outSupport);
         virtual int32_t getDisplayMultiThreadedPresentSupport(bool& outSupport);

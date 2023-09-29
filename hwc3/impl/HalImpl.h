@@ -159,9 +159,9 @@ class HalImpl : public IComposerHal {
                             std::vector<int32_t>* outRequestMasks,
                             ClientTargetProperty* outClientTargetProperty,
                             DimmingStage* outDimmingStage) override;
-    int32_t setExpectedPresentTime(
-            int64_t display,
-            const std::optional<ClockMonotonicTimestamp> expectedPresentTime) override;
+    int32_t setExpectedPresentTime(int64_t display,
+                                   const std::optional<ClockMonotonicTimestamp> expectedPresentTime,
+                                   int frameIntervalNs) override;
 
     EventCallback* getEventCallback() { return mEventCallback; }
     int32_t setRefreshRateChangedCallbackDebugEnabled(int64_t display, bool enabled) override;

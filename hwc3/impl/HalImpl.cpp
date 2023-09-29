@@ -1099,7 +1099,8 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
 }
 
 int HalImpl::setExpectedPresentTime(
-        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime,
+        int frameIntervalNs) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
@@ -1109,7 +1110,7 @@ int HalImpl::setExpectedPresentTime(
         ALOGW("HalImpl: set expected present time multiple times in one frame");
     }
 
-    halDisplay->setExpectedPresentTime(expectedPresentTime->timestampNanos);
+    halDisplay->setExpectedPresentTime(expectedPresentTime->timestampNanos, frameIntervalNs);
 
     return HWC2_ERROR_NONE;
 }
