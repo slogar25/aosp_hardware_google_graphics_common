@@ -628,11 +628,18 @@ public:
     CtrlValue() : value_(), dirty_(false) {}
     CtrlValue(const T& value) : value_(value), dirty_(false) {}
 
-    void store(T value) {
+    void store(const T& value) {
         if (value == value_) return;
         dirty_ = true;
         value_ = value;
     };
+
+    void store(T&& value) {
+        if (value == value_) return;
+        dirty_ = true;
+        value_ = std::move(value);
+    };
+
     const T &get() { return value_; };
     bool is_dirty() { return dirty_; };
     void clear_dirty() { dirty_ = false; };
