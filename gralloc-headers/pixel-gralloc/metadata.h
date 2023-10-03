@@ -68,6 +68,13 @@ enum class MetadataType : int64_t {
     // header if any. But some IPs require the offset starting from the header of a plane.
     RAW_OFFSET_PLANE_LAYOUTS,
 
+    // Ideally drivers should be using fourcc to identify an allocation, but some of the drivers
+    // depend upon the format too much that updating them will require longer time.
+    // Returns: ::pixel::graphics::Format
+    // Encoder: encodePixelFormatRequested
+    // Decoder: decodePixelFormatRequested
+    PIXEL_FORMAT_ALLOCATED,
+
     // This is a experimental feature
     VIDEO_GMV,
 };
