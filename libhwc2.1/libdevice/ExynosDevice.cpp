@@ -45,7 +45,6 @@ using aidl::android::hardware::graphics::composer3::IComposerCallback;
 
 class ExynosDevice;
 
-extern uint32_t mFenceLogSize;
 extern void PixelDisplayInit(ExynosDisplay *exynos_display, const std::string_view instance_str);
 
 static const std::map<const uint32_t, const std::string_view> pixelDisplayIntfName =
@@ -96,9 +95,18 @@ ExynosDevice::ExynosDevice()
     exynosHWCControl.sysFenceLogging = false;
     exynosHWCControl.useDynamicRecomp = false;
 
-    mInterfaceType = getDeviceInterfaceType();
+    hwcDebug = 0;
 
+    mInterfaceType = getDeviceInterfaceType();
     ALOGD("HWC2 : %s : interface type(%d)", __func__, mInterfaceType);
+
+    /*
+     * This order should not be changed
+     * new ExynosResourceManager ->
+     * create displays and add them to the list ->
+     * initDeviceInterface() ->
+     * ExynosResourceManager::updateRestrictions()
+     */
     mResourceManager = new ExynosResourceManagerModule(this);
 
     for (size_t i = 0; i < AVAILABLE_DISPLAY_UNITS.size(); i++) {
@@ -107,7 +115,9 @@ ExynosDevice::ExynosDevice()
         ALOGD("Create display[%zu] type: %d, index: %d", i, display_t.type, display_t.index);
         switch(display_t.type) {
             case HWC_DISPLAY_PRIMARY:
-                exynos_display = (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosPrimaryDisplayModule(display_t.index, this,
+                                                                         display_t.display_name));
                 if(display_t.index == 0) {
                     exynos_display->mPlugState = true;
                     ExynosMPP::mainDisplayWidth = exynos_display->mXres;
@@ -121,10 +131,14 @@ ExynosDevice::ExynosDevice()
                 }
                 break;
             case HWC_DISPLAY_EXTERNAL:
-                exynos_display = (ExynosDisplay *)(new ExynosExternalDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosExternalDisplayModule(display_t.index, this,
+                                                                          display_t.display_name));
                 break;
             case HWC_DISPLAY_VIRTUAL:
-                exynos_display = (ExynosDisplay *)(new ExynosVirtualDisplayModule(display_t.index, this));
+                exynos_display =
+                        (ExynosDisplay *)(new ExynosVirtualDisplayModule(display_t.index, this,
+                                                                         display_t.display_name));
                 mNumVirtualDisplay = 0;
                 break;
             default:
@@ -132,8 +146,8 @@ ExynosDevice::ExynosDevice()
                 break;
         }
         exynos_display->mDeconNodeName.appendFormat("%s", display_t.decon_node_name.c_str());
-        exynos_display->mDisplayName.appendFormat("%s", display_t.display_name.c_str());
         mDisplays.add(exynos_display);
+        mDisplayMap.insert(std::make_pair(exynos_display->mDisplayId, exynos_display));
 
 #ifndef FORCE_DISABLE_DR
         if (exynos_display->mDREnable)
@@ -145,7 +159,6 @@ ExynosDevice::ExynosDevice()
 
     dynamicRecompositionThreadCreate();
 
-    hwcDebug = 0;
     for (uint32_t i = 0; i < FENCE_IP_ALL; i++)
         hwcFenceDebug[i] = 0;
 
@@ -154,24 +167,25 @@ ExynosDevice::ExynosDevice()
         sprintf(fence_names[i], "_%2dh", i);
     }
 
-    String8 saveString;
-    saveString.appendFormat("ExynosDevice is initialized");
-    uint32_t errFileSize = saveErrorLog(saveString);
-    ALOGI("Initial errlog size: %d bytes\n", errFileSize);
+    for (auto it : mDisplays) {
+        std::string displayName = std::string(it->mDisplayName.c_str());
+        it->mErrLogFileWriter.setPrefixName(displayName + "_hwc_error_log");
+        it->mDebugDumpFileWriter.setPrefixName(displayName + "_hwc_debug");
+        it->mFenceFileWriter.setPrefixName(displayName + "_hwc_fence_state");
+        String8 saveString;
+        saveString.appendFormat("ExynosDisplay %s is initialized", it->mDisplayName.c_str());
+        saveErrorLog(saveString, it);
+    }
 
-    /*
-     * This order should not be changed
-     * new ExynosResourceManager ->
-     * create displays and add them to the list ->
-     * initDeviceInterface() ->
-     * ExynosResourceManager::updateRestrictions()
-     */
     initDeviceInterface(mInterfaceType);
+
+    // registerRestrictions();
     mResourceManager->updateRestrictions();
+    mResourceManager->initDisplays(mDisplays, mDisplayMap);
+    mResourceManager->initDisplaysTDMInfo();
 
     if (mInterfaceType == INTERFACE_TYPE_DRM) {
-        /* disable vblank immediately after updates */
-        setVBlankOffDelay(-1);
+        setVBlankOffDelay(1);
     }
 
     char value[PROPERTY_VALUE_MAX];
@@ -212,6 +226,7 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
                     display->mDisplayInterface) != NO_ERROR) {
             ALOGD("Remove display[%d], Failed to initialize display interface", i);
             mDisplays.removeAt(i);
+            mDisplayMap.erase(display->mDisplayId);
             delete display;
         } else {
             i++;
@@ -259,6 +274,17 @@ bool ExynosDevice::isLastValidate(ExynosDisplay *display)
             return false;
     }
     return true;
+}
+
+bool ExynosDevice::hasOtherDisplayOn(ExynosDisplay *display) {
+    for (uint32_t i = 0; i < mDisplays.size(); i++) {
+        if (mDisplays[i] == display) continue;
+        if ((mDisplays[i]->mType != HWC_DISPLAY_VIRTUAL) &&
+            mDisplays[i]->mPowerModeState.has_value() &&
+            (mDisplays[i]->mPowerModeState.value() != (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
+            return true;
+    }
+    return false;
 }
 
 bool ExynosDevice::isDynamicRecompositionThreadAlive()
@@ -339,24 +365,6 @@ void *ExynosDevice::dynamicRecompositionThreadLoop(void *data)
     }
 
     android_atomic_dec(&(dev->mDRThreadStatus));
-
-    return NULL;
-}
-/**
- * @param display
- * @return ExynosDisplay
- */
-ExynosDisplay* ExynosDevice::getDisplay(uint32_t display) {
-    if (mDisplays.isEmpty()) {
-        ALOGE("mDisplays.size(%zu), requested display(%d)",
-                mDisplays.size(), display);
-        return NULL;
-    }
-
-    for (size_t i = 0;i < mDisplays.size(); i++) {
-        if (mDisplays[i]->mDisplayId == display)
-            return (ExynosDisplay*)mDisplays[i];
-    }
 
     return NULL;
 }
@@ -802,13 +810,12 @@ bool ExynosDevice::checkNonInternalConnection()
     return false;
 }
 
-void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t* outCapabilities)
-{
+void ExynosDevice::getCapabilitiesLegacy(uint32_t *outCount, int32_t *outCapabilities) {
     uint32_t capabilityNum = 0;
 #ifdef HWC_SUPPORT_COLOR_TRANSFORM
     capabilityNum++;
 #endif
-#ifdef HWC_SKIP_VALIDATE
+#ifndef HWC_NO_SUPPORT_SKIP_VALIDATE
     capabilityNum++;
 #endif
     if (outCapabilities == NULL) {
@@ -819,14 +826,34 @@ void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t* outCapabilities)
         ALOGE("%s:: invalid outCount(%d), should be(%d)", __func__, *outCount, capabilityNum);
         return;
     }
-#if defined(HWC_SUPPORT_COLOR_TRANSFORM) || defined(HWC_SKIP_VALIDATE)
+#if defined(HWC_SUPPORT_COLOR_TRANSFORM) || !defined(HWC_NO_SUPPORT_SKIP_VALIDATE)
     uint32_t index = 0;
 #endif
 #ifdef HWC_SUPPORT_COLOR_TRANSFORM
     outCapabilities[index++] = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM;
 #endif
-#ifdef HWC_SKIP_VALIDATE
+#ifndef HWC_NO_SUPPORT_SKIP_VALIDATE
     outCapabilities[index++] = HWC2_CAPABILITY_SKIP_VALIDATE;
+#endif
+    return;
+}
+
+void ExynosDevice::getCapabilities(uint32_t *outCount, int32_t *outCapabilities) {
+    uint32_t capabilityNum = 0;
+#ifdef HWC_SUPPORT_COLOR_TRANSFORM
+    capabilityNum++;
+#endif
+    if (outCapabilities == NULL) {
+        *outCount = capabilityNum;
+        return;
+    }
+    if (capabilityNum != *outCount) {
+        ALOGE("%s:: invalid outCount(%d), should be(%d)", __func__, *outCount, capabilityNum);
+        return;
+    }
+#if defined(HWC_SUPPORT_COLOR_TRANSFORM)
+    uint32_t index = 0;
+    outCapabilities[index++] = HWC2_CAPABILITY_SKIP_CLIENT_COLOR_TRANSFORM;
 #endif
     return;
 }
@@ -895,7 +922,6 @@ bool ExynosDevice::validateFences(ExynosDisplay *display) {
 
     if (exynosHWCControl.doFenceFileDump) {
         ALOGD("Fence file dump !");
-        if (mFenceLogSize != 0) ALOGD("Fence file not empty!");
         saveFenceTrace(display);
         exynosHWCControl.doFenceFileDump = false;
     }
@@ -1192,4 +1218,20 @@ void ExynosDevice::onVsyncIdle(hwc2_display_t displayId) {
             reinterpret_cast<void (*)(hwc2_callback_data_t callbackData,
                                       hwc2_display_t hwcDisplay)>(callbackInfo.funcPointer);
     callbackFunc(callbackInfo.callbackData, displayId);
+}
+
+void ExynosDevice::onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod) {
+    Mutex::Autolock lock(mDeviceCallbackMutex);
+    const auto &refreshRateCallback =
+            mHwc3CallbackInfos.find(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug);
+
+    if (refreshRateCallback == mHwc3CallbackInfos.end()) return;
+
+    const auto &callbackInfo = refreshRateCallback->second;
+    if (callbackInfo.funcPointer == nullptr || callbackInfo.callbackData == nullptr) return;
+
+    auto callbackFunc =
+            reinterpret_cast<void (*)(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
+                                      hwc2_vsync_period_t)>(callbackInfo.funcPointer);
+    callbackFunc(callbackInfo.callbackData, displayId, vsyncPeriod);
 }

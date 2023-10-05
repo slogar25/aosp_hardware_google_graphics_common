@@ -137,6 +137,30 @@ ndk::ScopedAStatus Display::getLhbmState(bool *_aidl_return) {
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
+ndk::ScopedAStatus Display::setPeakRefreshRate(int rate) {
+    if (mDisplay && mDisplay->mOperationRateManager) {
+        mDisplay->mOperationRateManager->onPeakRefreshRate(rate);
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::setLowPowerMode(bool enabled) {
+    if (mDisplay && mDisplay->mOperationRateManager) {
+        mDisplay->mOperationRateManager->onLowPowerMode(enabled);
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
+ndk::ScopedAStatus Display::isOperationRateSupported(bool *_aidl_return) {
+    if (mDisplay) {
+        *_aidl_return = mDisplay->isOperationRateSupported();
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
 ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &native_handle,
                                                        const std::string &imageName,
                                                        int *_aidl_return) {
@@ -175,19 +199,38 @@ ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_retur
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
-bool Display::runMediator(const RoiRect roi, const Weight weight, const HistogramPos pos,
+bool Display::runMediator(const RoiRect &roi, const Weight &weight, const HistogramPos &pos,
                             std::vector<char16_t> *histogrambuffer) {
-    if (mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
-        ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
-        return false;
+    bool isConfigChanged;
+    histogram::HistogramMediator::HistogramConfig pendingConfig(roi, weight, pos);
+
+    {
+        std::unique_lock<std::mutex> lk(mMediator.mConfigMutex);
+        isConfigChanged = mMediator.mConfig != pendingConfig;
+
+        if (isConfigChanged &&
+            mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
+            ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
+            return false;
+        }
+
+        mMediator.mConfig = pendingConfig;
     }
+
     if (!mMediator.histRequested() &&
         mMediator.requestHist() == HistogramErrorCode::ENABLE_HIST_ERROR) {
         ALOGE("histogram error, ENABLE_HIST ERROR\n");
     }
-    if (mMediator.getFrameCount() != mMediator.getSampleFrameCounter()) {
-        mDisplay->mDevice->onRefresh(mDisplay->mDisplayId); // DRM not busy & sampled frame changed
+
+    /*
+     * DPU driver maintains always-on histogram engine state with up to date histogram data.
+     * Therefore we don't have explicitly to trigger onRefresh in case histogram configuration
+     * does not change.
+     */
+    if (isConfigChanged) {
+        mDisplay->mDevice->onRefresh(mDisplay->mDisplayId);
     }
+
     if (mMediator.collectRoiLuma(histogrambuffer) != HistogramErrorCode::NONE) {
         ALOGE("histogram error, COLLECT_ROI_LUMA ERROR\n");
         return false;

@@ -246,21 +246,23 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
         } else {
             level = brightness < 0 ? 0 : static_cast<uint32_t>(brightness * mMaxBrightness + 0.5f);
         }
-        // go sysfs path
+        // clear dirty before go sysfs path
+        mBrightnessFloatReq.clear_dirty();
     }
 
     // Sysfs path is faster than drm path. If there is an unchecked drm path change, the sysfs
     // path should check the sysfs content.
     if (mUncheckedGbhmRequest) {
         ATRACE_NAME("check_ghbm_mode");
-        checkSysfsStatus(kGlobalHbmModeFileNode,
+        checkSysfsStatus(GetPanelSysfileByIndex(kGlobalHbmModeFileNode),
                          {std::to_string(toUnderlying(mPendingGhbmStatus.load()))}, vsyncNs * 5);
         mUncheckedGbhmRequest = false;
     }
 
     if (mUncheckedLhbmRequest) {
         ATRACE_NAME("check_lhbm_mode");
-        checkSysfsStatus(kLocalHbmModeFileNode, {std::to_string(mPendingLhbmStatus)}, vsyncNs * 5);
+        checkSysfsStatus(GetPanelSysfileByIndex(kLocalHbmModeFileNode),
+                         {std::to_string(mPendingLhbmStatus)}, vsyncNs * 5);
         mUncheckedLhbmRequest = false;
     }
 
@@ -299,7 +301,8 @@ int BrightnessController::applyPendingChangeViaSysfs(const nsecs_t vsyncNs) {
 
     if (mUncheckedBlRequest) {
         ATRACE_NAME("check_bl_value");
-        checkSysfsStatus(BRIGHTNESS_SYSFS_NODE, {std::to_string(mPendingBl)}, vsyncNs * 5);
+        checkSysfsStatus(GetPanelSysfileByIndex(BRIGHTNESS_SYSFS_NODE),
+                         {std::to_string(mPendingBl)}, vsyncNs * 5);
         mUncheckedBlRequest = false;
     }
 
@@ -313,6 +316,13 @@ int BrightnessController::processLocalHbm(bool on) {
 
     std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mLhbmReq.store(on);
+    // As kernel timeout timer might disable LHBM without letting HWC know, enforce mLhbmReq and
+    // mLhbm dirty to ensure the enabling request can be passed through kernel unconditionally.
+    // TODO-b/260915350: move LHBM timeout mechanism from kernel to HWC for easier control and sync.
+    if (on) {
+        mLhbmReq.set_dirty();
+        mLhbm.set_dirty();
+    }
     if (mLhbmReq.is_dirty()) {
         updateStates();
     }
@@ -697,34 +707,39 @@ int BrightnessController::queryBrightness(float brightness, bool *ghbm, uint32_t
 }
 
 // Return immediately if it's already in the status. Otherwise poll the status
-int BrightnessController::checkSysfsStatus(const char* file,
+int BrightnessController::checkSysfsStatus(const std::string& file,
                                            const std::vector<std::string>& expectedValue,
                                            const nsecs_t timeoutNs) {
     ATRACE_CALL();
 
-    if (expectedValue.size() == 0) return false;
+    if (expectedValue.size() == 0) {
+      return -EINVAL;
+    }
 
     char buf[16];
-    String8 nodeName;
-    nodeName.appendFormat(file, mPanelIndex);
-    UniqueFd fd = open(nodeName.c_str(), O_RDONLY);
+    UniqueFd fd = open(file.c_str(), O_RDONLY);
+    if (fd.get() < 0) {
+        ALOGE("%s failed to open sysfs %s: %s", __func__, file.c_str(), strerror(errno));
+        return -ENOENT;
+    }
 
     int size = read(fd.get(), buf, sizeof(buf));
     if (size <= 0) {
-        ALOGE("%s failed to read from %s", __func__, kLocalHbmModeFileNode);
-        return false;
+        ALOGE("%s failed to read from %s: %s", __func__, file.c_str(), strerror(errno));
+        return -EIO;
     }
 
     // '- 1' to remove trailing '\n'
     std::string val = std::string(buf, size - 1);
     if (std::find(expectedValue.begin(), expectedValue.end(), val) != expectedValue.end()) {
-        return true;
+        return OK;
     } else if (timeoutNs == 0) {
-        return false;
+        // not get the expected value and no intention to wait
+        return -EINVAL;
     }
 
     struct pollfd pfd;
-    int ret = EINVAL;
+    int ret = -EINVAL;
 
     auto startTime = systemTime(SYSTEM_TIME_MONOTONIC);
     pfd.fd = fd.get();
@@ -738,9 +753,9 @@ int BrightnessController::checkSysfsStatus(const char* file,
         }
         int pollRet = poll(&pfd, 1, ns2ms(remainTimeNs));
         if (pollRet == 0) {
-            ALOGW("%s poll timeout", __func__);
+            ALOGW("%s poll %s timeout", __func__, file.c_str());
             // time out
-            ret = ETIMEDOUT;
+            ret = -ETIMEDOUT;
             break;
         } else if (pollRet > 0) {
             if (!(pfd.revents & POLLPRI)) {
@@ -753,7 +768,8 @@ int BrightnessController::checkSysfsStatus(const char* file,
                 val = std::string(buf, size - 1);
                 if (std::find(expectedValue.begin(), expectedValue.end(), val) !=
                     expectedValue.end()) {
-                    ret = 0;
+                    ret = OK;
+                    break;
                 } else {
                     std::string values;
                     for (auto& s : expectedValue) {
@@ -762,27 +778,27 @@ int BrightnessController::checkSysfsStatus(const char* file,
                     if (values.size() > 0) {
                         values.resize(values.size() - 1);
                     }
-                    ALOGE("%s read %s expected %s after notified", __func__, val.c_str(),
-                          values.c_str());
-                    ret = EINVAL;
+                    ALOGW("%s read %s expected %s after notified on file %s", __func__, val.c_str(),
+                          values.c_str(), file.c_str());
                 }
             } else {
-                ret = EIO;
-                ALOGE("%s failed to read after notified %d", __func__, errno);
+                ret = -EIO;
+                ALOGE("%s failed to read after notified %d on file %s", __func__, errno,
+                      file.c_str());
+                break;
             }
-            break;
         } else {
             if (errno == EAGAIN || errno == EINTR) {
                 continue;
             }
 
-            ALOGE("%s poll failed %d", __func__, errno);
-            ret = errno;
+            ALOGE("%s poll failed %d on file %s", __func__, errno, file.c_str());
+            ret = -errno;
             break;
         }
     };
 
-    return ret == NO_ERROR;
+    return ret;
 }
 
 void BrightnessController::resetLhbmState() {
