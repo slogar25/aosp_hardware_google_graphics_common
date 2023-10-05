@@ -64,9 +64,16 @@ enum class MetadataType : int64_t {
     // Returns: std::vector<int>
     PLANE_DMA_BUFS,
 
-    // PLANE_LAYOUTS from gralloc reply with the actual offset of the plane by considering the
-    // header if any. But some IPs require the offset starting from the header of a plane.
-    RAW_OFFSET_PLANE_LAYOUTS,
+    // PLANE_LAYOUTS from gralloc reply with the actual offset of the plane from the start of the
+    // header if any. But some IPs require the offset starting from the body of a plane.
+    // Returns: std::vector<PlaneLayout>
+    // Encoder: encodePlaneLayouts
+    // Decoder: decodePlaneLayouts
+    // TODO(b/303707610): Ideally this API should not be needed and offsets required by different
+    // IPs should be aligned. Even if the conclusion on the bug turns out to be "live with it", this
+    // metadata should be updated to be generic compressed buffer layout rather than a hack for body
+    // offset.
+    BODY_OFFSET_PLANE_LAYOUTS,
 
     // Ideally drivers should be using fourcc to identify an allocation, but some of the drivers
     // depend upon the format too much that updating them will require longer time.
