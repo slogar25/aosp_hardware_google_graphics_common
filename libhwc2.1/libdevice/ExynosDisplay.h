@@ -433,10 +433,7 @@ class ExynosDisplay {
         uint32_t mXdpi;
         uint32_t mYdpi;
         uint32_t mVsyncPeriod;
-        uint32_t mBtsVsyncPeriod;
-
-        int                     mPanelType;
-        int                     mPsrMode;
+        int32_t mBtsFrameScanoutPeriod;
 
         /* Constructor */
         ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device,
@@ -1199,10 +1196,10 @@ class ExynosDisplay {
         int32_t getConfigAppliedTime(const uint64_t desiredTime,
                 const uint64_t actualChangeTime,
                 int64_t &appliedTime, int64_t &refreshTime);
-        void updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool configApplied = false);
+        void updateBtsFrameScanoutPeriod(int32_t frameScanoutPeriod, bool configApplied = false);
         uint32_t getBtsRefreshRate() const;
-        virtual void checkBtsReassignResource(const uint32_t __unused vsyncPeriod,
-                                              const uint32_t __unused btsVsyncPeriod) {}
+        virtual void checkBtsReassignResource(const int32_t __unused vsyncPeriod,
+                                              const int32_t __unused btsVsyncPeriod) {}
 
         /* TODO : TBD */
         int32_t setCursorPositionAsync(uint32_t x_pos, uint32_t y_pos);
@@ -1586,6 +1583,20 @@ class ExynosDisplay {
             getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &vsync_period);
             assert(vsync_period > 0);
             return static_cast<uint32_t>(vsync_period);
+        }
+        inline int32_t getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config) {
+            assert(isBadConfig() == false);
+
+            int32_t frameScanoutPeriodNs;
+            std::optional<VrrConfig_t> vrrConfig = getVrrConfigs(config);
+            if (vrrConfig.has_value()) {
+                frameScanoutPeriodNs = vrrConfig->minFrameIntervalNs;
+            } else {
+                getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &frameScanoutPeriodNs);
+            }
+
+            assert(frameScanoutPeriodNs > 0);
+            return frameScanoutPeriodNs;
         }
 
         virtual void calculateTimeline(

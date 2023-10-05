@@ -1177,8 +1177,8 @@ void ExynosPrimaryDisplay::updateAppliedActiveConfig(const hwc2_config_t newConf
     mAppliedActiveConfig = newConfig;
 }
 
-void ExynosPrimaryDisplay::checkBtsReassignResource(const uint32_t vsyncPeriod,
-                                                    const uint32_t btsVsyncPeriod) {
+void ExynosPrimaryDisplay::checkBtsReassignResource(const int32_t vsyncPeriod,
+                                                    const int32_t btsVsyncPeriod) {
     ATRACE_CALL();
     uint32_t refreshRate = static_cast<uint32_t>(round(nsecsPerSec / vsyncPeriod * 0.1f) * 10);
 

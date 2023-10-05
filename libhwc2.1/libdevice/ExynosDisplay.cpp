@@ -980,8 +980,8 @@ String8 ExynosCompositionInfo::getTypeStr()
     }
 }
 
-ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device,
-                             const std::string &displayName)
+ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device,
+                             const std::string& displayName)
       : mDisplayId(getDisplayId(type, index)),
         mType(type),
         mIndex(index),
@@ -991,7 +991,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice *device
         mXdpi(25400),
         mYdpi(25400),
         mVsyncPeriod(16666666),
-        mBtsVsyncPeriod(16666666),
+        mBtsFrameScanoutPeriod(16666666),
         mDevice(device),
         mDisplayName(displayName.c_str()),
         mDisplayTraceName(String8::format("%s(%d)", displayName.c_str(), mDisplayId)),
@@ -4206,8 +4206,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     /* mActiveConfig should be changed immediately for internal status */
     mActiveConfig = config;
     mVsyncAppliedTimeLine = *outTimeline;
-    uint32_t vsync_period = getDisplayVsyncPeriodFromConfig(config);
-    updateBtsVsyncPeriod(vsync_period);
+    updateBtsFrameScanoutPeriod(getDisplayFrameScanoutPeriodFromConfig(config));
 
     bool earlyWakeupNeeded = checkRrCompensationEnabled();
     if (earlyWakeupNeeded) {
@@ -4307,15 +4306,15 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     return NO_ERROR;
 }
 
-void ExynosDisplay::updateBtsVsyncPeriod(uint32_t vsyncPeriod, bool configApplied) {
-    if (configApplied || vsyncPeriod < mBtsVsyncPeriod) {
-        checkBtsReassignResource(vsyncPeriod, mBtsVsyncPeriod);
-        mBtsVsyncPeriod = vsyncPeriod;
+void ExynosDisplay::updateBtsFrameScanoutPeriod(int32_t frameScanoutPeriod, bool configApplied) {
+    if (configApplied || frameScanoutPeriod < mBtsFrameScanoutPeriod) {
+        checkBtsReassignResource(frameScanoutPeriod, mBtsFrameScanoutPeriod);
+        mBtsFrameScanoutPeriod = frameScanoutPeriod;
     }
 }
 
 uint32_t ExynosDisplay::getBtsRefreshRate() const {
-    return static_cast<uint32_t>(round(nsecsPerSec / mBtsVsyncPeriod * 0.1f) * 10);
+    return static_cast<uint32_t>(round(nsecsPerSec / mBtsFrameScanoutPeriod * 0.1f) * 10);
 }
 
 void ExynosDisplay::updateRefreshRateHint() {
@@ -4330,7 +4329,7 @@ int32_t ExynosDisplay::resetConfigRequestStateLocked(hwc2_config_t config) {
     ATRACE_CALL();
 
     mVsyncPeriod = getDisplayVsyncPeriodFromConfig(config);
-    updateBtsVsyncPeriod(mVsyncPeriod, true);
+    updateBtsFrameScanoutPeriod(getDisplayFrameScanoutPeriodFromConfig(config), true);
     DISPLAY_LOGD(eDebugDisplayConfig, "Update mVsyncPeriod %d by config(%d)", mVsyncPeriod, config);
 
     updateRefreshRateHint();
