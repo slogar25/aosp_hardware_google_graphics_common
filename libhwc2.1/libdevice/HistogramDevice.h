@@ -47,6 +47,9 @@ public:
     using HistogramWeights = aidl::com::google::hardware::pixel::display::Weight;
     using HistogramChannelIoctl_t = ExynosDisplayDrmInterface::HistogramChannelIoctl_t;
 
+    /* For blocking roi and roi, (0, 0, 0, 0) means disabled */
+    static constexpr HistogramRoiRect DISABLED_ROI = {0, 0, 0, 0};
+
     /* Histogram weight constraint: weightR + weightG + weightB = WEIGHT_SUM */
     static constexpr size_t WEIGHT_SUM = 1024;
 
@@ -98,6 +101,9 @@ public:
 
         /* requested roi from the client by registerHistogram or reconfigHistogram */
         HistogramRoiRect requestedRoi GUARDED_BY(channelInfoMutex);
+
+        /* requested blocking roi from the client by registerHistogram or reconfigHistogram */
+        HistogramRoiRect requestedBlockingRoi GUARDED_BY(channelInfoMutex);
 
         /* histogram config that would be applied to hardware, the requestedRoi may be different
          * from the roi described in workingConfig due to RRS (Runtime Resolution Switch) */
@@ -286,6 +292,8 @@ private:
     std::queue<uint8_t> mFreeChannels GUARDED_BY(mAllocatorMutex); // free channel list
     std::unordered_map<AIBinder*, TokenInfo> mTokenInfoMap GUARDED_BY(mAllocatorMutex);
     std::vector<ChannelInfo> mChannels;
+    int32_t mDisplayActiveH = 0;
+    int32_t mDisplayActiveV = 0;
     ExynosDisplay* mDisplay = nullptr;
 
     /* Death recipient for the binderdied callback, would be deleted in the destructor */
@@ -312,11 +320,11 @@ private:
     void initHistogramCapability(bool supportMultiChannel);
 
     /**
-     * initSupportSamplePosList
+     * initPlatformHistogramCapability
      *
-     * Initialize the supported sample position list.
+     * Initialize platform specific histogram capability.
      */
-    virtual void initSupportSamplePosList();
+    virtual void initPlatformHistogramCapability() {}
 
     /**
      * configHistogram
@@ -415,10 +423,9 @@ private:
      * @channelId the channel id to be configured.
      * @token binder object created by the client.
      * @histogramConfig histogram config requested by the client.
-     * @threshold histogram threshold calculated from the roi.
      */
     void fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder& token,
-                           const HistogramConfig& histogramConfig, int threshold);
+                           const HistogramConfig& histogramConfig);
 
     /**
      * prepareChannelCommit
@@ -437,10 +444,13 @@ private:
      *
      * @drmReq drm atomic request object
      * @channelId histogram channel id
+     * @moduleDisplayInterface display drm interface pointer
+     * @isResolutionChanged true if the resolution change is detected, false otherwise.
      * @return NO_ERROR on success, else otherwise
      */
-    int prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
-                             uint8_t channelId);
+    int prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq, uint8_t channelId,
+                             ExynosDisplayDrmInterface* moduleDisplayInterface,
+                             bool isResolutionChanged);
 
     /**
      * createHistogramDrmConfigLocked
@@ -477,11 +487,14 @@ private:
     void dumpHistogramCapability(String8& result) const;
 
     HistogramErrorCode validateHistogramConfig(const HistogramConfig& histogramConfig) const;
-    HistogramErrorCode validateHistogramRoi(const HistogramRoiRect& roi) const;
+    HistogramErrorCode validateHistogramRoi(const HistogramRoiRect& roi, const char* roiType) const;
     HistogramErrorCode validateHistogramWeights(const HistogramWeights& weights) const;
     HistogramErrorCode validateHistogramSamplePos(const HistogramSamplePos& samplePos) const;
+    HistogramErrorCode validateHistogramBlockingRoi(
+            const std::optional<HistogramRoiRect>& blockingRoi) const;
 
-    static int calculateThreshold(const HistogramRoiRect& roi);
+    int calculateThreshold(const HistogramRoiRect& roi) const;
+
     static std::string toString(const ChannelStatus_t& status);
     static std::string toString(const HistogramRoiRect& roi);
     static std::string toString(const HistogramWeights& weights);

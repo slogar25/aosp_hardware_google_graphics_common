@@ -56,7 +56,8 @@ HistogramDevice::ChannelInfo::ChannelInfo()
       : status(ChannelStatus_t::DISABLED),
         token(nullptr),
         pid(-1),
-        requestedRoi(),
+        requestedRoi(DISABLED_ROI),
+        requestedBlockingRoi(DISABLED_ROI),
         workingConfig(),
         threshold(0),
         histDataCollecting(false) {}
@@ -67,6 +68,7 @@ HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo& other) {
     token = other.token;
     pid = other.pid;
     requestedRoi = other.requestedRoi;
+    requestedBlockingRoi = other.requestedBlockingRoi;
     workingConfig = other.workingConfig;
     threshold = other.threshold;
     histDataCollecting = other.histDataCollecting;
@@ -94,6 +96,11 @@ void HistogramDevice::initDrm(const DrmCrtc& crtc) {
 
     // TODO: b/295786065 - Check if the multi channel property is supported.
     initHistogramCapability(crtc.histogram_channel_property(0).id() != 0);
+
+    /* print the histogram capability */
+    String8 logString;
+    dumpHistogramCapability(logString);
+    ALOGI("%s", logString.c_str());
 }
 
 ndk::ScopedAStatus HistogramDevice::getHistogramCapability(
@@ -290,9 +297,25 @@ void HistogramDevice::handleDrmEvent(void* event) {
 void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq) {
     ATRACE_NAME("HistogramAtomicCommit");
 
+    ExynosDisplayDrmInterface* moduleDisplayInterface =
+            static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
+    if (!moduleDisplayInterface) {
+        HWC_LOGE(mDisplay, "%s: failed to get ExynosDisplayDrmInterface (nullptr)", __func__);
+        return;
+    }
+
+    /* Get the current active region and check if the resolution is changed. */
+    int32_t currDisplayActiveH = moduleDisplayInterface->getActiveModeHDisplay();
+    int32_t currDisplayActiveV = moduleDisplayInterface->getActiveModeVDisplay();
+    bool isResolutionChanged =
+            (mDisplayActiveH != currDisplayActiveH) || (mDisplayActiveV != currDisplayActiveV);
+    mDisplayActiveH = currDisplayActiveH;
+    mDisplayActiveV = currDisplayActiveV;
+
     /* Loop through every channel and call prepareChannelCommit */
     for (uint8_t channelId = 0; channelId < mChannels.size(); ++channelId) {
-        int channelRet = prepareChannelCommit(drmReq, channelId);
+        int channelRet = prepareChannelCommit(drmReq, channelId, moduleDisplayInterface,
+                                              isResolutionChanged);
 
         /* Every channel is independent, no early return when the channel commit fails. */
         if (channelRet) {
@@ -345,6 +368,9 @@ void HistogramDevice::dump(String8& result) const {
         tb.add("pid", channel.pid);
         tb.add("requestedRoi", toString(channel.requestedRoi));
         tb.add("workingRoi", toString(channel.workingConfig.roi));
+        tb.add("requestedBlockRoi", toString(channel.requestedBlockingRoi));
+        tb.add("workingBlockRoi",
+               toString(channel.workingConfig.blockingRoi.value_or(DISABLED_ROI)));
         tb.add("threshold", channel.threshold);
         tb.add("weightRGB", toString(channel.workingConfig.weights));
         tb.add("samplePos",
@@ -397,18 +423,13 @@ void HistogramDevice::initHistogramCapability(bool supportMultiChannel) {
         mHistogramCapability.fullResolutionHeight =
                 moduleDisplayInterface->getPanelFullResolutionVSize();
     }
-    ALOGI("%s: full screen roi: (0,0)x(%dx%d)", __func__, mHistogramCapability.fullResolutionWidth,
-          mHistogramCapability.fullResolutionHeight);
 
     mHistogramCapability.channelCount = mChannels.size();
     mHistogramCapability.supportMultiChannel = supportMultiChannel;
-
-    initSupportSamplePosList();
-}
-
-void HistogramDevice::initSupportSamplePosList() {
-    mHistogramCapability.supportSamplePosList.push_back(HistogramSamplePos::PRE_POSTPROC);
     mHistogramCapability.supportSamplePosList.push_back(HistogramSamplePos::POST_POSTPROC);
+    mHistogramCapability.supportBlockingRoi = false;
+
+    initPlatformHistogramCapability();
 }
 
 ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder& token,
@@ -437,9 +458,6 @@ ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder& token
         return ndk::ScopedAStatus::ok();
     }
 
-    /* threshold is calculated based on the roi coordinates rather than configured by the client */
-    int threshold = calculateThreshold(histogramConfig.roi);
-
     {
         ATRACE_BEGIN("getOrAcquireChannelId");
         uint8_t channelId;
@@ -465,7 +483,7 @@ ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder& token
 
         /* store the histogram information, and mark the channel ready for atomic commit by setting
          * the status to CONFIG_PENDING */
-        fillupChannelInfo(channelId, token, histogramConfig, threshold);
+        fillupChannelInfo(channelId, token, histogramConfig);
 
         if (!isReconfig) {
             /* link the binder object (token) to the death recipient. When the binder object is
@@ -631,20 +649,19 @@ void HistogramDevice::cleanupChannelInfo(uint8_t channelId) {
     channel.status = ChannelStatus_t::DISABLE_PENDING;
     channel.token = nullptr;
     channel.pid = -1;
-    channel.requestedRoi = {.left = 0, .top = 0, .right = 0, .bottom = 0};
-    channel.workingConfig = {.roi.left = 0,
-                             .roi.top = 0,
-                             .roi.right = 0,
-                             .roi.bottom = 0,
+    channel.requestedRoi = DISABLED_ROI;
+    channel.requestedBlockingRoi = DISABLED_ROI;
+    channel.workingConfig = {.roi = DISABLED_ROI,
                              .weights.weightR = 0,
                              .weights.weightG = 0,
                              .weights.weightB = 0,
-                             .samplePos = HistogramSamplePos::POST_POSTPROC};
+                             .samplePos = HistogramSamplePos::POST_POSTPROC,
+                             .blockingRoi = DISABLED_ROI};
     channel.threshold = 0;
 }
 
 void HistogramDevice::fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder& token,
-                                        const HistogramConfig& histogramConfig, int threshold) {
+                                        const HistogramConfig& histogramConfig) {
     ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
     ChannelInfo& channel = mChannels[channelId];
     std::scoped_lock lock(channel.channelInfoMutex);
@@ -652,46 +669,39 @@ void HistogramDevice::fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder
     channel.token = token;
     channel.pid = AIBinder_getCallingPid();
     channel.requestedRoi = histogramConfig.roi;
+    channel.requestedBlockingRoi = histogramConfig.blockingRoi.value_or(DISABLED_ROI);
     channel.workingConfig = histogramConfig;
-    channel.workingConfig.roi = {};
-    channel.threshold = threshold;
+    channel.workingConfig.roi = DISABLED_ROI;
+    channel.workingConfig.blockingRoi = DISABLED_ROI;
 }
 
 int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
-                                          uint8_t channelId) {
+                                          uint8_t channelId,
+                                          ExynosDisplayDrmInterface* moduleDisplayInterface,
+                                          bool isResolutionChanged) {
     int ret = NO_ERROR;
-    ExynosDisplayDrmInterface* moduleDisplayInterface =
-            static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
-    if (!moduleDisplayInterface) {
-        HWC_LOGE(mDisplay, "%s: failed to get ExynosDisplayDrmInterface (nullptr)", __func__);
-        return -EINVAL;
-    }
 
     ChannelInfo& channel = mChannels[channelId];
     std::scoped_lock lock(channel.channelInfoMutex);
 
     if (channel.status == ChannelStatus_t::CONFIG_COMMITTED ||
         channel.status == ChannelStatus_t::CONFIG_PENDING) {
-        HistogramRoiRect workingRoi;
-
-        /* calculate the roi based on the current active resolution */
-        ret = convertRoiLocked(moduleDisplayInterface, channel.requestedRoi, workingRoi);
-        if (ret == -EAGAIN) {
+        if (mDisplayActiveH == 0 || mDisplayActiveV == 0) {
+            /* mActiveModeState is not initialized, postpone histogram config to next atomic commit
+             */
+            ALOGW("%s: mActiveModeState is not initialized, active: (%dx%d), postpone histogram "
+                  "config to next atomic commit",
+                  __func__, mDisplayActiveH, mDisplayActiveV);
             /* postpone the histogram config to next atomic commit */
             ALOGD("%s: histogram channel #%u: set status (CONFIG_PENDING)", __func__, channelId);
             channel.status = ChannelStatus_t::CONFIG_PENDING;
             return NO_ERROR;
-        } else if (ret) {
-            ALOGE("%s: histogram channel #%u: failed to convert to workingRoi, ret: %d", __func__,
-                  channelId, ret);
-            channel.status = ChannelStatus_t::CONFIG_ERROR;
-            return ret;
         }
 
-        /* If the channel status is CONFIG_COMMITTED, also check if the working roi needs to be
+        /* If the channel status is CONFIG_COMMITTED, check if the working roi needs to be
          * updated due to resolution changed. */
         if (channel.status == ChannelStatus_t::CONFIG_COMMITTED) {
-            if (LIKELY(channel.workingConfig.roi == workingRoi)) {
+            if (LIKELY(isResolutionChanged == false)) {
                 return NO_ERROR;
             } else {
                 ALOGI("%s: histogram channel #%u: detect resolution changed, update roi setting",
@@ -699,8 +709,30 @@ int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtom
             }
         }
 
-        /* Adopt the roi calculated from convertRoiLocked */
-        channel.workingConfig.roi = workingRoi;
+        HistogramRoiRect convertedRoi;
+
+        /* calculate the roi based on the current active resolution */
+        ret = convertRoiLocked(moduleDisplayInterface, channel.requestedRoi, convertedRoi);
+        if (ret) {
+            ALOGE("%s: histogram channel #%u: failed to convert to workingRoi, ret: %d", __func__,
+                  channelId, ret);
+            channel.status = ChannelStatus_t::CONFIG_ERROR;
+            return ret;
+        }
+        channel.workingConfig.roi = convertedRoi;
+
+        /* calculate the blocking roi based on the current active resolution */
+        ret = convertRoiLocked(moduleDisplayInterface, channel.requestedBlockingRoi, convertedRoi);
+        if (ret) {
+            ALOGE("%s: histogram channel #%u: failed to convert to workingBlockRoi, ret: %d",
+                  __func__, channelId, ret);
+            channel.status = ChannelStatus_t::CONFIG_ERROR;
+            return ret;
+        }
+        channel.workingConfig.blockingRoi = convertedRoi;
+
+        /* threshold is calculated based on the roi coordinates rather than configured by client */
+        channel.threshold = calculateThreshold(channel.workingConfig.roi);
 
         /* Create histogram drm config struct (platform dependent) */
         std::shared_ptr<void> blobData;
@@ -750,33 +782,27 @@ int HistogramDevice::createHistogramDrmConfigLocked(const ChannelInfo& channel,
 
 int HistogramDevice::convertRoiLocked(ExynosDisplayDrmInterface* moduleDisplayInterface,
                                       const HistogramRoiRect& requestedRoi,
-                                      HistogramRoiRect& workingRoi) const {
-    int32_t activeH = moduleDisplayInterface->getActiveModeHDisplay();
-    int32_t activeV = moduleDisplayInterface->getActiveModeVDisplay();
-    int32_t panelH = mHistogramCapability.fullResolutionWidth;
-    int32_t panelV = mHistogramCapability.fullResolutionHeight;
+                                      HistogramRoiRect& convertedRoi) const {
+    const int32_t& panelH = mHistogramCapability.fullResolutionWidth;
+    const int32_t& panelV = mHistogramCapability.fullResolutionHeight;
 
-    ALOGV("%s: active: (%dx%d), panel: (%dx%d)", __func__, activeH, activeV, panelH, panelV);
+    ALOGV("%s: active: (%dx%d), panel: (%dx%d)", __func__, mDisplayActiveH, mDisplayActiveV, panelH,
+          panelV);
 
-    if (panelH < activeH || activeH < 0 || panelV < activeV || activeV < 0) {
-        ALOGE("%s: failed to convert roi, active: (%dx%d), panel: (%dx%d)", __func__, activeH,
-              activeV, panelH, panelV);
+    if (panelH < mDisplayActiveH || mDisplayActiveH < 0 || panelV < mDisplayActiveV ||
+        mDisplayActiveV < 0) {
+        ALOGE("%s: failed to convert roi, active: (%dx%d), panel: (%dx%d)", __func__,
+              mDisplayActiveH, mDisplayActiveV, panelH, panelV);
         return -EINVAL;
-    } else if (activeH == 0 || activeV == 0) {
-        /* mActiveModeState is not initialized, postpone histogram config to next atomic commit */
-        ALOGW("%s: mActiveModeState is not initialized, active: (%dx%d), postpone histogram config "
-              "to next atomic commit",
-              __func__, activeH, activeV);
-        return -EAGAIN;
     }
 
     /* Linear transform from full resolution to active resolution */
-    workingRoi.left = requestedRoi.left * activeH / panelH;
-    workingRoi.top = requestedRoi.top * activeV / panelV;
-    workingRoi.right = requestedRoi.right * activeH / panelH;
-    workingRoi.bottom = requestedRoi.bottom * activeV / panelV;
+    convertedRoi.left = requestedRoi.left * mDisplayActiveH / panelH;
+    convertedRoi.top = requestedRoi.top * mDisplayActiveV / panelV;
+    convertedRoi.right = requestedRoi.right * mDisplayActiveH / panelH;
+    convertedRoi.bottom = requestedRoi.bottom * mDisplayActiveV / panelV;
 
-    ALOGV("%s: working roi: %s", __func__, toString(workingRoi).c_str());
+    ALOGV("%s: working roi: %s", __func__, toString(convertedRoi).c_str());
 
     return NO_ERROR;
 }
@@ -786,6 +812,8 @@ void HistogramDevice::dumpHistogramCapability(String8& result) const {
     result.appendFormat("Histogram capability:\n");
     result.appendFormat("\tsupportMultiChannel: %s\n",
                         mHistogramCapability.supportMultiChannel ? "true" : "false");
+    result.appendFormat("\tsupportBlockingRoi: %s\n",
+                        mHistogramCapability.supportBlockingRoi ? "true" : "false");
     result.appendFormat("\tchannelCount: %d\n", mHistogramCapability.channelCount);
     result.appendFormat("\tfullscreen roi: (0,0)x(%dx%d)\n",
                         mHistogramCapability.fullResolutionWidth,
@@ -803,9 +831,11 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramConfig(
         const HistogramConfig& histogramConfig) const {
     HistogramErrorCode ret;
 
-    if ((ret = validateHistogramRoi(histogramConfig.roi)) != HistogramErrorCode::NONE ||
+    if ((ret = validateHistogramRoi(histogramConfig.roi, "")) != HistogramErrorCode::NONE ||
         (ret = validateHistogramWeights(histogramConfig.weights)) != HistogramErrorCode::NONE ||
-        (ret = validateHistogramSamplePos(histogramConfig.samplePos)) != HistogramErrorCode::NONE) {
+        (ret = validateHistogramSamplePos(histogramConfig.samplePos)) != HistogramErrorCode::NONE ||
+        (ret = validateHistogramBlockingRoi(histogramConfig.blockingRoi)) !=
+                HistogramErrorCode::NONE) {
         return ret;
     }
 
@@ -813,11 +843,13 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramConfig(
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramRoi(
-        const HistogramRoiRect& roi) const {
+        const HistogramRoiRect& roi, const char* roiType) const {
+    if (roi == DISABLED_ROI) return HistogramErrorCode::NONE;
+
     if ((roi.left < 0) || (roi.top < 0) || (roi.right - roi.left <= 0) ||
         (roi.bottom - roi.top <= 0) || (roi.right > mHistogramCapability.fullResolutionWidth) ||
         (roi.bottom > mHistogramCapability.fullResolutionHeight)) {
-        ALOGE("%s: BAD_ROI, roi: %s, full screen roi: (0,0)x(%dx%d)", __func__,
+        ALOGE("%s: BAD_ROI, %sroi: %s, full screen roi: (0,0)x(%dx%d)", __func__, roiType,
               toString(roi).c_str(), mHistogramCapability.fullResolutionWidth,
               mHistogramCapability.fullResolutionHeight);
         return HistogramErrorCode::BAD_ROI;
@@ -849,9 +881,28 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramSamplePos(
     return HistogramErrorCode::BAD_POSITION;
 }
 
-int HistogramDevice::calculateThreshold(const HistogramRoiRect& roi) {
+HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramBlockingRoi(
+        const std::optional<HistogramRoiRect>& blockingRoi) const {
+    /* If the platform doesn't support blockingRoi, client should not enable blockingRoi  */
+    if (mHistogramCapability.supportBlockingRoi == false) {
+        if (blockingRoi.has_value() && blockingRoi.value() != DISABLED_ROI) {
+            ALOGE("%s: BAD_ROI, platform doesn't support blockingRoi, requested: %s", __func__,
+                  toString(blockingRoi.value()).c_str());
+            return HistogramErrorCode::BAD_ROI;
+        }
+        return HistogramErrorCode::NONE;
+    }
+
+    /* For the platform that supports blockingRoi, use the same validate rule as roi */
+    return validateHistogramRoi(blockingRoi.value_or(DISABLED_ROI), "blocking ");
+}
+
+int HistogramDevice::calculateThreshold(const HistogramRoiRect& roi) const {
+    /* If roi is disabled, the targeted region is entire screen. */
+    int32_t roiH = (roi != DISABLED_ROI) ? (roi.right - roi.left) : mDisplayActiveH;
+    int32_t roiV = (roi != DISABLED_ROI) ? (roi.bottom - roi.top) : mDisplayActiveV;
+    int threshold = (roiV * roiH) >> 16;
     // TODO: b/294491895 - Check if the threshold plus one really need it
-    int threshold = ((roi.bottom - roi.top) * (roi.right - roi.left)) >> 16;
     return threshold + 1;
 }
 
@@ -881,6 +932,8 @@ std::string HistogramDevice::toString(const ChannelStatus_t& status) {
 }
 
 std::string HistogramDevice::toString(const HistogramRoiRect& roi) {
+    if (roi == DISABLED_ROI) return "OFF";
+
     std::ostringstream os;
     os << "(" << roi.left << "," << roi.top << ")";
     os << "x";
