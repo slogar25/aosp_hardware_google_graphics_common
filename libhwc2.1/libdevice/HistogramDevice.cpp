@@ -35,10 +35,10 @@
  *
  * @cookie pointer to the TokenInfo of the binder object.
  */
-static void histogramOnBinderDied(void *cookie) {
+static void histogramOnBinderDied(void* cookie) {
     ATRACE_CALL();
     HistogramDevice::HistogramErrorCode histogramErrorCode;
-    HistogramDevice::TokenInfo *tokenInfo = (HistogramDevice::TokenInfo *)cookie;
+    HistogramDevice::TokenInfo* tokenInfo = (HistogramDevice::TokenInfo*)cookie;
     ALOGI("%s: histogram channel #%u: client with token(%p) is died", __func__,
           tokenInfo->channelId, tokenInfo->token.get());
 
@@ -61,7 +61,7 @@ HistogramDevice::ChannelInfo::ChannelInfo()
         threshold(0),
         histDataCollecting(false) {}
 
-HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo &other) {
+HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo& other) {
     std::scoped_lock lock(other.channelInfoMutex);
     status = other.status;
     token = other.token;
@@ -72,7 +72,7 @@ HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo &other) {
     histDataCollecting = other.histDataCollecting;
 }
 
-HistogramDevice::HistogramDevice(ExynosDisplay *display, uint8_t channelCount,
+HistogramDevice::HistogramDevice(ExynosDisplay* display, uint8_t channelCount,
                                  std::vector<uint8_t> reservedChannels) {
     mDisplay = display;
 
@@ -89,7 +89,7 @@ HistogramDevice::~HistogramDevice() {
     }
 }
 
-void HistogramDevice::initDrm(const DrmCrtc &crtc) {
+void HistogramDevice::initDrm(const DrmCrtc& crtc) {
     // TODO: b/295786065 - Get available channels from crtc property.
 
     // TODO: b/295786065 - Check if the multi channel property is supported.
@@ -97,7 +97,7 @@ void HistogramDevice::initDrm(const DrmCrtc &crtc) {
 }
 
 ndk::ScopedAStatus HistogramDevice::getHistogramCapability(
-        HistogramCapability *histogramCapability) const {
+        HistogramCapability* histogramCapability) const {
     ATRACE_CALL();
 
     if (!histogramCapability) {
@@ -110,9 +110,9 @@ ndk::ScopedAStatus HistogramDevice::getHistogramCapability(
     return ndk::ScopedAStatus::ok();
 }
 
-ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder &token,
-                                                      const HistogramConfig &histogramConfig,
-                                                      HistogramErrorCode *histogramErrorCode) {
+ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& token,
+                                                      const HistogramConfig& histogramConfig,
+                                                      HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
 
     if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
@@ -123,9 +123,9 @@ ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder &tok
     return configHistogram(token, histogramConfig, histogramErrorCode, false);
 }
 
-ndk::ScopedAStatus HistogramDevice::queryHistogram(const ndk::SpAIBinder &token,
-                                                   std::vector<char16_t> *histogramBuffer,
-                                                   HistogramErrorCode *histogramErrorCode) {
+ndk::ScopedAStatus HistogramDevice::queryHistogram(const ndk::SpAIBinder& token,
+                                                   std::vector<char16_t>* histogramBuffer,
+                                                   HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
 
     if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
@@ -188,9 +188,9 @@ ndk::ScopedAStatus HistogramDevice::queryHistogram(const ndk::SpAIBinder &token,
     return ndk::ScopedAStatus::ok();
 }
 
-ndk::ScopedAStatus HistogramDevice::reconfigHistogram(const ndk::SpAIBinder &token,
-                                                      const HistogramConfig &histogramConfig,
-                                                      HistogramErrorCode *histogramErrorCode) {
+ndk::ScopedAStatus HistogramDevice::reconfigHistogram(const ndk::SpAIBinder& token,
+                                                      const HistogramConfig& histogramConfig,
+                                                      HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
 
     if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
@@ -201,8 +201,8 @@ ndk::ScopedAStatus HistogramDevice::reconfigHistogram(const ndk::SpAIBinder &tok
     return configHistogram(token, histogramConfig, histogramErrorCode, true);
 }
 
-ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder &token,
-                                                        HistogramErrorCode *histogramErrorCode) {
+ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder& token,
+                                                        HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
 
     if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
@@ -257,10 +257,10 @@ ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder &t
     return ndk::ScopedAStatus::ok();
 }
 
-void HistogramDevice::handleDrmEvent(void *event) {
+void HistogramDevice::handleDrmEvent(void* event) {
     int ret = NO_ERROR;
     uint8_t channelId;
-    char16_t *buffer;
+    char16_t* buffer;
 
     if ((ret = parseDrmEvent(event, channelId, buffer))) {
         ALOGE("%s: failed to parseDrmEvent, ret %d", __func__, ret);
@@ -273,7 +273,7 @@ void HistogramDevice::handleDrmEvent(void *event) {
         return;
     }
 
-    ChannelInfo &channel = mChannels[channelId];
+    ChannelInfo& channel = mChannels[channelId];
     std::unique_lock<std::mutex> lock(channel.histDataCollectingMutex);
 
     /* Check if the histogram channel is collecting the histogram data */
@@ -287,7 +287,7 @@ void HistogramDevice::handleDrmEvent(void *event) {
     channel.histDataCollecting_cv.notify_all();
 }
 
-void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq) {
+void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq) {
     ATRACE_NAME("HistogramAtomicCommit");
 
     /* Loop through every channel and call prepareChannelCommit */
@@ -305,7 +305,7 @@ void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtom
 void HistogramDevice::postAtomicCommit() {
     /* Atomic commit is success, loop through every channel and update the channel status */
     for (uint8_t channelId = 0; channelId < mChannels.size(); ++channelId) {
-        ChannelInfo &channel = mChannels[channelId];
+        ChannelInfo& channel = mChannels[channelId];
         std::scoped_lock lock(channel.channelInfoMutex);
 
         switch (channel.status) {
@@ -321,7 +321,7 @@ void HistogramDevice::postAtomicCommit() {
     }
 }
 
-void HistogramDevice::dump(String8 &result) const {
+void HistogramDevice::dump(String8& result) const {
     /* Do not dump the Histogram Device if it is not supported. */
     if (!mHistogramCapability.supportMultiChannel) {
         return;
@@ -337,7 +337,7 @@ void HistogramDevice::dump(String8 &result) const {
     for (uint8_t channelId = 0; channelId < mChannels.size(); ++channelId) {
         // TODO: b/294489887 - Use buildForMiniDump can eliminate the redundant rows.
         TableBuilder tb;
-        const ChannelInfo &channel = mChannels[channelId];
+        const ChannelInfo& channel = mChannels[channelId];
         std::scoped_lock lock(channel.channelInfoMutex);
         tb.add("ID", (int)channelId);
         tb.add("status", toString(channel.status));
@@ -357,7 +357,7 @@ void HistogramDevice::dump(String8 &result) const {
 }
 
 void HistogramDevice::initChannels(uint8_t channelCount,
-                                   const std::vector<uint8_t> &reservedChannels) {
+                                   const std::vector<uint8_t>& reservedChannels) {
     mChannels.resize(channelCount);
     ALOGI("%s: init histogram with %d channels", __func__, channelCount);
 
@@ -382,8 +382,8 @@ void HistogramDevice::initChannels(uint8_t channelCount,
 }
 
 void HistogramDevice::initHistogramCapability(bool supportMultiChannel) {
-    ExynosDisplayDrmInterface *moduleDisplayInterface =
-            static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
+    ExynosDisplayDrmInterface* moduleDisplayInterface =
+            static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
 
     if (!moduleDisplayInterface) {
         ALOGE("%s: failed to get ExynosDisplayDrmInterface (nullptr), cannot get panel full "
@@ -411,9 +411,9 @@ void HistogramDevice::initSupportSamplePosList() {
     mHistogramCapability.supportSamplePosList.push_back(HistogramSamplePos::POST_POSTPROC);
 }
 
-ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder &token,
-                                                    const HistogramConfig &histogramConfig,
-                                                    HistogramErrorCode *histogramErrorCode,
+ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder& token,
+                                                    const HistogramConfig& histogramConfig,
+                                                    HistogramErrorCode* histogramErrorCode,
                                                     bool isReconfig) {
     /* validate the argument (histogramErrorCode) */
     if (!histogramErrorCode) {
@@ -489,12 +489,12 @@ ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder &token
     return ndk::ScopedAStatus::ok();
 }
 
-void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t> *histogramBuffer,
-                                       HistogramErrorCode *histogramErrorCode) {
+void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t>* histogramBuffer,
+                                       HistogramErrorCode* histogramErrorCode) {
     ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
     int32_t ret;
-    ExynosDisplayDrmInterface *moduleDisplayInterface =
-            static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
+    ExynosDisplayDrmInterface* moduleDisplayInterface =
+            static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
     if (!moduleDisplayInterface) {
         *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
         ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, moduleDisplayInterface is nullptr",
@@ -502,7 +502,7 @@ void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t> 
         return;
     }
 
-    ChannelInfo &channel = mChannels[channelId];
+    ChannelInfo& channel = mChannels[channelId];
 
     std::unique_lock<std::mutex> lock(channel.histDataCollectingMutex);
 
@@ -578,14 +578,14 @@ void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t> 
     histogramBuffer->assign(channel.histData, channel.histData + HISTOGRAM_BIN_COUNT);
 }
 
-int HistogramDevice::parseDrmEvent(void *event, uint8_t &channelId, char16_t *&buffer) const {
+int HistogramDevice::parseDrmEvent(void* event, uint8_t& channelId, char16_t*& buffer) const {
     channelId = 0;
     buffer = nullptr;
     return INVALID_OPERATION;
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::acquireChannelLocked(
-        const ndk::SpAIBinder &token, uint8_t &channelId) {
+        const ndk::SpAIBinder& token, uint8_t& channelId) {
     ATRACE_CALL();
     if (mFreeChannels.size() == 0) {
         ALOGE("%s: NO_CHANNEL_AVAILABLE, there is no histogram channel available", __func__);
@@ -613,7 +613,7 @@ void HistogramDevice::releaseChannelLocked(uint8_t channelId) {
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::getChannelIdByTokenLocked(
-        const ndk::SpAIBinder &token, uint8_t &channelId) {
+        const ndk::SpAIBinder& token, uint8_t& channelId) {
     if (mTokenInfoMap.find(token.get()) == mTokenInfoMap.end()) {
         ALOGE("%s: BAD_TOKEN, token (%p) is not registered", __func__, token.get());
         return HistogramErrorCode::BAD_TOKEN;
@@ -626,7 +626,7 @@ HistogramDevice::HistogramErrorCode HistogramDevice::getChannelIdByTokenLocked(
 
 void HistogramDevice::cleanupChannelInfo(uint8_t channelId) {
     ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
-    ChannelInfo &channel = mChannels[channelId];
+    ChannelInfo& channel = mChannels[channelId];
     std::scoped_lock lock(channel.channelInfoMutex);
     channel.status = ChannelStatus_t::DISABLE_PENDING;
     channel.token = nullptr;
@@ -643,10 +643,10 @@ void HistogramDevice::cleanupChannelInfo(uint8_t channelId) {
     channel.threshold = 0;
 }
 
-void HistogramDevice::fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder &token,
-                                        const HistogramConfig &histogramConfig, int threshold) {
+void HistogramDevice::fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder& token,
+                                        const HistogramConfig& histogramConfig, int threshold) {
     ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
-    ChannelInfo &channel = mChannels[channelId];
+    ChannelInfo& channel = mChannels[channelId];
     std::scoped_lock lock(channel.channelInfoMutex);
     channel.status = ChannelStatus_t::CONFIG_PENDING;
     channel.token = token;
@@ -657,17 +657,17 @@ void HistogramDevice::fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder
     channel.threshold = threshold;
 }
 
-int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq,
+int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
                                           uint8_t channelId) {
     int ret = NO_ERROR;
-    ExynosDisplayDrmInterface *moduleDisplayInterface =
-            static_cast<ExynosDisplayDrmInterface *>(mDisplay->mDisplayInterface.get());
+    ExynosDisplayDrmInterface* moduleDisplayInterface =
+            static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
     if (!moduleDisplayInterface) {
         HWC_LOGE(mDisplay, "%s: failed to get ExynosDisplayDrmInterface (nullptr)", __func__);
         return -EINVAL;
     }
 
-    ChannelInfo &channel = mChannels[channelId];
+    ChannelInfo& channel = mChannels[channelId];
     std::scoped_lock lock(channel.channelInfoMutex);
 
     if (channel.status == ChannelStatus_t::CONFIG_COMMITTED ||
@@ -738,9 +738,9 @@ int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtom
     return ret;
 }
 
-int HistogramDevice::createHistogramDrmConfigLocked(const ChannelInfo &channel,
-                                                    std::shared_ptr<void> &configPtr,
-                                                    size_t &length) const {
+int HistogramDevice::createHistogramDrmConfigLocked(const ChannelInfo& channel,
+                                                    std::shared_ptr<void>& configPtr,
+                                                    size_t& length) const {
     /* Default implementation doesn't know the histogram channel config struct in the kernel.
      * Cannot allocate and initialize the channel config. */
     configPtr = nullptr;
@@ -748,9 +748,9 @@ int HistogramDevice::createHistogramDrmConfigLocked(const ChannelInfo &channel,
     return INVALID_OPERATION;
 }
 
-int HistogramDevice::convertRoiLocked(ExynosDisplayDrmInterface *moduleDisplayInterface,
-                                      const HistogramRoiRect &requestedRoi,
-                                      HistogramRoiRect &workingRoi) const {
+int HistogramDevice::convertRoiLocked(ExynosDisplayDrmInterface* moduleDisplayInterface,
+                                      const HistogramRoiRect& requestedRoi,
+                                      HistogramRoiRect& workingRoi) const {
     int32_t activeH = moduleDisplayInterface->getActiveModeHDisplay();
     int32_t activeV = moduleDisplayInterface->getActiveModeVDisplay();
     int32_t panelH = mHistogramCapability.fullResolutionWidth;
@@ -781,7 +781,7 @@ int HistogramDevice::convertRoiLocked(ExynosDisplayDrmInterface *moduleDisplayIn
     return NO_ERROR;
 }
 
-void HistogramDevice::dumpHistogramCapability(String8 &result) const {
+void HistogramDevice::dumpHistogramCapability(String8& result) const {
     /* Append the histogram capability info to the dump string */
     result.appendFormat("Histogram capability:\n");
     result.appendFormat("\tsupportMultiChannel: %s\n",
@@ -800,7 +800,7 @@ void HistogramDevice::dumpHistogramCapability(String8 &result) const {
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramConfig(
-        const HistogramConfig &histogramConfig) const {
+        const HistogramConfig& histogramConfig) const {
     HistogramErrorCode ret;
 
     if ((ret = validateHistogramRoi(histogramConfig.roi)) != HistogramErrorCode::NONE ||
@@ -813,7 +813,7 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramConfig(
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramRoi(
-        const HistogramRoiRect &roi) const {
+        const HistogramRoiRect& roi) const {
     if ((roi.left < 0) || (roi.top < 0) || (roi.right - roi.left <= 0) ||
         (roi.bottom - roi.top <= 0) || (roi.right > mHistogramCapability.fullResolutionWidth) ||
         (roi.bottom > mHistogramCapability.fullResolutionHeight)) {
@@ -827,7 +827,7 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramRoi(
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramWeights(
-        const HistogramWeights &weights) const {
+        const HistogramWeights& weights) const {
     if ((weights.weightR + weights.weightG + weights.weightB) != WEIGHT_SUM) {
         ALOGE("%s: BAD_WEIGHT, weights(%d,%d,%d)\n", __func__, weights.weightR, weights.weightG,
               weights.weightB);
@@ -838,7 +838,7 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramWeights(
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramSamplePos(
-        const HistogramSamplePos &samplePos) const {
+        const HistogramSamplePos& samplePos) const {
     for (HistogramSamplePos mSamplePos : mHistogramCapability.supportSamplePosList) {
         if (samplePos == mSamplePos) {
             return HistogramErrorCode::NONE;
@@ -849,13 +849,13 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramSamplePos(
     return HistogramErrorCode::BAD_POSITION;
 }
 
-int HistogramDevice::calculateThreshold(const HistogramRoiRect &roi) {
+int HistogramDevice::calculateThreshold(const HistogramRoiRect& roi) {
     // TODO: b/294491895 - Check if the threshold plus one really need it
     int threshold = ((roi.bottom - roi.top) * (roi.right - roi.left)) >> 16;
     return threshold + 1;
 }
 
-std::string HistogramDevice::toString(const ChannelStatus_t &status) {
+std::string HistogramDevice::toString(const ChannelStatus_t& status) {
     switch (status) {
         case ChannelStatus_t::RESERVED:
             return "RESERVED";
@@ -880,7 +880,7 @@ std::string HistogramDevice::toString(const ChannelStatus_t &status) {
     return "UNDEFINED";
 }
 
-std::string HistogramDevice::toString(const HistogramRoiRect &roi) {
+std::string HistogramDevice::toString(const HistogramRoiRect& roi) {
     std::ostringstream os;
     os << "(" << roi.left << "," << roi.top << ")";
     os << "x";
@@ -888,7 +888,7 @@ std::string HistogramDevice::toString(const HistogramRoiRect &roi) {
     return os.str();
 }
 
-std::string HistogramDevice::toString(const HistogramWeights &weights) {
+std::string HistogramDevice::toString(const HistogramWeights& weights) {
     std::ostringstream os;
     os << "(";
     os << (int)weights.weightR << ",";
