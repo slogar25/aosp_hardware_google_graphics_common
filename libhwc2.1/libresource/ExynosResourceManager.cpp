@@ -1206,40 +1206,33 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
     uint32_t otfMppRatio = 1;
     uint32_t m2mMppRatio = 1;
     if (scaleUp) {
-        std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
-                     [&dst_scale_img, &dst_img, &otfMpp, &otfMppRatio](auto m) {
-                         auto ratio = m->getMaxUpscale(dst_scale_img, dst_img);
-                         if (ratio > 1) {
-                             otfMpp = m;
-                             otfMppRatio = ratio;
-                             return true;
-                         }
-                         return false;
-                     });
+        for (ExynosMPP *m : mOtfMPPs) {
+            auto ratio = m->getMaxUpscale(dst_scale_img, dst_img);
+            if (ratio > 1) {
+                otfMpp = m;
+                otfMppRatio = ratio;
+                break;
+            }
+        }
         const auto reqRatio = max(float(dst_img.w) / float(srcWidth * otfMppRatio),
                                   float(dst_img.h) / float(srcHeight * otfMppRatio));
-        std::find_if(mM2mMPPs.begin(), mM2mMPPs.end(),
-                     [&src_img, &dst_scale_img, reqRatio, &m2mMpp, &m2mMppRatio](auto m) {
-                         float ratio = float(m->getMaxUpscale(src_img, dst_scale_img));
-                         if (ratio > reqRatio) {
-                             m2mMpp = m;
-                             m2mMppRatio = ratio;
-                             return true;
-                         }
-                         return false;
-                     });
+        for (ExynosMPP *m : mM2mMPPs) {
+            float ratio = float(m->getMaxUpscale(src_img, dst_scale_img));
+            if (ratio > reqRatio) {
+                m2mMpp = m;
+                m2mMppRatio = ratio;
+                break;
+            }
+        }
     } else {
-        std::find_if(mM2mMPPs.begin(), mM2mMPPs.end(),
-                     [&src_img, &dst_scale_img, display, &m2mMpp, &m2mMppRatio](auto m) {
-                         auto ratio = m->getMaxDownscale(*display, src_img, dst_scale_img);
-                         if (ratio > 1) {
-                             m2mMpp = m;
-                             m2mMppRatio = ratio;
-                             return true;
-                         }
-                         return false;
-                     });
-
+        for (ExynosMPP *m : mM2mMPPs) {
+            auto ratio = m->getMaxDownscale(*display, src_img, dst_scale_img);
+            if (ratio > 1) {
+                m2mMpp = m;
+                m2mMppRatio = ratio;
+                break;
+            }
+        }
         const float otfSrcWidth = float(srcWidth / m2mMppRatio);
         const float scaleRatio_H = otfSrcWidth / float(dst_img.w);
         const float otfSrcHeight = float(srcHeight / m2mMppRatio);
@@ -1247,19 +1240,16 @@ void ExynosResourceManager::getCandidateScalingM2mMPPOutImages(
         const float displayRatio_V = float(dst_img.h) / float(display->mYres);
         const float resolution = otfSrcWidth * otfSrcHeight * display->getBtsRefreshRate() / 1000;
 
-        std::find_if(mOtfMPPs.begin(), mOtfMPPs.end(),
-                     [&dst_scale_img, &dst_img, resolution, scaleRatio_H, scaleRatio_V,
-                      displayRatio_V, &otfMpp, &otfMppRatio](auto m) {
-                         auto ratio = m->getDownscaleRestriction(dst_scale_img, dst_img);
+        for (ExynosMPP *m : mOtfMPPs) {
+            auto ratio = m->getDownscaleRestriction(dst_scale_img, dst_img);
 
-                         if (ratio >= scaleRatio_H && ratio >= scaleRatio_V &&
-                             m->checkDownscaleCap(resolution, displayRatio_V)) {
-                             otfMpp = m;
-                             otfMppRatio = ratio;
-                             return true;
-                         }
-                         return false;
-                     });
+            if (ratio >= scaleRatio_H && ratio >= scaleRatio_V &&
+                m->checkDownscaleCap(resolution, displayRatio_V)) {
+                otfMpp = m;
+                otfMppRatio = ratio;
+                break;
+            }
+        }
     }
 
     if (!otfMpp && !m2mMpp) {
