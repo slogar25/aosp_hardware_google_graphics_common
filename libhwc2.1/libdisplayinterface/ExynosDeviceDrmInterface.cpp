@@ -312,3 +312,12 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleIdleEnterEvent(char 
         primaryDisplay->handleDisplayIdleEnter(idleTeVrefresh);
     }
 }
+
+int32_t ExynosDeviceDrmInterface::registerSysfsEventHandler(
+        std::shared_ptr<DrmSysfsEventHandler> handler) {
+    return mDrmDevice->event_listener()->RegisterSysfsHandler(std::move(handler));
+}
+
+int32_t ExynosDeviceDrmInterface::unregisterSysfsEventHandler(int sysfsFd) {
+    return mDrmDevice->event_listener()->UnRegisterSysfsHandler(sysfsFd);
+}

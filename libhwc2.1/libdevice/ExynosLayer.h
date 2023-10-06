@@ -77,6 +77,7 @@ typedef struct pre_processed_layer_info
 
 enum {
     HWC2_COMPOSITION_DISPLAY_DECORATION = toUnderlying(Composition::DISPLAY_DECORATION),
+    HWC2_COMPOSITION_REFRESH_RATE_INDICATOR = toUnderlying(Composition::REFRESH_RATE_INDICATOR),
     /*add after hwc2_composition_t, margin number here*/
     HWC2_COMPOSITION_EXYNOS = 32,
 };
@@ -91,8 +92,18 @@ class ExynosLayer : public ExynosMPPSource {
 
         /**
          * Layer's compositionType
+         *
+         * If acceptDisplayChanges() is called, it will be set to the validated type
+         * since SF may update their state and doesn't call back into HWC
          */
         int32_t mCompositionType;
+
+        /**
+         * Composition type that is originally requested by SF only using setLayerComposisionType()
+         *
+         * It will not be changed if applyDisplayChanges() is called.
+         */
+        int32_t mRequestedCompositionType;
 
         /**
          * Composition type that is used by HAL
@@ -177,6 +188,8 @@ class ExynosLayer : public ExynosMPPSource {
          * Display buffer handle
          */
         buffer_handle_t mLayerBuffer;
+
+        nsecs_t mLastUpdateTime;
 
         /**
          * Surface Damage

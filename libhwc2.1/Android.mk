@@ -67,8 +67,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	libvendorgraphicbuffer libbinder_ndk \
 	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk
 
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V1-ndk \
-                          com.google.hardware.pixel.display-V7-ndk \
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
+                          com.google.hardware.pixel.display-V8-ndk \
                           libbinder_ndk \
                           libbase \
                           libpng \
@@ -97,6 +97,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libexternaldisplay \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libvirtualdisplay \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libcolormanager \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdisplayinterface \
@@ -134,7 +135,7 @@ endif
 include $(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/Android.mk
 
 LOCAL_CFLAGS += -DHLOG_CODE=0
-LOCAL_CFLAGS += -DLOG_TAG=\"display\"
+LOCAL_CFLAGS += -DLOG_TAG=\"hwc-display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
@@ -158,9 +159,10 @@ LOCAL_HEADER_LIBRARIES += libgralloc_headers
 LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay libacryl \
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
-	android.hardware.graphics.mapper@2.0
+	android.hardware.graphics.mapper@2.0 \
+	android.hardware.graphics.composer3-V2-ndk
 
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V7-ndk \
+LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V8-ndk \
                           libbinder_ndk \
                           libbase
 
@@ -180,6 +182,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libexternaldisplay \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libvirtualdisplay \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libcolormanager \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
@@ -190,7 +193,7 @@ LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libdrm
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_C_INCLUDES)
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
-LOCAL_CFLAGS += -DLOG_TAG=\"hwcservice\"
+LOCAL_CFLAGS += -DLOG_TAG=\"hwc-service\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
 LOCAL_SRC_FILES := \
@@ -220,8 +223,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 	android.hardware.graphics.mapper@2.0 \
 	libui
 
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V1-ndk \
-                          com.google.hardware.pixel.display-V7-ndk \
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
+                          com.google.hardware.pixel.display-V8-ndk \
                           libbinder_ndk \
                           libbase
 
@@ -230,7 +233,7 @@ LOCAL_HEADER_LIBRARIES := libhardware_legacy_headers libbinder_headers google_ha
 LOCAL_HEADER_LIBRARIES += libgralloc_headers
 
 LOCAL_CFLAGS := -DHLOG_CODE=0
-LOCAL_CFLAGS += -DLOG_TAG=\"hwcomposer\"
+LOCAL_CFLAGS += -DLOG_TAG=\"hwc-2\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
@@ -251,6 +254,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libmaindisplay \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libexternaldisplay \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libvirtualdisplay \
+	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libcolormanager \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libdevice \
 	$(TOP)/hardware/google/graphics/$(soc_ver)/libhwc2.1/libresource \

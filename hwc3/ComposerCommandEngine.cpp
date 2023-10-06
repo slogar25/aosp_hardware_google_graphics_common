@@ -55,9 +55,9 @@ namespace aidl::android::hardware::graphics::composer3::impl {
         }                                                                         \
     } while (0)
 
-bool ComposerCommandEngine::init() {
+int32_t ComposerCommandEngine::init() {
     mWriter = std::make_unique<ComposerServiceWriter>();
-    return (mWriter != nullptr);
+    return (mWriter != nullptr) ? ::android::NO_ERROR : ::android::NO_MEMORY;
 }
 
 int32_t ComposerCommandEngine::execute(const std::vector<DisplayCommand>& commands,
@@ -232,16 +232,12 @@ void ComposerCommandEngine::executeSetDisplayBrightness(uint64_t display,
 void ComposerCommandEngine::executePresentOrValidateDisplay(
         int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
     executeSetExpectedPresentTimeInternal(display, expectedPresentTime);
-
-    int err;
     // First try to Present as is.
-    if (mHal->hasCapability(Capability::SKIP_VALIDATE)) {
-        err = mResources->mustValidateDisplay(display) ? IComposerClient::EX_NOT_VALIDATED
-                                                       : executePresentDisplay(display);
-        if (!err) {
-            mWriter->setPresentOrValidateResult(display, PresentOrValidate::Result::Presented);
-            return;
-        }
+    auto err = mResources->mustValidateDisplay(display) ? IComposerClient::EX_NOT_VALIDATED
+                                                        : executePresentDisplay(display);
+    if (!err) {
+        mWriter->setPresentOrValidateResult(display, PresentOrValidate::Result::Presented);
+        return;
     }
 
     // Fallback to validate
