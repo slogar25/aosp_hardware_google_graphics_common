@@ -3189,7 +3189,7 @@ int32_t ExynosDisplay::getDisplayName(uint32_t* outSize, char* outName)
                 *outSize, strSize);
         strSize = *outSize;
     }
-    std::strncpy(outName, mDisplayName, strSize);
+    std::strncpy(outName, mDisplayName.c_str(), strSize);
     *outSize = strSize;
 
     return HWC2_ERROR_NONE;
