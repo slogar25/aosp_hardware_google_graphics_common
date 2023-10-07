@@ -210,11 +210,12 @@ void BrightnessController::initDimmingUsage() {
     String8 propName;
     propName.appendFormat(kDimmingUsagePropName, mPanelIndex);
 
-    mBrightnessDimmingUsage = static_cast<BrightnessDimmingUsage>(property_get_int32(propName, 0));
+    mBrightnessDimmingUsage =
+            static_cast<BrightnessDimmingUsage>(property_get_int32(propName.c_str(), 0));
 
     propName.clear();
     propName.appendFormat(kDimmingHbmTimePropName, mPanelIndex);
-    mHbmDimmingTimeUs = property_get_int32(propName, kHbmDimmingTimeUs);
+    mHbmDimmingTimeUs = property_get_int32(propName.c_str(), kHbmDimmingTimeUs);
 
     if (mBrightnessDimmingUsage == BrightnessDimmingUsage::NORMAL) {
         mDimming.store(true);
