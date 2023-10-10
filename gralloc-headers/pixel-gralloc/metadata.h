@@ -66,20 +66,12 @@ enum class MetadataType : int64_t {
 
     // PLANE_LAYOUTS from gralloc reply with the actual offset of the plane from the start of the
     // header if any. But some IPs require the offset starting from the body of a plane.
-    // Returns: std::vector<PlaneLayout>
-    // Encoder: encodePlaneLayouts
-    // Decoder: decodePlaneLayouts
-    // TODO(b/303707610): Ideally this API should not be needed and offsets required by different
-    // IPs should be aligned. Even if the conclusion on the bug turns out to be "live with it", this
-    // metadata should be updated to be generic compressed buffer layout rather than a hack for body
-    // offset.
-    BODY_OFFSET_PLANE_LAYOUTS,
+    // Returns: std::vector<CompressedPlaneLayout>
+    COMPRESSED_PLANE_LAYOUTS,
 
     // Ideally drivers should be using fourcc to identify an allocation, but some of the drivers
     // depend upon the format too much that updating them will require longer time.
     // Returns: ::pixel::graphics::Format
-    // Encoder: encodePixelFormatRequested
-    // Decoder: decodePixelFormatRequested
     PIXEL_FORMAT_ALLOCATED,
 
     // This is a experimental feature
@@ -92,5 +84,22 @@ struct VideoGMV {
 };
 
 #undef MapMetadataType
+
+// There is no backward compatibility guarantees, all dependencies must be built together.
+struct CompressedPlaneLayout {
+    uint64_t header_offset_in_bytes;
+    uint64_t header_size_in_bytes;
+    uint64_t body_offset_in_bytes;
+    uint64_t body_size_in_bytes;
+
+    bool operator==(const CompressedPlaneLayout& other) const {
+        return header_offset_in_bytes == other.header_offset_in_bytes &&
+                header_size_in_bytes == other.header_size_in_bytes &&
+                body_offset_in_bytes == other.body_offset_in_bytes &&
+                body_size_in_bytes == other.body_size_in_bytes;
+    }
+
+    bool operator!=(const CompressedPlaneLayout& other) const { return !(*this == other); }
+};
 
 } // namespace pixel::graphics
