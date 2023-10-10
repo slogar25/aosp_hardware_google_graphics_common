@@ -40,7 +40,6 @@ using namespace SOC_VERSION;
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
 constexpr float DISPLAY_LUMINANCE_UNIT = 10000;
-constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr auto vsyncPeriodTag = "VsyncPeriod";
 
 typedef struct _drmModeAtomicReqItem drmModeAtomicReqItem, *drmModeAtomicReqItemPtr;
@@ -915,7 +914,7 @@ int32_t ExynosDisplayDrmInterface::setLowPowerMode() {
     mExynosDisplay->mXres = mDozeDrmMode.h_display();
     mExynosDisplay->mYres = mDozeDrmMode.v_display();
     // in nanoseconds
-    mExynosDisplay->mVsyncPeriod = nsecsPerSec / mDozeDrmMode.v_refresh();
+    mExynosDisplay->mVsyncPeriod = mDozeDrmMode.te_period();
     // Dots per 1000 inches
     mExynosDisplay->mXdpi = mm_width ? (mDozeDrmMode.h_display() * kUmPerInch) / mm_width : -1;
     // Dots per 1000 inches
@@ -1013,7 +1012,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
     std::lock_guard<std::recursive_mutex> lock(mDrmConnector->modesLock());
 
     if (!outConfigs) {
-        int ret = mDrmConnector->UpdateModes(isVrrModeSupported());
+        int ret = mDrmConnector->UpdateModes(mIsVrrModeSupported);
         if (ret < 0) {
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
@@ -1049,7 +1048,11 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         for (const DrmMode &mode : mDrmConnector->modes()) {
             displayConfigs_t configs;
             float rr = mode.v_refresh();
-            configs.vsyncPeriod = nsecsPerSec / rr;
+            configs.vsyncPeriod = static_cast<int>(mode.te_period());
+            if (configs.vsyncPeriod <= 0.0f) {
+                ALOGE("%s:: invalid vsync period", __func__);
+                return HWC2_ERROR_BAD_DISPLAY;
+            }
             configs.width = mode.h_display();
             configs.height = mode.v_display();
             // Dots per 1000 inches
@@ -1069,16 +1072,6 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
                 vrrConfig.notifyExpectedPresentConfig.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs;
                 vrrConfig.notifyExpectedPresentConfig.TimeoutNs = mNotifyExpectedPresentTimeoutNs;
                 configs.vrrConfig = std::make_optional(vrrConfig);
-                if (mode.is_ns_mode()) {
-                    configs.vsyncPeriod = mVrrNsVsyncPeriodNs;
-                } else {
-                    configs.vsyncPeriod = mVrrHsVsyncPeriodNs;
-                }
-                if (configs.vsyncPeriod <= 0) {
-                    ALOGE("%s: %s mode in vrr without explicitly configure VSync information",
-                          __func__, mode.is_ns_mode() ? "Ns" : "Hs");
-                    return HWC2_ERROR_BAD_PARAMETER;
-                }
                 configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height,
                                                               vrrConfig.minFrameIntervalNs,
                                                               configs.vsyncPeriod);
@@ -1086,10 +1079,10 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
                 configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height);
             }
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
-            ALOGD("config group(%d), w(%d), h(%d), vsync(%d), xdpi(%d), ydpi(%d), vrr mode(%s), NS "
-                  "mode(%s)",
-                  configs.groupId, configs.width, configs.height, configs.vsyncPeriod, configs.Xdpi,
-                  configs.Ydpi, mode.is_vrr_mode() ? "true" : "false",
+            ALOGD("config group(%d), w(%d), h(%d), refresh rate(%f), TE(%d), xdpi(%d), ydpi(%d), "
+                  "vrr mode(%s), NS mode(%s)",
+                  configs.groupId, configs.width, configs.height, rr, configs.vsyncPeriod,
+                  configs.Xdpi, configs.Ydpi, mode.is_vrr_mode() ? "true" : "false",
                   mode.is_ns_mode() ? "true" : "false");
         }
         mExynosDisplay->setPeakRefreshRate(peakRr);
@@ -1276,7 +1269,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
     } else if ((mActiveModeState.blob_id != 0) && (mActiveModeState.mode.id() == config)) {
         ALOGD("%s:: same mode %d", __func__, config);
         /* trigger resetConfigRequestStateLocked() */
-        mVsyncCallback.setDesiredVsyncPeriod(nsecsPerSec / mActiveModeState.mode.v_refresh());
+        mVsyncCallback.setDesiredVsyncPeriod(mActiveModeState.mode.te_period());
         mDrmVSyncWorker.VSyncControl(true);
         return HWC2_ERROR_NONE;
     }
@@ -2118,8 +2111,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             mDrmConnector->ResetLpMode();
             getLowPowerDrmModeModeInfo();
         }
-        mVsyncCallback.setDesiredVsyncPeriod(
-                nsecsPerSec/mActiveModeState.mode.v_refresh());
+        mVsyncCallback.setDesiredVsyncPeriod(mActiveModeState.mode.te_period());
         /* Enable vsync to check vsync period */
         mDrmVSyncWorker.VSyncControl(true);
     }
@@ -2167,13 +2159,8 @@ int32_t ExynosDisplayDrmInterface::triggerClearDisplayPlanes()
 }
 
 void ExynosDisplayDrmInterface::setVrrSettings(const VrrSettings_t& vrrSettings) {
-    mVrrHsVsyncPeriodNs = vrrSettings.vrrVsync.hsHz > 0
-            ? static_cast<int32_t>(std::nano::den / vrrSettings.vrrVsync.hsHz)
-            : 0;
-    mVrrNsVsyncPeriodNs = vrrSettings.vrrVsync.nsHz > 0
-            ? static_cast<int32_t>(std::nano::den / vrrSettings.vrrVsync.nsHz)
-            : 0;
-    if (isVrrModeSupported()) {
+    if (vrrSettings.enabled) {
+        mIsVrrModeSupported = true;
         mNotifyExpectedPresentHeadsUpNs = vrrSettings.notifyExpectedPresentConfig.HeadsUpNs;
         mNotifyExpectedPresentTimeoutNs = vrrSettings.notifyExpectedPresentConfig.TimeoutNs;
     }
@@ -2837,10 +2824,6 @@ int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoc
                                                              uint8_t channelId) const {
     ALOGE("%s: kernel doesn't support multi channel histogram ioctl", __func__);
     return INVALID_OPERATION;
-}
-
-bool ExynosDisplayDrmInterface::isVrrModeSupported() const {
-    return (mVrrHsVsyncPeriodNs != 0 || mVrrNsVsyncPeriodNs != 0);
 }
 
 static constexpr auto kDpHotplugErrorCodeSysfsPath =
