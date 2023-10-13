@@ -350,12 +350,6 @@ struct ResolutionInfo {
     int      nPanelType[3];
 };
 
-typedef struct VrrVsyncHz {
-    int nsHz = 0;
-    int hsHz = 0;
-    inline bool isValid() const { return (nsHz > 0) || (hsHz > 0); }
-} VrrVsyncHz_t;
-
 typedef struct FrameIntervalPowerHint {
     int frameIntervalNs = 0;
     int averageRefreshPeriodNs = 0;
@@ -373,9 +367,8 @@ typedef struct VrrConfig {
 } VrrConfig_t;
 
 typedef struct VrrSettings {
-    VrrVsyncHz_t vrrVsync;
+    bool enabled;
     NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
-    inline bool isValid() const { return vrrVsync.isValid(); }
 } VrrSettings_t;
 
 typedef struct displayConfigs {

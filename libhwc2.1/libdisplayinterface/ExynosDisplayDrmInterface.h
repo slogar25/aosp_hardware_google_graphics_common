@@ -572,7 +572,7 @@ class ExynosDisplayDrmInterface :
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
 
-        bool isVrrModeSupported() const;
+        bool mIsVrrModeSupported = false;
 
         String8 mDisplayTraceName;
         DrmMode mDozeDrmMode;
@@ -582,8 +582,6 @@ class ExynosDisplayDrmInterface :
         int32_t mPanelFullResolutionVSize = 0;
 
         // Vrr related settings.
-        int32_t mVrrHsVsyncPeriodNs = 0;
-        int32_t mVrrNsVsyncPeriodNs = 0;
         int32_t mNotifyExpectedPresentHeadsUpNs = 0;
         int32_t mNotifyExpectedPresentTimeoutNs = 0;
 

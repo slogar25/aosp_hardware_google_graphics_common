@@ -125,9 +125,8 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
               mDbvThresholdForBlockingZone);
     }
 
-    mVrrSettings.vrrVsync.hsHz = property_get_int32("ro.vendor.primarydisplay.vrr.hs.vsync_hz", 0);
-    mVrrSettings.vrrVsync.nsHz = property_get_int32("ro.vendor.primarydisplay.vrr.ns.vsync_hz", 0);
-    if (mVrrSettings.isValid()) {
+    mVrrSettings.enabled = property_get_int32("ro.vendor.primarydisplay.vrr.enabled", false);
+    if (mVrrSettings.enabled) {
         mVrrSettings.notifyExpectedPresentConfig.HeadsUpNs =
                 property_get_int32("ro.vendor.primarydisplay.vrr.expected_present.headsup_ns",
                                    kDefaultNotifyExpectedPresentConfigHeadsUpNs);
@@ -493,7 +492,7 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
                 __func__, interfaceType);
     mDisplayInterface->init(this);
 
-    if (mVrrSettings.isValid()) {
+    if (mVrrSettings.enabled) {
         mDisplayInterface->setVrrSettings(mVrrSettings);
     }
 

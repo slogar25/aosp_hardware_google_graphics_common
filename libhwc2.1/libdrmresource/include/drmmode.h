@@ -19,12 +19,17 @@
 
 #include <stdint.h>
 #include <xf86drmMode.h>
+
+#include <ratio>
 #include <string>
 
 // Alternative definitions(alias) of DRM modes and flags for VRR.
 // The kernel contains corresponding defines that MUST align with those specified here..
 #define DRM_MODE_TYPE_VRR DRM_MODE_TYPE_USERDEF
 #define DRM_MODE_FLAG_NS DRM_MODE_FLAG_CLKDIV2
+#define DRM_MODE_FLAG_TE_FREQ_X1 DRM_MODE_FLAG_PHSYNC
+#define DRM_MODE_FLAG_TE_FREQ_X2 DRM_MODE_FLAG_NHSYNC
+#define DRM_MODE_FLAG_TE_FREQ_X4 DRM_MODE_FLAG_PVSYNC
 
 namespace android {
 
@@ -56,6 +61,10 @@ class DrmMode {
   uint32_t v_total() const;
   uint32_t v_scan() const;
   float v_refresh() const;
+  float te_frequency() const;
+  // Convert frequency to period, with the default unit being nanoseconds.
+  float v_period(int64_t unit = std::nano::den) const;
+  float te_period(int64_t unit = std::nano::den) const;
 
   uint32_t flags() const;
   uint32_t type() const;
