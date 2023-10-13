@@ -1453,6 +1453,10 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     mExynosDisplay->mMaxAverageLuminance = 0;
     mExynosDisplay->mMinLuminance = 0;
 
+    if (mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL) {
+        int upd_res = mDrmConnector->UpdateLuminanceAndHdrProperties();
+        if (!upd_res) ALOGW("%s: UpdateLuminanceAndHdrProperties failed (%d)", __func__, upd_res);
+    }
     const DrmProperty &prop_max_luminance = mDrmConnector->max_luminance();
     const DrmProperty &prop_max_avg_luminance = mDrmConnector->max_avg_luminance();
     const DrmProperty &prop_min_luminance = mDrmConnector->min_luminance();
@@ -1468,9 +1472,11 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
         (prop_max_avg_luminance.id() == 0) ||
         (prop_min_luminance.id() == 0) ||
         (prop_hdr_formats.id() == 0)) {
-        ALOGE("%s:: there is no property for hdrCapabilities (max_luminance: %d, max_avg_luminance: %d, min_luminance: %d, hdr_formats: %d",
-                __func__, prop_max_luminance.id(), prop_max_avg_luminance.id(),
-                prop_min_luminance.id(), prop_hdr_formats.id());
+        HWC_LOGE(mExynosDisplay,
+                 "%s:: there is no property for hdrCapabilities (max_luminance: %d, "
+                 "max_avg_luminance: %d, min_luminance: %d, hdr_formats: %d",
+                 __func__, prop_max_luminance.id(), prop_max_avg_luminance.id(),
+                 prop_min_luminance.id(), prop_hdr_formats.id());
         return -1;
     }
 

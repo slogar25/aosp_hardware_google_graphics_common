@@ -55,6 +55,7 @@ class DrmConnector {
 
   int UpdateModes(bool is_vrr_mode = false);
   int UpdateEdidProperty();
+  int UpdateLuminanceAndHdrProperties();
 
   const std::vector<DrmMode> &modes() const {
     return modes_;

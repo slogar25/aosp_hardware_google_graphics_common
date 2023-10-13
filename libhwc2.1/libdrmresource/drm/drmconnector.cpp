@@ -319,6 +319,24 @@ int DrmConnector::UpdateEdidProperty() {
   return drm_->UpdateConnectorProperty(*this, &edid_property_);
 }
 
+int DrmConnector::UpdateLuminanceAndHdrProperties() {
+  int res = 0;
+
+  res = drm_->UpdateConnectorProperty(*this, &max_luminance_);
+  if (res)
+    return res;
+  res = drm_->UpdateConnectorProperty(*this, &max_avg_luminance_);
+  if (res)
+    return res;
+  res = drm_->UpdateConnectorProperty(*this, &min_luminance_);
+  if (res)
+    return res;
+  res = drm_->UpdateConnectorProperty(*this, &hdr_formats_);
+  if (res)
+    return res;
+  return 0;
+}
+
 const DrmMode &DrmConnector::active_mode() const {
   return active_mode_;
 }
