@@ -47,9 +47,14 @@ inline constexpr int kDefaultNotifyExpectedPresentConfigHeadsUpNs =
 inline constexpr int kDefaultNotifyExpectedPresentConfigTimeoutNs =
         std::chrono::nanoseconds(500ms).count();
 
+static constexpr int kMaximumPropertyIdentifierLength = 128;
+
 static const std::map<const DisplayType, const std::string> panelSysfsPath =
         {{DisplayType::DISPLAY_PRIMARY, "/sys/devices/platform/exynos-drm/primary-panel/"},
-         {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}};
+#ifdef USES_IDISPLAY_INTF_SEC
+         {DisplayType::DISPLAY_SECONDARY, "/sys/devices/platform/exynos-drm/secondary-panel/"}
+#endif
+};
 } // namespace
 
 static String8 getPropertyBootModeStr(const int32_t dispId) {
@@ -125,14 +130,30 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
               mDbvThresholdForBlockingZone);
     }
 
-    mVrrSettings.enabled = property_get_int32("ro.vendor.primarydisplay.vrr.enabled", false);
-    if (mVrrSettings.enabled) {
-        mVrrSettings.notifyExpectedPresentConfig.HeadsUpNs =
-                property_get_int32("ro.vendor.primarydisplay.vrr.expected_present.headsup_ns",
-                                   kDefaultNotifyExpectedPresentConfigHeadsUpNs);
-        mVrrSettings.notifyExpectedPresentConfig.TimeoutNs =
-                property_get_int32("ro.vendor.primarydisplay.vrr.expected_present.timeout_ns",
-                                   kDefaultNotifyExpectedPresentConfigTimeoutNs);
+    DisplayType displayType = getDisplayTypeFromIndex(mIndex);
+    std::string displayTypeIdentifier;
+    if (displayType == DisplayType::DISPLAY_PRIMARY) {
+        displayTypeIdentifier = "primarydisplay";
+    }
+#ifdef USES_IDISPLAY_INTF_SEC
+    else if (displayType == DisplayType::DISPLAY_SECONDARY) {
+        displayTypeIdentifier = "secondarydisplay";
+    }
+#endif
+    if (!displayTypeIdentifier.empty()) {
+        char pathBuffer[kMaximumPropertyIdentifierLength];
+        sprintf(pathBuffer, "ro.vendor.%s.vrr.enabled", displayTypeIdentifier.c_str());
+        mVrrSettings.enabled = property_get_bool(pathBuffer, false);
+        if (mVrrSettings.enabled) {
+            sprintf(pathBuffer, "ro.vendor.%s.vrr.expected_present.headsup_ns",
+                    displayTypeIdentifier.c_str());
+            mVrrSettings.notifyExpectedPresentConfig.HeadsUpNs =
+                    property_get_int32(pathBuffer, kDefaultNotifyExpectedPresentConfigHeadsUpNs);
+            sprintf(pathBuffer, "ro.vendor.%s.vrr.expected_present.timeout_ns",
+                    displayTypeIdentifier.c_str());
+            mVrrSettings.notifyExpectedPresentConfig.TimeoutNs =
+                    property_get_int32(pathBuffer, kDefaultNotifyExpectedPresentConfigTimeoutNs);
+        }
     }
 
     // Allow to enable dynamic recomposition after every power on
