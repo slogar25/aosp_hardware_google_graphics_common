@@ -2809,6 +2809,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     if (outData) {
         *outDataSize = std::min(*outDataSize, blob->length);
         memcpy(outData, blob->data, *outDataSize);
+        setManufacturerInfo(outData[kEDIDManufacturerIDByte1], outData[kEDIDManufacturerIDByte2]);
+        setProductId(outData[kEDIDProductIDByte1], outData[kEDIDProductIDByte2]);
     } else {
         *outDataSize = blob->length;
     }
@@ -2983,4 +2985,12 @@ void ExynosDisplayDrmInterface::handleDrmPropertyUpdate(uint32_t connector_id, u
         hdcpLevels.maxLevel = HdcpLevel::HDCP_V1;
         mExynosDisplay->contentProtectionUpdated(hdcpLevels);
     }
+}
+
+void ExynosDisplayDrmInterface::setManufacturerInfo(uint8_t edid8, uint8_t edid9) {
+    mManufacturerInfo = edid9 << 8 | edid8;
+}
+
+void ExynosDisplayDrmInterface::setProductId(uint8_t edid10, uint8_t edid11) {
+    mProductId = edid11 << 8 | edid10;
 }

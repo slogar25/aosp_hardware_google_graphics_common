@@ -415,6 +415,15 @@ class ExynosDisplayDrmInterface :
 
         void handleDrmPropertyUpdate(uint32_t connector_id, uint32_t prop_id);
 
+        /* store the manufacturer info and product id from EDID
+         * - Manufacturer ID is stored in EDID byte 8 and 9.
+         * - Manufacturer product ID is stored in EDID byte 10 and 11.
+         */
+        virtual void setManufacturerInfo(uint8_t edid8, uint8_t edid9) override;
+        virtual uint32_t getManufacturerInfo() override { return mManufacturerInfo; }
+        virtual void setProductId(uint8_t edid10, uint8_t edid11) override;
+        virtual uint32_t getProductId() override { return mProductId; }
+
     protected:
         enum class HalMipiSyncType : uint32_t {
             HAL_MIPI_CMD_SYNC_REFRESH_RATE = 0,
@@ -610,6 +619,13 @@ class ExynosDisplayDrmInterface :
          * Note: this function will be called only once in initDrmDevice()
          */
         void retrievePanelFullResolution();
+
+        const uint8_t kEDIDManufacturerIDByte1 = 8;
+        const uint8_t kEDIDManufacturerIDByte2 = 9;
+        const uint8_t kEDIDProductIDByte1 = 10;
+        const uint8_t kEDIDProductIDByte2 = 11;
+        uint32_t mManufacturerInfo;
+        uint32_t mProductId;
 
     public:
         virtual bool readHotplugStatus();
