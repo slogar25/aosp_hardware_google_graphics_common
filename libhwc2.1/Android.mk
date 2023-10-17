@@ -44,6 +44,7 @@ LOCAL_SRC_FILES := \
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
 
 LOCAL_MODULE := libdrmresource
@@ -68,7 +69,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk
 
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
-                          com.google.hardware.pixel.display-V8-ndk \
+                          com.google.hardware.pixel.display-V9-ndk \
                           libbinder_ndk \
                           libbase \
                           libpng \
@@ -112,6 +113,7 @@ LOCAL_SRC_FILES := \
 	libdevice/ExynosDisplay.cpp \
 	libdevice/ExynosDevice.cpp \
 	libdevice/ExynosLayer.cpp \
+	libdevice/HistogramDevice.cpp \
 	libmaindisplay/ExynosPrimaryDisplay.cpp \
 	libresource/ExynosMPP.cpp \
 	libresource/ExynosResourceManager.cpp \
@@ -138,6 +140,7 @@ LOCAL_CFLAGS += -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 
 LOCAL_MODULE := libexynosdisplay
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
@@ -162,7 +165,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.graphics.mapper@2.0 \
 	android.hardware.graphics.composer3-V2-ndk
 
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V8-ndk \
+LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V9-ndk \
                           libbinder_ndk \
                           libbase
 
@@ -195,6 +198,7 @@ LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_C_INCLUDES)
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-service\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 
 LOCAL_SRC_FILES := \
 	libhwcService/IExynosHWC.cpp \
@@ -224,7 +228,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 	libui
 
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
-                          com.google.hardware.pixel.display-V8-ndk \
+                          com.google.hardware.pixel.display-V9-ndk \
                           libbinder_ndk \
                           libbase
 
@@ -235,6 +239,7 @@ LOCAL_HEADER_LIBRARIES += libgralloc_headers
 LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-2\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
+LOCAL_CFLAGS += -Wthread-safety
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
 LOCAL_CFLAGS += -DUSES_HWC_SERVICES
