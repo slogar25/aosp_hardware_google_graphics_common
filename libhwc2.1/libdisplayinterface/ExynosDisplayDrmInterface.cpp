@@ -461,6 +461,11 @@ void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayIdleTimerSupport(bool &outSupport) {
+    if (mIsVrrModeSupported) {
+        outSupport = false;
+        return NO_ERROR;
+    }
+
     auto [ret, support] = mDrmConnector->panel_idle_support().value();
     if (ret) {
         ALOGI("no panel_idle_support drm property or invalid value (%d)", ret);
