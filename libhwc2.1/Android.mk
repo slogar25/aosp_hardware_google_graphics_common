@@ -123,6 +123,7 @@ LOCAL_C_INCLUDES += \
         $(TOP)/hardware/google/graphics/$(soc_ver)
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
+	DisplaySceneInfo.cpp \
 	ExynosHWCDebug.cpp \
 	libdevice/BrightnessController.cpp \
 	libdevice/ExynosDisplay.cpp \
