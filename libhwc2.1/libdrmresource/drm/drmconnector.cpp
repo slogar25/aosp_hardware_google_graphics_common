@@ -277,6 +277,10 @@ int DrmConnector::UpdateModes(bool is_vrr_mode) {
 
   state_ = c->connection;
 
+  // Update mm_width_ and mm_height_ for xdpi/ydpi calculations
+  mm_width_ = c->mmWidth;
+  mm_height_ = c->mmHeight;
+
   bool preferred_mode_found = false;
   std::vector<DrmMode> new_modes;
   for (int i = 0; i < c->count_modes; ++i) {
