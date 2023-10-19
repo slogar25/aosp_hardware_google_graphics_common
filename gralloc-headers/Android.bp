@@ -6,8 +6,8 @@ cc_library_headers {
     name: "pixel-gralloc-headers",
     // TODO(270442578): Change to vendor: true
     vendor_available: true,
-    defaults:[
-        "android.hardware.graphics.common-ndk_shared"
+    defaults: [
+        "android.hardware.graphics.common-ndk_shared",
     ],
     export_include_dirs: [
         ".",
@@ -19,5 +19,10 @@ cc_library_headers {
     visibility: [
         "//visibility:public",
     ],
-}
+    // should be platform available since this header is used in lib_aion_buffer which is platform-available
+    apex_available: [
+        "//apex_available:platform",
+        "//apex_available:anyapex",
+    ],
 
+}
