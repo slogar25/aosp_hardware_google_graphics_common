@@ -86,6 +86,9 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
                           android.hardware.drm-V1-ndk \
                           com.google.hardware.pixel.display-V10-ndk \
+                          android.frameworks.stats-V2-ndk \
+                          libpixelatoms_defs \
+                          pixelatoms-cpp \
                           libbinder_ndk \
                           libbase \
                           libpng \
@@ -153,6 +156,7 @@ LOCAL_SRC_FILES := \
 	libvrr/RefreshRateCalculator/VideoFrameRateCalculator.cpp \
 	libvrr/Utils.cpp \
 	pixel-display.cpp \
+	pixelstats-display.cpp \
 	histogram_mediator.cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS += libacryl libdrm libui libvendorgraphicbuffer
@@ -210,6 +214,9 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.drm-V1-ndk
 
 LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V10-ndk \
+                          android.frameworks.stats-V2-ndk \
+                          libpixelatoms_defs \
+                          pixelatoms-cpp \
                           libbinder_ndk \
                           libbase
 
@@ -288,6 +295,9 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
                           android.hardware.drm-V1-ndk \
                           com.google.hardware.pixel.display-V10-ndk \
+                          android.frameworks.stats-V2-ndk \
+                          libpixelatoms_defs \
+                          pixelatoms-cpp \
                           libbinder_ndk \
                           libbase
 
