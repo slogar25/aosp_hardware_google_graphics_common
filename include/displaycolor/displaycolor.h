@@ -86,8 +86,10 @@ enum DisplayType {
     DISPLAY_PRIMARY = 0,
     /// builtin secondary display
     DISPLAY_SECONDARY = 1,
+    /// external display
+    DISPLAY_EXTERNAL = 2,
     /// number of display
-    DISPLAY_MAX = 2,
+    DISPLAY_MAX = 3,
 };
 
 enum BrightnessMode {
@@ -149,6 +151,7 @@ class IBrightnessTable {
  * @brief This structure holds data imported from HWC.
  */
 struct DisplayInfo {
+    DisplayType display_type;
     std::string panel_name;
     std::string panel_serial;
 
