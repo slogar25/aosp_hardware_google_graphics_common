@@ -4,6 +4,7 @@
 #include <log/log.h>
 
 #include "format.h"
+#include "format_type.h"
 #include "metadata.h"
 #include "utils.h"
 
@@ -87,6 +88,7 @@ GET(VIDEO_GMV, VideoGMV);
 
 GET(COMPRESSED_PLANE_LAYOUTS, std::vector<CompressedPlaneLayout>);
 GET(PIXEL_FORMAT_ALLOCATED, Format);
+GET(FORMAT_TYPE, FormatType);
 
 #pragma clang diagnostic pop
 

@@ -74,6 +74,9 @@ enum class MetadataType : int64_t {
     // Returns: ::pixel::graphics::Format
     PIXEL_FORMAT_ALLOCATED,
 
+    // Returns: ::pixel::graphics::FormatType
+    FORMAT_TYPE,
+
     // This is a experimental feature
     VIDEO_GMV,
 };
