@@ -19,7 +19,11 @@
 #include <map>
 
 #include "../libdevice/ExynosDisplay.h"
+#include "../libvrr/VariableRefreshRateController.h"
+#include "../libvrr/VariableRefreshRateInterface.h"
 
+using android::hardware::graphics::composer::PresentListener;
+using android::hardware::graphics::composer::VariableRefreshRateController;
 using namespace displaycolor;
 
 class ExynosPrimaryDisplay : public ExynosDisplay {
@@ -68,6 +72,10 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual int32_t getPreferredDisplayConfigInternal(int32_t* outConfig) override;
         virtual bool isConfigSettingEnabled() override;
         virtual void enableConfigSetting(bool en) override;
+
+        virtual int32_t getDisplayConfigs(uint32_t* outNumConfigs,
+                                          hwc2_config_t* outConfigs) override;
+        virtual int32_t presentDisplay(int32_t* outRetireFence) override;
 
     protected:
         /* setPowerMode(int32_t mode)
@@ -172,8 +180,11 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int64_t mDisplayIdleDelayNanos;
         bool mDisplayNeedHandleIdleExit;
 
-        // Vrr related settings.
+        // Function and variables related to Vrr.
+        PresentListener* getPresentListener();
+
         VrrSettings_t mVrrSettings;
+        std::shared_ptr<VariableRefreshRateController> mVariableRefreshRateController;
 };
 
 #endif

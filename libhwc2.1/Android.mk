@@ -110,6 +110,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libvrr \
         $(TOP)/hardware/google/graphics/$(soc_ver)
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
@@ -128,6 +129,7 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
+	libvrr/VariableRefreshRateController.cpp \
 	pixel-display.cpp \
 	histogram_mediator.cpp
 
