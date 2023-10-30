@@ -461,7 +461,7 @@ void ExynosDisplay::PowerHalHintWorker::signalActualWorkDuration(nsecs_t actualD
     }
 
     mActualWorkDuration = reportedDurationNs;
-    WorkDuration duration = {.durationNanos = reportedDurationNs, .timeStampNanos = systemTime()};
+    WorkDuration duration = {.timeStampNanos = systemTime(), .durationNanos = reportedDurationNs};
 
     if (sTraceHintSessionData) {
         DISPLAY_ATRACE_INT64("Measured duration", actualDurationNanos);
