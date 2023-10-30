@@ -31,6 +31,9 @@
 #define DRM_MODE_FLAG_TE_FREQ_X2 DRM_MODE_FLAG_NHSYNC
 #define DRM_MODE_FLAG_TE_FREQ_X4 DRM_MODE_FLAG_PVSYNC
 
+#define PANEL_REFRESH_CTRL_FI (1 << 0)
+#define PANEL_REFRESH_CTRL_IDLE (1 << 1)
+
 namespace android {
 
 class DrmMode {

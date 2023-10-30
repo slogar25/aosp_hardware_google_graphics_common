@@ -26,6 +26,7 @@
 #include <optional>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "DeconCommonHeader.h"
@@ -669,6 +670,55 @@ struct RollingAverage {
         elems = std::min(elems + 1, bufferSize);
         average = total / elems;
     }
+};
+
+class FileNodeWriter {
+public:
+    FileNodeWriter(const std::string& nodePath) : mNodePath(nodePath) {}
+
+    ~FileNodeWriter() {
+        for (auto& node : mOperateNodes) {
+            close(node.second);
+        }
+    }
+
+    template <typename T>
+    bool WriteCommandString(const std::string& nodeName, T cmd) {
+        // ref: https://elixir.bootlin.com/linux/latest/source/include/linux/kstrtox.h
+        static_assert(std::is_integral_v<T>);
+
+        int fd = getOperateNodeFileHandle(nodeName);
+        if (fd >= 0) {
+            std::string cmdString = std::to_string(cmd);
+            int ret = write(fd, cmdString.c_str(), std::strlen(cmdString.c_str()));
+            if (ret < 0) {
+                ALOGE("Write to file node %s failed: %d", mNodePath.c_str(), ret);
+                return false;
+            }
+        } else {
+            ALOGE("Write to invalid file node %s", mNodePath.c_str());
+            return false;
+        }
+        return true;
+    }
+
+private:
+    int getOperateNodeFileHandle(const std::string& nodeName) {
+        if (mOperateNodes.count(nodeName) > 0) {
+            return mOperateNodes[nodeName];
+        }
+        std::string fullPath = mNodePath + nodeName;
+        int fd = open(fullPath.c_str(), O_WRONLY, 0);
+        if (fd < 0) {
+            ALOGE("Open file node failed, fd = %d", fd);
+            return fd;
+        }
+        mOperateNodes[nodeName] = fd;
+        return fd;
+    }
+
+    std::string mNodePath;
+    std::unordered_map<std::string, int> mOperateNodes;
 };
 
 // Waits for a given property value, or returns std::nullopt if unavailable

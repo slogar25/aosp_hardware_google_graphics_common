@@ -1308,6 +1308,8 @@ class ExynosDisplay {
         /* set brightness by dbv value */
         virtual int32_t setBrightnessDbv(const uint32_t dbv);
 
+        virtual std::string getPanelFileNodePath() const { return std::string(); }
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);

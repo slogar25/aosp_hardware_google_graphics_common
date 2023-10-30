@@ -21,6 +21,9 @@
 #include <android-base/logging.h>
 #include <utils/Trace.h>
 
+#include "ExynosHWCHelper.h"
+#include "drmmode.h"
+
 #include <chrono>
 #include <tuple>
 
@@ -37,6 +40,11 @@ int64_t getNowNs() {
 
 auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display)
         -> std::shared_ptr<VariableRefreshRateController> {
+    if (!display) {
+        LOG(ERROR)
+                << "VrrController: create VariableRefreshRateController without display handler.";
+        return nullptr;
+    }
     auto controller = std::shared_ptr<VariableRefreshRateController>(
             new VariableRefreshRateController(display));
     std::thread thread = std::thread(&VariableRefreshRateController::threadBody, controller.get());
@@ -53,6 +61,13 @@ auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display)
 VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* display)
       : mDisplay(display) {
     mState = VrrControllerState::kDisable;
+    std::string displayFileNodePath = mDisplay->getPanelFileNodePath();
+    if (displayFileNodePath.empty()) {
+        LOG(WARNING) << "VrrController: Cannot find file node of display: "
+                     << mDisplay->mDisplayName;
+    } else {
+        mFileNodeWritter = std::make_unique<FileNodeWriter>(displayFileNodePath);
+    }
 }
 
 int VariableRefreshRateController::notifyExpectedPresent(int64_t timestamp,
@@ -153,6 +168,7 @@ void VariableRefreshRateController::onPresent() {
         }
         // Drop the out of date timeout.
         dropEventLocked(kRenderingTimeout);
+        dropEventLocked(kNextFrameInsertion);
         // Post next rendering timeout.
         postEvent(VrrControllerEventType::kRenderingTimeout,
                   getNowNs() + mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig.TimeoutNs);
@@ -170,6 +186,32 @@ void VariableRefreshRateController::setExpectedPresentTime(int64_t timestampNano
 
 void VariableRefreshRateController::onVsync(int64_t __unused timestampNanos,
                                             int32_t __unused vsyncPeriodNanos) {}
+
+int VariableRefreshRateController::doFrameInsertionLocked() {
+    ATRACE_CALL();
+    static const std::string kNodeName = "refresh_ctrl";
+
+    if (mPendingFramesToInsert <= 0) {
+        LOG(ERROR) << "VrrController: the number of frames to be inserted should >= 1, but is "
+                   << mPendingFramesToInsert << " now.";
+        return -1;
+    }
+    bool ret = mFileNodeWritter->WriteCommandString(kNodeName, PANEL_REFRESH_CTRL_FI);
+    if (!ret) {
+        LOG(ERROR) << "VrrController: write command to file node failed.";
+        return -1;
+    }
+    if (--mPendingFramesToInsert > 0) {
+        postEvent(VrrControllerEventType::kNextFrameInsertion,
+                  getNowNs() + mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
+    }
+    return ret;
+}
+
+int VariableRefreshRateController::doFrameInsertionLocked(int frames) {
+    mPendingFramesToInsert = frames;
+    return doFrameInsertionLocked();
+}
 
 void VariableRefreshRateController::dropEventLocked() {
     mEventQueue = std::priority_queue<VrrControllerEvent>();
@@ -251,6 +293,11 @@ void VariableRefreshRateController::handleResume() {
 
 void VariableRefreshRateController::handleHibernate() {
     ATRACE_CALL();
+
+    static constexpr int kNumFramesToInsert = 2;
+    int ret = doFrameInsertionLocked(kNumFramesToInsert);
+    LOG(INFO) << "VrrController: apply frame insertion, ret = " << ret;
+
     // TODO(cweichun): handle entering panel hibernate.
     postEvent(VrrControllerEventType::kHibernateTimeout,
               getNowNs() + kDefaultWakeUpTimeInPowerSaving);
@@ -333,6 +380,10 @@ void VariableRefreshRateController::threadBody() {
                     case VrrControllerEventType::kNotifyExpectedPresentConfig: {
                         handleResume();
                         mState = VrrControllerState::kRendering;
+                        break;
+                    }
+                    case VrrControllerEventType::kNextFrameInsertion: {
+                        doFrameInsertionLocked();
                         break;
                     }
                     default: {

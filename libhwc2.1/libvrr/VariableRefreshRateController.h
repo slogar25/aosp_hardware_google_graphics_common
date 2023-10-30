@@ -97,11 +97,12 @@ private:
         kRenderingTimeout = 0,
         kHibernateTimeout,
         kNotifyExpectedPresentConfig,
+        kNextFrameInsertion,
         // Sensors, outer events...
     };
 
     struct VrrControllerEvent {
-        bool operator<(const VrrControllerEvent& b) const { return mWhenNs < b.mWhenNs; }
+        bool operator<(const VrrControllerEvent& b) const { return mWhenNs > b.mWhenNs; }
         std::string getName() const {
             switch (mEventType) {
                 case kRenderingTimeout:
@@ -110,6 +111,8 @@ private:
                     return "kHibernateTimeout";
                 case kNotifyExpectedPresentConfig:
                     return "NotifyExpectedPresentConfig";
+                case kNextFrameInsertion:
+                    return "kNextFrameInsertion";
                 default:
                     return "Unknown";
             }
@@ -136,6 +139,9 @@ private:
     // Implement interface VsyncListener.
     virtual void onVsync(int64_t timestamp, int32_t vsyncPeriodNanos) override;
 
+    int doFrameInsertionLocked();
+    int doFrameInsertionLocked(int frames);
+
     void dropEventLocked();
     void dropEventLocked(VrrControllerEventType event_type);
 
@@ -158,14 +164,17 @@ private:
     // The core function of the VRR controller thread.
     void threadBody();
 
-    ExynosDisplay* __unused mDisplay;
+    ExynosDisplay* mDisplay;
 
     // The subsequent variables must be guarded by mMutex when accessed.
+    int mPendingFramesToInsert = 0;
     std::priority_queue<VrrControllerEvent> mEventQueue;
     VrrRecord mRecord;
     VrrControllerState mState;
     hwc2_config_t mVrrActiveConfig;
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
+
+    std::unique_ptr<FileNodeWriter> mFileNodeWritter;
 
     bool mEnabled = false;
     bool mThreadExit = false;

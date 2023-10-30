@@ -525,13 +525,13 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
           mDpuData.rcdConfigs.size());
 }
 
-std::string ExynosPrimaryDisplay::getPanelSysfsPath(const DisplayType &type) {
+std::string ExynosPrimaryDisplay::getPanelSysfsPath(const DisplayType& type) const {
     if ((type < DisplayType::DISPLAY_PRIMARY) || (type >= DisplayType::DISPLAY_MAX)) {
         ALOGE("Invalid display panel type %d", type);
         return {};
     }
 
-    auto iter = panelSysfsPath.find(type);
+    const auto& iter = panelSysfsPath.find(type);
     if (iter == panelSysfsPath.end()) {
         return {};
     }
@@ -668,6 +668,10 @@ int32_t ExynosPrimaryDisplay::presentDisplay(int32_t* outRetireFence) {
         presentListener->onPresent();
     }
     return res;
+}
+
+std::string ExynosPrimaryDisplay::getPanelFileNodePath() const {
+    return getPanelSysfsPath(getDisplayTypeFromIndex(mIndex));
 }
 
 int32_t ExynosPrimaryDisplay::setLhbmDisplayConfigLocked(uint32_t peakRate) {
