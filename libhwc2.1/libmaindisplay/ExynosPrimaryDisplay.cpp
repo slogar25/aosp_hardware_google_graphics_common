@@ -1027,7 +1027,7 @@ int32_t ExynosPrimaryDisplay::setDisplayIdleDelayNanos(const int32_t delayNanos,
     const int32_t displayIdleDelayMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                                                std::chrono::nanoseconds(mDisplayIdleDelayNanos))
                                                .count();
-    const std::string path = getPanelSysfsPath(DisplayType::DISPLAY_PRIMARY) + "idle_delay_ms";
+    const std::string path = getPanelSysfsPath(getDisplayTypeFromIndex(mIndex)) + "idle_delay_ms";
     std::ofstream ofs(path);
     if (!ofs.is_open()) {
         ALOGW("%s() unable to open node '%s', error = %s", __func__, path.c_str(), strerror(errno));
