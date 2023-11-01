@@ -19,6 +19,7 @@
 #include "VariableRefreshRateController.h"
 
 #include <android-base/logging.h>
+#include <sync/sync.h>
 #include <utils/Trace.h>
 
 #include "ExynosHWCHelper.h"
@@ -89,6 +90,7 @@ void VariableRefreshRateController::reset() {
     const std::lock_guard<std::mutex> lock(mMutex);
     mEventQueue = std::priority_queue<VrrControllerEvent>();
     mRecord.clear();
+    mLastFence = -1;
     dropEventLocked();
 }
 
@@ -145,8 +147,10 @@ void VariableRefreshRateController::stopThread() {
     mCondition.notify_all();
 }
 
-void VariableRefreshRateController::onPresent() {
+void VariableRefreshRateController::onPresent(int fence) {
     ATRACE_CALL();
+    int lastFence;
+    hwc2_config_t currentConfig;
     {
         const std::lock_guard<std::mutex> lock(mMutex);
         if (!mRecord.mPendingCurrentPresentTime.has_value()) {
@@ -166,6 +170,9 @@ void VariableRefreshRateController::onPresent() {
             mState = VrrControllerState::kRendering;
             dropEventLocked(kHibernateTimeout);
         }
+        lastFence = mLastFence;
+        currentConfig = mVrrActiveConfig;
+        mLastFence = dup(fence);
         // Drop the out of date timeout.
         dropEventLocked(kRenderingTimeout);
         dropEventLocked(kNextFrameInsertion);
@@ -174,6 +181,21 @@ void VariableRefreshRateController::onPresent() {
                   getNowNs() + mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig.TimeoutNs);
     }
     mCondition.notify_all();
+
+    if (lastFence < 0) {
+        return;
+    }
+    int64_t lastSignalTime = getLastFenceSignalTimeUnlocked(lastFence);
+    if (lastSignalTime == SIGNAL_TIME_PENDING || lastSignalTime == SIGNAL_TIME_INVALID) {
+        return;
+    }
+
+    // Acquire the mutex again to store the vsync record.
+    const std::lock_guard<std::mutex> lock(mMutex);
+    mRecord.mVsyncHistory
+            .next() = {.mType = VariableRefreshRateController::VsyncEvent::Type::kReleaseFence,
+                       .mConfig = currentConfig,
+                       .mTime = lastSignalTime};
 }
 
 void VariableRefreshRateController::setExpectedPresentTime(int64_t timestampNanos,
@@ -251,6 +273,38 @@ std::string VariableRefreshRateController::dumpEventQueueLocked() {
     }
     mEventQueue = std::move(q);
     return content;
+}
+
+int64_t VariableRefreshRateController::getLastFenceSignalTimeUnlocked(int fd) {
+    if (fd == -1) {
+        return SIGNAL_TIME_INVALID;
+    }
+    struct sync_file_info* finfo = sync_file_info(fd);
+    if (finfo == nullptr) {
+        LOG(ERROR) << "VrrController: sync_file_info returned NULL for fd " << fd;
+        return SIGNAL_TIME_INVALID;
+    }
+    if (finfo->status != 1) {
+        const auto status = finfo->status;
+        if (status < 0) {
+            LOG(ERROR) << "VrrController:: sync_file_info contains an error: " << status;
+        }
+        sync_file_info_free(finfo);
+        return status < 0 ? SIGNAL_TIME_INVALID : SIGNAL_TIME_PENDING;
+    }
+    uint64_t timestamp = 0;
+    struct sync_fence_info* pinfo = sync_get_fence_info(finfo);
+    if (finfo->num_fences != 1) {
+        LOG(WARNING) << "VrrController:: there is more than one fence in the file descriptor = "
+                     << fd;
+    }
+    for (size_t i = 0; i < finfo->num_fences; i++) {
+        if (pinfo[i].timestamp_ns > timestamp) {
+            timestamp = pinfo[i].timestamp_ns;
+        }
+    }
+    sync_file_info_free(finfo);
+    return timestamp;
 }
 
 int64_t VariableRefreshRateController::getNextEventTimeLocked() const {

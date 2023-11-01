@@ -24,7 +24,7 @@ public:
 
     virtual void setExpectedPresentTime(int64_t timestampNanos, int frameIntervalNs) = 0;
 
-    virtual void onPresent() = 0;
+    virtual void onPresent(int32_t fence) = 0;
 };
 
 class VsyncListener {

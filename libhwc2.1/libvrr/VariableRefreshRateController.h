@@ -56,6 +56,8 @@ private:
     static constexpr int kDefaultRingBufferCapacity = 128;
     static constexpr int64_t kDefaultWakeUpTimeInPowerSaving =
             100 * (std::nano::den / std::milli::den); // 10 Hz = 100 ms
+    static constexpr int64_t SIGNAL_TIME_PENDING = INT64_MAX;
+    static constexpr int64_t SIGNAL_TIME_INVALID = -1;
 
     enum class VrrControllerState {
         kDisable = 0,
@@ -138,7 +140,7 @@ private:
     VariableRefreshRateController(ExynosDisplay* display);
 
     // Implement interface PresentListener.
-    virtual void onPresent() override;
+    virtual void onPresent(int32_t fence) override;
     virtual void setExpectedPresentTime(int64_t timestampNanos, int frameIntervalNs) override;
 
     // Implement interface VsyncListener.
@@ -151,6 +153,8 @@ private:
     void dropEventLocked(VrrControllerEventType event_type);
 
     std::string dumpEventQueueLocked();
+
+    int64_t getLastFenceSignalTimeUnlocked(int fd);
 
     int64_t getNextEventTimeLocked() const;
 
@@ -178,6 +182,8 @@ private:
     VrrControllerState mState;
     hwc2_config_t mVrrActiveConfig;
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
+
+    int mLastFence = -1;
 
     std::unique_ptr<FileNodeWriter> mFileNodeWritter;
 

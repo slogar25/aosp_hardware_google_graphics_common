@@ -665,7 +665,7 @@ int32_t ExynosPrimaryDisplay::presentDisplay(int32_t* outRetireFence) {
     // Forward presentDisplay if there is a listener.
     const auto presentListener = getPresentListener();
     if (res == HWC2_ERROR_NONE && presentListener) {
-        presentListener->onPresent();
+        presentListener->onPresent(*outRetireFence);
     }
     return res;
 }
