@@ -65,13 +65,18 @@ private:
 
     typedef struct PresentEvent {
         hwc2_config_t config;
-        int64_t time;
-        int duration;
+        int64_t mTime;
+        int mDuration;
     } PresentEvent;
 
     typedef struct VsyncEvent {
-        hwc2_config_t config;
-        int64_t time;
+        enum class Type {
+            kVblank,
+            kReleaseFence,
+        };
+        Type mType;
+        hwc2_config_t mConfig;
+        int64_t mTime;
     } VsyncEvent;
 
     typedef struct VrrRecord {

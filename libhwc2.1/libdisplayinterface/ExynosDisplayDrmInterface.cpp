@@ -858,6 +858,8 @@ void ExynosDisplayDrmInterface::Callback(
         mExynosDisplay->mLastVsyncTimestamp = timestamp;
     }
 
+    mExynosDisplay->onVsync(timestamp);
+
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
 
     if (exynosDevice->onVsync_2_4(mExynosDisplay->mDisplayId, timestamp,

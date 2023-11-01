@@ -1310,6 +1310,8 @@ class ExynosDisplay {
 
         virtual std::string getPanelFileNodePath() const { return std::string(); }
 
+        virtual void onVsync(int64_t __unused timestamp) { return; };
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);

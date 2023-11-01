@@ -24,6 +24,7 @@
 
 using android::hardware::graphics::composer::PresentListener;
 using android::hardware::graphics::composer::VariableRefreshRateController;
+using android::hardware::graphics::composer::VsyncListener;
 using namespace displaycolor;
 
 class ExynosPrimaryDisplay : public ExynosDisplay {
@@ -78,6 +79,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual int32_t presentDisplay(int32_t* outRetireFence) override;
 
         virtual std::string getPanelFileNodePath() const override;
+
+        virtual void onVsync(int64_t timestamp) override;
 
     protected:
         /* setPowerMode(int32_t mode)
@@ -184,6 +187,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         // Function and variables related to Vrr.
         PresentListener* getPresentListener();
+        VsyncListener* getVsyncListener();
 
         VrrSettings_t mVrrSettings;
         std::shared_ptr<VariableRefreshRateController> mVariableRefreshRateController;

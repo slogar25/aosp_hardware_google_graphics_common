@@ -674,6 +674,13 @@ std::string ExynosPrimaryDisplay::getPanelFileNodePath() const {
     return getPanelSysfsPath(getDisplayTypeFromIndex(mIndex));
 }
 
+void ExynosPrimaryDisplay::onVsync(int64_t timestamp) {
+    const auto vsyncListener = getVsyncListener();
+    if (vsyncListener) {
+        vsyncListener->onVsync(timestamp, 0);
+    }
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmDisplayConfigLocked(uint32_t peakRate) {
     auto hwConfig = mDisplayInterface->getActiveModeId();
     auto config = getConfigId(peakRate, mDisplayConfigs[hwConfig].width,
@@ -1314,6 +1321,13 @@ int32_t ExynosPrimaryDisplay::setDbmState(bool enabled) {
 }
 
 PresentListener* ExynosPrimaryDisplay::getPresentListener() {
+    if (mVariableRefreshRateController) {
+        return mVariableRefreshRateController.get();
+    }
+    return nullptr;
+}
+
+VsyncListener* ExynosPrimaryDisplay::getVsyncListener() {
     if (mVariableRefreshRateController) {
         return mVariableRefreshRateController.get();
     }

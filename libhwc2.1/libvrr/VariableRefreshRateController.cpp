@@ -155,8 +155,8 @@ void VariableRefreshRateController::onPresent() {
             return;
         } else {
             LOG(INFO) << "VrrController: On present frame: time = "
-                      << mRecord.mPendingCurrentPresentTime.value().time
-                      << " duration = " << mRecord.mPendingCurrentPresentTime.value().duration;
+                      << mRecord.mPendingCurrentPresentTime.value().mTime
+                      << " duration = " << mRecord.mPendingCurrentPresentTime.value().mDuration;
             mRecord.mPresentHistory.next() = mRecord.mPendingCurrentPresentTime.value();
             mRecord.mPendingCurrentPresentTime = std::nullopt;
         }
@@ -184,8 +184,14 @@ void VariableRefreshRateController::setExpectedPresentTime(int64_t timestampNano
     mRecord.mPendingCurrentPresentTime = {mVrrActiveConfig, timestampNanos, frameIntervalNs};
 }
 
-void VariableRefreshRateController::onVsync(int64_t __unused timestampNanos,
-                                            int32_t __unused vsyncPeriodNanos) {}
+void VariableRefreshRateController::onVsync(int64_t timestampNanos,
+                                            int32_t __unused vsyncPeriodNanos) {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    mRecord.mVsyncHistory
+            .next() = {.mType = VariableRefreshRateController::VsyncEvent::Type::kVblank,
+                       .mConfig = mVrrActiveConfig,
+                       .mTime = timestampNanos};
+}
 
 int VariableRefreshRateController::doFrameInsertionLocked() {
     ATRACE_CALL();
