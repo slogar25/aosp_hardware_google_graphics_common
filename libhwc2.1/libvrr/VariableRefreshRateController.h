@@ -50,12 +50,14 @@ public:
 
     void setEnable(bool isEnabled);
 
+    void setPowerMode(int32_t mode);
+
     void setVrrConfigurations(std::unordered_map<hwc2_config_t, VrrConfig_t> configs);
 
 private:
     static constexpr int kDefaultRingBufferCapacity = 128;
     static constexpr int64_t kDefaultWakeUpTimeInPowerSaving =
-            100 * (std::nano::den / std::milli::den); // 10 Hz = 100 ms
+            500 * (std::nano::den / std::milli::den); // 500 ms
     static constexpr int64_t SIGNAL_TIME_PENDING = INT64_MAX;
     static constexpr int64_t SIGNAL_TIME_INVALID = -1;
 
@@ -92,7 +94,7 @@ private:
 
         std::optional<PresentEvent> mNextExpectedPresentTime = std::nullopt;
         std::optional<PresentEvent> mPendingCurrentPresentTime = std::nullopt;
-        ;
+
         typedef RingBuffer<PresentEvent, kDefaultRingBufferCapacity> PresentTimeRecord;
         typedef RingBuffer<VsyncEvent, kDefaultRingBufferCapacity> VsyncRecord;
         PresentTimeRecord mPresentHistory;
@@ -169,7 +171,7 @@ private:
 
     void postEvent(VrrControllerEventType type, int64_t when);
 
-    void stopThread();
+    void stopThread(bool exit);
 
     // The core function of the VRR controller thread.
     void threadBody();
@@ -180,6 +182,7 @@ private:
     int mPendingFramesToInsert = 0;
     std::priority_queue<VrrControllerEvent> mEventQueue;
     VrrRecord mRecord;
+    int32_t mPowerMode = -1;
     VrrControllerState mState;
     hwc2_config_t mVrrActiveConfig;
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;

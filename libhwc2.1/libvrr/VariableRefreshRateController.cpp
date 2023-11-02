@@ -72,7 +72,7 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
 }
 
 VariableRefreshRateController::~VariableRefreshRateController() {
-    stopThread();
+    stopThread(true);
 
     const std::lock_guard<std::mutex> lock(mMutex);
     if (mLastPresentFence.has_value()) {
@@ -146,19 +146,65 @@ void VariableRefreshRateController::setEnable(bool isEnabled) {
     mCondition.notify_all();
 }
 
+void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
+    ATRACE_CALL();
+    LOG(INFO) << "VrrController: Set power mode to " << powerMode;
+
+    {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        if (mPowerMode == powerMode) {
+            return;
+        }
+        switch (powerMode) {
+            case HWC_POWER_MODE_OFF:
+            case HWC_POWER_MODE_DOZE:
+            case HWC_POWER_MODE_DOZE_SUSPEND: {
+                mState = VrrControllerState::kDisable;
+                dropEventLocked();
+                break;
+            }
+            case HWC_POWER_MODE_NORMAL: {
+                // We should transition from either HWC_POWER_MODE_OFF, HWC_POWER_MODE_DOZE, or
+                // HWC_POWER_MODE_DOZE_SUSPEND. At this point, there should be no pending events
+                // posted.
+                if (!mEventQueue.empty()) {
+                    LOG(WARNING) << "VrrController: there should be no pending event when resume "
+                                    "from power mode = "
+                                 << mPowerMode << " to power mode = " << powerMode;
+                }
+                mState = VrrControllerState::kRendering;
+                const auto& vrrConfig = mVrrConfigs[mVrrActiveConfig];
+                postEvent(VrrControllerEventType::kRenderingTimeout,
+                          getNowNs() + vrrConfig.notifyExpectedPresentConfig.TimeoutNs);
+                break;
+            }
+            default: {
+                LOG(ERROR) << "VrrController: Unknown power mode = " << powerMode;
+                return;
+            }
+        }
+        mPowerMode = powerMode;
+    }
+    mCondition.notify_all();
+}
+
 void VariableRefreshRateController::setVrrConfigurations(
         std::unordered_map<hwc2_config_t, VrrConfig_t> configs) {
     ATRACE_CALL();
+
+    for (const auto& it : configs) {
+        LOG(INFO) << "VrrController: set Vrr configuration id = " << it.first;
+    }
 
     const std::lock_guard<std::mutex> lock(mMutex);
     mVrrConfigs = std::move(configs);
 }
 
-void VariableRefreshRateController::stopThread() {
+void VariableRefreshRateController::stopThread(bool exit) {
     ATRACE_CALL();
     {
         const std::lock_guard<std::mutex> lock(mMutex);
-        mThreadExit = true;
+        mThreadExit = exit;
         mEnabled = false;
         mState = VrrControllerState::kDisable;
     }
@@ -172,6 +218,9 @@ void VariableRefreshRateController::onPresent(int fence) {
     ATRACE_CALL();
     {
         const std::lock_guard<std::mutex> lock(mMutex);
+        if (mState == VrrControllerState::kDisable) {
+            return;
+        }
         if (!mRecord.mPendingCurrentPresentTime.has_value()) {
             LOG(WARNING) << "VrrController: VrrController: Present without expected present time "
                             "information";
