@@ -71,6 +71,18 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     }
 }
 
+VariableRefreshRateController::~VariableRefreshRateController() {
+    stopThread();
+
+    const std::lock_guard<std::mutex> lock(mMutex);
+    if (mLastPresentFence.has_value()) {
+        if (close(mLastPresentFence.value())) {
+            LOG(ERROR) << "VrrController:: close fence file failed, errno = " << errno;
+        }
+        mLastPresentFence = std::nullopt;
+    }
+};
+
 int VariableRefreshRateController::notifyExpectedPresent(int64_t timestamp,
                                                          int32_t frameIntervalNs) {
     ATRACE_CALL();
@@ -90,8 +102,13 @@ void VariableRefreshRateController::reset() {
     const std::lock_guard<std::mutex> lock(mMutex);
     mEventQueue = std::priority_queue<VrrControllerEvent>();
     mRecord.clear();
-    mLastFence = -1;
     dropEventLocked();
+    if (mLastPresentFence.has_value()) {
+        if (close(mLastPresentFence.value())) {
+            LOG(ERROR) << "VrrController:: close fence file failed, errno = " << errno;
+        }
+        mLastPresentFence = std::nullopt;
+    }
 }
 
 void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t config) {
@@ -149,8 +166,6 @@ void VariableRefreshRateController::stopThread() {
 
 void VariableRefreshRateController::onPresent(int fence) {
     ATRACE_CALL();
-    int lastFence;
-    hwc2_config_t currentConfig;
     {
         const std::lock_guard<std::mutex> lock(mMutex);
         if (!mRecord.mPendingCurrentPresentTime.has_value()) {
@@ -158,9 +173,6 @@ void VariableRefreshRateController::onPresent(int fence) {
                             "information";
             return;
         } else {
-            LOG(INFO) << "VrrController: On present frame: time = "
-                      << mRecord.mPendingCurrentPresentTime.value().mTime
-                      << " duration = " << mRecord.mPendingCurrentPresentTime.value().mDuration;
             mRecord.mPresentHistory.next() = mRecord.mPendingCurrentPresentTime.value();
             mRecord.mPendingCurrentPresentTime = std::nullopt;
         }
@@ -170,9 +182,24 @@ void VariableRefreshRateController::onPresent(int fence) {
             mState = VrrControllerState::kRendering;
             dropEventLocked(kHibernateTimeout);
         }
-        lastFence = mLastFence;
-        currentConfig = mVrrActiveConfig;
-        mLastFence = dup(fence);
+    }
+
+    // Prior to pushing the most recent fence update, verify the release timestamps of all preceding
+    // fences.
+    // TODO(b/309873055): delegate the task of executing updateVsyncHistory to the Vrr controller's
+    // loop thread in order to reduce the workload of calling thread.
+    updateVsyncHistory();
+    int dupFence = dup(fence);
+    if (dupFence < 0) {
+        LOG(ERROR) << "VrrController: duplicate fence file failed." << errno;
+    }
+
+    {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        if (mLastPresentFence.has_value()) {
+            LOG(WARNING) << "VrrController: last present fence remains open.";
+        }
+        mLastPresentFence = dupFence;
         // Drop the out of date timeout.
         dropEventLocked(kRenderingTimeout);
         dropEventLocked(kNextFrameInsertion);
@@ -181,21 +208,6 @@ void VariableRefreshRateController::onPresent(int fence) {
                   getNowNs() + mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig.TimeoutNs);
     }
     mCondition.notify_all();
-
-    if (lastFence < 0) {
-        return;
-    }
-    int64_t lastSignalTime = getLastFenceSignalTimeUnlocked(lastFence);
-    if (lastSignalTime == SIGNAL_TIME_PENDING || lastSignalTime == SIGNAL_TIME_INVALID) {
-        return;
-    }
-
-    // Acquire the mutex again to store the vsync record.
-    const std::lock_guard<std::mutex> lock(mMutex);
-    mRecord.mVsyncHistory
-            .next() = {.mType = VariableRefreshRateController::VsyncEvent::Type::kReleaseFence,
-                       .mConfig = currentConfig,
-                       .mTime = lastSignalTime};
 }
 
 void VariableRefreshRateController::setExpectedPresentTime(int64_t timestampNanos,
@@ -211,8 +223,37 @@ void VariableRefreshRateController::onVsync(int64_t timestampNanos,
     const std::lock_guard<std::mutex> lock(mMutex);
     mRecord.mVsyncHistory
             .next() = {.mType = VariableRefreshRateController::VsyncEvent::Type::kVblank,
-                       .mConfig = mVrrActiveConfig,
                        .mTime = timestampNanos};
+}
+
+void VariableRefreshRateController::updateVsyncHistory() {
+    int fence = -1;
+
+    {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        if (!mLastPresentFence.has_value()) {
+            return;
+        }
+        fence = mLastPresentFence.value();
+        mLastPresentFence = std::nullopt;
+    }
+
+    // Execute the following logic unlocked to enhance performance.
+    int64_t lastSignalTime = getLastFenceSignalTimeUnlocked(fence);
+    if (close(fence)) {
+        LOG(ERROR) << "VrrController:: close fence file failed, errno = " << errno;
+        return;
+    } else if (lastSignalTime == SIGNAL_TIME_PENDING || lastSignalTime == SIGNAL_TIME_INVALID) {
+        return;
+    }
+
+    {
+        // Acquire the mutex again to store the vsync record.
+        const std::lock_guard<std::mutex> lock(mMutex);
+        mRecord.mVsyncHistory
+                .next() = {.mType = VariableRefreshRateController::VsyncEvent::Type::kReleaseFence,
+                           .mTime = lastSignalTime};
+    }
 }
 
 int VariableRefreshRateController::doFrameInsertionLocked() {
@@ -336,7 +377,7 @@ void VariableRefreshRateController::handleCadenceChange() {
                         "information.";
         return;
     }
-    // TODO(cweichun): handle frame rate change.
+    // TODO(b/305311056): handle frame rate change.
     mRecord.mNextExpectedPresentTime = std::nullopt;
 }
 
@@ -347,7 +388,7 @@ void VariableRefreshRateController::handleResume() {
                 << "VrrController: resume occurs without the expected present timing information.";
         return;
     }
-    // TODO(cweichun): handle panel resume.
+    // TODO(b/305311281): handle panel resume.
     mRecord.mNextExpectedPresentTime = std::nullopt;
 }
 
@@ -358,14 +399,14 @@ void VariableRefreshRateController::handleHibernate() {
     int ret = doFrameInsertionLocked(kNumFramesToInsert);
     LOG(INFO) << "VrrController: apply frame insertion, ret = " << ret;
 
-    // TODO(cweichun): handle entering panel hibernate.
+    // TODO(b/305311206): handle entering panel hibernate.
     postEvent(VrrControllerEventType::kHibernateTimeout,
               getNowNs() + kDefaultWakeUpTimeInPowerSaving);
 }
 
 void VariableRefreshRateController::handleStayHibernate() {
     ATRACE_CALL();
-    // TODO(cweichun): handle keeping panel hibernate.
+    // TODO(b/305311698): handle keeping panel hibernate.
     postEvent(VrrControllerEventType::kHibernateTimeout,
               getNowNs() + kDefaultWakeUpTimeInPowerSaving);
 }
@@ -377,6 +418,7 @@ void VariableRefreshRateController::threadBody() {
         return;
     }
     for (;;) {
+        bool stateChanged = false;
         {
             std::unique_lock<std::mutex> lock(mMutex);
             if (mThreadExit) break;
@@ -411,6 +453,7 @@ void VariableRefreshRateController::threadBody() {
                     case VrrControllerEventType::kRenderingTimeout: {
                         handleHibernate();
                         mState = VrrControllerState::kHibernate;
+                        stateChanged = true;
                         break;
                     }
                     case VrrControllerEventType::kNotifyExpectedPresentConfig: {
@@ -439,6 +482,7 @@ void VariableRefreshRateController::threadBody() {
                     case VrrControllerEventType::kNotifyExpectedPresentConfig: {
                         handleResume();
                         mState = VrrControllerState::kRendering;
+                        stateChanged = true;
                         break;
                     }
                     case VrrControllerEventType::kNextFrameInsertion: {
@@ -450,6 +494,11 @@ void VariableRefreshRateController::threadBody() {
                     }
                 }
             }
+        }
+        // TODO(b/309873055): implement a handler to serialize all outer function calls to the same
+        // thread owned by the VRR controller.
+        if (stateChanged) {
+            updateVsyncHistory();
         }
     }
 }

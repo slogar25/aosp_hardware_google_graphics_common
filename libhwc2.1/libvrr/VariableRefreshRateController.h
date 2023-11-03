@@ -34,7 +34,7 @@ constexpr uint64_t kMillisecondToNanoSecond = 1000000;
 
 class VariableRefreshRateController : public VsyncListener, public PresentListener {
 public:
-    ~VariableRefreshRateController() { stopThread(); };
+    ~VariableRefreshRateController();
 
     auto static CreateInstance(ExynosDisplay* display)
             -> std::shared_ptr<VariableRefreshRateController>;
@@ -77,7 +77,6 @@ private:
             kReleaseFence,
         };
         Type mType;
-        hwc2_config_t mConfig;
         int64_t mTime;
     } VsyncEvent;
 
@@ -146,6 +145,8 @@ private:
     // Implement interface VsyncListener.
     virtual void onVsync(int64_t timestamp, int32_t vsyncPeriodNanos) override;
 
+    void updateVsyncHistory();
+
     int doFrameInsertionLocked();
     int doFrameInsertionLocked(int frames);
 
@@ -182,8 +183,7 @@ private:
     VrrControllerState mState;
     hwc2_config_t mVrrActiveConfig;
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
-
-    int mLastFence = -1;
+    std::optional<int> mLastPresentFence;
 
     std::unique_ptr<FileNodeWriter> mFileNodeWritter;
 
