@@ -209,13 +209,13 @@ bool Display::runMediator(const RoiRect &roi, const Weight &weight, const Histog
         std::scoped_lock lock(mMediator.mConfigMutex);
         isConfigChanged = mMediator.mConfig != pendingConfig;
 
-        if (isConfigChanged &&
-            mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
-            ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
-            return false;
+        if (isConfigChanged) {
+            if (mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
+                ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
+                return false;
+            }
+            mMediator.mConfig = pendingConfig;
         }
-
-        mMediator.mConfig = pendingConfig;
     }
 
     if (!mMediator.histRequested() &&
