@@ -777,10 +777,10 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
         parseRangeEnums(plane->range_property());
     }
 
-    chosePreferredConfig();
+    choosePreferredConfig();
 
-    // After chosePreferredConfig, the mDrmConnector->modes array is initialized, get the panel full
-    // resolution information here.
+    // After choosePreferredConfig, the mDrmConnector->modes array is initialized, get the panel
+    // full resolution information here.
     if (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) {
         retrievePanelFullResolution();
     }
@@ -968,8 +968,7 @@ int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
-{
+int32_t ExynosDisplayDrmInterface::choosePreferredConfig() {
     uint32_t num_configs = 0;
     int32_t err = getDisplayConfigs(&num_configs, NULL);
     if (err != HWC2_ERROR_NONE || !num_configs)

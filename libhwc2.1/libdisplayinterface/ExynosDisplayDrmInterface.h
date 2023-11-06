@@ -460,7 +460,7 @@ class ExynosDisplayDrmInterface :
         int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
         int32_t clearDisplayMode(DrmModeAtomicReq &drmReq);
         int32_t clearDisplayPlanes(DrmModeAtomicReq &drmReq);
-        int32_t chosePreferredConfig();
+        int32_t choosePreferredConfig();
         int getDeconChannel(ExynosMPP *otfMPP);
         /*
          * This function adds FB and gets new fb id if fbId is 0,
