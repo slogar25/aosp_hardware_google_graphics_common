@@ -3636,8 +3636,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         mPowerHalHint.signalNonIdle();
     }
 
-    if (needUpdateRRIndicator()) {
-        updateRefreshRateIndicator();
+    if (mRefreshRateIndicatorHandler && needUpdateRRIndicator()) {
+        mRefreshRateIndicatorHandler->checkOnPresentDisplay();
     }
 
     handleWindowUpdate();
@@ -4220,6 +4220,9 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     if (earlyWakeupNeeded) {
         setEarlyWakeupDisplay();
     }
+    if (mRefreshRateIndicatorHandler) {
+        mRefreshRateIndicatorHandler->checkOnSetActiveConfig(mDisplayConfigs[config].refreshRate);
+    }
 
     return HWC2_ERROR_NONE;
 }
@@ -4309,6 +4312,9 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
     mHdrFullScrenAreaThreshold = mXres * mYres * kHdrFullScreen;
     if (updateVsync) {
         resetConfigRequestStateLocked(config);
+    }
+    if (mRefreshRateIndicatorHandler) {
+        mRefreshRateIndicatorHandler->checkOnSetActiveConfig(mDisplayConfigs[config].refreshRate);
     }
 
     return NO_ERROR;
@@ -6317,14 +6323,18 @@ void ExynosDisplay::hotplug() {
           mHpdStatus ? "connection" : "disconnection", mDisplayId, hotplugErrorCode);
 }
 
-ExynosDisplay::RefreshRateIndicatorHandler::RefreshRateIndicatorHandler(ExynosDisplay *display)
+ExynosDisplay::SysfsBasedRRIHandler::SysfsBasedRRIHandler(ExynosDisplay* display)
       : mDisplay(display),
         mLastRefreshRate(0),
         mLastCallbackTime(0),
         mIgnoringLastUpdate(false),
         mCanIgnoreIncreaseUpdate(false) {}
 
-int32_t ExynosDisplay::RefreshRateIndicatorHandler::init() {
+ExynosDisplay::SysfsBasedRRIHandler::~SysfsBasedRRIHandler() {
+    mDisplay->mDevice->mDeviceInterface->unregisterSysfsEventHandler(getFd());
+}
+
+int32_t ExynosDisplay::SysfsBasedRRIHandler::init() {
     auto path = String8::format(kRefreshRateStatePathFormat, mDisplay->mIndex);
     mFd.Set(open(path.c_str(), O_RDONLY));
     if (mFd.get() < 0) {
@@ -6332,11 +6342,17 @@ int32_t ExynosDisplay::RefreshRateIndicatorHandler::init() {
               strerror(errno));
         return -errno;
     }
-
+    auto ret = mDisplay->mDevice->mDeviceInterface->registerSysfsEventHandler(shared_from_this());
+    if (ret != NO_ERROR) {
+        ALOGE("%s: Failed to register sysfs event handler: %d", __func__, ret);
+        return ret;
+    }
+    // Call the callback immediately
+    handleSysfsEvent();
     return NO_ERROR;
 }
 
-void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRateLocked(int refreshRate) {
+void ExynosDisplay::SysfsBasedRRIHandler::updateRefreshRateLocked(int refreshRate) {
     ATRACE_CALL();
     ATRACE_INT("Refresh rate indicator event", refreshRate);
     // Ignore refresh rate increase that is caused by refresh rate indicator update but there's
@@ -6358,7 +6374,7 @@ void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRateLocked(int ref
     mCanIgnoreIncreaseUpdate = true;
 }
 
-void ExynosDisplay::RefreshRateIndicatorHandler::handleSysfsEvent() {
+void ExynosDisplay::SysfsBasedRRIHandler::handleSysfsEvent() {
     ATRACE_CALL();
     std::scoped_lock lock(mMutex);
 
@@ -6382,7 +6398,7 @@ void ExynosDisplay::RefreshRateIndicatorHandler::handleSysfsEvent() {
     updateRefreshRateLocked(refreshRate);
 }
 
-void ExynosDisplay::RefreshRateIndicatorHandler::updateRefreshRate(int refreshRate) {
+void ExynosDisplay::SysfsBasedRRIHandler::updateRefreshRate(int refreshRate) {
     std::scoped_lock lock(mMutex);
     updateRefreshRateLocked(refreshRate);
 }
@@ -6395,7 +6411,11 @@ int32_t ExynosDisplay::setRefreshRateChangedCallbackDebugEnabled(bool enabled) {
     }
     int32_t ret = NO_ERROR;
     if (enabled) {
-        mRefreshRateIndicatorHandler = std::make_shared<RefreshRateIndicatorHandler>(this);
+        if (mType == HWC_DISPLAY_PRIMARY) {
+            mRefreshRateIndicatorHandler = std::make_shared<SysfsBasedRRIHandler>(this);
+        } else {
+            mRefreshRateIndicatorHandler = std::make_shared<ActiveConfigBasedRRIHandler>(this);
+        }
         if (!mRefreshRateIndicatorHandler) {
             ALOGE("%s: Failed to create refresh rate debug handler", __func__);
             return -ENOMEM;
@@ -6406,17 +6426,7 @@ int32_t ExynosDisplay::setRefreshRateChangedCallbackDebugEnabled(bool enabled) {
             mRefreshRateIndicatorHandler.reset();
             return ret;
         }
-        ret = mDevice->mDeviceInterface->registerSysfsEventHandler(mRefreshRateIndicatorHandler);
-        if (ret != NO_ERROR) {
-            ALOGE("%s: Failed to register sysfs event handler: %d", __func__, ret);
-            mRefreshRateIndicatorHandler.reset();
-            return ret;
-        }
-        // Call the callback immediately
-        mRefreshRateIndicatorHandler->handleSysfsEvent();
     } else {
-        ret = mDevice->mDeviceInterface->unregisterSysfsEventHandler(
-                mRefreshRateIndicatorHandler->getFd());
         mRefreshRateIndicatorHandler.reset();
     }
     return ret;
@@ -6434,13 +6444,34 @@ nsecs_t ExynosDisplay::getLastLayerUpdateTime() {
     return time;
 }
 
-void ExynosDisplay::updateRefreshRateIndicator() {
+void ExynosDisplay::SysfsBasedRRIHandler::checkOnPresentDisplay() {
     // Update refresh rate indicator if the last update event is ignored to make sure that
     // the refresh rate caused by the current frame update will be applied immediately since
     // we may not receive the sysfs event if the refresh rate is the same as the last ignored one.
-    if (!mRefreshRateIndicatorHandler || !mRefreshRateIndicatorHandler->isIgnoringLastUpdate())
+    if (!mIgnoringLastUpdate) {
         return;
-    mRefreshRateIndicatorHandler->handleSysfsEvent();
+    }
+    handleSysfsEvent();
+}
+
+ExynosDisplay::ActiveConfigBasedRRIHandler::ActiveConfigBasedRRIHandler(ExynosDisplay* display)
+      : mDisplay(display), mLastRefreshRate(0) {}
+
+int32_t ExynosDisplay::ActiveConfigBasedRRIHandler::init() {
+    updateRefreshRate(mDisplay->mRefreshRate);
+    return NO_ERROR;
+}
+
+void ExynosDisplay::ActiveConfigBasedRRIHandler::updateRefreshRate(int refreshRate) {
+    if (mLastRefreshRate == refreshRate) {
+        return;
+    }
+    mLastRefreshRate = refreshRate;
+    mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId, s2ns(1) / refreshRate);
+}
+
+void ExynosDisplay::ActiveConfigBasedRRIHandler::checkOnSetActiveConfig(int refreshRate) {
+    updateRefreshRate(refreshRate);
 }
 
 bool ExynosDisplay::needUpdateRRIndicator() {

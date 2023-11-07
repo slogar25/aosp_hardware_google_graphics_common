@@ -1685,14 +1685,28 @@ class ExynosDisplay {
         virtual void handleHotplugEvent(bool hpdStatus);
         virtual void hotplug();
 
-        class RefreshRateIndicatorHandler : public DrmSysfsEventHandler {
+        class RefreshRateIndicator {
         public:
-            RefreshRateIndicatorHandler(ExynosDisplay* display);
-            int32_t init();
-            virtual void handleSysfsEvent() override;
-            virtual int getFd() override { return mFd.get(); };
-            bool isIgnoringLastUpdate() { return mIgnoringLastUpdate; }
-            void updateRefreshRate(int refreshRate);
+            virtual ~RefreshRateIndicator() = default;
+            virtual int32_t init() { return NO_ERROR; }
+            virtual void updateRefreshRate(int __unused refreshRate) {}
+            virtual void checkOnPresentDisplay() {}
+            virtual void checkOnSetActiveConfig(int __unused refreshRate) {}
+        };
+
+        class SysfsBasedRRIHandler : public RefreshRateIndicator,
+                                     public DrmSysfsEventHandler,
+                                     public std::enable_shared_from_this<SysfsBasedRRIHandler> {
+        public:
+            SysfsBasedRRIHandler(ExynosDisplay* display);
+            virtual ~SysfsBasedRRIHandler();
+
+            int32_t init() override;
+            void updateRefreshRate(int refreshRate) override;
+            void checkOnPresentDisplay() override;
+
+            void handleSysfsEvent() override;
+            int getFd() override { return mFd.get(); }
 
         private:
             void updateRefreshRateLocked(int refreshRate) REQUIRES(mMutex);
@@ -1709,9 +1723,24 @@ class ExynosDisplay {
                     "/sys/class/backlight/panel%d-backlight/state";
         };
 
-        std::shared_ptr<RefreshRateIndicatorHandler> mRefreshRateIndicatorHandler;
+        class ActiveConfigBasedRRIHandler : public RefreshRateIndicator {
+        public:
+            ActiveConfigBasedRRIHandler(ExynosDisplay* display);
+            virtual ~ActiveConfigBasedRRIHandler() = default;
+
+            int32_t init() override;
+            void updateRefreshRate(int refreshRate) override;
+            void checkOnSetActiveConfig(int refreshRate) override;
+
+        private:
+            void updateVsyncPeriod(int vsyncPeriod);
+
+            ExynosDisplay* mDisplay;
+            int mLastRefreshRate;
+        };
+
+        std::shared_ptr<RefreshRateIndicator> mRefreshRateIndicatorHandler;
         int32_t setRefreshRateChangedCallbackDebugEnabled(bool enabled);
-        void updateRefreshRateIndicator();
         nsecs_t getLastLayerUpdateTime();
         bool needUpdateRRIndicator();
         virtual void checkPreblendingRequirement(){};
