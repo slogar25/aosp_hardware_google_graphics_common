@@ -48,8 +48,17 @@ LOCAL_CFLAGS += -Wthread-safety
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
 
 ifeq ($(CLANG_COVERAGE),true)
-LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_STATIC_LIBRARIES += libprofile-clang-extras_ndk
 LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
 endif
 
 LOCAL_MODULE := libdrmresource
@@ -150,8 +159,17 @@ LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 
 ifeq ($(CLANG_COVERAGE),true)
-LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_STATIC_LIBRARIES += libprofile-clang-extras_ndk
 LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
 endif
 
 LOCAL_MODULE := libexynosdisplay
@@ -213,8 +231,17 @@ LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 
 ifeq ($(CLANG_COVERAGE),true)
-LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_STATIC_LIBRARIES += libprofile-clang-extras_ndk
 LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
 endif
 
 LOCAL_SRC_FILES := \
@@ -259,8 +286,17 @@ LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 
 ifeq ($(CLANG_COVERAGE),true)
-LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping -mllvm -runtime-counter-relocation
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_STATIC_LIBRARIES += libprofile-clang-extras_ndk
 LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
 endif
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
