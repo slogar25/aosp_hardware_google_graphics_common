@@ -77,6 +77,7 @@ public:
     int processOperationRate(int32_t hz);
     bool isDbmSupported() { return mDbmSupported; }
     int applyPendingChangeViaSysfs(const nsecs_t vsyncNs);
+    int applyAclViaSysfs();
     bool validateLayerBrightness(float brightness);
 
     /**
