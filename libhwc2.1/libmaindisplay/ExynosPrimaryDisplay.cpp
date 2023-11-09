@@ -155,6 +155,8 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
                     displayTypeIdentifier.c_str());
             mVrrSettings.notifyExpectedPresentConfig.TimeoutNs =
                     property_get_int32(pathBuffer, kDefaultNotifyExpectedPresentConfigTimeoutNs);
+            mVrrSettings.configChangeCallback =
+                    std::bind(&ExynosPrimaryDisplay::onConfigChange, this, std::placeholders::_1);
         }
     }
 
@@ -1290,11 +1292,6 @@ void ExynosPrimaryDisplay::updateAppliedActiveConfig(const hwc2_config_t newConf
     }
 
     mAppliedActiveConfig = newConfig;
-
-    // Forward applied active config if there is a vrr controller.
-    if (mVariableRefreshRateController) {
-        mVariableRefreshRateController->setActiveVrrConfiguration(mAppliedActiveConfig);
-    }
 }
 
 void ExynosPrimaryDisplay::checkBtsReassignResource(const int32_t vsyncPeriod,
@@ -1351,4 +1348,10 @@ VsyncListener* ExynosPrimaryDisplay::getVsyncListener() {
         return mVariableRefreshRateController.get();
     }
     return nullptr;
+}
+
+void ExynosPrimaryDisplay::onConfigChange(int configId) {
+    if (mVariableRefreshRateController) {
+        return mVariableRefreshRateController->setActiveVrrConfiguration(configId);
+    }
 }

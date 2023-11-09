@@ -112,6 +112,7 @@ void VariableRefreshRateController::reset() {
 }
 
 void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t config) {
+    LOG(INFO) << "VrrController: Set active Vrr configuration = " << config;
     ATRACE_CALL();
     {
         const std::lock_guard<std::mutex> lock(mMutex);

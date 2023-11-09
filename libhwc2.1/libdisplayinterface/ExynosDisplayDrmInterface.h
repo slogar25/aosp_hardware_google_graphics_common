@@ -258,6 +258,10 @@ class ExynosDisplayDrmInterface :
                 };
                 void dumpDrmAtomicCommitMessage(int err);
 
+                void setAckCallback(std::function<void()> callback) {
+                    mAckCallback = std::move(callback);
+                };
+
             private:
                 drmModeAtomicReqPtr mPset;
                 drmModeAtomicReqPtr mSavedPset;
@@ -266,6 +270,8 @@ class ExynosDisplayDrmInterface :
                 /* Destroy old blobs after commit */
                 std::vector<uint32_t> mOldBlobs;
                 int drmFd() const { return mDrmDisplayInterface->mDrmDevice->fd(); }
+
+                std::function<void()> mAckCallback;
 
                 static constexpr uint32_t kAllowDumpDrmAtomicMessageTimeMs = 5000U;
                 static constexpr const char* kDrmModuleParametersDebugNode =
@@ -457,7 +463,8 @@ class ExynosDisplayDrmInterface :
             }
         };
         int32_t createModeBlob(const DrmMode &mode, uint32_t &modeBlob);
-        int32_t setDisplayMode(DrmModeAtomicReq &drmReq, const uint32_t modeBlob);
+        int32_t setDisplayMode(DrmModeAtomicReq& drmReq, const uint32_t& modeBlob,
+                               const uint32_t& modeId);
         int32_t clearDisplayMode(DrmModeAtomicReq &drmReq);
         int32_t clearDisplayPlanes(DrmModeAtomicReq &drmReq);
         int32_t choosePreferredConfig();
@@ -572,8 +579,6 @@ class ExynosDisplayDrmInterface :
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);
 
-        bool mIsVrrModeSupported = false;
-
         String8 mDisplayTraceName;
         DrmMode mDozeDrmMode;
         uint32_t mMaxWindowNum = 0;
@@ -582,8 +587,10 @@ class ExynosDisplayDrmInterface :
         int32_t mPanelFullResolutionVSize = 0;
 
         // Vrr related settings.
+        bool mIsVrrModeSupported = false;
         int32_t mNotifyExpectedPresentHeadsUpNs = 0;
         int32_t mNotifyExpectedPresentTimeoutNs = 0;
+        std::function<void(int)> mConfigChangeCallback;
 
         /**
          * retrievePanelFullResolution

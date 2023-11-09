@@ -134,6 +134,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t setLhbmDisplayConfigLocked(uint32_t peakRate);
         void restoreLhbmDisplayConfigLocked();
 
+        void onConfigChange(int configId);
+
         // LHBM
         FILE* mLhbmFd;
         std::atomic<bool> mLhbmOn;

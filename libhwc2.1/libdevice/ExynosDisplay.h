@@ -369,6 +369,7 @@ typedef struct VrrConfig {
 typedef struct VrrSettings {
     bool enabled;
     NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
+    std::function<void(int)> configChangeCallback;
 } VrrSettings_t;
 
 typedef struct displayConfigs {
