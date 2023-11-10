@@ -401,8 +401,7 @@ void VariableRefreshRateController::threadBody() {
             }
             const auto event = mEventQueue.top();
             mEventQueue.pop();
-            LOG(INFO) << "VrrController: handle event in state = " << getStateName(mState)
-                      << ", event type = " << event.getName();
+
             if (mState == VrrControllerState::kRendering) {
                 if (event.mEventType == VrrControllerEventType::kHibernateTimeout) {
                     LOG(ERROR) << "VrrController: receiving a hibernate timeout event while in the "
