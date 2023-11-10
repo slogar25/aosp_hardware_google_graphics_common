@@ -26,6 +26,9 @@
 
 namespace android {
 
+constexpr uint32_t kDefaultVsyncPeriodNanoSecond = 16666666;
+constexpr int32_t kDefaultRefreshRateFrequency = 60;
+
 class DrmDevice;
 
 class DrmEventHandler {
