@@ -386,6 +386,9 @@ typedef struct displayConfigs {
     uint32_t groupId;
 
     std::optional<VrrConfig_t> vrrConfig;
+
+    /* internal use */
+    int32_t refreshRate;
 } displayConfigs_t;
 
 struct DisplayControl {
@@ -426,6 +429,7 @@ class ExynosDisplay {
         uint32_t mXdpi;
         uint32_t mYdpi;
         uint32_t mVsyncPeriod;
+        int32_t mRefreshRate;
         int32_t mBtsFrameScanoutPeriod;
 
         /* Constructor */
@@ -1389,7 +1393,7 @@ class ExynosDisplay {
             virtual ~PowerHalHintWorker();
             int Init();
 
-            void signalRefreshRate(hwc2_power_mode_t powerMode, uint32_t vsyncPeriod);
+            void signalRefreshRate(hwc2_power_mode_t powerMode, int32_t refreshRate);
             void signalNonIdle();
             void signalActualWorkDuration(nsecs_t actualDurationNanos);
             void signalTargetWorkDuration(nsecs_t targetDurationNanos);
@@ -1415,14 +1419,14 @@ class ExynosDisplay {
             int32_t checkPowerHalExtHintSupport(const std::string& mode);
             int32_t sendPowerHalExtHint(const std::string& mode, bool enabled);
 
-            int32_t checkRefreshRateHintSupport(int refreshRate);
-            int32_t updateRefreshRateHintInternal(hwc2_power_mode_t powerMode,
-                                                  uint32_t vsyncPeriod);
-            int32_t sendRefreshRateHint(int refreshRate, bool enabled);
+            int32_t checkRefreshRateHintSupport(const int32_t refreshRate);
+            int32_t updateRefreshRateHintInternal(const hwc2_power_mode_t powerMode,
+                                                  const int32_t refreshRate);
+            int32_t sendRefreshRateHint(const int32_t refreshRate, bool enabled);
             void forceUpdateHints();
 
             int32_t checkIdleHintSupport();
-            int32_t updateIdleHint(int64_t deadlineTime, bool forceUpdate);
+            int32_t updateIdleHint(const int64_t deadlineTime, const bool forceUpdate);
             bool needUpdateIdleHintLocked(int64_t& timeout) REQUIRES(mutex_);
 
             // for adpf cpu hints
@@ -1446,7 +1450,7 @@ class ExynosDisplay {
             int mLastRefreshRateHint;
 
             // support list of refresh rate hints
-            std::map<int, bool> mRefreshRateHintSupportMap;
+            std::map<int32_t, bool> mRefreshRateHintSupportMap;
 
             bool mIdleHintIsEnabled;
             bool mForceUpdateIdleHint;
@@ -1463,7 +1467,7 @@ class ExynosDisplay {
             std::string mRefreshRateHintPrefixStr;
 
             hwc2_power_mode_t mPowerModeState;
-            uint32_t mVsyncPeriod;
+            int32_t mRefreshRate;
 
             uint32_t mConnectRetryCount;
             bool isPowerHalExist() { return mConnectRetryCount < 10; }
@@ -1584,8 +1588,6 @@ class ExynosDisplay {
             return static_cast<uint32_t>(vsync_period);
         }
         inline int32_t getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config) {
-            assert(isBadConfig() == false);
-
             int32_t frameScanoutPeriodNs;
             std::optional<VrrConfig_t> vrrConfig = getVrrConfigs(config);
             if (vrrConfig.has_value()) {

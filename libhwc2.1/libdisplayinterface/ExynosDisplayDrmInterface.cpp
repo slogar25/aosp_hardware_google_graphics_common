@@ -921,11 +921,13 @@ int32_t ExynosDisplayDrmInterface::setLowPowerMode() {
     mExynosDisplay->mXres = mDozeDrmMode.h_display();
     mExynosDisplay->mYres = mDozeDrmMode.v_display();
     // in nanoseconds
-    mExynosDisplay->mVsyncPeriod = mDozeDrmMode.te_period();
+    mExynosDisplay->mVsyncPeriod = static_cast<uint32_t>(mDozeDrmMode.te_period());
     // Dots per 1000 inches
     mExynosDisplay->mXdpi = mm_width ? (mDozeDrmMode.h_display() * kUmPerInch) / mm_width : -1;
     // Dots per 1000 inches
     mExynosDisplay->mYdpi = mm_height ? (mDozeDrmMode.v_display() * kUmPerInch) / mm_height : -1;
+
+    mExynosDisplay->mRefreshRate = static_cast<int32_t>(mDozeDrmMode.v_refresh());
 
     return setActiveDrmMode(mDozeDrmMode);
 }
@@ -1054,7 +1056,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         for (const DrmMode &mode : mDrmConnector->modes()) {
             displayConfigs_t configs;
             float rr = mode.v_refresh();
-            configs.vsyncPeriod = static_cast<int>(mode.te_period());
+            configs.refreshRate = static_cast<int32_t>(rr);
+            configs.vsyncPeriod = static_cast<int32_t>(mode.te_period());
             if (configs.vsyncPeriod <= 0.0f) {
                 ALOGE("%s:: invalid vsync period", __func__);
                 return HWC2_ERROR_BAD_DISPLAY;
@@ -2625,9 +2628,9 @@ void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace()
 
 int32_t ExynosDisplayDrmInterface::getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize,
                                                       uint8_t *outData) {
-    int width = mExynosDisplay->mXres;
-    int height = mExynosDisplay->mYres;
-    int clock = (width) * (height) * 60 / 10000;
+    uint32_t width = mExynosDisplay->mXres;
+    uint32_t height = mExynosDisplay->mYres;
+    uint32_t clock = (width * height * kDefaultRefreshRateFrequency) / 10000;
     std::array<uint8_t, 128> edid_buf{
             0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, /* header */
             0x1C, 0xEC,                                     /* manufacturer GGL */

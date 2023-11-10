@@ -63,7 +63,7 @@ constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr int64_t nsecsIdleHintTimeout = std::chrono::nanoseconds(100ms).count();
 
 ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId,
-                                                      const String8 &displayTraceName)
+                                                      const String8& displayTraceName)
       : Worker("DisplayHints", HAL_PRIORITY_URGENT_DISPLAY),
         mNeedUpdateRefreshRateHint(false),
         mLastRefreshRateHint(0),
@@ -74,7 +74,7 @@ ExynosDisplay::PowerHalHintWorker::PowerHalHintWorker(uint32_t displayId,
         mIdleHintIsSupported(false),
         mDisplayTraceName(displayTraceName),
         mPowerModeState(HWC2_POWER_MODE_OFF),
-        mVsyncPeriod(16666666),
+        mRefreshRate(kDefaultRefreshRateFrequency),
         mConnectRetryCount(0),
         mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
         mPowerHalExtAidl(nullptr),
@@ -196,7 +196,7 @@ int32_t ExynosDisplay::PowerHalHintWorker::sendPowerHalExtHint(const std::string
     return NO_ERROR;
 }
 
-int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refreshRate) {
+int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(const int32_t refreshRate) {
     int32_t ret = NO_ERROR;
 
     if (!isPowerHalExist()) {
@@ -223,7 +223,8 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkRefreshRateHintSupport(int refre
     return ret;
 }
 
-int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(int refreshRate, bool enabled) {
+int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(const int32_t refreshRate,
+                                                               bool enabled) {
     std::string hintStr = mRefreshRateHintPrefixStr + std::to_string(refreshRate) + "FPS";
     int32_t ret = sendPowerHalExtHint(hintStr, enabled);
     if (ret == -ENOTCONN) {
@@ -234,11 +235,10 @@ int32_t ExynosDisplay::PowerHalHintWorker::sendRefreshRateHint(int refreshRate, 
 }
 
 int32_t ExynosDisplay::PowerHalHintWorker::updateRefreshRateHintInternal(
-        hwc2_power_mode_t powerMode, uint32_t vsyncPeriod) {
+        const hwc2_power_mode_t powerMode, const int32_t refreshRate) {
     int32_t ret = NO_ERROR;
 
     /* TODO: add refresh rate buckets, tracked in b/181100731 */
-    int refreshRate = round(nsecsPerSec / vsyncPeriod * 0.1f) * 10;
     // skip sending unnecessary hint if it's still the same.
     if (mLastRefreshRateHint == refreshRate && powerMode == HWC2_POWER_MODE_ON) {
         return NO_ERROR;
@@ -340,7 +340,8 @@ int32_t ExynosDisplay::PowerHalHintWorker::checkPowerHintSessionSupport() {
     return out;
 }
 
-int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(int64_t deadlineTime, bool forceUpdate) {
+int32_t ExynosDisplay::PowerHalHintWorker::updateIdleHint(const int64_t deadlineTime,
+                                                          const bool forceUpdate) {
     int32_t ret = checkIdleHintSupport();
     if (ret != NO_ERROR) {
         return ret;
@@ -509,10 +510,10 @@ void ExynosDisplay::PowerHalHintWorker::signalTargetWorkDuration(nsecs_t targetD
 }
 
 void ExynosDisplay::PowerHalHintWorker::signalRefreshRate(hwc2_power_mode_t powerMode,
-                                                          uint32_t vsyncPeriod) {
+                                                          int32_t refreshRate) {
     Lock();
     mPowerModeState = powerMode;
-    mVsyncPeriod = vsyncPeriod;
+    mRefreshRate = refreshRate;
     mNeedUpdateRefreshRateHint = true;
     Unlock();
 
@@ -579,7 +580,6 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
     bool needUpdateRefreshRateHint = mNeedUpdateRefreshRateHint;
     int64_t deadlineTime = mIdleHintDeadlineTime;
     hwc2_power_mode_t powerMode = mPowerModeState;
-    uint32_t vsyncPeriod = mVsyncPeriod;
 
     /*
      * Clear the flags here instead of clearing them after calling the hint
@@ -602,7 +602,7 @@ void ExynosDisplay::PowerHalHintWorker::Routine() {
     updateIdleHint(deadlineTime, forceUpdateIdleHint);
 
     if (needUpdateRefreshRateHint) {
-        int32_t rc = updateRefreshRateHintInternal(powerMode, vsyncPeriod);
+        int32_t rc = updateRefreshRateHintInternal(powerMode, mRefreshRate);
         if (rc != NO_ERROR && rc != -EOPNOTSUPP) {
             Lock();
             if (mPowerModeState == HWC2_POWER_MODE_ON) {
@@ -990,8 +990,8 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device
         mYres(2960),
         mXdpi(25400),
         mYdpi(25400),
-        mVsyncPeriod(16666666),
-        mBtsFrameScanoutPeriod(16666666),
+        mVsyncPeriod(kDefaultVsyncPeriodNanoSecond),
+        mBtsFrameScanoutPeriod(kDefaultVsyncPeriodNanoSecond),
         mDevice(device),
         mDisplayName(displayName.c_str()),
         mDisplayTraceName(String8::format("%s(%d)", displayName.c_str(), mDisplayId)),
@@ -4326,9 +4326,9 @@ uint32_t ExynosDisplay::getBtsRefreshRate() const {
 }
 
 void ExynosDisplay::updateRefreshRateHint() {
-    if (mVsyncPeriod) {
+    if (mRefreshRate) {
         mPowerHalHint.signalRefreshRate(mPowerModeState.value_or(HWC2_POWER_MODE_OFF),
-                                        mVsyncPeriod);
+                                        mRefreshRate);
     }
 }
 
@@ -4336,6 +4336,9 @@ void ExynosDisplay::updateRefreshRateHint() {
 int32_t ExynosDisplay::resetConfigRequestStateLocked(hwc2_config_t config) {
     ATRACE_CALL();
 
+    assert(isBadConfig(config) == false);
+
+    mRefreshRate = mDisplayConfigs[config].refreshRate;
     mVsyncPeriod = getDisplayVsyncPeriodFromConfig(config);
     updateBtsFrameScanoutPeriod(getDisplayFrameScanoutPeriodFromConfig(config), true);
     DISPLAY_LOGD(eDebugDisplayConfig, "Update mVsyncPeriod %d by config(%d)", mVsyncPeriod, config);

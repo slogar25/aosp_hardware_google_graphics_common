@@ -157,6 +157,7 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
         mXres = displayConfig.width;
         mYres = displayConfig.height;
         mVsyncPeriod = displayConfig.vsyncPeriod;
+        mRefreshRate = displayConfig.refreshRate;
 
         if (mDisplayInterface->mType == INTERFACE_TYPE_DRM) {
             ret = mDisplayInterface->setActiveConfig(mActiveConfig);
