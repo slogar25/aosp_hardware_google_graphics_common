@@ -44,13 +44,6 @@ namespace aidl::android::hardware::graphics::composer3::impl {
         }                                                                    \
     } while (0)
 
-#define DISPATCH_DISPLAY_COMMAND(displayCmd, field, funcName)         \
-    do {                                                              \
-        if (displayCmd.field) {                                       \
-            execute##funcName(displayCmd.display, *displayCmd.field); \
-        }                                                             \
-    } while (0)
-
 #define DISPATCH_DISPLAY_BOOL_COMMAND(displayCmd, field, funcName)           \
     do {                                                                     \
         if (displayCmd.field) {                                              \
