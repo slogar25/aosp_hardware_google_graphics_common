@@ -82,7 +82,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	libvendorgraphicbuffer libbinder_ndk \
 	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk
 
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
                           com.google.hardware.pixel.display-V10-ndk \
                           libbinder_ndk \
                           libbase \
@@ -193,7 +193,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
-	android.hardware.graphics.composer3-V2-ndk
+	android.hardware.graphics.composer3-V3-ndk
 
 LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V10-ndk \
                           libbinder_ndk \
@@ -271,7 +271,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 	android.hardware.graphics.mapper@2.0 \
 	libui
 
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
                           com.google.hardware.pixel.display-V10-ndk \
                           libbinder_ndk \
                           libbase
