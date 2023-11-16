@@ -90,6 +90,7 @@ class DrmConnector {
   const DrmProperty &rr_switch_duration() const;
   const DrmProperty &operation_rate() const;
   const DrmProperty &refresh_on_lp() const;
+  const DrmProperty &content_protection() const;
 
   const std::vector<DrmProperty *> &properties() const {
       return properties_;
@@ -151,6 +152,7 @@ class DrmConnector {
   DrmProperty rr_switch_duration_;
   DrmProperty operation_rate_;
   DrmProperty refresh_on_lp_;
+  DrmProperty content_protection_;
   std::vector<DrmProperty *> properties_;
 
   std::vector<DrmEncoder *> possible_encoders_;

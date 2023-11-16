@@ -201,6 +201,16 @@ int DrmEventListener::UnRegisterSysfsHandler(int sysfs_fd) {
   return 0;
 }
 
+void DrmEventListener::RegisterPropertyUpdateHandler(DrmPropertyUpdateHandler *handler) {
+  assert(!drm_prop_update_handler_);
+  drm_prop_update_handler_.reset(handler);
+}
+
+void DrmEventListener::UnRegisterPropertyUpdateHandler(DrmPropertyUpdateHandler *handler) {
+  if (handler == drm_prop_update_handler_.get())
+    drm_prop_update_handler_ = NULL;
+}
+
 bool DrmEventListener::IsDrmInTUI() {
   char buffer[1024];
   int ret;
@@ -252,6 +262,9 @@ void DrmEventListener::UEventHandler() {
   }
 
   bool drm_event = false, hotplug_event = false;
+  bool have_connector_id = false, have_property_id = false;
+  unsigned connector_id = 0;
+  unsigned updated_property_id = 0;
   for (int i = 0; i < ret;) {
     char *event = buffer + i;
 
@@ -261,9 +274,21 @@ void DrmEventListener::UEventHandler() {
       panel_idle_handler_->handleIdleEnterEvent(event);
     } else if (!strcmp(event, "HOTPLUG=1")) {
       hotplug_event = true;
+    } else if (sscanf(event, "CONNECTOR=%u", &connector_id) == 1) {
+      have_connector_id = true;
+    } else if (sscanf(event, "PROPERTY=%u", &updated_property_id) == 1) {
+      have_property_id = true;
     }
 
     i += strlen(event) + 1;
+  }
+
+  // Property updates also have HOTPLUG=1 string, so must be handled
+  // first. Actual hotplug events don't have property id.
+  if (have_connector_id && have_property_id) {
+    if (drm_prop_update_handler_)
+      drm_prop_update_handler_->handleDrmPropertyUpdate(connector_id, updated_property_id);
+    return;
   }
 
   if (drm_event && hotplug_event) {

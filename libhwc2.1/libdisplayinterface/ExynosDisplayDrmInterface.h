@@ -414,6 +414,8 @@ class ExynosDisplayDrmInterface :
             return (mIsVrrModeSupported && !mExynosDisplay->mDevice->isVrrApiSupported());
         }
 
+        void handleDrmPropertyUpdate(uint32_t connector_id, uint32_t prop_id);
+
     protected:
         enum class HalMipiSyncType : uint32_t {
             HAL_MIPI_CMD_SYNC_REFRESH_RATE = 0,

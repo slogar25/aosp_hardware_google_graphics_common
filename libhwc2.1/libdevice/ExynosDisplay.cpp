@@ -6394,6 +6394,10 @@ void ExynosDisplay::hotplug() {
           mHpdStatus ? "connection" : "disconnection", mDisplayId, hotplugErrorCode);
 }
 
+void ExynosDisplay::contentProtectionUpdated(HdcpLevels hdcpLevels) {
+    mDevice->onContentProtectionUpdated(mDisplayId, hdcpLevels);
+}
+
 ExynosDisplay::SysfsBasedRRIHandler::SysfsBasedRRIHandler(ExynosDisplay* display)
       : mDisplay(display),
         mLastRefreshRate(0),

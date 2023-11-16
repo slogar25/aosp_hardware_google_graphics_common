@@ -619,6 +619,26 @@ void ExynosDevice::onVsyncPeriodTimingChanged(uint32_t displayId,
     callbackFunc(callbackData, displayId, timeline);
 }
 
+void ExynosDevice::onContentProtectionUpdated(uint32_t displayId, HdcpLevels hdcpLevels) {
+    Mutex::Autolock lock(mDeviceCallbackMutex);
+
+    // Workaround to pass content protection updates to SurfaceFlinger
+    // without changing HWC HAL interface.
+    if (isCallbackRegisteredLocked(HWC2_CALLBACK_VSYNC_2_4)) {
+        ALOGI("%s: displayId=%u hdcpLevels=%s sending to SF via onVsync_2_4", __func__, displayId,
+              hdcpLevels.toString().c_str());
+        hwc2_callback_data_t vsyncCallbackData =
+                mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4].callbackData;
+        HWC2_PFN_VSYNC_2_4 vsyncCallbackFunc = reinterpret_cast<HWC2_PFN_VSYNC_2_4>(
+                mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4].funcPointer);
+        int32_t connectedLevel = static_cast<int32_t>(hdcpLevels.connectedLevel);
+        int32_t maxLevel = static_cast<int32_t>(hdcpLevels.maxLevel);
+        int32_t timestampValue = (connectedLevel & 0xFF) | ((maxLevel & 0xFF) << 8);
+        vsyncCallbackFunc(vsyncCallbackData, displayId, -timestampValue, ~1);
+    } else
+        ALOGW("%s: onVsync_2_4 is not registered, ignoring onContentProtectionUpdated", __func__);
+}
+
 void ExynosDevice::setHWCDebug(unsigned int debug)
 {
     hwcDebug = debug;

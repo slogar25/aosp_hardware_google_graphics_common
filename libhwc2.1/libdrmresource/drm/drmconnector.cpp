@@ -171,6 +171,11 @@ int DrmConnector::Init() {
     ALOGE("Could not get refresh_on_lp property\n");
   }
 
+  ret = drm_->GetConnectorProperty(*this, "Content Protection", &content_protection_);
+  if (ret) {
+    ALOGE("Could not get Content Protection property\n");
+  }
+
   properties_.push_back(&dpms_property_);
   properties_.push_back(&crtc_id_property_);
   properties_.push_back(&edid_property_);
@@ -195,6 +200,7 @@ int DrmConnector::Init() {
   properties_.push_back(&rr_switch_duration_);
   properties_.push_back(&operation_rate_);
   properties_.push_back(&refresh_on_lp_);
+  properties_.push_back(&content_protection_);
 
   return 0;
 }
@@ -464,6 +470,10 @@ const DrmProperty &DrmConnector::panel_idle_support() const {
 
 const DrmProperty &DrmConnector::rr_switch_duration() const {
     return rr_switch_duration_;
+}
+
+const DrmProperty &DrmConnector::content_protection() const {
+    return content_protection_;
 }
 
 DrmEncoder *DrmConnector::encoder() const {

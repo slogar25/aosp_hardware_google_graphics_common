@@ -17,6 +17,7 @@
 #ifndef _EXYNOSDISPLAY_H
 #define _EXYNOSDISPLAY_H
 
+#include <aidl/android/hardware/drm/HdcpLevels.h>
 #include <android/hardware/graphics/composer/2.4/types.h>
 #include <hardware/hwcomposer2.h>
 #include <system/graphics.h>
@@ -43,6 +44,7 @@
 
 #define LOW_FPS_THRESHOLD     5
 
+using ::aidl::android::hardware::drm::HdcpLevels;
 using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
 using namespace std::chrono_literals;
 
@@ -1684,6 +1686,8 @@ class ExynosDisplay {
         virtual bool checkHotplugEventUpdated(bool &hpdStatus);
         virtual void handleHotplugEvent(bool hpdStatus);
         virtual void hotplug();
+
+        void contentProtectionUpdated(HdcpLevels hdcpLevels);
 
         class RefreshRateIndicator {
         public:

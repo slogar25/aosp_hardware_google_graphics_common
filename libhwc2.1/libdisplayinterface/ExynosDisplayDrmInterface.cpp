@@ -18,6 +18,7 @@
 
 #include "ExynosDisplayDrmInterface.h"
 
+#include <aidl/android/hardware/drm/HdcpLevels.h>
 #include <cutils/properties.h>
 #include <drm.h>
 #include <drm/drm_fourcc.h>
@@ -34,6 +35,8 @@
 #include "ExynosPrimaryDisplay.h"
 #include "HistogramController.h"
 
+using ::aidl::android::hardware::drm::HdcpLevel;
+using ::aidl::android::hardware::drm::HdcpLevels;
 using namespace std::chrono_literals;
 using namespace SOC_VERSION;
 
@@ -2888,4 +2891,28 @@ void ExynosDisplayDrmInterface::resetHotplugErrorCode() {
     if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL) return;
     std::ofstream ofs(kDpHotplugErrorCodeSysfsPath);
     if (ofs.is_open()) ofs << "0";
+}
+
+void ExynosDisplayDrmInterface::handleDrmPropertyUpdate(uint32_t connector_id, uint32_t prop_id) {
+    if (!mDrmConnector || mDrmConnector->id() != connector_id) return;
+    auto& conn_props = mDrmConnector->properties();
+    auto prop = std::find_if(conn_props.begin(), conn_props.end(),
+                             [prop_id](const DrmProperty* prop) { return prop->id() == prop_id; });
+    if (prop == conn_props.end()) {
+        ALOGD("%s: Unknown property prop_id=%u", __func__, prop_id);
+        return;
+    }
+    mDrmDevice->UpdateConnectorProperty(*mDrmConnector, *prop);
+    if ((*prop)->id() == mDrmConnector->content_protection().id()) {
+        auto [ret, content_protection_value] = mDrmConnector->content_protection().value();
+        if (ret < 0) {
+            ALOGW("%s: failed to get DRM content_protection property value ret=%d", __func__, ret);
+            return;
+        }
+        bool protectionEnabled = (content_protection_value == DRM_MODE_CONTENT_PROTECTION_ENABLED);
+        HdcpLevels hdcpLevels;
+        hdcpLevels.connectedLevel = protectionEnabled ? HdcpLevel::HDCP_V1 : HdcpLevel::HDCP_NONE;
+        hdcpLevels.maxLevel = HdcpLevel::HDCP_V1;
+        mExynosDisplay->contentProtectionUpdated(hdcpLevels);
+    }
 }

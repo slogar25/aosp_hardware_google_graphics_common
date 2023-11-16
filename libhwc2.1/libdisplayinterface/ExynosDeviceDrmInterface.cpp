@@ -71,6 +71,8 @@ ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice) {
 }
 
 ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface() {
+    mDrmDevice->event_listener()->UnRegisterPropertyUpdateHandler(
+            static_cast<DrmPropertyUpdateHandler*>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterHotplugHandler(
             static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterHistogramHandler(
@@ -103,6 +105,8 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice) {
             static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
     mDrmDevice->event_listener()->RegisterPanelIdleHandler(
             static_cast<DrmPanelIdleEventHandler *>(&mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->RegisterPropertyUpdateHandler(
+            static_cast<DrmPropertyUpdateHandler*>(&mExynosDrmEventHandler));
 
     if (mDrmDevice->event_listener()->IsDrmInTUI()) {
         mExynosDevice->enterToTUI();
@@ -331,6 +335,16 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleIdleEnterEvent(char 
         }
 
         primaryDisplay->handleDisplayIdleEnter(idleTeVrefresh);
+    }
+}
+
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleDrmPropertyUpdate(unsigned connector_id,
+                                                                              unsigned prop_id) {
+    ALOGD("%s: connector_id=%u prop_id=%u", __func__, connector_id, prop_id);
+    for (auto display : mExynosDevice->mDisplays) {
+        ExynosDisplayDrmInterface* displayInterface =
+                static_cast<ExynosDisplayDrmInterface*>(display->mDisplayInterface.get());
+        if (displayInterface) displayInterface->handleDrmPropertyUpdate(connector_id, prop_id);
     }
 }
 

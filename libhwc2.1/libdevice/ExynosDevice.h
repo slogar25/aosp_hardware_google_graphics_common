@@ -17,6 +17,7 @@
 #ifndef _EXYNOSDEVICE_H
 #define _EXYNOSDEVICE_H
 
+#include <aidl/android/hardware/drm/HdcpLevels.h>
 #include <aidl/android/hardware/graphics/composer3/OverlayProperties.h>
 #include <aidl/com/google/hardware/pixel/display/BnDisplay.h>
 #include <cutils/atomic.h>
@@ -59,6 +60,7 @@
 #define WRITEBACK_CAPTURE_PATH "/data/vendor/log/hwc"
 #endif
 
+using ::aidl::android::hardware::drm::HdcpLevels;
 using HbmState = ::aidl::com::google::hardware::pixel::display::HbmState;
 using LbeState = ::aidl::com::google::hardware::pixel::display::LbeState;
 using PanelCalibrationStatus = ::aidl::com::google::hardware::pixel::display::PanelCalibrationStatus;
@@ -288,6 +290,8 @@ class ExynosDevice {
         bool onVsync_2_4(uint32_t displayId, int64_t timestamp, uint32_t vsyncPeriod);
         void onVsyncPeriodTimingChanged(uint32_t displayId,
                                         hwc_vsync_period_change_timeline_t *timeline);
+
+        void onContentProtectionUpdated(uint32_t displayId, HdcpLevels hdcpLevels);
 
         void setHWCDebug(unsigned int debug);
         uint32_t getHWCDebug();
