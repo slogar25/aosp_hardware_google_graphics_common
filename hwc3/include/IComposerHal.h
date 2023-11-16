@@ -24,6 +24,7 @@
 #include <aidl/android/hardware/graphics/common/BlendMode.h>
 #include <aidl/android/hardware/graphics/common/ColorTransform.h>
 #include <aidl/android/hardware/graphics/common/Dataspace.h>
+#include <aidl/android/hardware/graphics/common/DisplayHotplugEvent.h>
 #include <aidl/android/hardware/graphics/common/FRect.h>
 #include <aidl/android/hardware/graphics/common/Hdr.h>
 #include <aidl/android/hardware/graphics/common/HdrConversionCapability.h>
@@ -110,6 +111,7 @@ class IComposerHal {
          virtual void onVsyncIdle(int64_t display) = 0;
          virtual void onSeamlessPossible(int64_t display) = 0;
          virtual void onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) = 0;
+         virtual void onHotplugEvent(int64_t display, common::DisplayHotplugEvent event) = 0;
      };
     virtual void registerEventCallback(EventCallback* callback) = 0;
     virtual void unregisterEventCallback() = 0;
