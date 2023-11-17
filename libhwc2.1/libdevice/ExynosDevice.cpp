@@ -68,16 +68,16 @@ uint32_t getDeviceInterfaceType()
         return INTERFACE_TYPE_FB;
 }
 
-ExynosDevice::ExynosDevice()
-    : mGeometryChanged(0),
-    mVsyncFd(-1),
-    mExtVsyncFd(-1),
-    mVsyncDisplayId(getDisplayId(HWC_DISPLAY_PRIMARY, 0)),
-    mTimestamp(0),
-    mDisplayMode(0),
-    mInterfaceType(INTERFACE_TYPE_FB),
-    mIsInTUI(false)
-{
+ExynosDevice::ExynosDevice(bool vrrApiSupported)
+      : mGeometryChanged(0),
+        mVsyncFd(-1),
+        mExtVsyncFd(-1),
+        mVsyncDisplayId(getDisplayId(HWC_DISPLAY_PRIMARY, 0)),
+        mTimestamp(0),
+        mDisplayMode(0),
+        mInterfaceType(INTERFACE_TYPE_FB),
+        mIsInTUI(false),
+        mVrrApiSupported(vrrApiSupported) {
     exynosHWCControl.forceGpu = false;
     exynosHWCControl.windowUpdate = true;
     exynosHWCControl.forcePanic = false;
@@ -222,8 +222,7 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
     for (uint32_t i = 0; i < mDisplays.size();) {
         ExynosDisplay* display = mDisplays[i];
         display->initDisplayInterface(interfaceType);
-        if (mDeviceInterface->initDisplayInterface(
-                    display->mDisplayInterface) != NO_ERROR) {
+        if (mDeviceInterface->initDisplayInterface(display->mDisplayInterface) != NO_ERROR) {
             ALOGD("Remove display[%d], Failed to initialize display interface", i);
             mDisplays.removeAt(i);
             mDisplayMap.erase(display->mDisplayId);

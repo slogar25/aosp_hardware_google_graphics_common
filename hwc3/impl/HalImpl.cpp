@@ -30,14 +30,20 @@
 
 using namespace SOC_VERSION;
 
+namespace {
+
+static constexpr int32_t kMinComposerInterfaceVersionForVrrApi = 3;
+
+};
+
 namespace aidl::android::hardware::graphics::composer3::impl {
 
-std::unique_ptr<IComposerHal> IComposerHal::create() {
-    auto device = std::make_unique<ExynosDeviceModule>();
+std::unique_ptr<IComposerHal> IComposerHal::create(int32_t composerInterfaceVersion) {
+    bool vrrApiSupported = composerInterfaceVersion >= kMinComposerInterfaceVersionForVrrApi;
+    auto device = std::make_unique<ExynosDeviceModule>(vrrApiSupported);
     if (!device) {
         return nullptr;
     }
-
     return std::make_unique<HalImpl>(std::move(device));
 }
 

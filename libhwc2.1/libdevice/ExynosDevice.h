@@ -217,7 +217,7 @@ class ExynosDevice {
         std::unique_ptr<ExynosDeviceInterface> mDeviceInterface;
 
         // Con/Destructors
-        ExynosDevice();
+        ExynosDevice(bool vrrApiSupported);
         virtual ~ExynosDevice();
 
         bool isFirstValidate();
@@ -346,6 +346,8 @@ class ExynosDevice {
 
         void onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod);
 
+        bool isVrrApiSupported() const { return mVrrApiSupported; };
+
     protected:
         void initDeviceInterface(uint32_t interfaceType);
     protected:
@@ -365,6 +367,7 @@ class ExynosDevice {
     private:
         bool mIsInTUI;
         bool mDisplayOffAsync;
+        bool mVrrApiSupported = false;
 
     public:
         void handleHotplug();

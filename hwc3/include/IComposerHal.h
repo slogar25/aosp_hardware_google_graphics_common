@@ -92,25 +92,25 @@ namespace aidl::android::hardware::graphics::composer3::impl {
 // IComposerClient interface.
 class IComposerHal {
  public:
-    static std::unique_ptr<IComposerHal> create();
-    virtual ~IComposerHal() = default;
+     static std::unique_ptr<IComposerHal> create(int32_t composerInterfaceVersion);
+     virtual ~IComposerHal() = default;
 
-    virtual void getCapabilities(std::vector<Capability>* caps) = 0;
-    virtual void dumpDebugInfo(std::string* output) = 0;
-    virtual bool hasCapability(Capability cap) = 0;
+     virtual void getCapabilities(std::vector<Capability>* caps) = 0;
+     virtual void dumpDebugInfo(std::string* output) = 0;
+     virtual bool hasCapability(Capability cap) = 0;
 
-    class EventCallback {
-      public:
-        virtual ~EventCallback() = default;
-        virtual void onHotplug(int64_t display, bool connected) = 0;
-        virtual void onRefresh(int64_t display) = 0;
-        virtual void onVsync(int64_t display, int64_t timestamp, int32_t vsyncPeriodNanos) = 0;
-        virtual void onVsyncPeriodTimingChanged(int64_t display,
-                                                const VsyncPeriodChangeTimeline& timeline) = 0;
-        virtual void onVsyncIdle(int64_t display) = 0;
-        virtual void onSeamlessPossible(int64_t display) = 0;
-        virtual void onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) = 0;
-    };
+     class EventCallback {
+     public:
+         virtual ~EventCallback() = default;
+         virtual void onHotplug(int64_t display, bool connected) = 0;
+         virtual void onRefresh(int64_t display) = 0;
+         virtual void onVsync(int64_t display, int64_t timestamp, int32_t vsyncPeriodNanos) = 0;
+         virtual void onVsyncPeriodTimingChanged(int64_t display,
+                                                 const VsyncPeriodChangeTimeline& timeline) = 0;
+         virtual void onVsyncIdle(int64_t display) = 0;
+         virtual void onSeamlessPossible(int64_t display) = 0;
+         virtual void onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) = 0;
+     };
     virtual void registerEventCallback(EventCallback* callback) = 0;
     virtual void unregisterEventCallback() = 0;
 
