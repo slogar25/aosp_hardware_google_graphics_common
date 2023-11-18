@@ -1017,10 +1017,20 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         uint32_t* outNumConfigs,
         hwc2_config_t* outConfigs)
 {
+    if (!mExynosDisplay || !(mExynosDisplay->mDevice)) {
+        return HWC2_ERROR_BAD_DISPLAY;
+    }
+
     std::lock_guard<std::recursive_mutex> lock(mDrmConnector->modesLock());
 
     if (!outConfigs) {
-        int ret = mDrmConnector->UpdateModes(mIsVrrModeSupported);
+        bool isVrrApiSupported = mExynosDisplay->mDevice->isVrrApiSupported();
+        bool useVrrConfigs = mIsVrrModeSupported && isVrrApiSupported;
+        ALOGI("Select Vrr Config: composer interface compatibility = %s, composer hardware "
+              "Compatibility = %s, use Vrr config = %s",
+              isVrrApiSupported ? "true" : "false", mIsVrrModeSupported ? "true" : "false",
+              useVrrConfigs ? "true" : "false");
+        int ret = mDrmConnector->UpdateModes(useVrrConfigs);
         if (ret < 0) {
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
