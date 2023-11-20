@@ -1061,6 +1061,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
 
         uint32_t mm_width = mDrmConnector->mm_width();
         uint32_t mm_height = mDrmConnector->mm_height();
+        ALOGD("%s: mm_width(%u) mm_height(%u)",
+              mExynosDisplay->mDisplayName.c_str(), mm_width, mm_height);
 
         DisplayConfigGroupIdGenerator groupIdGenerator;
         float peakRr = -1;
@@ -1099,8 +1101,9 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
                 configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height);
             }
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
-            ALOGD("config group(%d), w(%d), h(%d), refresh rate(%f), TE(%d), xdpi(%d), ydpi(%d), "
+            ALOGD("%s: config group(%d), w(%d), h(%d), rr(%f), TE(%d), xdpi(%d), ydpi(%d), "
                   "vrr mode(%s), NS mode(%s)",
+                  mExynosDisplay->mDisplayName.c_str(),
                   configs.groupId, configs.width, configs.height, rr, configs.vsyncPeriod,
                   configs.Xdpi, configs.Ydpi, mode.is_vrr_mode() ? "true" : "false",
                   mode.is_ns_mode() ? "true" : "false");
@@ -1134,13 +1137,16 @@ void ExynosDisplayDrmInterface::dumpDisplayConfigs()
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
     for (uint32_t i = 0; i < num_modes; i++) {
         auto mode = mDrmConnector->modes().at(i);
-        ALOGD("%s display config[%d] %s:: id(%d), clock(%d), flags(%d), type(%d)",
-                mExynosDisplay->mDisplayName.c_str(), i, mode.name().c_str(), mode.id(), mode.clock(), mode.flags(), mode.type());
+        ALOGD("%s: config[%d] %s: id(%d), clock(%d), flags(0x%x), type(0x%x)",
+              mExynosDisplay->mDisplayName.c_str(), i, mode.name().c_str(), mode.id(),
+              mode.clock(), mode.flags(), mode.type());
         ALOGD("\th_display(%d), h_sync_start(%d), h_sync_end(%d), h_total(%d), h_skew(%d)",
-                mode.h_display(), mode.h_sync_start(), mode.h_sync_end(), mode.h_total(), mode.h_skew());
-        ALOGD("\tv_display(%d), v_sync_start(%d), v_sync_end(%d), v_total(%d), v_scan(%d), v_refresh(%f)",
-                mode.v_display(), mode.v_sync_start(), mode.v_sync_end(), mode.v_total(), mode.v_scan(), mode.v_refresh());
-
+              mode.h_display(), mode.h_sync_start(), mode.h_sync_end(), mode.h_total(),
+              mode.h_skew());
+        ALOGD("\tv_display(%d), v_sync_start(%d), v_sync_end(%d), v_total(%d), v_scan(%d), "
+              "v_refresh(%f)",
+              mode.v_display(), mode.v_sync_start(), mode.v_sync_end(), mode.v_total(),
+              mode.v_scan(), mode.v_refresh());
     }
 }
 
