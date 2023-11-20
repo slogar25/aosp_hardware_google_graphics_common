@@ -46,7 +46,7 @@ ifeq ($(CLANG_COVERAGE),true)
 # enable code coverage (these flags are copied from build/soong/cc/coverage.go)
 LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
 LOCAL_CFLAGS += -Wno-frame-larger-than=
-LOCAL_STATIC_LIBRARIES += libprofile-clang-extras_ndk
+LOCAL_WHOLE_STATIC_LIBRARIES += libprofile-clang-extras_ndk
 LOCAL_LDFLAGS += -fprofile-instr-generate
 LOCAL_LDFLAGS += -Wl,--wrap,open
 
