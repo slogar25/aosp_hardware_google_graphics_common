@@ -31,6 +31,9 @@
 #define DRM_MODE_FLAG_TE_FREQ_X2 DRM_MODE_FLAG_NHSYNC
 #define DRM_MODE_FLAG_TE_FREQ_X4 DRM_MODE_FLAG_PVSYNC
 
+// BTS needs to take operation rate into account
+#define DRM_MODE_FLAG_BTS_OP_RATE DRM_MODE_FLAG_NVSYNC
+
 #define PANEL_REFRESH_CTRL_FI (1 << 0)
 #define PANEL_REFRESH_CTRL_IDLE (1 << 1)
 
@@ -69,6 +72,7 @@ class DrmMode {
   float v_period(int64_t unit = std::nano::den) const;
   float te_period(int64_t unit = std::nano::den) const;
 
+  bool is_operation_rate_to_bts() const;
   uint32_t flags() const;
   uint32_t type() const;
 

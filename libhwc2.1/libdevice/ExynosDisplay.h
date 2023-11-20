@@ -388,6 +388,7 @@ typedef struct displayConfigs {
     std::optional<VrrConfig_t> vrrConfig;
 
     /* internal use */
+    bool isOperationRateToBts;
     int32_t refreshRate;
 } displayConfigs_t;
 
@@ -431,6 +432,7 @@ class ExynosDisplay {
         uint32_t mVsyncPeriod;
         int32_t mRefreshRate;
         int32_t mBtsFrameScanoutPeriod;
+        int32_t mBtsPendingOperationRatePeriod;
 
         /* Constructor */
         ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device,
@@ -1194,6 +1196,7 @@ class ExynosDisplay {
                 const uint64_t actualChangeTime,
                 int64_t &appliedTime, int64_t &refreshTime);
         void updateBtsFrameScanoutPeriod(int32_t frameScanoutPeriod, bool configApplied = false);
+        void tryUpdateBtsFromOperationRate(bool beforeValidateDisplay);
         uint32_t getBtsRefreshRate() const;
         virtual void checkBtsReassignResource(const int32_t __unused vsyncPeriod,
                                               const int32_t __unused btsVsyncPeriod) {}
@@ -1588,19 +1591,7 @@ class ExynosDisplay {
             assert(vsync_period > 0);
             return static_cast<uint32_t>(vsync_period);
         }
-        inline int32_t getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config) {
-            int32_t frameScanoutPeriodNs;
-            std::optional<VrrConfig_t> vrrConfig = getVrrConfigs(config);
-            if (vrrConfig.has_value()) {
-                frameScanoutPeriodNs = vrrConfig->minFrameIntervalNs;
-            } else {
-                getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &frameScanoutPeriodNs);
-            }
-
-            assert(frameScanoutPeriodNs > 0);
-            return frameScanoutPeriodNs;
-        }
-
+        inline int32_t getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config);
         virtual void calculateTimeline(
                 hwc2_config_t config,
                 hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,

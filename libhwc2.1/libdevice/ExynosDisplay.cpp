@@ -992,6 +992,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device
         mYdpi(25400),
         mVsyncPeriod(kDefaultVsyncPeriodNanoSecond),
         mBtsFrameScanoutPeriod(kDefaultVsyncPeriodNanoSecond),
+        mBtsPendingOperationRatePeriod(0),
         mDevice(device),
         mDisplayName(displayName.c_str()),
         mDisplayTraceName(String8::format("%s(%d)", displayName.c_str(), mDisplayId)),
@@ -3497,6 +3498,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         return ret;
     }
 
+    tryUpdateBtsFromOperationRate(true);
+
     if (mRenderingState != RENDERING_STATE_ACCEPTED_CHANGE) {
         /*
          * presentDisplay() can be called before validateDisplay()
@@ -3739,6 +3742,8 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
     }
 
     mPriorFrameMixedComposition = mixedComposition;
+
+    tryUpdateBtsFromOperationRate(false);
 
     return ret;
 err:
@@ -4321,10 +4326,70 @@ int32_t ExynosDisplay::updateInternalDisplayConfigVariables(
 }
 
 void ExynosDisplay::updateBtsFrameScanoutPeriod(int32_t frameScanoutPeriod, bool configApplied) {
+    if (mBtsFrameScanoutPeriod == frameScanoutPeriod) {
+        return;
+    }
+
     if (configApplied || frameScanoutPeriod < mBtsFrameScanoutPeriod) {
         checkBtsReassignResource(frameScanoutPeriod, mBtsFrameScanoutPeriod);
         mBtsFrameScanoutPeriod = frameScanoutPeriod;
+        ATRACE_INT("btsFrameScanoutPeriod", mBtsFrameScanoutPeriod);
     }
+}
+
+void ExynosDisplay::tryUpdateBtsFromOperationRate(bool beforeValidateDisplay) {
+    if (mOperationRateManager == nullptr || mBrightnessController == nullptr ||
+        mActiveConfig == UINT_MAX) {
+        return;
+    }
+
+    if (!mDisplayConfigs[mActiveConfig].isOperationRateToBts) {
+        return;
+    }
+
+    if (beforeValidateDisplay && mBrightnessController->isOperationRatePending()) {
+        uint32_t opRate = mBrightnessController->getOperationRate();
+        if (opRate) {
+            int32_t operationRatePeriod = nsecsPerSec / opRate;
+            if (operationRatePeriod < mBtsFrameScanoutPeriod) {
+                updateBtsFrameScanoutPeriod(opRate);
+                mBtsPendingOperationRatePeriod = 0;
+            } else if (operationRatePeriod != mBtsFrameScanoutPeriod) {
+                mBtsPendingOperationRatePeriod = operationRatePeriod;
+            }
+        }
+    }
+
+    if (!beforeValidateDisplay && mBtsPendingOperationRatePeriod &&
+        !mBrightnessController->isOperationRatePending()) {
+        /* Do not update during rr transition, it will be updated after setting config done */
+        if (mConfigRequestState != hwc_request_state_t::SET_CONFIG_STATE_REQUESTED) {
+            updateBtsFrameScanoutPeriod(mBtsPendingOperationRatePeriod, true);
+        }
+        mBtsPendingOperationRatePeriod = 0;
+    }
+}
+
+inline int32_t ExynosDisplay::getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config) {
+    int32_t frameScanoutPeriodNs;
+    std::optional<VrrConfig_t> vrrConfig = getVrrConfigs(config);
+    if (vrrConfig.has_value()) {
+        frameScanoutPeriodNs = vrrConfig->minFrameIntervalNs;
+    } else {
+        getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &frameScanoutPeriodNs);
+        if (mOperationRateManager && mBrightnessController &&
+            mDisplayConfigs[config].isOperationRateToBts) {
+            uint32_t opRate = mBrightnessController->getOperationRate();
+            if (opRate) {
+                uint32_t opPeriodNs = nsecsPerSec / opRate;
+                frameScanoutPeriodNs =
+                        (frameScanoutPeriodNs <= opPeriodNs) ? frameScanoutPeriodNs : opPeriodNs;
+            }
+        }
+    }
+
+    assert(frameScanoutPeriodNs > 0);
+    return frameScanoutPeriodNs;
 }
 
 uint32_t ExynosDisplay::getBtsRefreshRate() const {
@@ -4613,6 +4678,7 @@ int32_t ExynosDisplay::validateDisplay(
 
     for (size_t i = 0; i < mLayers.size(); i++) mLayers[i]->setSrcAcquireFence();
 
+    tryUpdateBtsFromOperationRate(true);
     doPreProcessing();
     checkLayerFps();
     if (exynosHWCControl.useDynamicRecomp == true && mDREnable)
@@ -6481,8 +6547,8 @@ bool ExynosDisplay::needUpdateRRIndicator() {
 }
 
 uint32_t ExynosDisplay::getPeakRefreshRate() {
-    float opRate = mBrightnessController->getOperationRate();
-    return static_cast<uint32_t>(std::round(opRate ?: mPeakRefreshRate));
+    uint32_t opRate = mBrightnessController->getOperationRate();
+    return opRate ?: mPeakRefreshRate;
 }
 
 VsyncPeriodNanos ExynosDisplay::getVsyncPeriod(const int32_t config) {

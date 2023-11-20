@@ -168,6 +168,13 @@ float DrmMode::te_period(int64_t unit) const {
   return (1.0 / frequency) * unit;
 }
 
+bool DrmMode::is_operation_rate_to_bts() const {
+  if (!is_vrr_mode()) {
+    return HasFlag(flags_, DRM_MODE_FLAG_BTS_OP_RATE);
+  }
+  return false;
+}
+
 uint32_t DrmMode::flags() const {
   return flags_;
 }

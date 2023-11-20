@@ -155,6 +155,11 @@ public:
         return mOperationRate.get();
     }
 
+    bool isOperationRatePending() {
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+        return mOperationRate.is_dirty();
+    }
+
     bool isSupported() {
         // valid mMaxBrightness means both brightness and max_brightness sysfs exist
         return mMaxBrightness > 0;

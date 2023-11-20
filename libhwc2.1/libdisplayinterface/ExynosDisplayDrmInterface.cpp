@@ -1075,6 +1075,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
                 ALOGE("%s:: invalid vsync period", __func__);
                 return HWC2_ERROR_BAD_DISPLAY;
             }
+            configs.isOperationRateToBts = mode.is_operation_rate_to_bts();
             configs.width = mode.h_display();
             configs.height = mode.v_display();
             // Dots per 1000 inches
