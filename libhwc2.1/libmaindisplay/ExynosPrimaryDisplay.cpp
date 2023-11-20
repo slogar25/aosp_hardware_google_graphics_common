@@ -305,15 +305,14 @@ int32_t ExynosPrimaryDisplay::setBootDisplayConfig(int32_t config) {
     if (mode.vsyncPeriod == 0)
         return HWC2_ERROR_BAD_CONFIG;
 
-    int refreshRate = round(nsecsPerSec / mode.vsyncPeriod * 0.1f) * 10;
+    int vsyncRate = round(static_cast<float>(nsecsPerSec) / mode.vsyncPeriod);
     char modeStr[PROPERTY_VALUE_MAX];
-    int ret = snprintf(modeStr, sizeof(modeStr), "%dx%d@%d",
-             mode.width, mode.height, refreshRate);
+    int ret = snprintf(modeStr, sizeof(modeStr), "%dx%d@%d:%d",
+             mode.width, mode.height, mode.refreshRate, vsyncRate);
     if (ret <= 0)
         return HWC2_ERROR_BAD_CONFIG;
 
-    ALOGD("%s: mode=%s (%d) vsyncPeriod=%d", __func__, modeStr, config,
-            mode.vsyncPeriod);
+    ALOGD("%s: mode=%s (%d)", __func__, modeStr, config);
     ret = property_set(getPropertyBootModeStr(mDisplayId).c_str(), modeStr);
 
     return !ret ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_CONFIG;
@@ -335,15 +334,31 @@ int32_t ExynosPrimaryDisplay::getPreferredDisplayConfigInternal(int32_t *outConf
     }
 
     int width, height;
-    int fps = 0;
+    int fps = 0, vsyncRate = 0;
 
-    ret = sscanf(modeStr, "%dx%d@%d", &width, &height, &fps);
-    if ((ret < 3) || !fps) {
-        ALOGD("%s: unable to find boot config for mode: %s", __func__, modeStr);
+    ret = sscanf(modeStr, "%dx%d@%d:%d", &width, &height, &fps, &vsyncRate);
+    if (ret < 4) {
+        ret = sscanf(modeStr, "%dx%d@%d", &width, &height, &fps);
+        if ((ret < 3) || !fps) {
+            ALOGW("%s: unable to find boot config for mode: %s", __func__, modeStr);
+            return HWC2_ERROR_BAD_CONFIG;
+        }
+        if (lookupDisplayConfigs(width, height, fps, fps, outConfig) != HWC2_ERROR_NONE) {
+            ALOGE("%s: kernel doesn't support mode: %s", __func__, modeStr);
+            return HWC2_ERROR_BAD_CONFIG;
+        }
+        ret = setBootDisplayConfig(*outConfig);
+        if (ret == HWC2_ERROR_NONE)
+            ALOGI("%s: succeeded to replace %s with new format", __func__, modeStr);
+        else
+            ALOGE("%s: failed to replace %s with new format", __func__, modeStr);
+        return ret;
+    }
+    if (!fps || !vsyncRate || (fps > vsyncRate)) {
+        ALOGE("%s: bad boot config: %s", __func__, modeStr);
         return HWC2_ERROR_BAD_CONFIG;
     }
-
-    return lookupDisplayConfigs(width, height, fps, outConfig);
+    return lookupDisplayConfigs(width, height, fps, vsyncRate, outConfig);
 }
 
 int32_t ExynosPrimaryDisplay::setPowerOn() {

@@ -979,9 +979,10 @@ int32_t ExynosDisplayDrmInterface::choosePreferredConfig() {
     int32_t config = -1;
     char modeStr[PROPERTY_VALUE_MAX] = "\0";
     int32_t width = 0, height = 0, fps = 0;
+    // only legacy products use this property, kernel preferred mode will be used going forward
     if (property_get("vendor.display.preferred_mode", modeStr, "") > 0 &&
         sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
-        err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, &config);
+        err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, fps, &config);
     } else {
         err = HWC2_ERROR_BAD_CONFIG;
     }

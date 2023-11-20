@@ -136,7 +136,7 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
 
         if (property_get("vendor.display.external.preferred_mode", modeStr, "") > 0) {
             if (sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
-                err = lookupDisplayConfigs(width, height, fps, &config);
+                err = lookupDisplayConfigs(width, height, fps, fps, &config);
                 if (err != HWC2_ERROR_NONE) {
                     DISPLAY_LOGW("%s: display does not support preferred mode %dx%d@%d",
                                  __func__, width, height, fps);

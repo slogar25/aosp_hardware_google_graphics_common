@@ -6195,21 +6195,22 @@ bool ExynosDisplay::isMixedComposition() {
 int ExynosDisplay::lookupDisplayConfigs(const int32_t &width,
                                         const int32_t &height,
                                         const int32_t &fps,
+                                        const int32_t &vsyncRate,
                                         int32_t *outConfig) {
-    if (!fps)
+    if (!fps || !vsyncRate)
         return HWC2_ERROR_BAD_CONFIG;
 
     constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
     constexpr auto nsecsPerMs = std::chrono::nanoseconds(1ms).count();
 
-    const auto vsyncPeriod = nsecsPerSec / fps;
+    const auto vsyncPeriod = nsecsPerSec / vsyncRate;
 
     for (auto const& [config, mode] : mDisplayConfigs) {
         long delta = abs(vsyncPeriod - mode.vsyncPeriod);
         if ((width == 0 || width == mode.width) && (height == 0 || height == mode.height) &&
-            (delta < nsecsPerMs)) {
-            ALOGD("%s: found display config for mode: %dx%d@%d=%d",
-                 __func__, width, height, fps, config);
+            (delta < nsecsPerMs) && (fps == mode.refreshRate)) {
+            ALOGD("%s: found display config for mode: %dx%d@%d:%d config=%d",
+                 __func__, width, height, fps, vsyncRate, config);
             *outConfig = config;
             return HWC2_ERROR_NONE;
         }
