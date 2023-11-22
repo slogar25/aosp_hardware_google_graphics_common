@@ -6486,16 +6486,15 @@ uint32_t ExynosDisplay::getPeakRefreshRate() {
 }
 
 VsyncPeriodNanos ExynosDisplay::getVsyncPeriod(const int32_t config) {
-    const auto &it = mDisplayConfigs.find(config);
+    const auto& it = mDisplayConfigs.find(config);
     if (it == mDisplayConfigs.end()) return 0;
-    return mDisplayConfigs[config].vsyncPeriod;
+    return it->second.vsyncPeriod;
 }
 
 uint32_t ExynosDisplay::getRefreshRate(const int32_t config) {
-    VsyncPeriodNanos period = getVsyncPeriod(config);
-    if (!period) return 0;
-    constexpr float nsecsPerSec = std::chrono::nanoseconds(1s).count();
-    return round(nsecsPerSec / period * 0.1f) * 10;
+    const auto& it = mDisplayConfigs.find(config);
+    if (it == mDisplayConfigs.end()) return 0;
+    return it->second.refreshRate;
 }
 
 uint32_t ExynosDisplay::getConfigId(const int32_t refreshRate, const int32_t width,
