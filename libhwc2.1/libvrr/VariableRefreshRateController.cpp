@@ -114,7 +114,8 @@ void VariableRefreshRateController::reset() {
 }
 
 void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t config) {
-    LOG(INFO) << "VrrController: Set active Vrr configuration = " << config;
+    LOG(INFO) << "VrrController: Set active Vrr configuration = " << config
+              << ", power mode = " << mPowerMode;
     ATRACE_CALL();
     {
         const std::lock_guard<std::mutex> lock(mMutex);
@@ -122,8 +123,11 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
             LOG(ERROR) << "VrrController: Set an undefined active configuration";
             return;
         }
-        mState = VrrControllerState::kRendering;
         mVrrActiveConfig = config;
+        if (mState == VrrControllerState::kDisable) {
+            return;
+        }
+        mState = VrrControllerState::kRendering;
         dropEventLocked(kRenderingTimeout);
 
         const auto& vrrConfig = mVrrConfigs[mVrrActiveConfig];
@@ -173,6 +177,7 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
                     LOG(WARNING) << "VrrController: there should be no pending event when resume "
                                     "from power mode = "
                                  << mPowerMode << " to power mode = " << powerMode;
+                    LOG(INFO) << dumpEventQueueLocked();
                 }
                 mState = VrrControllerState::kRendering;
                 const auto& vrrConfig = mVrrConfigs[mVrrActiveConfig];
@@ -346,6 +351,7 @@ std::string VariableRefreshRateController::dumpEventQueueLocked() {
     std::priority_queue<VrrControllerEvent> q;
     while (!mEventQueue.empty()) {
         const auto& it = mEventQueue.top();
+        content += "VrrController: event = ";
         content += it.toString();
         content += "\n";
         q.push(it);
