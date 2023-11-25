@@ -1027,20 +1027,20 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
     if (!outConfigs) {
         bool isVrrApiSupported = mExynosDisplay->mDevice->isVrrApiSupported();
         bool useVrrConfigs = mIsVrrModeSupported && isVrrApiSupported;
-        ALOGI("Select Vrr Config: composer interface compatibility = %s, composer hardware "
-              "Compatibility = %s, use Vrr config = %s",
-              isVrrApiSupported ? "true" : "false", mIsVrrModeSupported ? "true" : "false",
-              useVrrConfigs ? "true" : "false");
         int ret = mDrmConnector->UpdateModes(useVrrConfigs);
         if (ret < 0) {
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
         }
-
         if (ret == 0) {
             // no need to update mExynosDisplay->mDisplayConfigs
             goto no_mode_changes;
         }
+        ALOGI("Select Vrr Config for display %s: composer interface compatibility = %s, display "
+              "hardware "
+              "Compatibility = %s, use Vrr config = %s",
+              mExynosDisplay->mDisplayName.c_str(), isVrrApiSupported ? "true" : "false",
+              mIsVrrModeSupported ? "true" : "false", useVrrConfigs ? "true" : "false");
 
         if (mDrmConnector->state() == DRM_MODE_CONNECTED) {
             /*

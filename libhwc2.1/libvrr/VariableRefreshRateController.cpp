@@ -77,7 +77,7 @@ VariableRefreshRateController::~VariableRefreshRateController() {
     const std::lock_guard<std::mutex> lock(mMutex);
     if (mLastPresentFence.has_value()) {
         if (close(mLastPresentFence.value())) {
-            LOG(ERROR) << "VrrController:: close fence file failed, errno = " << errno;
+            LOG(ERROR) << "VrrController: close fence file failed, errno = " << errno;
         }
         mLastPresentFence = std::nullopt;
     }
@@ -105,7 +105,7 @@ void VariableRefreshRateController::reset() {
     dropEventLocked();
     if (mLastPresentFence.has_value()) {
         if (close(mLastPresentFence.value())) {
-            LOG(ERROR) << "VrrController:: close fence file failed, errno = " << errno;
+            LOG(ERROR) << "VrrController: close fence file failed, errno = " << errno;
         }
         mLastPresentFence = std::nullopt;
     }
@@ -166,6 +166,9 @@ void VariableRefreshRateController::stopThread() {
 }
 
 void VariableRefreshRateController::onPresent(int fence) {
+    if (fence < 0) {
+        return;
+    }
     ATRACE_CALL();
     {
         const std::lock_guard<std::mutex> lock(mMutex);
@@ -242,7 +245,7 @@ void VariableRefreshRateController::updateVsyncHistory() {
     // Execute the following logic unlocked to enhance performance.
     int64_t lastSignalTime = getLastFenceSignalTimeUnlocked(fence);
     if (close(fence)) {
-        LOG(ERROR) << "VrrController:: close fence file failed, errno = " << errno;
+        LOG(ERROR) << "VrrController: close fence file failed, errno = " << errno;
         return;
     } else if (lastSignalTime == SIGNAL_TIME_PENDING || lastSignalTime == SIGNAL_TIME_INVALID) {
         return;
@@ -329,7 +332,7 @@ int64_t VariableRefreshRateController::getLastFenceSignalTimeUnlocked(int fd) {
     if (finfo->status != 1) {
         const auto status = finfo->status;
         if (status < 0) {
-            LOG(ERROR) << "VrrController:: sync_file_info contains an error: " << status;
+            LOG(ERROR) << "VrrController: sync_file_info contains an error: " << status;
         }
         sync_file_info_free(finfo);
         return status < 0 ? SIGNAL_TIME_INVALID : SIGNAL_TIME_PENDING;
