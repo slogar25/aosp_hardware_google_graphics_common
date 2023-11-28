@@ -1316,7 +1316,7 @@ class ExynosDisplay {
         /* set brightness by dbv value */
         virtual int32_t setBrightnessDbv(const uint32_t dbv);
 
-        virtual std::string getPanelFileNodePath() const { return std::string(); }
+        virtual std::string getPanelSysfsPath() const { return std::string(); }
 
         virtual void onVsync(int64_t __unused timestamp) { return; };
 

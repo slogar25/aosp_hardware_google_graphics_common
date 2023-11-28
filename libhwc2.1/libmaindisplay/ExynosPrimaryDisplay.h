@@ -78,8 +78,6 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
                                           hwc2_config_t* outConfigs) override;
         virtual int32_t presentDisplay(int32_t* outRetireFence) override;
 
-        virtual std::string getPanelFileNodePath() const override;
-
         virtual void onVsync(int64_t timestamp) override;
 
     protected:
@@ -103,6 +101,9 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
     public:
         // Prepare multi resolution
         ResolutionInfo mResolutionInfo;
+        std::string getPanelSysfsPath() const override {
+            return getPanelSysfsPath(getDisplayTypeFromIndex(mIndex));
+        }
         std::string getPanelSysfsPath(const displaycolor::DisplayType& type) const;
 
         uint32_t mRcdId = -1;

@@ -64,7 +64,7 @@ auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display)
 VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* display)
       : mDisplay(display) {
     mState = VrrControllerState::kDisable;
-    std::string displayFileNodePath = mDisplay->getPanelFileNodePath();
+    std::string displayFileNodePath = mDisplay->getPanelSysfsPath();
     if (displayFileNodePath.empty()) {
         LOG(WARNING) << "VrrController: Cannot find file node of display: "
                      << mDisplay->mDisplayName;
