@@ -1120,18 +1120,23 @@ void ExynosPrimaryDisplay::setDisplayNeedHandleIdleExit(const bool needed, const
 }
 
 void ExynosPrimaryDisplay::handleDisplayIdleEnter(const uint32_t idleTeRefreshRate) {
-    Mutex::Autolock lock(mDisplayMutex);
-    uint32_t btsRefreshRate = getBtsRefreshRate();
-    if (idleTeRefreshRate <= btsRefreshRate) {
-        return;
+    {
+        Mutex::Autolock lock(mDisplayMutex);
+        uint32_t btsRefreshRate = getBtsRefreshRate();
+        if (idleTeRefreshRate <= btsRefreshRate) {
+            return;
+        }
     }
 
     bool needed = false;
-    for (size_t i = 0; i < mLayers.size(); i++) {
-        if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP == nullptr &&
-            !mLayers[i]->checkBtsCap(idleTeRefreshRate)) {
-            needed = true;
-            break;
+    {
+        Mutex::Autolock lock(mDRMutex);
+        for (size_t i = 0; i < mLayers.size(); i++) {
+            if (mLayers[i]->mOtfMPP && mLayers[i]->mM2mMPP == nullptr &&
+                !mLayers[i]->checkBtsCap(idleTeRefreshRate)) {
+                needed = true;
+                break;
+            }
         }
     }
 
