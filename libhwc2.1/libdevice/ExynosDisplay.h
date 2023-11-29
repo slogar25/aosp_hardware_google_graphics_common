@@ -1663,7 +1663,7 @@ class ExynosDisplay {
             virtual int32_t onConfig(hwc2_config_t __unused cfg) { return 0; }
             virtual int32_t onBrightness(uint32_t __unused dbv) { return 0; }
             virtual int32_t onPowerMode(int32_t __unused mode) { return 0; }
-            virtual int32_t getTargetOperationRate() { return 0; }
+            virtual int32_t getTargetOperationRate() const { return 0; }
         };
 
     public:
