@@ -692,7 +692,8 @@ public:
             std::string cmdString = std::to_string(cmd);
             int ret = write(fd, cmdString.c_str(), std::strlen(cmdString.c_str()));
             if (ret < 0) {
-                ALOGE("Write to file node %s failed: %d", mNodePath.c_str(), ret);
+                ALOGE("Write to file node %s failed, ret = %d errno = %d", mNodePath.c_str(), ret,
+                      errno);
                 return false;
             }
         } else {

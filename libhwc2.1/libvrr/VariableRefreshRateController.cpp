@@ -30,6 +30,8 @@
 
 namespace android::hardware::graphics::composer {
 
+const std::string VariableRefreshRateController::kFrameInsertionNodeName = "refresh_ctrl";
+
 namespace {
 
 int64_t getNowNs() {
@@ -255,10 +257,14 @@ void VariableRefreshRateController::onPresent(int fence) {
         mLastPresentFence = dupFence;
         // Drop the out of date timeout.
         dropEventLocked(kRenderingTimeout);
-        dropEventLocked(kNextFrameInsertion);
+        cancelFrameInsertionLocked();
         // Post next rendering timeout.
         postEvent(VrrControllerEventType::kRenderingTimeout,
                   getNowNs() + mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig.TimeoutNs);
+        // Post next frmae insertion event.
+        mPendingFramesToInsert = kDefaultNumFramesToInsert;
+        postEvent(VrrControllerEventType::kNextFrameInsertion,
+                  getNowNs() + kDefaultFrameInsertionTimer);
     }
     mCondition.notify_all();
 }
@@ -279,55 +285,34 @@ void VariableRefreshRateController::onVsync(int64_t timestampNanos,
                        .mTime = timestampNanos};
 }
 
-void VariableRefreshRateController::updateVsyncHistory() {
-    int fence = -1;
-
-    {
-        const std::lock_guard<std::mutex> lock(mMutex);
-        if (!mLastPresentFence.has_value()) {
-            return;
-        }
-        fence = mLastPresentFence.value();
-        mLastPresentFence = std::nullopt;
-    }
-
-    // Execute the following logic unlocked to enhance performance.
-    int64_t lastSignalTime = getLastFenceSignalTimeUnlocked(fence);
-    if (close(fence)) {
-        LOG(ERROR) << "VrrController: close fence file failed, errno = " << errno;
-        return;
-    } else if (lastSignalTime == SIGNAL_TIME_PENDING || lastSignalTime == SIGNAL_TIME_INVALID) {
-        return;
-    }
-
-    {
-        // Acquire the mutex again to store the vsync record.
-        const std::lock_guard<std::mutex> lock(mMutex);
-        mRecord.mVsyncHistory
-                .next() = {.mType = VariableRefreshRateController::VsyncEvent::Type::kReleaseFence,
-                           .mTime = lastSignalTime};
-    }
+void VariableRefreshRateController::cancelFrameInsertionLocked() {
+    dropEventLocked(kNextFrameInsertion);
+    mPendingFramesToInsert = 0;
 }
 
 int VariableRefreshRateController::doFrameInsertionLocked() {
     ATRACE_CALL();
-    static const std::string kNodeName = "refresh_ctrl";
 
+    if (mState == VrrControllerState::kDisable) {
+        cancelFrameInsertionLocked();
+        return 0;
+    }
     if (mPendingFramesToInsert <= 0) {
         LOG(ERROR) << "VrrController: the number of frames to be inserted should >= 1, but is "
                    << mPendingFramesToInsert << " now.";
         return -1;
     }
-    bool ret = mFileNodeWritter->WriteCommandString(kNodeName, PANEL_REFRESH_CTRL_FI);
+    bool ret = mFileNodeWritter->WriteCommandString(kFrameInsertionNodeName, PANEL_REFRESH_CTRL_FI);
     if (!ret) {
-        LOG(ERROR) << "VrrController: write command to file node failed.";
+        LOG(ERROR) << "VrrController: write command to file node failed. " << getStateName(mState)
+                   << " " << mPowerMode;
         return -1;
     }
     if (--mPendingFramesToInsert > 0) {
         postEvent(VrrControllerEventType::kNextFrameInsertion,
                   getNowNs() + mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
     }
-    return ret;
+    return 0;
 }
 
 int VariableRefreshRateController::doFrameInsertionLocked(int frames) {
@@ -337,6 +322,7 @@ int VariableRefreshRateController::doFrameInsertionLocked(int frames) {
 
 void VariableRefreshRateController::dropEventLocked() {
     mEventQueue = std::priority_queue<VrrControllerEvent>();
+    mPendingFramesToInsert = 0;
 }
 
 void VariableRefreshRateController::dropEventLocked(VrrControllerEventType event_type) {
@@ -447,11 +433,6 @@ void VariableRefreshRateController::handleResume() {
 
 void VariableRefreshRateController::handleHibernate() {
     ATRACE_CALL();
-
-    static constexpr int kNumFramesToInsert = 2;
-    int ret = doFrameInsertionLocked(kNumFramesToInsert);
-    LOG(INFO) << "VrrController: apply frame insertion, ret = " << ret;
-
     // TODO(b/305311206): handle entering panel hibernate.
     postEvent(VrrControllerEventType::kHibernateTimeout,
               getNowNs() + kDefaultWakeUpTimeInPowerSaving);
@@ -513,6 +494,10 @@ void VariableRefreshRateController::threadBody() {
                         handleCadenceChange();
                         break;
                     }
+                    case VrrControllerEventType::kNextFrameInsertion: {
+                        doFrameInsertionLocked();
+                        break;
+                    }
                     default: {
                         break;
                     }
@@ -538,10 +523,6 @@ void VariableRefreshRateController::threadBody() {
                         stateChanged = true;
                         break;
                     }
-                    case VrrControllerEventType::kNextFrameInsertion: {
-                        doFrameInsertionLocked();
-                        break;
-                    }
                     default: {
                         break;
                     }
@@ -561,6 +542,36 @@ void VariableRefreshRateController::postEvent(VrrControllerEventType type, int64
     event.mEventType = type;
     event.mWhenNs = when;
     mEventQueue.emplace(event);
+}
+
+void VariableRefreshRateController::updateVsyncHistory() {
+    int fence = -1;
+
+    {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        if (!mLastPresentFence.has_value()) {
+            return;
+        }
+        fence = mLastPresentFence.value();
+        mLastPresentFence = std::nullopt;
+    }
+
+    // Execute the following logic unlocked to enhance performance.
+    int64_t lastSignalTime = getLastFenceSignalTimeUnlocked(fence);
+    if (close(fence)) {
+        LOG(ERROR) << "VrrController: close fence file failed, errno = " << errno;
+        return;
+    } else if (lastSignalTime == SIGNAL_TIME_PENDING || lastSignalTime == SIGNAL_TIME_INVALID) {
+        return;
+    }
+
+    {
+        // Acquire the mutex again to store the vsync record.
+        const std::lock_guard<std::mutex> lock(mMutex);
+        mRecord.mVsyncHistory
+                .next() = {.mType = VariableRefreshRateController::VsyncEvent::Type::kReleaseFence,
+                           .mTime = lastSignalTime};
+    }
 }
 
 } // namespace android::hardware::graphics::composer

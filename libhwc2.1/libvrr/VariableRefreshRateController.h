@@ -61,6 +61,11 @@ private:
     static constexpr int64_t SIGNAL_TIME_PENDING = INT64_MAX;
     static constexpr int64_t SIGNAL_TIME_INVALID = -1;
 
+    static const std::string kFrameInsertionNodeName;
+    static constexpr int kDefaultNumFramesToInsert = 2;
+    static constexpr int64_t kDefaultFrameInsertionTimer =
+            33 * (std::nano::den / std::milli::den); // 33 ms
+
     enum class VrrControllerState {
         kDisable = 0,
         kRendering,
@@ -147,7 +152,7 @@ private:
     // Implement interface VsyncListener.
     virtual void onVsync(int64_t timestamp, int32_t vsyncPeriodNanos) override;
 
-    void updateVsyncHistory();
+    void cancelFrameInsertionLocked();
 
     int doFrameInsertionLocked();
     int doFrameInsertionLocked(int frames);
@@ -175,6 +180,8 @@ private:
 
     // The core function of the VRR controller thread.
     void threadBody();
+
+    void updateVsyncHistory();
 
     ExynosDisplay* mDisplay;
 
