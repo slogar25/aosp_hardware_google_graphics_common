@@ -19,6 +19,7 @@
 #include "Composer.h"
 
 #include <android-base/logging.h>
+#include <android-base/thread_annotations.h>
 #include <android/binder_ibinder_platform.h>
 
 #include "Util.h"
@@ -39,6 +40,7 @@ Composer::Composer() {
 ndk::ScopedAStatus Composer::createClient(std::shared_ptr<IComposerClient>* outClient) {
     DEBUG_FUNC();
     std::unique_lock<std::mutex> lock(mClientMutex);
+    ::android::base::ScopedLockAssertion lock_assertion(mClientMutex);
     if (!waitForClientDestroyedLocked(lock)) {
         *outClient = nullptr;
         return TO_BINDER_STATUS(EX_NO_RESOURCES);
@@ -83,8 +85,10 @@ bool Composer::waitForClientDestroyedLocked(std::unique_lock<std::mutex>& lock) 
         // inverted (create and then destroy). Wait for a brief period to
         // see if the existing client is destroyed.
         LOG(DEBUG) << "waiting for previous client to be destroyed";
-        mClientDestroyedCondition.wait_for(lock, 1s,
-                                           [this]() -> bool { return !mClientAlive; });
+        mClientDestroyedCondition.wait_for(lock, 1s, [this]() -> bool {
+            ::android::base::ScopedLockAssertion lock_assertion(mClientMutex);
+            return !mClientAlive;
+        });
         if (mClientAlive) {
             LOG(DEBUG) << "previous client was not destroyed";
         }
