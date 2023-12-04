@@ -132,10 +132,12 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
               mDbvThresholdForBlockingZone);
     }
 
-    DisplayType displayType = getDisplayTypeFromIndex(mIndex);
+    DisplayType displayType = getDcDisplayType();
     std::string displayTypeIdentifier;
     if (displayType == DisplayType::DISPLAY_PRIMARY) {
         displayTypeIdentifier = "primarydisplay";
+    } else if (displayType == DisplayType::DISPLAY_EXTERNAL) {
+        displayTypeIdentifier = "externaldisplay";
     }
 #ifdef USES_IDISPLAY_INTF_SEC
     else if (displayType == DisplayType::DISPLAY_SECONDARY) {
@@ -189,7 +191,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
 
     char value[PROPERTY_VALUE_MAX];
     const char *earlyWakeupNodeBase = early_wakeup_node_0_base;
-    if (getDisplayTypeFromIndex(mIndex) == DisplayType::DISPLAY_SECONDARY &&
+    if (getDcDisplayType() == DisplayType::DISPLAY_SECONDARY &&
         property_get("vendor.display.secondary_early_wakeup_node", value, "") > 0) {
         earlyWakeupNodeBase = value;
     }

@@ -6616,3 +6616,18 @@ void ExynosDisplay::storePrevValidateCompositionType() {
     }
     mClientCompositionInfo.mPrevHasCompositionLayer = mClientCompositionInfo.mHasCompositionLayer;
 }
+
+displaycolor::DisplayType ExynosDisplay::getDcDisplayType() const {
+    switch (mType) {
+        case HWC_DISPLAY_PRIMARY:
+            return mIndex == 0 ? displaycolor::DisplayType::DISPLAY_PRIMARY
+                               : displaycolor::DisplayType::DISPLAY_SECONDARY;
+        case HWC_DISPLAY_EXTERNAL:
+            return displaycolor::DisplayType::DISPLAY_EXTERNAL;
+        case HWC_DISPLAY_VIRTUAL:
+        default:
+            DISPLAY_LOGE("%s: Unsupported display type(%d)", __func__, mType);
+            assert(false);
+            return displaycolor::DisplayType::DISPLAY_PRIMARY;
+    }
+}

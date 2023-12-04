@@ -1320,6 +1320,8 @@ class ExynosDisplay {
 
         virtual void onVsync(int64_t __unused timestamp) { return; };
 
+        displaycolor::DisplayType getDcDisplayType() const;
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
