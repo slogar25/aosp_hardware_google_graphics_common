@@ -1648,7 +1648,7 @@ class ExynosDisplay {
             int32_t mLastFileIndex;
             FILE* mFile;
         };
-        RotatingLogFileWriter mErrLogFileWriter;
+        mutable RotatingLogFileWriter mErrLogFileWriter;
         RotatingLogFileWriter mDebugDumpFileWriter;
         RotatingLogFileWriter mFenceFileWriter;
 

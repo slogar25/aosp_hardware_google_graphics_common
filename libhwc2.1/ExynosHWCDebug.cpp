@@ -18,7 +18,7 @@
 #include <sync/sync.h>
 #include "exynos_sync.h"
 
-int32_t saveErrorLog(const String8 &errString, ExynosDisplay *display) {
+int32_t saveErrorLog(const String8& errString, const ExynosDisplay* display) {
     if (display == nullptr) return -1;
     int32_t ret = NO_ERROR;
 

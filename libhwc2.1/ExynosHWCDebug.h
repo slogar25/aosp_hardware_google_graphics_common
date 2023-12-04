@@ -67,7 +67,7 @@ inline int hwcCheckFenceDebug(ExynosDisplay *display, uint32_t fence_type, uint3
         return fence;
 }
 
-int32_t saveErrorLog(const android::String8 &errString, ExynosDisplay *display = NULL);
+int32_t saveErrorLog(const android::String8& errString, const ExynosDisplay* display = NULL);
 
 #if defined(DISABLE_HWC_DEBUG)
 #define ALOGD_AND_ATRACE_NAME(debugFlag, fmt, ...)
