@@ -278,10 +278,15 @@ int32_t ExynosPrimaryDisplay::setActiveConfigInternal(hwc2_config_t config, bool
     return ExynosDisplay::setActiveConfigInternal(config, force);
 }
 
+// If a display is Off, applyPendingConfig() calls to setActiveConfig() that also
+// power on the display by a blocking commit.
 int32_t ExynosPrimaryDisplay::applyPendingConfig() {
     if (!isConfigSettingEnabled()) {
         ALOGI("%s:: config setting is disabled", __func__);
-        return HWC2_ERROR_NONE;
+        if (mPowerModeState.has_value() && (*mPowerModeState == HWC2_POWER_MODE_ON)) {
+            ALOGI("%s:: skip apply pending config", __func__);
+            return HWC2_ERROR_NONE;
+        }
     }
 
     hwc2_config_t config;
