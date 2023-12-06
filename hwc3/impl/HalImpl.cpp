@@ -119,15 +119,6 @@ void refreshRateChangedDebug(hwc2_callback_data_t callbackData, hwc2_display_t h
     });
 }
 
-void hotplugEvent(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
-                  common::DisplayHotplugEvent hotplugEvent) {
-    auto hal = static_cast<HalImpl*>(callbackData);
-    int64_t display;
-
-    h2a::translate(hwcDisplay, display);
-    hal->getEventCallback()->onHotplugEvent(display, hotplugEvent);
-}
-
 } // nampesapce hook
 
 HalImpl::HalImpl(std::unique_ptr<ExynosDevice> device) : mDevice(std::move(device)) {
@@ -226,8 +217,6 @@ void HalImpl::registerEventCallback(EventCallback* callback) {
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug, this,
                                   reinterpret_cast<hwc2_function_pointer_t>(
                                           hook::refreshRateChangedDebug));
-    mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this,
-                                  reinterpret_cast<hwc2_function_pointer_t>(hook::hotplugEvent));
 }
 
 void HalImpl::unregisterEventCallback() {
@@ -241,7 +230,6 @@ void HalImpl::unregisterEventCallback() {
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onVsyncIdle, this, nullptr);
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug, this,
                                   nullptr);
-    mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this, nullptr);
 
     mEventCallback = nullptr;
 }

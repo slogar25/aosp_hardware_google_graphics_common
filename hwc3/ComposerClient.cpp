@@ -527,15 +527,6 @@ void ComposerClient::HalEventCallback::onSeamlessPossible(int64_t display) {
     }
 }
 
-void ComposerClient::HalEventCallback::onHotplugEvent(int64_t display,
-                                                      common::DisplayHotplugEvent event) {
-    DEBUG_DISPLAY_FUNC(display);
-    auto ret = mCallback->onHotplugEvent(display, event);
-    if (!ret.isOk()) {
-        LOG(ERROR) << "failed to send onHotplugEvent:" << ret.getDescription();
-    }
-}
-
 void ComposerClient::HalEventCallback::cleanDisplayResources(int64_t display) {
     DEBUG_DISPLAY_FUNC(display);
     size_t cacheSize;
