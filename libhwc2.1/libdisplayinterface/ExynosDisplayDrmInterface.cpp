@@ -461,8 +461,13 @@ void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayIdleTimerSupport(bool &outSupport) {
-    if (mIsVrrModeSupported) {
+    if (isFullVrrSupported()) {
         outSupport = false;
+        return NO_ERROR;
+    } else if (isPseudoVrrSupported()) {
+        // Retuen true to avoid SF idle timer working. We insert frames manually
+        // for pseudo VRR, so ideally panel idle should be disabled in the driver.
+        outSupport = true;
         return NO_ERROR;
     }
 
