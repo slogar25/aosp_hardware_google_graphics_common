@@ -1682,6 +1682,7 @@ class ExynosDisplay {
         public:
             virtual ~RefreshRateIndicator() = default;
             virtual int32_t init() { return NO_ERROR; }
+            virtual int32_t disable() { return NO_ERROR; }
             virtual void updateRefreshRate(int __unused refreshRate) {}
             virtual void checkOnPresentDisplay() {}
             virtual void checkOnSetActiveConfig(int __unused refreshRate) {}
@@ -1692,9 +1693,10 @@ class ExynosDisplay {
                                      public std::enable_shared_from_this<SysfsBasedRRIHandler> {
         public:
             SysfsBasedRRIHandler(ExynosDisplay* display);
-            virtual ~SysfsBasedRRIHandler();
+            virtual ~SysfsBasedRRIHandler() = default;
 
             int32_t init() override;
+            int32_t disable() override;
             void updateRefreshRate(int refreshRate) override;
             void checkOnPresentDisplay() override;
 

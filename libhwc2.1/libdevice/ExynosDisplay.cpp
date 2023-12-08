@@ -6401,10 +6401,6 @@ ExynosDisplay::SysfsBasedRRIHandler::SysfsBasedRRIHandler(ExynosDisplay* display
         mIgnoringLastUpdate(false),
         mCanIgnoreIncreaseUpdate(false) {}
 
-ExynosDisplay::SysfsBasedRRIHandler::~SysfsBasedRRIHandler() {
-    mDisplay->mDevice->mDeviceInterface->unregisterSysfsEventHandler(getFd());
-}
-
 int32_t ExynosDisplay::SysfsBasedRRIHandler::init() {
     auto path = String8::format(kRefreshRateStatePathFormat, mDisplay->mIndex);
     mFd.Set(open(path.c_str(), O_RDONLY));
@@ -6421,6 +6417,10 @@ int32_t ExynosDisplay::SysfsBasedRRIHandler::init() {
     // Call the callback immediately
     handleSysfsEvent();
     return NO_ERROR;
+}
+
+int32_t ExynosDisplay::SysfsBasedRRIHandler::disable() {
+    return mDisplay->mDevice->mDeviceInterface->unregisterSysfsEventHandler(getFd());
 }
 
 void ExynosDisplay::SysfsBasedRRIHandler::updateRefreshRateLocked(int refreshRate) {
@@ -6498,6 +6498,7 @@ int32_t ExynosDisplay::setRefreshRateChangedCallbackDebugEnabled(bool enabled) {
             return ret;
         }
     } else {
+        ret = mRefreshRateIndicatorHandler->disable();
         mRefreshRateIndicatorHandler.reset();
     }
     return ret;
