@@ -407,6 +407,12 @@ class ExynosDisplayDrmInterface :
         int32_t triggerClearDisplayPlanes();
 
         virtual void setVrrSettings(const VrrSettings_t& vrrSettings) override;
+        bool isFullVrrSupported() const {
+            return (mIsVrrModeSupported && mExynosDisplay->mDevice->isVrrApiSupported());
+        }
+        bool isPseudoVrrSupported() const {
+            return (mIsVrrModeSupported && !mExynosDisplay->mDevice->isVrrApiSupported());
+        }
 
     protected:
         enum class HalMipiSyncType : uint32_t {

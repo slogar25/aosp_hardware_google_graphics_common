@@ -1025,8 +1025,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
     std::lock_guard<std::recursive_mutex> lock(mDrmConnector->modesLock());
 
     if (!outConfigs) {
-        bool isVrrApiSupported = mExynosDisplay->mDevice->isVrrApiSupported();
-        bool useVrrConfigs = mIsVrrModeSupported && isVrrApiSupported;
+        bool useVrrConfigs = isFullVrrSupported();
         int ret = mDrmConnector->UpdateModes(useVrrConfigs);
         if (ret < 0) {
             ALOGE("Failed to update display modes %d", ret);
@@ -1036,11 +1035,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             // no need to update mExynosDisplay->mDisplayConfigs
             goto no_mode_changes;
         }
-        ALOGI("Select Vrr Config for display %s: composer interface compatibility = %s, display "
-              "hardware "
-              "Compatibility = %s, use Vrr config = %s",
-              mExynosDisplay->mDisplayName.c_str(), isVrrApiSupported ? "true" : "false",
-              mIsVrrModeSupported ? "true" : "false", useVrrConfigs ? "true" : "false");
+        ALOGI("Select Vrr Config for display %s: %s", mExynosDisplay->mDisplayName.c_str(),
+              useVrrConfigs ? "full" : (isPseudoVrrSupported() ? "pseudo" : "non-Vrr"));
 
         if (mDrmConnector->state() == DRM_MODE_CONNECTED) {
             /*
