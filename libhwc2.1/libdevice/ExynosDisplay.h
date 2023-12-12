@@ -594,6 +594,10 @@ class ExynosDisplay {
 
         // Skip present frame if there was no validate after power on
         bool mSkipFrame;
+        // Drop frame during resolution switch because the merged display frame
+        // is not equal to the full-resolution yet.
+        // TODO(b/310656340): remove this if it has been fixed from SF.
+        bool mDropFrameDuringResSwitch = false;
 
         hwc_vsync_period_change_constraints_t mVsyncPeriodChangeConstraints;
         hwc_vsync_period_change_timeline_t mVsyncAppliedTimeLine;

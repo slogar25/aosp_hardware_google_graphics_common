@@ -2979,6 +2979,9 @@ bool ExynosDisplay::checkFrameValidation() {
 
 int32_t ExynosDisplay::acceptDisplayChanges() {
     int32_t type = 0;
+    if (mDropFrameDuringResSwitch) {
+        return HWC2_ERROR_NONE;
+    }
     if (mRenderingState != RENDERING_STATE_VALIDATED) {
         DISPLAY_LOGE("%s:: display is not validated : %d", __func__, mRenderingState);
         return HWC2_ERROR_NOT_VALIDATED;
@@ -3079,6 +3082,12 @@ int32_t ExynosDisplay::getLayerCompositionTypeForValidationType(uint32_t layerIn
 int32_t ExynosDisplay::getChangedCompositionTypes(
         uint32_t* outNumElements, hwc2_layer_t* outLayers,
         int32_t* /*hwc2_composition_t*/ outTypes) {
+    if (mDropFrameDuringResSwitch) {
+        if ((outLayers == NULL) || (outTypes == NULL)) {
+            *outNumElements = 0;
+        }
+        return HWC2_ERROR_NONE;
+    }
 
     if (mRenderingState != RENDERING_STATE_VALIDATED) {
         DISPLAY_LOGE("%s:: display is not validated : %d", __func__, mRenderingState);
@@ -3240,6 +3249,13 @@ int32_t ExynosDisplay::getDisplayRequests(
 
     String8 errString;
     *outDisplayRequests = 0;
+
+    if (mDropFrameDuringResSwitch) {
+        if ((outLayers == NULL) || (outLayerRequests == NULL)) {
+            *outNumElements = 0;
+        }
+        return HWC2_ERROR_NONE;
+    }
 
     uint32_t requestNum = 0;
     if (mClientCompositionInfo.mHasCompositionLayer == true) {
@@ -3657,14 +3673,13 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     Mutex::Autolock lock(mDisplayMutex);
 
-    bool dropFrame = false;
-    if ((mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) &&
-            !isFullScreenComposition()) {
+    mDropFrameDuringResSwitch =
+            (mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) && !isFullScreenComposition();
+    if (mDropFrameDuringResSwitch) {
         ALOGD("presentDisplay: drop invalid frame during resolution switch");
-        dropFrame = true;
     }
 
-    if (dropFrame || mPauseDisplay || mDevice->isInTUI()) {
+    if (mDropFrameDuringResSwitch || mPauseDisplay || mDevice->isInTUI()) {
         closeFencesForSkipFrame(RENDERING_STATE_PRESENTED);
         *outRetireFence = -1;
         mRenderingState = RENDERING_STATE_PRESENTED;
@@ -4860,9 +4875,12 @@ int32_t ExynosDisplay::validateDisplay(
 
     if (mPauseDisplay) return HWC2_ERROR_NONE;
 
-    if ((mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) &&
-            !isFullScreenComposition()) {
+    mDropFrameDuringResSwitch =
+            (mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) && !isFullScreenComposition();
+    if (mDropFrameDuringResSwitch) {
         ALOGD("validateDisplay: drop invalid frame during resolution switch");
+        *outNumTypes = 0;
+        *outNumRequests = 0;
         return HWC2_ERROR_NONE;
     }
 
