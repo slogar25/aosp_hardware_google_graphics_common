@@ -113,9 +113,11 @@ void refreshRateChangedDebug(hwc2_callback_data_t callbackData, hwc2_display_t h
 
     h2a::translate(hwcDisplay, display);
     h2a::translate(hwcVsyncPeriodNanos, vsyncPeriodNanos);
+    // TODO (b/314527560) Update refreshPeriodNanos for VRR display
     hal->getEventCallback()->onRefreshRateChangedDebug(RefreshRateChangedDebugData{
             .display = display,
             .vsyncPeriodNanos = vsyncPeriodNanos,
+            .refreshPeriodNanos = vsyncPeriodNanos,
     });
 }
 
