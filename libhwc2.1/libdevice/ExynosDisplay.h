@@ -1322,6 +1322,11 @@ class ExynosDisplay {
 
         displaycolor::DisplayType getDcDisplayType() const;
 
+        virtual int32_t notifyExpectedPresent(int64_t __unused timestamp,
+                                              int32_t __unused frameIntervalNs) {
+            return HWC2_ERROR_UNSUPPORTED;
+        };
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);

@@ -431,8 +431,15 @@ int32_t HalImpl::getDisplayConfigurations(int64_t display, int32_t,
     return HWC2_ERROR_NONE;
 }
 
-int32_t HalImpl::notifyExpectedPresent(int64_t, const ClockMonotonicTimestamp&, int32_t) {
-    return HWC2_ERROR_UNSUPPORTED;
+int32_t HalImpl::notifyExpectedPresent(int64_t display,
+                                       const ClockMonotonicTimestamp& expectedPresentTime,
+                                       int32_t frameIntervalNs) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    RET_IF_ERR(
+            halDisplay->notifyExpectedPresent(expectedPresentTime.timestampNanos, frameIntervalNs));
+    return HWC2_ERROR_NONE;
 }
 
 int32_t HalImpl::getDisplayConnectionType(int64_t display, DisplayConnectionType* outType) {

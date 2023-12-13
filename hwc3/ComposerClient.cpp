@@ -84,9 +84,12 @@ ndk::ScopedAStatus ComposerClient::getDisplayConfigurations(
     return TO_BINDER_STATUS(err);
 }
 
-ndk::ScopedAStatus ComposerClient::notifyExpectedPresent(int64_t, const ClockMonotonicTimestamp&,
-                                                         int32_t) {
-    return TO_BINDER_STATUS(HWC2_ERROR_UNSUPPORTED);
+ndk::ScopedAStatus ComposerClient::notifyExpectedPresent(
+        int64_t display, const ClockMonotonicTimestamp& expectedPresentTime,
+        int32_t frameIntervalNs) {
+    DEBUG_DISPLAY_FUNC(display);
+    auto err = mHal->notifyExpectedPresent(display, expectedPresentTime, frameIntervalNs);
+    return TO_BINDER_STATUS(err);
 }
 
 ndk::ScopedAStatus ComposerClient::destroyLayer(int64_t display, int64_t layer) {

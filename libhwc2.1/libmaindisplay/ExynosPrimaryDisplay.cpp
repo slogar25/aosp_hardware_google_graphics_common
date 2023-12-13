@@ -708,6 +708,13 @@ void ExynosPrimaryDisplay::onVsync(int64_t timestamp) {
     }
 }
 
+int32_t ExynosPrimaryDisplay::notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs) {
+    if (mVariableRefreshRateController) {
+        mVariableRefreshRateController->notifyExpectedPresent(timestamp, frameIntervalNs);
+    }
+    return NO_ERROR;
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmDisplayConfigLocked(uint32_t peakRate) {
     auto hwConfig = mDisplayInterface->getActiveModeId();
     auto config = getConfigId(peakRate, mDisplayConfigs[hwConfig].width,

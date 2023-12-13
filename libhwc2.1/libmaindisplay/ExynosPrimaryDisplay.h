@@ -80,6 +80,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         virtual void onVsync(int64_t timestamp) override;
 
+        int32_t notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs) override;
+
     protected:
         /* setPowerMode(int32_t mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
