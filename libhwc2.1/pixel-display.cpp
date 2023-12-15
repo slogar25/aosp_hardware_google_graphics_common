@@ -165,7 +165,7 @@ ndk::ScopedAStatus Display::isOperationRateSupported(bool *_aidl_return) {
 ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &native_handle,
                                                        const std::string &imageName,
                                                        int *_aidl_return) {
-    if (mDisplay && mDisplay->isColorCalibratedByDevice()) {
+    if (mDisplay && mDisplay->getPanelCalibrationStatus() == PanelCalibrationStatus::ORIGINAL) {
         *_aidl_return = readCompensationImage(native_handle, imageName);
     } else {
         *_aidl_return = -1;
