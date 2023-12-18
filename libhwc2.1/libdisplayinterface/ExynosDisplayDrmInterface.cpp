@@ -1341,6 +1341,10 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
 
     if (!test) {
         if (modeBlob) { /* only replace desired mode if it has changed */
+            if (mDesiredModeState.isFullModeSwitch(*mode)) {
+                mIsResolutionSwitchInProgress = true;
+                mExynosDisplay->mDevice->setVBlankOffDelay(0);
+            }
             mDesiredModeState.setMode(*mode, modeBlob, drmReq);
             if (mExynosDisplay->mOperationRateManager) {
                 mExynosDisplay->mOperationRateManager->onConfig(config);
@@ -2504,6 +2508,12 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
         if (!(flags & DRM_MODE_ATOMIC_TEST_ONLY)) {
             mAckCallback();
         }
+    }
+
+    if (mDrmDisplayInterface->mIsResolutionSwitchInProgress &&
+        !mDrmDisplayInterface->mDesiredModeState.needsModeSet()) {
+        mDrmDisplayInterface->mIsResolutionSwitchInProgress = false;
+        mDrmDisplayInterface->mExynosDisplay->mDevice->setVBlankOffDelay(1);
     }
 
     return ret;

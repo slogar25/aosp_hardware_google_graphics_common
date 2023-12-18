@@ -583,6 +583,7 @@ class ExynosDisplayDrmInterface :
         FramebufferManager mFBManager;
         std::array<uint8_t, MONITOR_DESCRIPTOR_DATA_LENGTH> mMonitorDescription;
         nsecs_t mLastDumpDrmAtomicMessageTime;
+        bool mIsResolutionSwitchInProgress = false;
 
     private:
         int32_t getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize, uint8_t *outData);

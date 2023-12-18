@@ -176,15 +176,15 @@ ExynosDevice::ExynosDevice(bool vrrApiSupported)
         saveErrorLog(saveString, it);
     }
 
+    if (mInterfaceType == INTERFACE_TYPE_DRM) {
+        setVBlankOffDelay(1);
+    }
+
     initDeviceInterface(mInterfaceType);
 
     // registerRestrictions();
     mResourceManager->updateRestrictions();
     mResourceManager->initDisplays(mDisplays, mDisplayMap);
-
-    if (mInterfaceType == INTERFACE_TYPE_DRM) {
-        setVBlankOffDelay(1);
-    }
 
     char value[PROPERTY_VALUE_MAX];
     property_get("vendor.display.lbe.supported", value, "0");
@@ -1179,7 +1179,7 @@ void ExynosDevice::getLayerGenericMetadataKey(uint32_t __unused keyIndex,
     return;
 }
 
-void ExynosDevice::setVBlankOffDelay(int vblankOffDelay) {
+void ExynosDevice::setVBlankOffDelay(const int vblankOffDelay) {
     static constexpr const char *kVblankOffDelayPath = "/sys/module/drm/parameters/vblankoffdelay";
 
     writeIntToFile(kVblankOffDelayPath, vblankOffDelay);

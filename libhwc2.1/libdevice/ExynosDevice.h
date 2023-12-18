@@ -351,6 +351,7 @@ class ExynosDevice {
         void onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod);
 
         bool isVrrApiSupported() const { return mVrrApiSupported; };
+        void setVBlankOffDelay(const int vblankOffDelay);
 
     protected:
         void initDeviceInterface(uint32_t interfaceType);
@@ -360,7 +361,6 @@ class ExynosDevice {
         Mutex mCaptureMutex;
         Condition mCaptureCondition;
         std::atomic<bool> mIsWaitingReadbackReqDone = false;
-        void setVBlankOffDelay(int vblankOffDelay);
         bool isCallbackRegisteredLocked(int32_t descriptor);
 
     public:
