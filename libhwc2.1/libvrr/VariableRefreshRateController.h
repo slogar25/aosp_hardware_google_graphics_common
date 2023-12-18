@@ -191,7 +191,7 @@ private:
     VrrRecord mRecord;
     int32_t mPowerMode = -1;
     VrrControllerState mState;
-    hwc2_config_t mVrrActiveConfig;
+    hwc2_config_t mVrrActiveConfig = -1;
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
     std::optional<int> mLastPresentFence;
 

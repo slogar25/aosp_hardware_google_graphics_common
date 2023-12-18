@@ -412,17 +412,19 @@ int32_t HalImpl::getDisplayConfigurations(int64_t display, int32_t,
         hwc2_config_t hwcConfigId;
         a2h::translate(configId, hwcConfigId);
         std::optional<VrrConfig_t> vrrConfig = halDisplay->getVrrConfigs(hwcConfigId);
-        if (vrrConfig.has_value()) {
+        if (vrrConfig.has_value() && vrrConfig->isFullySupported) {
             // TODO(b/290843234): complete the remaining values within vrrConfig.
             VrrConfig hwc3VrrConfig;
             VrrConfig::NotifyExpectedPresentConfig notifyExpectedPresentConfig;
             hwc3VrrConfig.minFrameIntervalNs = vrrConfig->minFrameIntervalNs;
-            notifyExpectedPresentConfig.notifyExpectedPresentHeadsUpNs =
-                    vrrConfig->notifyExpectedPresentConfig.HeadsUpNs;
-            notifyExpectedPresentConfig.notifyExpectedPresentTimeoutNs =
-                    vrrConfig->notifyExpectedPresentConfig.TimeoutNs;
-            hwc3VrrConfig.notifyExpectedPresentConfig =
-                    std::make_optional(notifyExpectedPresentConfig);
+            if (vrrConfig->notifyExpectedPresentConfig.has_value()) {
+                notifyExpectedPresentConfig.notifyExpectedPresentHeadsUpNs =
+                        vrrConfig->notifyExpectedPresentConfig->HeadsUpNs;
+                notifyExpectedPresentConfig.notifyExpectedPresentTimeoutNs =
+                        vrrConfig->notifyExpectedPresentConfig->TimeoutNs;
+                hwc3VrrConfig.notifyExpectedPresentConfig =
+                        std::make_optional(notifyExpectedPresentConfig);
+            }
             config.vrrConfig = std::make_optional(hwc3VrrConfig);
         }
         outConfigs->push_back(config);

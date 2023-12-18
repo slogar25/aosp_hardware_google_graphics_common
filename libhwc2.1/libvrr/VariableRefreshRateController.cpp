@@ -130,9 +130,11 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
         mState = VrrControllerState::kRendering;
         dropEventLocked(kRenderingTimeout);
 
-        const auto& vrrConfig = mVrrConfigs[mVrrActiveConfig];
-        postEvent(VrrControllerEventType::kRenderingTimeout,
-                  getNowNs() + vrrConfig.notifyExpectedPresentConfig.TimeoutNs);
+        if (mVrrConfigs[mVrrActiveConfig].isFullySupported) {
+            postEvent(VrrControllerEventType::kRenderingTimeout,
+                      getNowNs() +
+                              mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
+        }
     }
     mCondition.notify_all();
 }
@@ -181,8 +183,10 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
                 }
                 mState = VrrControllerState::kRendering;
                 const auto& vrrConfig = mVrrConfigs[mVrrActiveConfig];
-                postEvent(VrrControllerEventType::kRenderingTimeout,
-                          getNowNs() + vrrConfig.notifyExpectedPresentConfig.TimeoutNs);
+                if (vrrConfig.isFullySupported) {
+                    postEvent(VrrControllerEventType::kRenderingTimeout,
+                              getNowNs() + vrrConfig.notifyExpectedPresentConfig->TimeoutNs);
+                }
                 break;
             }
             default: {
@@ -201,6 +205,13 @@ void VariableRefreshRateController::setVrrConfigurations(
 
     for (const auto& it : configs) {
         LOG(INFO) << "VrrController: set Vrr configuration id = " << it.first;
+        if (it.second.isFullySupported) {
+            if (!it.second.notifyExpectedPresentConfig.has_value()) {
+                LOG(ERROR) << "VrrController: full vrr config should have "
+                              "notifyExpectedPresentConfig.";
+                return;
+            }
+        }
     }
 
     const std::lock_guard<std::mutex> lock(mMutex);
@@ -264,8 +275,11 @@ void VariableRefreshRateController::onPresent(int fence) {
         dropEventLocked(kRenderingTimeout);
         cancelFrameInsertionLocked();
         // Post next rendering timeout.
-        postEvent(VrrControllerEventType::kRenderingTimeout,
-                  getNowNs() + mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig.TimeoutNs);
+        if (mVrrConfigs[mVrrActiveConfig].isFullySupported) {
+            postEvent(VrrControllerEventType::kRenderingTimeout,
+                      getNowNs() +
+                              mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
+        }
         // Post next frmae insertion event.
         mPendingFramesToInsert = kDefaultNumFramesToInsert;
         postEvent(VrrControllerEventType::kNextFrameInsertion,
@@ -477,13 +491,13 @@ void VariableRefreshRateController::threadBody() {
                     continue;
                 }
             }
+
             if (mEventQueue.empty()) {
-                LOG(ERROR) << "VrrController: event queue should NOT be empty.";
-                break;
+                continue;
             }
+
             const auto event = mEventQueue.top();
             mEventQueue.pop();
-
             if (mState == VrrControllerState::kRendering) {
                 if (event.mEventType == VrrControllerEventType::kHibernateTimeout) {
                     LOG(ERROR) << "VrrController: receiving a hibernate timeout event while in the "

@@ -1087,22 +1087,34 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             // Dots per 1000 inches
             configs.Ydpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
             // find peak rr
-            if (rr > peakRr)
-                  peakRr = rr;
+            if (rr > peakRr) {
+                peakRr = rr;
+            }
             // Configure VRR if it's turned on.
-            if (mode.is_vrr_mode()) {
+            if (mIsVrrModeSupported) {
                 VrrConfig_t vrrConfig;
                 vrrConfig.minFrameIntervalNs = static_cast<int>(std::nano::den / rr);
-                // TODO(b/290843234): FrameIntervalPowerHint is currently optional and omitted.
-                // Supply initial values for notifyExpectedPresentConfig; potential changes may come
-                // later.
-                vrrConfig.notifyExpectedPresentConfig.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs;
-                vrrConfig.notifyExpectedPresentConfig.TimeoutNs = mNotifyExpectedPresentTimeoutNs;
                 configs.vrrConfig = std::make_optional(vrrConfig);
-                configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height,
-                                                              vrrConfig.minFrameIntervalNs,
-                                                              configs.vsyncPeriod);
-            } else {
+                if (mode.is_vrr_mode()) {
+                    if (!isFullVrrSupported()) {
+                        return HWC2_ERROR_BAD_DISPLAY;
+                    }
+                    configs.vrrConfig->isFullySupported = true;
+                    // TODO(b/290843234): FrameIntervalPowerHint is currently optional and omitted.
+                    // Supply initial values for notifyExpectedPresentConfig; potential changes may
+                    // come later.
+                    NotifyExpectedPresentConfig_t notifyExpectedPresentConfig =
+                            {.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs,
+                             .TimeoutNs = mNotifyExpectedPresentTimeoutNs};
+                    configs.vrrConfig->notifyExpectedPresentConfig =
+                            std::make_optional(notifyExpectedPresentConfig);
+                    configs.groupId =
+                            groupIdGenerator.getGroupId(configs.width, configs.height,
+                                                        configs.vrrConfig->minFrameIntervalNs,
+                                                        configs.vsyncPeriod);
+                }
+            }
+            if (!mode.is_vrr_mode()) {
                 configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height);
             }
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));

@@ -363,9 +363,10 @@ typedef struct NotifyExpectedPresentConfig {
 } NotifyExpectedPresentConfig_t;
 
 typedef struct VrrConfig {
+    bool isFullySupported = false;
     int minFrameIntervalNs = 0;
-    std::vector<FrameIntervalPowerHint_t> frameIntervalPowerHint;
-    NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
+    std::optional<std::vector<FrameIntervalPowerHint_t>> frameIntervalPowerHint;
+    std::optional<NotifyExpectedPresentConfig_t> notifyExpectedPresentConfig;
 } VrrConfig_t;
 
 typedef struct VrrSettings {
@@ -1178,7 +1179,7 @@ class ExynosDisplay {
          * HWC3
          *
          * Retrieve the vrrConfig for the corresponding display configuration.
-         * If the configuration doesn't exist, return a nullptr.
+         * If the configuration doesn't exist, return a nullopt.
          *
          */
         std::optional<VrrConfig_t> getVrrConfigs(hwc2_config_t config);

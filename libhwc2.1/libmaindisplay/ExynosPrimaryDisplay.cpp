@@ -681,6 +681,7 @@ int32_t ExynosPrimaryDisplay::getDisplayConfigs(uint32_t* outNumConfigs,
                 std::unordered_map<hwc2_config_t, VrrConfig_t> vrrConfigs;
                 for (const auto& it : mDisplayConfigs) {
                     if (!it.second.vrrConfig.has_value()) {
+                        ALOGE("Both pseudo and full VRR modes should include VRR configurations.");
                         return HWC2_ERROR_BAD_CONFIG;
                     }
                     vrrConfigs[it.first] = it.second.vrrConfig.value();
