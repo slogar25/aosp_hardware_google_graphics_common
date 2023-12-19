@@ -234,10 +234,14 @@ int32_t ExynosPrimaryDisplay::setActiveConfigInternal(hwc2_config_t config, bool
 }
 
 int32_t ExynosPrimaryDisplay::applyPendingConfig() {
-    if (!isConfigSettingEnabled()) return HWC2_ERROR_NONE;
+    if (!isConfigSettingEnabled()) {
+        ALOGI("%s:: config setting is disabled", __func__);
+        return HWC2_ERROR_NONE;
+    }
 
     hwc2_config_t config;
     if (mPendingConfig != UINT_MAX) {
+        ALOGI("%s:: mPendingConfig: %d", __func__, mPendingConfig);
         config = mPendingConfig;
         mPendingConfig = UINT_MAX;
     } else {
@@ -578,7 +582,7 @@ bool ExynosPrimaryDisplay::isConfigSettingEnabled() {
 
 void ExynosPrimaryDisplay::enableConfigSetting(bool en) {
     DISPLAY_ATRACE_INT("ConfigSettingDisabled", !en);
-
+    ALOGI("%s:: mConfigSettingDisabled: %d", __func__, !en);
     if (!en) {
         mConfigSettingDisabled = true;
         mConfigSettingDisabledTimestamp = systemTime(SYSTEM_TIME_MONOTONIC);
