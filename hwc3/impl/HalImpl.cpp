@@ -418,9 +418,9 @@ int32_t HalImpl::getDisplayConfigurations(int64_t display, int32_t,
             VrrConfig::NotifyExpectedPresentConfig notifyExpectedPresentConfig;
             hwc3VrrConfig.minFrameIntervalNs = vrrConfig->minFrameIntervalNs;
             if (vrrConfig->notifyExpectedPresentConfig.has_value()) {
-                notifyExpectedPresentConfig.notifyExpectedPresentHeadsUpNs =
+                notifyExpectedPresentConfig.headsUpNs =
                         vrrConfig->notifyExpectedPresentConfig->HeadsUpNs;
-                notifyExpectedPresentConfig.notifyExpectedPresentTimeoutNs =
+                notifyExpectedPresentConfig.timeoutNs =
                         vrrConfig->notifyExpectedPresentConfig->TimeoutNs;
                 hwc3VrrConfig.notifyExpectedPresentConfig =
                         std::make_optional(notifyExpectedPresentConfig);
