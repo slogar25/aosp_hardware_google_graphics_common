@@ -20,7 +20,7 @@
 
 #include "../libdevice/ExynosDisplay.h"
 #include "../libvrr/VariableRefreshRateController.h"
-#include "../libvrr/VariableRefreshRateInterface.h"
+#include "../libvrr/interface/VariableRefreshRateInterface.h"
 
 using android::hardware::graphics::composer::PresentListener;
 using android::hardware::graphics::composer::VariableRefreshRateController;

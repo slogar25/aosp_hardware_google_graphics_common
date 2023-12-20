@@ -26,13 +26,16 @@
 
 #include "../libdevice/ExynosDisplay.h"
 #include "RingBuffer.h"
-#include "VariableRefreshRateInterface.h"
+#include "interface/DisplayContextProvider.h"
+#include "interface/VariableRefreshRateInterface.h"
 
 namespace android::hardware::graphics::composer {
 
 constexpr uint64_t kMillisecondToNanoSecond = 1000000;
 
-class VariableRefreshRateController : public VsyncListener, public PresentListener {
+class VariableRefreshRateController : public VsyncListener,
+                                      public PresentListener,
+                                      public DisplayContextProvider {
 public:
     ~VariableRefreshRateController();
 
@@ -53,6 +56,14 @@ public:
     void setPowerMode(int32_t mode);
 
     void setVrrConfigurations(std::unordered_map<hwc2_config_t, VrrConfig_t> configs);
+
+    // Inherit from DisplayContextProvider.
+    int getAmbientLightSensorOutput() const override;
+    BrightnessMode getBrightnessMode() const override;
+    int getBrightnessNits() const override;
+    int getEstimatedPlaybackFrameRate() const override;
+    OperationSpeedMode getOperationSpeedMode() const override;
+    bool isProximityThrottingEnabled() const override;
 
 private:
     static constexpr int kDefaultRingBufferCapacity = 128;

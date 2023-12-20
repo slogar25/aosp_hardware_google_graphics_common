@@ -218,6 +218,30 @@ void VariableRefreshRateController::setVrrConfigurations(
     mVrrConfigs = std::move(configs);
 }
 
+int VariableRefreshRateController::getAmbientLightSensorOutput() const {
+    return -1;
+}
+
+BrightnessMode VariableRefreshRateController::getBrightnessMode() const {
+    return BrightnessMode::kInvalidBrightnessMode;
+}
+
+int VariableRefreshRateController::getBrightnessNits() const {
+    return -1;
+}
+
+int VariableRefreshRateController::getEstimatedPlaybackFrameRate() const {
+    return -1;
+}
+
+OperationSpeedMode VariableRefreshRateController::getOperationSpeedMode() const {
+    return OperationSpeedMode::kHighSpeedMode;
+}
+
+bool VariableRefreshRateController::isProximityThrottingEnabled() const {
+    return false;
+}
+
 void VariableRefreshRateController::stopThread(bool exit) {
     ATRACE_CALL();
     {
