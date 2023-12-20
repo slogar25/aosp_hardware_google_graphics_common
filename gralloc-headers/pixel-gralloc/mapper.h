@@ -79,6 +79,7 @@ static std::optional<typename ReturnType<T>::type> get(buffer_handle_t /*handle*
 GET(PLANE_DMA_BUFS, std::vector<int>);
 GET(VIDEO_HDR, void*);
 GET(VIDEO_ROI, void*);
+GET(VIDEO_GMV, VideoGMV);
 #undef GET
 
 template <MetadataType T>
@@ -104,6 +105,7 @@ static Error set(buffer_handle_t /*handle*/, typename ReturnType<T>::type /*data
         return ret;                                                                       \
     }
 
+SET(VIDEO_GMV, VideoGMV);
 #undef SET
 
 } // namespace pixel::graphics::mapper
