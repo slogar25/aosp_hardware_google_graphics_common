@@ -1374,3 +1374,9 @@ void assign(decon_win_rect& win_rect, uint32_t left, uint32_t right, uint32_t wi
     win_rect.w = std::max(0U, width);
     win_rect.h = std::max(0U, height);
 }
+
+uint32_t nanoSec2Hz(uint64_t ns) {
+    if (ns == 0) return 0;
+    constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
+    return round(static_cast<float>(nsecsPerSec) / ns);
+};

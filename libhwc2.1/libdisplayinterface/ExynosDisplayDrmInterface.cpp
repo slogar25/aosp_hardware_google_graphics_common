@@ -984,42 +984,51 @@ int32_t ExynosDisplayDrmInterface::choosePreferredConfig() {
     if (err != HWC2_ERROR_NONE || !num_configs)
         return err;
 
-    int32_t config = -1;
-    char modeStr[PROPERTY_VALUE_MAX] = "\0";
-    int32_t width = 0, height = 0, fps = 0;
-    // only legacy products use this property, kernel preferred mode will be used going forward
-    if (property_get("vendor.display.preferred_mode", modeStr, "") > 0 &&
-        sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
-        err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, fps, &config);
-    } else {
-        err = HWC2_ERROR_BAD_CONFIG;
+    int32_t id = -1, fps = 0, vsyncRate = 0, width = 0, height = 0;
+    err = HWC2_ERROR_BAD_CONFIG;
+    if ((mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) && (mExynosDisplay->mIndex == 0)) {
+        char modeStr[PROPERTY_VALUE_MAX];
+        // kernel preferred mode should be aligned to bootloader setting, use this property
+        // to specify default user space preferred mode to override kernel's setting.
+        if (property_get("vendor.display.preferred_mode", modeStr, "") > 0 &&
+            sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
+            err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, fps, &id);
+        } else if (property_get("ro.vendor.primarydisplay.preferred_mode", modeStr, "") > 0 &&
+                   sscanf(modeStr, "%dx%d@%d:%d", &width, &height, &fps, &vsyncRate) == 4) {
+            err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, vsyncRate, &id);
+        }
     }
 
-    const int32_t drmPreferredConfig = mDrmConnector->get_preferred_mode_id();
+    const int32_t drmPreferredId = mDrmConnector->get_preferred_mode_id();
     if (err != HWC2_ERROR_NONE) {
-        config = drmPreferredConfig;
+        id = drmPreferredId;
     }
-    ALOGI("Preferred mode id: %d(%s), state: %d", config, modeStr, mDrmConnector->state());
 
-    auto &configs = mExynosDisplay->mDisplayConfigs;
-    if (config != drmPreferredConfig &&
-        (configs[config].width != configs[drmPreferredConfig].width ||
-         configs[config].height != configs[drmPreferredConfig].height)) {
+    auto& configs = mExynosDisplay->mDisplayConfigs;
+    auto& config = configs[id];
+    width = config.width;
+    height = config.height;
+    fps = config.refreshRate;
+    vsyncRate = nanoSec2Hz(config.vsyncPeriod);
+    ALOGI("Preferred mode: configs[%d]=%dx%d@%d:%d, state: %d", id, width, height, fps, vsyncRate,
+          mDrmConnector->state());
+    if (id != drmPreferredId &&
+        (width != configs[drmPreferredId].width || height != configs[drmPreferredId].height)) {
         // HWC cannot send a resolution change commit here until 1st frame update because of
         // some panels requirement. Therefore, it calls setActiveConfigWithConstraints() help
         // set mDesiredModeState correctly, and then trigger modeset in the 1s frame update.
-        if ((err = setActiveConfigWithConstraints(config)) < 0) {
+        if ((err = setActiveConfigWithConstraints(id)) < 0) {
             ALOGE("failed to setActiveConfigWithConstraints(), err %d", err);
             return err;
         }
     } else {
-        if ((err = setActiveConfig(config)) < 0) {
+        if ((err = setActiveConfig(id)) < 0) {
             ALOGE("failed to set default config, err %d", err);
             return err;
         }
     }
 
-    return mExynosDisplay->updateInternalDisplayConfigVariables(config);
+    return mExynosDisplay->updateInternalDisplayConfigVariables(id);
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayConfigs(

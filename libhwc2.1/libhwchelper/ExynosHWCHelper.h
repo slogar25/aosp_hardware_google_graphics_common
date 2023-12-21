@@ -728,4 +728,5 @@ std::optional<std::string> waitForPropertyValue(const std::string &property, int
 uint32_t rectSize(const hwc_rect_t &rect);
 void assign(decon_win_rect &win_rect, uint32_t left, uint32_t right, uint32_t width,
             uint32_t height);
+uint32_t nanoSec2Hz(uint64_t ns);
 #endif

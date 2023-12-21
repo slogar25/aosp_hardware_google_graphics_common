@@ -6270,9 +6270,7 @@ int ExynosDisplay::lookupDisplayConfigs(const int32_t &width,
     if (!fps || !vsyncRate)
         return HWC2_ERROR_BAD_CONFIG;
 
-    constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
     constexpr auto nsecsPerMs = std::chrono::nanoseconds(1ms).count();
-
     const auto vsyncPeriod = nsecsPerSec / vsyncRate;
 
     for (auto const& [config, mode] : mDisplayConfigs) {

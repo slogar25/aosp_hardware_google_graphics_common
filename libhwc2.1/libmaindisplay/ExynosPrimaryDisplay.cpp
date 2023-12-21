@@ -314,10 +314,9 @@ int32_t ExynosPrimaryDisplay::setBootDisplayConfig(int32_t config) {
     if (mode.vsyncPeriod == 0)
         return HWC2_ERROR_BAD_CONFIG;
 
-    int vsyncRate = round(static_cast<float>(nsecsPerSec) / mode.vsyncPeriod);
     char modeStr[PROPERTY_VALUE_MAX];
-    int ret = snprintf(modeStr, sizeof(modeStr), "%dx%d@%d:%d",
-             mode.width, mode.height, mode.refreshRate, vsyncRate);
+    int ret = snprintf(modeStr, sizeof(modeStr), "%dx%d@%d:%d", mode.width, mode.height,
+                       mode.refreshRate, nanoSec2Hz(mode.vsyncPeriod));
     if (ret <= 0)
         return HWC2_ERROR_BAD_CONFIG;
 
