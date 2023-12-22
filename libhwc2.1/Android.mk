@@ -141,6 +141,7 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
 	libvrr/VariableRefreshRateController.cpp \
+	libvrr/Utils.cpp \
 	pixel-display.cpp \
 	histogram_mediator.cpp
 

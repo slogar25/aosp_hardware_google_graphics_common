@@ -23,6 +23,7 @@
 #include <utils/Trace.h>
 
 #include "ExynosHWCHelper.h"
+#include "Utils.h"
 #include "drmmode.h"
 
 #include <chrono>
@@ -31,15 +32,6 @@
 namespace android::hardware::graphics::composer {
 
 const std::string VariableRefreshRateController::kFrameInsertionNodeName = "refresh_ctrl";
-
-namespace {
-
-int64_t getNowNs() {
-    const auto t = std::chrono::high_resolution_clock::now();
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
-}
-
-} // namespace
 
 auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display)
         -> std::shared_ptr<VariableRefreshRateController> {
