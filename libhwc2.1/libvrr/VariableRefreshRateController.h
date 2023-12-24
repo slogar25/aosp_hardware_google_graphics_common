@@ -25,13 +25,12 @@
 #include <thread>
 
 #include "../libdevice/ExynosDisplay.h"
+#include "ExternalEventHandlerLoader.h"
 #include "RingBuffer.h"
 #include "interface/DisplayContextProvider.h"
 #include "interface/VariableRefreshRateInterface.h"
 
 namespace android::hardware::graphics::composer {
-
-constexpr uint64_t kMillisecondToNanoSecond = 1000000;
 
 class VariableRefreshRateController : public VsyncListener,
                                       public PresentListener,
@@ -39,7 +38,7 @@ class VariableRefreshRateController : public VsyncListener,
 public:
     ~VariableRefreshRateController();
 
-    auto static CreateInstance(ExynosDisplay* display)
+    auto static CreateInstance(ExynosDisplay* display, const std::string& panelName)
             -> std::shared_ptr<VariableRefreshRateController>;
 
     int notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs);
@@ -65,6 +64,10 @@ public:
     OperationSpeedMode getOperationSpeedMode() const override;
     bool isProximityThrottingEnabled() const override;
 
+    const DisplayContextProviderInterface* getDisplayContextProviderInterface() const {
+        return &mDisplayContextProviderInterface;
+    }
+
 private:
     static constexpr int kDefaultRingBufferCapacity = 128;
     static constexpr int64_t kDefaultWakeUpTimeInPowerSaving =
@@ -76,6 +79,8 @@ private:
     static constexpr int kDefaultNumFramesToInsert = 2;
     static constexpr int64_t kDefaultFrameInsertionTimer =
             33 * (std::nano::den / std::milli::den); // 33 ms
+
+    static constexpr std::string_view kVendorDisplayPanelLibrary = "libdisplaypanel.so";
 
     enum class VrrControllerState {
         kDisable = 0,
@@ -154,7 +159,7 @@ private:
         int64_t mWhenNs;
     };
 
-    VariableRefreshRateController(ExynosDisplay* display);
+    VariableRefreshRateController(ExynosDisplay* display, const std::string& panelName);
 
     // Implement interface PresentListener.
     virtual void onPresent(int32_t fence) override;
@@ -207,6 +212,12 @@ private:
     std::optional<int> mLastPresentFence;
 
     std::unique_ptr<FileNodeWriter> mFileNodeWritter;
+
+    DisplayContextProviderInterface mDisplayContextProviderInterface;
+    std::unique_ptr<ExternalEventHandlerLoader> mPresentTimeoutEventHandlerLoader;
+    ExternalEventHandler* mPresentTimeoutEventHandler = nullptr;
+
+    std::string mPanelName;
 
     bool mEnabled = false;
     bool mThreadExit = false;

@@ -676,7 +676,7 @@ int32_t ExynosPrimaryDisplay::getDisplayConfigs(uint32_t* outNumConfigs,
         if (mVrrSettings.enabled && mDisplayConfigs.size()) {
             if (!mVariableRefreshRateController) {
                 mVariableRefreshRateController =
-                        VariableRefreshRateController::CreateInstance(this);
+                        VariableRefreshRateController::CreateInstance(this, getPanelName());
                 std::unordered_map<hwc2_config_t, VrrConfig_t> vrrConfigs;
                 for (const auto& it : mDisplayConfigs) {
                     if (!it.second.vrrConfig.has_value()) {
@@ -1374,4 +1374,19 @@ void ExynosPrimaryDisplay::onConfigChange(int configId) {
     if (mVariableRefreshRateController) {
         return mVariableRefreshRateController->setActiveVrrConfiguration(configId);
     }
+}
+
+const std::string& ExynosPrimaryDisplay::getPanelName() {
+    if (!mPanelName.empty()) {
+        return mPanelName;
+    }
+
+    const std::string& sysfs = getPanelSysfsPath();
+    if (!sysfs.empty()) {
+        std::string sysfs_rel("panel_name");
+        if (readLineFromFile(sysfs + "/" + sysfs_rel, mPanelName, '\n') != OK) {
+            ALOGE("failed reading %s/%s", sysfs.c_str(), sysfs_rel.c_str());
+        }
+    }
+    return mPanelName;
 }

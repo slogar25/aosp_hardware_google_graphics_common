@@ -33,7 +33,44 @@ namespace android::hardware::graphics::composer {
 
 const std::string VariableRefreshRateController::kFrameInsertionNodeName = "refresh_ctrl";
 
-auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display)
+static OperationSpeedMode getOperationSpeedModeWrapper(void* host) {
+    VariableRefreshRateController* controller =
+            reinterpret_cast<VariableRefreshRateController*>(host);
+    return controller->getOperationSpeedMode();
+}
+
+static BrightnessMode getBrightnessModeWrapper(void* host) {
+    VariableRefreshRateController* controller =
+            reinterpret_cast<VariableRefreshRateController*>(host);
+    return controller->getBrightnessMode();
+}
+
+static int getBrightnessNitsWrapper(void* host) {
+    VariableRefreshRateController* controller =
+            reinterpret_cast<VariableRefreshRateController*>(host);
+    return controller->getBrightnessNits();
+}
+
+static int getEstimatePlaybackFrameRateWrapper(void* host) {
+    VariableRefreshRateController* controller =
+            reinterpret_cast<VariableRefreshRateController*>(host);
+    return controller->getEstimatedPlaybackFrameRate();
+}
+
+static int getAmbientLightSensorOutputWrapper(void* host) {
+    VariableRefreshRateController* controller =
+            reinterpret_cast<VariableRefreshRateController*>(host);
+    return controller->getAmbientLightSensorOutput();
+}
+
+static bool isProximityThrottingEnabledWrapper(void* host) {
+    VariableRefreshRateController* controller =
+            reinterpret_cast<VariableRefreshRateController*>(host);
+    return controller->isProximityThrottingEnabled();
+}
+
+auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display,
+                                                   const std::string& panelName)
         -> std::shared_ptr<VariableRefreshRateController> {
     if (!display) {
         LOG(ERROR)
@@ -41,7 +78,7 @@ auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display)
         return nullptr;
     }
     auto controller = std::shared_ptr<VariableRefreshRateController>(
-            new VariableRefreshRateController(display));
+            new VariableRefreshRateController(display, panelName));
     std::thread thread = std::thread(&VariableRefreshRateController::threadBody, controller.get());
     std::string threadName = "VrrCtrl_";
     threadName += display->mIndex == 0 ? "Primary" : "Second";
@@ -50,11 +87,13 @@ auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display)
         LOG(WARNING) << "VrrController: Unable to set thread name, error = " << strerror(error);
     }
     thread.detach();
+
     return controller;
 }
 
-VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* display)
-      : mDisplay(display) {
+VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* display,
+                                                             const std::string& panelName)
+      : mDisplay(display), mPanelName(panelName) {
     mState = VrrControllerState::kDisable;
     std::string displayFileNodePath = mDisplay->getPanelSysfsPath();
     if (displayFileNodePath.empty()) {
@@ -63,6 +102,23 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     } else {
         mFileNodeWritter = std::make_unique<FileNodeWriter>(displayFileNodePath);
     }
+
+    // Initialize DisplayContextProviderInterface.
+    mDisplayContextProviderInterface.getOperationSpeedMode = (&getOperationSpeedModeWrapper);
+    mDisplayContextProviderInterface.getBrightnessMode = (&getBrightnessModeWrapper);
+    mDisplayContextProviderInterface.getBrightnessNits = (&getBrightnessNitsWrapper);
+    mDisplayContextProviderInterface.getEstimatedPlaybackFrameRate =
+            (&getEstimatePlaybackFrameRateWrapper);
+    mDisplayContextProviderInterface.getAmbientLightSensorOutput =
+            (&getAmbientLightSensorOutputWrapper);
+    mDisplayContextProviderInterface.isProximityThrottingEnabled =
+            (&isProximityThrottingEnabledWrapper);
+
+    mPresentTimeoutEventHandlerLoader.reset(
+            new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),
+                                           &mDisplayContextProviderInterface, this,
+                                           mPanelName.c_str()));
+    mPresentTimeoutEventHandler = mPresentTimeoutEventHandlerLoader->getEventHandler();
 }
 
 VariableRefreshRateController::~VariableRefreshRateController() {

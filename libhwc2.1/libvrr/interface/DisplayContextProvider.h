@@ -47,4 +47,18 @@ public:
     virtual bool isProximityThrottingEnabled() const = 0;
 };
 
+struct DisplayContextProviderInterface {
+    OperationSpeedMode (*getOperationSpeedMode)(void* host);
+
+    BrightnessMode (*getBrightnessMode)(void* host);
+
+    int (*getBrightnessNits)(void* host);
+
+    int (*getEstimatedPlaybackFrameRate)(void* host);
+
+    int (*getAmbientLightSensorOutput)(void* hosts);
+
+    bool (*isProximityThrottingEnabled)(void* hosts);
+};
+
 } // namespace android::hardware::graphics::composer

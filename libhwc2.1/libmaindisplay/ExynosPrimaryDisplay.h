@@ -80,6 +80,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         virtual void onVsync(int64_t timestamp) override;
 
+        const std::string& getPanelName() final;
+
         int32_t notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs) override;
 
     protected:

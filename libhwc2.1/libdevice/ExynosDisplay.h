@@ -1251,6 +1251,8 @@ class ExynosDisplay {
         void setGeometryChanged(uint64_t changedBit);
         void clearGeometryChanged();
 
+        virtual const std::string& getPanelName() { return mPanelName; };
+
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
         void increaseMPPDstBufIndex();
@@ -1336,6 +1338,8 @@ class ExynosDisplay {
 
         void updateRefreshRateHint();
         bool isFullScreenComposition();
+
+        std::string mPanelName;
 
     public:
         /**

@@ -48,7 +48,7 @@ public:
 } // namespace android::hardware::graphics::composer
 
 typedef android::hardware::graphics::composer::ExternalEventHandler* (
-        *createExternalEventHandler_t)(void* interface, void* host);
+        *createExternalEventHandler_t)(void* interface, void* host, const char* panelName);
 
 typedef void (*destroyExternalEventHandler_t)(
         android::hardware::graphics::composer::ExternalEventHandler* handler);
