@@ -1354,12 +1354,12 @@ class ExynosDisplay {
         std::unique_ptr<ExynosDisplayInterface> mDisplayInterface;
         void requestLhbm(bool on);
 
-        virtual int setMinIdleRefreshRate(const int __unused fps,
-                                          const RrThrottleRequester __unused requester) {
+        virtual int32_t setMinIdleRefreshRate(const int __unused fps,
+                                              const RrThrottleRequester __unused requester) {
             return NO_ERROR;
         }
-        virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos,
-                                                const RrThrottleRequester __unused requester) {
+        virtual int32_t setRefreshRateThrottleNanos(const int64_t __unused delayNanos,
+                                                    const RrThrottleRequester __unused requester) {
             return NO_ERROR;
         }
 
@@ -1610,7 +1610,7 @@ class ExynosDisplay {
             return static_cast<uint32_t>(vsync_period);
         }
         inline int32_t getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config);
-        virtual void calculateTimeline(
+        virtual void calculateTimelineLocked(
                 hwc2_config_t config,
                 hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
                 hwc_vsync_period_change_timeline_t* outTimeline);

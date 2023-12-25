@@ -4342,9 +4342,9 @@ int32_t ExynosDisplay::getConfigAppliedTime(const uint64_t desiredTime,
     return NO_ERROR;
 }
 
-void ExynosDisplay::calculateTimeline(
-        hwc2_config_t config, hwc_vsync_period_change_constraints_t *vsyncPeriodChangeConstraints,
-        hwc_vsync_period_change_timeline_t *outTimeline) {
+void ExynosDisplay::calculateTimelineLocked(
+        hwc2_config_t config, hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+        hwc_vsync_period_change_timeline_t* outTimeline) {
     int64_t actualChangeTime = 0;
     /* actualChangeTime includes transient duration */
     mDisplayInterface->getVsyncAppliedTime(config, &actualChangeTime);
@@ -4427,7 +4427,7 @@ int32_t ExynosDisplay::setActiveConfigWithConstraints(hwc2_config_t config,
     mDesiredConfig = config;
     DISPLAY_ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
 
-    calculateTimeline(config, vsyncPeriodChangeConstraints, outTimeline);
+    calculateTimelineLocked(config, vsyncPeriodChangeConstraints, outTimeline);
 
     /* mActiveConfig should be changed immediately for internal status */
     mActiveConfig = config;
@@ -4722,12 +4722,13 @@ int32_t ExynosDisplay::doDisplayConfigPostProcess(ExynosDevice *dev)
         DISPLAY_LOGD(eDebugDisplayConfig, "Request setActiveConfig %d", mDesiredConfig);
         needSetActiveConfig = true;
         DISPLAY_ATRACE_INT("Pending ActiveConfig", 0);
-        DISPLAY_ATRACE_INT64("TimeToChangeConfig", 0);
+        DISPLAY_ATRACE_INT64("TimeToApplyConfig", 0);
     } else {
         DISPLAY_LOGD(eDebugDisplayConfig, "setActiveConfig still pending (mDesiredConfig %d)",
                      mDesiredConfig);
         DISPLAY_ATRACE_INT("Pending ActiveConfig", mDesiredConfig);
-        DISPLAY_ATRACE_INT64("TimeToChangeConfig", ns2ms(actualChangeTime - current));
+        DISPLAY_ATRACE_INT64("TimeToApplyConfig",
+                             ns2ms(mVsyncPeriodChangeConstraints.desiredTimeNanos - current));
     }
 
     if (needSetActiveConfig) {

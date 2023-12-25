@@ -55,10 +55,10 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         virtual void initDisplayInterface(uint32_t interfaceType);
         virtual int32_t doDisplayConfigInternal(hwc2_config_t config) override;
 
-        virtual int setMinIdleRefreshRate(const int fps,
-                                          const RrThrottleRequester requester) override;
-        virtual int setRefreshRateThrottleNanos(const int64_t delayNs,
-                                                const RrThrottleRequester requester) override;
+        virtual int32_t setMinIdleRefreshRate(const int fps,
+                                              const RrThrottleRequester requester) override;
+        virtual int32_t setRefreshRateThrottleNanos(const int64_t delayNs,
+                                                    const RrThrottleRequester requester) override;
         virtual bool isDbmSupported() override;
         virtual int32_t setDbmState(bool enabled) override;
 
@@ -160,9 +160,11 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         CtrlValue<std::tuple<int64_t, int>> mExpectedPresentTimeAndInterval;
 
-        void calculateTimeline(hwc2_config_t config,
-                               hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
-                               hwc_vsync_period_change_timeline_t* outTimeline) override;
+        virtual void calculateTimelineLocked(
+                hwc2_config_t config,
+                hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
+                hwc_vsync_period_change_timeline_t* outTimeline) override;
+        void recalculateTimelineLocked(int64_t refreshRateDelayNanos);
 
         // min idle refresh rate
         int mDefaultMinIdleRefreshRate;
@@ -178,7 +180,9 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         std::mutex mIdleRefreshRateThrottleMutex;
         int64_t mRrThrottleNanos[toUnderlying(RrThrottleRequester::MAX)];
         int64_t mRefreshRateDelayNanos;
+        int64_t mRrUseDelayNanos;
         int64_t mLastRefreshRateAppliedNanos;
+        bool mIsRrNeedCheckDelay;
         hwc2_config_t mAppliedActiveConfig;
 
         std::mutex mDisplayIdleDelayMutex;
