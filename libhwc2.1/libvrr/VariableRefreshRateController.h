@@ -75,9 +75,7 @@ private:
     static constexpr int64_t SIGNAL_TIME_PENDING = INT64_MAX;
     static constexpr int64_t SIGNAL_TIME_INVALID = -1;
 
-    static const std::string kFrameInsertionNodeName;
-    static constexpr int kDefaultNumFramesToInsert = 2;
-    static constexpr int64_t kDefaultFrameInsertionTimer =
+    static constexpr int64_t kDefaultVendorPresentTimeoutNs =
             33 * (std::nano::den / std::milli::den); // 33 ms
 
     static constexpr std::string_view kVendorDisplayPanelLibrary = "libdisplaypanel.so";
@@ -123,10 +121,18 @@ private:
     } VrrRecord;
 
     enum VrrControllerEventType {
-        kRenderingTimeout = 0,
+        // kSystemRenderingTimeout is responsible for managing present timeout according to the
+        // configuration specified in the system HAL API.
+        kSystemRenderingTimeout = 0,
+        // kVendorRenderingTimeout is responsible for managing present timeout based on the vendor's
+        // proprietary definition.
+        kVendorRenderingTimeout,
+        // kHandleVendorRenderingTimeout is responsible for addressing present timeout by invoking
+        // the
+        // handling function provided by the vendor.
+        kHandleVendorRenderingTimeout,
         kHibernateTimeout,
         kNotifyExpectedPresentConfig,
-        kNextFrameInsertion,
         // Sensors, outer events...
     };
 
@@ -134,14 +140,16 @@ private:
         bool operator<(const VrrControllerEvent& b) const { return mWhenNs > b.mWhenNs; }
         std::string getName() const {
             switch (mEventType) {
-                case kRenderingTimeout:
-                    return "RenderingTimeout";
+                case kSystemRenderingTimeout:
+                    return "kSystemRenderingTimeout";
+                case kVendorRenderingTimeout:
+                    return "kVendorRenderingTimeout";
+                case kHandleVendorRenderingTimeout:
+                    return "kHandleVendorRenderingTimeout";
                 case kHibernateTimeout:
                     return "kHibernateTimeout";
                 case kNotifyExpectedPresentConfig:
                     return "NotifyExpectedPresentConfig";
-                case kNextFrameInsertion:
-                    return "kNextFrameInsertion";
                 default:
                     return "Unknown";
             }
@@ -157,6 +165,7 @@ private:
         int64_t mDisplay;
         VrrControllerEventType mEventType;
         int64_t mWhenNs;
+        std::function<int()> mFunctor;
     };
 
     VariableRefreshRateController(ExynosDisplay* display, const std::string& panelName);
@@ -168,10 +177,7 @@ private:
     // Implement interface VsyncListener.
     virtual void onVsync(int64_t timestamp, int32_t vsyncPeriodNanos) override;
 
-    void cancelFrameInsertionLocked();
-
-    int doFrameInsertionLocked();
-    int doFrameInsertionLocked(int frames);
+    void cancelPresentTimeoutHandlingLocked();
 
     void dropEventLocked();
     void dropEventLocked(VrrControllerEventType event_type);
@@ -190,6 +196,9 @@ private:
     void handleHibernate();
     void handleStayHibernate();
 
+    void handlePresentTimeout(const VrrControllerEvent& event);
+
+    void postEvent(VrrControllerEventType type, TimedEvent& eventHandleContext);
     void postEvent(VrrControllerEventType type, int64_t when);
 
     void stopThread(bool exit);
@@ -202,7 +211,6 @@ private:
     ExynosDisplay* mDisplay;
 
     // The subsequent variables must be guarded by mMutex when accessed.
-    int mPendingFramesToInsert = 0;
     std::priority_queue<VrrControllerEvent> mEventQueue;
     VrrRecord mRecord;
     int32_t mPowerMode = -1;

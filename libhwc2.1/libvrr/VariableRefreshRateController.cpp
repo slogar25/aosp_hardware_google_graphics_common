@@ -31,8 +31,6 @@
 
 namespace android::hardware::graphics::composer {
 
-const std::string VariableRefreshRateController::kFrameInsertionNodeName = "refresh_ctrl";
-
 static OperationSpeedMode getOperationSpeedModeWrapper(void* host) {
     VariableRefreshRateController* controller =
             reinterpret_cast<VariableRefreshRateController*>(host);
@@ -176,10 +174,10 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
             return;
         }
         mState = VrrControllerState::kRendering;
-        dropEventLocked(kRenderingTimeout);
+        dropEventLocked(kSystemRenderingTimeout);
 
         if (mVrrConfigs[mVrrActiveConfig].isFullySupported) {
-            postEvent(VrrControllerEventType::kRenderingTimeout,
+            postEvent(VrrControllerEventType::kSystemRenderingTimeout,
                       getNowNs() +
                               mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
         }
@@ -232,7 +230,7 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
                 mState = VrrControllerState::kRendering;
                 const auto& vrrConfig = mVrrConfigs[mVrrActiveConfig];
                 if (vrrConfig.isFullySupported) {
-                    postEvent(VrrControllerEventType::kRenderingTimeout,
+                    postEvent(VrrControllerEventType::kSystemRenderingTimeout,
                               getNowNs() + vrrConfig.notifyExpectedPresentConfig->TimeoutNs);
                 }
                 break;
@@ -344,18 +342,17 @@ void VariableRefreshRateController::onPresent(int fence) {
         }
         mLastPresentFence = dupFence;
         // Drop the out of date timeout.
-        dropEventLocked(kRenderingTimeout);
-        cancelFrameInsertionLocked();
+        dropEventLocked(kSystemRenderingTimeout);
+        cancelPresentTimeoutHandlingLocked();
         // Post next rendering timeout.
         if (mVrrConfigs[mVrrActiveConfig].isFullySupported) {
-            postEvent(VrrControllerEventType::kRenderingTimeout,
+            postEvent(VrrControllerEventType::kSystemRenderingTimeout,
                       getNowNs() +
                               mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
         }
         // Post next frmae insertion event.
-        mPendingFramesToInsert = kDefaultNumFramesToInsert;
-        postEvent(VrrControllerEventType::kNextFrameInsertion,
-                  getNowNs() + kDefaultFrameInsertionTimer);
+        postEvent(VrrControllerEventType::kVendorRenderingTimeout,
+                  getNowNs() + kDefaultVendorPresentTimeoutNs);
     }
     mCondition.notify_all();
 }
@@ -376,44 +373,13 @@ void VariableRefreshRateController::onVsync(int64_t timestampNanos,
                        .mTime = timestampNanos};
 }
 
-void VariableRefreshRateController::cancelFrameInsertionLocked() {
-    dropEventLocked(kNextFrameInsertion);
-    mPendingFramesToInsert = 0;
-}
-
-int VariableRefreshRateController::doFrameInsertionLocked() {
-    ATRACE_CALL();
-
-    if (mState == VrrControllerState::kDisable) {
-        cancelFrameInsertionLocked();
-        return 0;
-    }
-    if (mPendingFramesToInsert <= 0) {
-        LOG(ERROR) << "VrrController: the number of frames to be inserted should >= 1, but is "
-                   << mPendingFramesToInsert << " now.";
-        return -1;
-    }
-    bool ret = mFileNodeWritter->WriteCommandString(kFrameInsertionNodeName, PANEL_REFRESH_CTRL_FI);
-    if (!ret) {
-        LOG(ERROR) << "VrrController: write command to file node failed. " << getStateName(mState)
-                   << " " << mPowerMode;
-        return -1;
-    }
-    if (--mPendingFramesToInsert > 0) {
-        postEvent(VrrControllerEventType::kNextFrameInsertion,
-                  getNowNs() + mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
-    }
-    return 0;
-}
-
-int VariableRefreshRateController::doFrameInsertionLocked(int frames) {
-    mPendingFramesToInsert = frames;
-    return doFrameInsertionLocked();
+void VariableRefreshRateController::cancelPresentTimeoutHandlingLocked() {
+    dropEventLocked(kVendorRenderingTimeout);
+    dropEventLocked(kHandleVendorRenderingTimeout);
 }
 
 void VariableRefreshRateController::dropEventLocked() {
     mEventQueue = std::priority_queue<VrrControllerEvent>();
-    mPendingFramesToInsert = 0;
 }
 
 void VariableRefreshRateController::dropEventLocked(VrrControllerEventType event_type) {
@@ -537,6 +503,16 @@ void VariableRefreshRateController::handleStayHibernate() {
               getNowNs() + kDefaultWakeUpTimeInPowerSaving);
 }
 
+void VariableRefreshRateController::handlePresentTimeout(const VrrControllerEvent& event) {
+    ATRACE_CALL();
+
+    if (mState == VrrControllerState::kDisable) {
+        cancelPresentTimeoutHandlingLocked();
+        return;
+    }
+    event.mFunctor();
+}
+
 void VariableRefreshRateController::threadBody() {
     struct sched_param param = {.sched_priority = 2};
     if (sched_setscheduler(0, SCHED_FIFO, &param) != 0) {
@@ -576,7 +552,7 @@ void VariableRefreshRateController::threadBody() {
                                   "rendering state.";
                 }
                 switch (event.mEventType) {
-                    case VrrControllerEventType::kRenderingTimeout: {
+                    case VrrControllerEventType::kSystemRenderingTimeout: {
                         handleHibernate();
                         mState = VrrControllerState::kHibernate;
                         stateChanged = true;
@@ -586,8 +562,19 @@ void VariableRefreshRateController::threadBody() {
                         handleCadenceChange();
                         break;
                     }
-                    case VrrControllerEventType::kNextFrameInsertion: {
-                        doFrameInsertionLocked();
+                    case VrrControllerEventType::kVendorRenderingTimeout: {
+                        if (mPresentTimeoutEventHandler) {
+                            auto eventHandleContexts =
+                                    mPresentTimeoutEventHandler->getHandleEvents();
+                            for (auto& eventHandleContext : eventHandleContexts) {
+                                postEvent(VrrControllerEventType::kHandleVendorRenderingTimeout,
+                                          eventHandleContext);
+                            }
+                        }
+                        break;
+                    }
+                    case VrrControllerEventType::kHandleVendorRenderingTimeout: {
+                        handlePresentTimeout(event);
                         break;
                     }
                     default: {
@@ -595,7 +582,7 @@ void VariableRefreshRateController::threadBody() {
                     }
                 }
             } else {
-                if (event.mEventType == VrrControllerEventType::kRenderingTimeout) {
+                if (event.mEventType == VrrControllerEventType::kSystemRenderingTimeout) {
                     LOG(ERROR) << "VrrController: receiving a rendering timeout event while in the "
                                   "hibernate state.";
                 }
@@ -633,6 +620,15 @@ void VariableRefreshRateController::postEvent(VrrControllerEventType type, int64
     VrrControllerEvent event;
     event.mEventType = type;
     event.mWhenNs = when;
+    mEventQueue.emplace(event);
+}
+
+void VariableRefreshRateController::postEvent(VrrControllerEventType type, TimedEvent& timedEvent) {
+    VrrControllerEvent event;
+    event.mEventType = type;
+    setTimedEventWithAbsoluteTime(timedEvent);
+    event.mWhenNs = timedEvent.mWhenNs;
+    event.mFunctor = std::move(timedEvent.mFunctor);
     mEventQueue.emplace(event);
 }
 
