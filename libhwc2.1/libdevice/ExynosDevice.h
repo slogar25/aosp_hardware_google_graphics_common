@@ -348,7 +348,8 @@ class ExynosDevice {
             return HWC2_ERROR_UNSUPPORTED;
         }
 
-        void onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod);
+        void onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod,
+                                       uint32_t refreshPeriod = 0);
 
         bool isVrrApiSupported() const { return mVrrApiSupported; };
         void setVBlankOffDelay(const int vblankOffDelay);

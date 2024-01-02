@@ -1260,7 +1260,8 @@ void ExynosDevice::handleHotplug() {
     }
 }
 
-void ExynosDevice::onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod) {
+void ExynosDevice::onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t vsyncPeriod,
+                                             uint32_t refreshPeriod) {
     Mutex::Autolock lock(mDeviceCallbackMutex);
     const auto &refreshRateCallback =
             mHwc3CallbackInfos.find(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug);
@@ -1272,6 +1273,6 @@ void ExynosDevice::onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t 
 
     auto callbackFunc =
             reinterpret_cast<void (*)(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
-                                      hwc2_vsync_period_t)>(callbackInfo.funcPointer);
-    callbackFunc(callbackInfo.callbackData, displayId, vsyncPeriod);
+                                      hwc2_vsync_period_t, int32_t)>(callbackInfo.funcPointer);
+    callbackFunc(callbackInfo.callbackData, displayId, vsyncPeriod, refreshPeriod ?: vsyncPeriod);
 }

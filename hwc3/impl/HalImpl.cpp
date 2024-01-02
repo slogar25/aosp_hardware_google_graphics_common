@@ -106,7 +106,8 @@ void seamlessPossible(hwc2_callback_data_t callbackData, hwc2_display_t hwcDispl
 }
 
 void refreshRateChangedDebug(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
-                             hwc2_vsync_period_t hwcVsyncPeriodNanos) {
+                             hwc2_vsync_period_t hwcVsyncPeriodNanos,
+                             int32_t hwcRefreshPeriodNanos) {
     auto hal = static_cast<HalImpl*>(callbackData);
     int64_t display;
     int32_t vsyncPeriodNanos;
@@ -117,7 +118,7 @@ void refreshRateChangedDebug(hwc2_callback_data_t callbackData, hwc2_display_t h
     hal->getEventCallback()->onRefreshRateChangedDebug(RefreshRateChangedDebugData{
             .display = display,
             .vsyncPeriodNanos = vsyncPeriodNanos,
-            .refreshPeriodNanos = vsyncPeriodNanos,
+            .refreshPeriodNanos = hwcRefreshPeriodNanos,
     });
 }
 
