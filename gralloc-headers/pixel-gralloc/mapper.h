@@ -46,34 +46,34 @@ static std::optional<typename ReturnType<T>::type> get(buffer_handle_t /*handle*
 }
 
 // TODO: Add support for stable-c mapper
-#define GET(metadata, return_type)                                                                \
-    template <>                                                                                   \
-    struct ReturnType<MetadataType::metadata> {                                                   \
-        using type = return_type;                                                                 \
-    };                                                                                            \
-                                                                                                  \
-    template <>                                                                                   \
-    std::optional<typename ReturnType<MetadataType::metadata>::type> get<MetadataType::metadata>( \
-            buffer_handle_t handle) {                                                             \
-        auto mapper = get_mapper();                                                               \
-        IMapper::MetadataType type = {                                                            \
-                .name = kPixelMetadataTypeName,                                                   \
-                .value = static_cast<int64_t>(MetadataType::metadata),                            \
-        };                                                                                        \
-                                                                                                  \
-        android::hardware::hidl_vec<uint8_t> vec;                                                 \
-        Error error;                                                                              \
-        auto ret = mapper->get(const_cast<native_handle_t*>(handle), type,                        \
-                               [&](const auto& tmpError,                                          \
-                                   const android::hardware::hidl_vec<uint8_t>& tmpVec) {          \
-                                   error = tmpError;                                              \
-                                   vec = tmpVec;                                                  \
-                               });                                                                \
-        if (!ret.isOk()) {                                                                        \
-            return {};                                                                            \
-        }                                                                                         \
-                                                                                                  \
-        return utils::decode<return_type>(vec);                                                   \
+#define GET(metadata, return_type)                                                       \
+    template <>                                                                          \
+    struct ReturnType<MetadataType::metadata> {                                          \
+        using type = return_type;                                                        \
+    };                                                                                   \
+                                                                                         \
+    template <>                                                                          \
+    [[maybe_unused]] std::optional<typename ReturnType<MetadataType::metadata>::type>    \
+    get<MetadataType::metadata>(buffer_handle_t handle) {                                \
+        auto mapper = get_mapper();                                                      \
+        IMapper::MetadataType type = {                                                   \
+                .name = kPixelMetadataTypeName,                                          \
+                .value = static_cast<int64_t>(MetadataType::metadata),                   \
+        };                                                                               \
+                                                                                         \
+        android::hardware::hidl_vec<uint8_t> vec;                                        \
+        Error error;                                                                     \
+        auto ret = mapper->get(const_cast<native_handle_t*>(handle), type,               \
+                               [&](const auto& tmpError,                                 \
+                                   const android::hardware::hidl_vec<uint8_t>& tmpVec) { \
+                                   error = tmpError;                                     \
+                                   vec = tmpVec;                                         \
+                               });                                                       \
+        if (!ret.isOk()) {                                                               \
+            return {};                                                                   \
+        }                                                                                \
+                                                                                         \
+        return utils::decode<return_type>(vec);                                          \
     }
 
 GET(PLANE_DMA_BUFS, std::vector<int>);
