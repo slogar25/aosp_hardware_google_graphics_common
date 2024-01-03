@@ -47,6 +47,7 @@ enum {
     eDebugDisplayConfig           =   0x00400000,
     eDebugTDM                     =   0x00800000,
     eDebugLoadBalancing           =   0x01000000,
+    eDebugOperationRate           =   0x02000000,
 };
 
 class ExynosDisplay;
@@ -101,12 +102,18 @@ int32_t saveErrorLog(const android::String8& errString, const ExynosDisplay* dis
 
 #if defined(DISABLE_HWC_DEBUG)
 #define DISPLAY_LOGD(...)
+#define DISPLAY_STR_LOGD(...)
 #define MPP_LOGD(...)
 #else
 #define DISPLAY_LOGD(type, msg, ...) \
     {\
         if (hwcCheckDebugMessages(type)) \
             ALOGD("%s:: [%s] " msg, __func__, mDisplayName.c_str(), ##__VA_ARGS__); \
+    }
+#define DISPLAY_STR_LOGD(dispString, type, msg, ...) \
+    {\
+        if (hwcCheckDebugMessages(type)) \
+            ALOGD("%s:: [%s] " msg, __func__, dispString, ##__VA_ARGS__); \
     }
 #define MPP_LOGD(type, msg, ...) \
     {\
