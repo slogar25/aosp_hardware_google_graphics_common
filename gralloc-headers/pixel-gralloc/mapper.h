@@ -79,7 +79,31 @@ static std::optional<typename ReturnType<T>::type> get(buffer_handle_t /*handle*
 GET(PLANE_DMA_BUFS, std::vector<int>);
 GET(VIDEO_HDR, void*);
 GET(VIDEO_ROI, void*);
-
 #undef GET
+
+template <MetadataType T>
+static Error set(buffer_handle_t /*handle*/, typename ReturnType<T>::type /*data*/) {
+    static_assert(always_false<T>::value, "Unspecialized set is not supported");
+    return {};
+}
+
+#define SET(metadata, metadata_typename)                                                  \
+    template <>                                                                           \
+    [[maybe_unused]] Error                                                                \
+    set<MetadataType::metadata>(buffer_handle_t handle,                                   \
+                                typename ReturnType<MetadataType::metadata>::type data) { \
+        auto mapper = get_mapper();                                                       \
+        auto encoded_data = utils::encode<metadata_typename>(data);                       \
+        IMapper::MetadataType type = {                                                    \
+                .name = kPixelMetadataTypeName,                                           \
+                .value = static_cast<int64_t>(MetadataType::metadata),                    \
+        };                                                                                \
+                                                                                          \
+        auto ret = mapper->set(const_cast<native_handle_t*>(handle), type, encoded_data); \
+                                                                                          \
+        return ret;                                                                       \
+    }
+
+#undef SET
 
 } // namespace pixel::graphics::mapper
