@@ -1989,9 +1989,11 @@ void ExynosResourceManager::updatePreAssignDisplayList(const ExynosDisplay* main
             if (minorDisp != NULL)
                 mpp->mPreAssignDisplayList[DISPLAY_MODE_PRIMARY_MAIN] =
                         minorDisp->getDisplayPreAssignBit();
-            else
+            else if (mainDisp != NULL)
                 mpp->mPreAssignDisplayList[DISPLAY_MODE_PRIMARY_MAIN] =
                         mainDisp->getDisplayPreAssignBit();
+            else
+                ALOGE("Main & minor display don't exist!");
         }
     };
 
