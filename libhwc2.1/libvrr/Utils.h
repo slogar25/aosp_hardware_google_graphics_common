@@ -16,13 +16,45 @@
 
 #pragma once
 
+#include <chrono>
+#include <cmath>
 #include <cstdint>
+
+#include "interface/Event.h"
 
 namespace android::hardware::graphics::composer {
 
 struct TimedEvent;
 
+enum PresentFrameFlag {
+    kHasRefreshRateIndicatorLayer = (1 << 0),
+    kIsYuv = (1 << 1),
+    kPresentingWhenDoze = (1 << 2),
+};
+
+template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+T roundDivide(T divident, T divisor) {
+    if (divident < 0 || divisor <= 0) {
+        return 0;
+    }
+    return (divident + (divisor / 2)) / divisor;
+}
+
+template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+T durationNsToFreq(T durationNs) {
+    auto res = roundDivide(std::nano::den, static_cast<int64_t>(durationNs));
+    return static_cast<T>(res);
+}
+
+template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+T freqTodurationNs(T freq) {
+    auto res = roundDivide(std::nano::den, static_cast<int64_t>(freq));
+    return static_cast<T>(res);
+}
+
 int64_t getNowNs();
+
+bool hasPresentFrameFlag(int flag, PresentFrameFlag target);
 
 void setTimedEventWithAbsoluteTime(TimedEvent& event);
 

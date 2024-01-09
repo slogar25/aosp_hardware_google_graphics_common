@@ -121,7 +121,8 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libvrr \
-        $(TOP)/hardware/google/graphics/$(soc_ver)
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libvrr/interface \
+	$(TOP)/hardware/google/graphics/$(soc_ver)
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
 	DisplaySceneInfo.cpp \
@@ -141,6 +142,11 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
 	libvrr/VariableRefreshRateController.cpp \
+	libvrr/RefreshRateCalculator/InstantRefreshRateCalculator.cpp \
+	libvrr/RefreshRateCalculator/PeriodRefreshRateCalculator.cpp \
+	libvrr/RefreshRateCalculator/CombinedRefreshRateCalculator.cpp \
+	libvrr/RefreshRateCalculator/RefreshRateCalculatorFactory.cpp \
+	libvrr/RefreshRateCalculator/VideoFrameRateCalculator.cpp \
 	libvrr/Utils.cpp \
 	pixel-display.cpp \
 	histogram_mediator.cpp

@@ -27,6 +27,10 @@ int64_t getNowNs() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
 }
 
+bool hasPresentFrameFlag(int flag, PresentFrameFlag target) {
+    return flag & static_cast<int>(target);
+}
+
 void setTimedEventWithAbsoluteTime(TimedEvent& event) {
     if (event.mIsRelativeTime) {
         event.mWhenNs += getNowNs();

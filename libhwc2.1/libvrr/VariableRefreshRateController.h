@@ -25,8 +25,12 @@
 #include <thread>
 
 #include "../libdevice/ExynosDisplay.h"
+#include "../libdevice/ExynosLayer.h"
+#include "EventQueue.h"
 #include "ExternalEventHandlerLoader.h"
+#include "RefreshRateCalculator/RefreshRateCalculator.h"
 #include "RingBuffer.h"
+#include "Utils.h"
 #include "interface/DisplayContextProvider.h"
 #include "interface/VariableRefreshRateInterface.h"
 
@@ -120,54 +124,6 @@ private:
         VsyncRecord mVsyncHistory;
     } VrrRecord;
 
-    enum VrrControllerEventType {
-        // kSystemRenderingTimeout is responsible for managing present timeout according to the
-        // configuration specified in the system HAL API.
-        kSystemRenderingTimeout = 0,
-        // kVendorRenderingTimeout is responsible for managing present timeout based on the vendor's
-        // proprietary definition.
-        kVendorRenderingTimeout,
-        // kHandleVendorRenderingTimeout is responsible for addressing present timeout by invoking
-        // the
-        // handling function provided by the vendor.
-        kHandleVendorRenderingTimeout,
-        kHibernateTimeout,
-        kNotifyExpectedPresentConfig,
-        // Sensors, outer events...
-    };
-
-    struct VrrControllerEvent {
-        bool operator<(const VrrControllerEvent& b) const { return mWhenNs > b.mWhenNs; }
-        std::string getName() const {
-            switch (mEventType) {
-                case kSystemRenderingTimeout:
-                    return "kSystemRenderingTimeout";
-                case kVendorRenderingTimeout:
-                    return "kVendorRenderingTimeout";
-                case kHandleVendorRenderingTimeout:
-                    return "kHandleVendorRenderingTimeout";
-                case kHibernateTimeout:
-                    return "kHibernateTimeout";
-                case kNotifyExpectedPresentConfig:
-                    return "NotifyExpectedPresentConfig";
-                default:
-                    return "Unknown";
-            }
-        }
-
-        std::string toString() const {
-            std::ostringstream os;
-            os << "Vrr event: [";
-            os << "type = " << getName() << ", ";
-            os << "when = " << mWhenNs << "ns]";
-            return os.str();
-        }
-        int64_t mDisplay;
-        VrrControllerEventType mEventType;
-        int64_t mWhenNs;
-        std::function<int()> mFunctor;
-    };
-
     VariableRefreshRateController(ExynosDisplay* display, const std::string& panelName);
 
     // Implement interface PresentListener.
@@ -180,13 +136,32 @@ private:
     void cancelPresentTimeoutHandlingLocked();
 
     void dropEventLocked();
-    void dropEventLocked(VrrControllerEventType event_type);
+    void dropEventLocked(VrrControllerEventType eventType);
 
     std::string dumpEventQueueLocked();
 
     int64_t getLastFenceSignalTimeUnlocked(int fd);
 
     int64_t getNextEventTimeLocked() const;
+
+    int getPresentFrameFlag() const {
+        int flag = 0;
+        // Is Yuv.
+        for (size_t i = 0; i < mDisplay->mLayers.size(); i++) {
+            auto layer = mDisplay->mLayers[i];
+            if (layer->isLayerFormatYuv()) {
+                flag |= static_cast<int>(PresentFrameFlag::kIsYuv);
+            }
+            if (layer->mRequestedCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) {
+                flag |= static_cast<int>(PresentFrameFlag::kHasRefreshRateIndicatorLayer);
+            }
+        }
+        // Present when doze.
+        if ((mPowerMode == HWC_POWER_MODE_DOZE) || (mPowerMode == HWC_POWER_MODE_DOZE_SUSPEND)) {
+            flag |= static_cast<int>(PresentFrameFlag::kPresentingWhenDoze);
+        }
+        return flag;
+    }
 
     std::string getStateName(VrrControllerState state) const;
 
@@ -196,9 +171,17 @@ private:
     void handleHibernate();
     void handleStayHibernate();
 
+    void handleGeneralEventLocked(VrrControllerEvent& event) {
+        if (event.mFunctor) {
+            event.mFunctor();
+        }
+    }
+
     void handlePresentTimeout(const VrrControllerEvent& event);
 
-    void postEvent(VrrControllerEventType type, TimedEvent& eventHandleContext);
+    void onRefreshRateChanged(int refreshRate);
+
+    void postEvent(VrrControllerEventType type, TimedEvent& timedEvent);
     void postEvent(VrrControllerEventType type, int64_t when);
 
     void stopThread(bool exit);
@@ -211,7 +194,7 @@ private:
     ExynosDisplay* mDisplay;
 
     // The subsequent variables must be guarded by mMutex when accessed.
-    std::priority_queue<VrrControllerEvent> mEventQueue;
+    EventQueue mEventQueue;
     VrrRecord mRecord;
     int32_t mPowerMode = -1;
     VrrControllerState mState;
@@ -226,6 +209,8 @@ private:
     ExternalEventHandler* mPresentTimeoutEventHandler = nullptr;
 
     std::string mPanelName;
+
+    std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
 
     bool mEnabled = false;
     bool mThreadExit = false;

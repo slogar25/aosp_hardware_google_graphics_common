@@ -17,12 +17,36 @@
 #pragma once
 
 #include <functional>
+#include <sstream>
 #include <string>
 
 #include "../Utils.h"
 #include "DisplayContextProvider.h"
 
 namespace android::hardware::graphics::composer {
+
+enum class VrrControllerEventType {
+    kGeneralEventMask = 0x100,
+    // kSystemRenderingTimeout is responsible for managing present timeout according to the
+    // configuration specified in the system HAL API.
+    kSystemRenderingTimeout,
+    // kVendorRenderingTimeout is responsible for managing present timeout based on the vendor's
+    // proprietary definition.
+    kVendorRenderingTimeout,
+    // kHandleVendorRenderingTimeout is responsible for addressing present timeout by invoking
+    // the handling function provided by the vendor.
+    kHandleVendorRenderingTimeout,
+    kHibernateTimeout,
+    kNotifyExpectedPresentConfig,
+    // Refresh rate Calculator events.
+    kRefreshRateCalculatorUpdateMask = 0x200,
+    kInstantRefreshRateCalculatorUpdate,
+    kPeriodRefreshRateCalculatorUpdate,
+    kVideoFrameRateCalculatorUpdate,
+    kCombinedRefreshRateCalculatorUpdate,
+    kAodRefreshRateCalculatorUpdate,
+    // Sensors, outer events...
+};
 
 struct TimedEvent {
     explicit TimedEvent(const std::string& name) : mEventName(std::move(name)) {}
@@ -37,6 +61,49 @@ struct TimedEvent {
     std::function<int()> mFunctor;
     bool mIsRelativeTime = true;
     int64_t mWhenNs = 0;
+};
+
+struct VrrControllerEvent {
+    bool operator<(const VrrControllerEvent& b) const { return mWhenNs > b.mWhenNs; }
+    std::string getName() const {
+        switch (mEventType) {
+            case VrrControllerEventType::kSystemRenderingTimeout:
+                return "kSystemRenderingTimeout";
+            case VrrControllerEventType::kVendorRenderingTimeout:
+                return "kVendorRenderingTimeout";
+            case VrrControllerEventType::kHandleVendorRenderingTimeout:
+                return "kHandleVendorRenderingTimeout";
+            case VrrControllerEventType::kHibernateTimeout:
+                return "kHibernateTimeout";
+            case VrrControllerEventType::kNotifyExpectedPresentConfig:
+                return "kNotifyExpectedPresentConfig";
+            case VrrControllerEventType::kInstantRefreshRateCalculatorUpdate:
+                return "kInstantRefreshRateCalculatorUpdate";
+            case VrrControllerEventType::kPeriodRefreshRateCalculatorUpdate:
+                return "kPeriodRefreshRateCalculatorUpdate";
+            case VrrControllerEventType::kVideoFrameRateCalculatorUpdate:
+                return "kVideoFrameRateCalculatorUpdate";
+            case VrrControllerEventType::kCombinedRefreshRateCalculatorUpdate:
+                return "kCombinedRefreshRateCalculatorUpdate";
+            case VrrControllerEventType::kAodRefreshRateCalculatorUpdate:
+                return "kAodRefreshRateCalculatorUpdate";
+            default:
+                return "Unknown";
+        }
+    }
+
+    std::string toString() const {
+        std::ostringstream os;
+        os << "Vrr event: [";
+        os << "type = " << getName() << ", ";
+        os << "when = " << mWhenNs << "ns]";
+        return os.str();
+    }
+    int64_t mDisplay;
+    VrrControllerEventType mEventType;
+    int64_t mWhenNs;
+    std::function<int()> mFunctor;
+    int64_t mPeriodNs = -1;
 };
 
 class ExternalEventHandler {
