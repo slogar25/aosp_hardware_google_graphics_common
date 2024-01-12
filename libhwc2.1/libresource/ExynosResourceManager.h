@@ -183,8 +183,9 @@ class ExynosResourceManager {
 
         void dump(String8 &result) const;
         void setM2MCapa(uint32_t physicalType, uint32_t capa);
-        bool isAssignable(ExynosMPP *candidateMPP, ExynosDisplay *display, struct exynos_image &src,
-                          struct exynos_image &dst, ExynosMPPSource *mppSrc);
+        virtual bool isAssignable(ExynosMPP* candidateMPP, ExynosDisplay* display,
+                                  struct exynos_image& src, struct exynos_image& dst,
+                                  ExynosMPPSource* mppSrc);
 
     private:
         int32_t changeLayerFromClientToDevice(ExynosDisplay* display, ExynosLayer* layer,
