@@ -1724,6 +1724,7 @@ class ExynosDisplay {
 
         private:
             void updateRefreshRateLocked(int refreshRate) REQUIRES(mMutex);
+            void setAllowWakeup(bool enabled);
 
             ExynosDisplay* mDisplay;
             int mLastRefreshRate GUARDED_BY(mMutex);
@@ -1735,6 +1736,8 @@ class ExynosDisplay {
 
             static constexpr auto kRefreshRateStatePathFormat =
                     "/sys/class/backlight/panel%d-backlight/state";
+            static constexpr auto kRefreshRateAllowWakeupStateChangePathFormat =
+                    "/sys/class/backlight/panel%d-backlight/allow_wakeup_by_state_change";
         };
 
         class ActiveConfigBasedRRIHandler : public RefreshRateIndicator {

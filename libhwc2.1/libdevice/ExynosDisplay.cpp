@@ -6627,12 +6627,14 @@ int32_t ExynosDisplay::SysfsBasedRRIHandler::init() {
         ALOGE("%s: Failed to register sysfs event handler: %d", __func__, ret);
         return ret;
     }
+    setAllowWakeup(true);
     // Call the callback immediately
     handleSysfsEvent();
     return NO_ERROR;
 }
 
 int32_t ExynosDisplay::SysfsBasedRRIHandler::disable() {
+    setAllowWakeup(false);
     return mDisplay->mDevice->mDeviceInterface->unregisterSysfsEventHandler(getFd());
 }
 
@@ -6685,6 +6687,19 @@ void ExynosDisplay::SysfsBasedRRIHandler::handleSysfsEvent() {
 void ExynosDisplay::SysfsBasedRRIHandler::updateRefreshRate(int refreshRate) {
     std::scoped_lock lock(mMutex);
     updateRefreshRateLocked(refreshRate);
+}
+
+void ExynosDisplay::SysfsBasedRRIHandler::setAllowWakeup(const bool enabled) {
+    auto path = String8::format(kRefreshRateAllowWakeupStateChangePathFormat, mDisplay->mIndex);
+    std::ofstream ofs(path);
+    if (ofs.is_open()) {
+        ofs << enabled;
+        if (ofs.fail()) {
+            ALOGW("%s: Failed to write %d to allow wakeup node: %d", __func__, enabled, errno);
+        }
+    } else {
+        ALOGW("%s: Failed to open allow wakeup node: %d", __func__, errno);
+    }
 }
 
 int32_t ExynosDisplay::setRefreshRateChangedCallbackDebugEnabled(bool enabled) {
