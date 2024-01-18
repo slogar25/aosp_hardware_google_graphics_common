@@ -17,12 +17,16 @@
 #ifndef _EXYNOSDISPLAYINTERFACE_H
 #define _EXYNOSDISPLAYINTERFACE_H
 
-#include <sys/types.h>
 #include <hardware/hwcomposer2.h>
+#include <sys/types.h>
 #include <utils/Errors.h>
+
 #include "ExynosHWCHelper.h"
 
 class ExynosDisplay;
+
+struct VrrSettings;
+typedef struct VrrSettings VrrSettings_t;
 
 using namespace android;
 class ExynosDisplayInterface {
@@ -86,6 +90,10 @@ class ExynosDisplayInterface {
         virtual int32_t waitVBlank() { return 0; };
 
         virtual bool readHotplugStatus() { return true; };
+        virtual int readHotplugErrorCode() { return 0; };
+        virtual void resetHotplugErrorCode(){};
+
+        virtual void setVrrSettings(const VrrSettings_t& vrrSettings);
 
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;

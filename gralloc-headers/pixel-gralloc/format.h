@@ -47,6 +47,7 @@ enum class Format : uint32_t {
 
     // Pixel specific formats
     GOOGLE_NV12 = 0x301,
+    GOOGLE_R8 = 0x303,
 };
 
 #undef MapFormat

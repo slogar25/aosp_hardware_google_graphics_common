@@ -462,7 +462,7 @@ int32_t ExynosHWCService::setMinIdleRefreshRate(uint32_t display_id, int32_t fps
     auto display = mHWCCtx->device->getDisplay(display_id);
 
     if (display != nullptr) {
-        return display->setMinIdleRefreshRate(fps, VrrThrottleRequester::TEST);
+        return display->setMinIdleRefreshRate(fps, RrThrottleRequester::TEST);
     }
 
     return -EINVAL;
@@ -478,7 +478,7 @@ int32_t ExynosHWCService::setRefreshRateThrottle(uint32_t display_id, int32_t de
                 ->setRefreshRateThrottleNanos(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                                       std::chrono::milliseconds(delayMs))
                                                       .count(),
-                                              VrrThrottleRequester::TEST);
+                                              RrThrottleRequester::TEST);
     }
 
     return -EINVAL;

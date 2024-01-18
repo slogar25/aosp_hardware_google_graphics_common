@@ -23,6 +23,12 @@
 
 namespace android {
 
+namespace {
+inline bool HasFlag(const int value, const int &flag) {
+  return ((value & flag) == flag);
+}
+}; // namespace
+
 DrmMode::DrmMode(drmModeModeInfoPtr m)
     : id_(0),
       clock_(m->clock),
@@ -123,7 +129,50 @@ uint32_t DrmMode::v_scan() const {
 
 float DrmMode::v_refresh() const {
   // Always recalculate refresh to report correct float rate
+  if (v_total_ == 0 || h_total_ == 0) {
+    return 0.0f;
+  }
   return clock_ / (float)(v_total_ * h_total_) * 1000.0f;
+}
+
+float DrmMode::te_frequency() const {
+  auto freq = v_refresh();
+  if (is_vrr_mode()) {
+    if (HasFlag(flags_, DRM_MODE_FLAG_TE_FREQ_X2)) {
+      freq *= 2;
+    } else if (HasFlag(flags_, DRM_MODE_FLAG_TE_FREQ_X4)) {
+      freq *= 4;
+    } else {
+      if (!HasFlag(flags_, DRM_MODE_FLAG_TE_FREQ_X1)) {
+        return 0.0f;
+      }
+    }
+  }
+  return freq;
+}
+
+// vertical refresh period.
+float DrmMode::v_period(int64_t unit) const {
+  auto frequency = v_refresh();
+  if (frequency == 0.0f) {
+    return 0.0f;
+  }
+  return (1.0 / frequency) * unit;
+}
+
+float DrmMode::te_period(int64_t unit) const {
+  auto frequency = te_frequency();
+  if (frequency == 0.0f) {
+    return 0.0f;
+  }
+  return (1.0 / frequency) * unit;
+}
+
+bool DrmMode::is_operation_rate_to_bts() const {
+  if (!is_vrr_mode()) {
+    return HasFlag(flags_, DRM_MODE_FLAG_BTS_OP_RATE);
+  }
+  return false;
 }
 
 uint32_t DrmMode::flags() const {

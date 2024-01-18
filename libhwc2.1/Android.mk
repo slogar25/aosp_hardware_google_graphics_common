@@ -47,6 +47,20 @@ LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := libdrm
 
+ifeq ($(CLANG_COVERAGE),true)
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_WHOLE_STATIC_LIBRARIES += libprofile-clang-extras_ndk
+LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
+endif
+
 LOCAL_MODULE := libdrmresource
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
 LOCAL_LICENSE_CONDITIONS := notice
@@ -68,8 +82,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	libvendorgraphicbuffer libbinder_ndk \
 	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk
 
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
-                          com.google.hardware.pixel.display-V9-ndk \
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
+                          com.google.hardware.pixel.display-V10-ndk \
                           libbinder_ndk \
                           libbase \
                           libpng \
@@ -105,6 +119,7 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libhwcService \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdisplayinterface \
 	$(TOP)/hardware/google/graphics/common/libhwc2.1/libdrmresource/include \
+	$(TOP)/hardware/google/graphics/common/libhwc2.1/libvrr \
         $(TOP)/hardware/google/graphics/$(soc_ver)
 LOCAL_SRC_FILES := \
 	libhwchelper/ExynosHWCHelper.cpp \
@@ -123,6 +138,7 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
+	libvrr/VariableRefreshRateController.cpp \
 	pixel-display.cpp \
 	histogram_mediator.cpp
 
@@ -141,6 +157,20 @@ LOCAL_CFLAGS += -DLOG_TAG=\"hwc-display\"
 LOCAL_CFLAGS += -Wno-unused-parameter
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
+
+ifeq ($(CLANG_COVERAGE),true)
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_WHOLE_STATIC_LIBRARIES += libprofile-clang-extras_ndk
+LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
+endif
 
 LOCAL_MODULE := libexynosdisplay
 LOCAL_LICENSE_KINDS := SPDX-license-identifier-Apache-2.0
@@ -163,9 +193,9 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.graphics.allocator@2.0 \
 	android.hardware.graphics.mapper@2.0 \
-	android.hardware.graphics.composer3-V2-ndk
+	android.hardware.graphics.composer3-V3-ndk
 
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V9-ndk \
+LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V10-ndk \
                           libbinder_ndk \
                           libbase
 
@@ -200,6 +230,20 @@ LOCAL_CFLAGS += -DLOG_TAG=\"hwc-service\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
 
+ifeq ($(CLANG_COVERAGE),true)
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_WHOLE_STATIC_LIBRARIES += libprofile-clang-extras_ndk
+LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
+endif
+
 LOCAL_SRC_FILES := \
 	libhwcService/IExynosHWC.cpp \
 	libhwcService/ExynosHWCService.cpp
@@ -227,8 +271,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 	android.hardware.graphics.mapper@2.0 \
 	libui
 
-LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V2-ndk \
-                          com.google.hardware.pixel.display-V9-ndk \
+LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
+                          com.google.hardware.pixel.display-V10-ndk \
                           libbinder_ndk \
                           libbase
 
@@ -240,6 +284,20 @@ LOCAL_CFLAGS := -DHLOG_CODE=0
 LOCAL_CFLAGS += -DLOG_TAG=\"hwc-2\"
 LOCAL_CFLAGS += -DSOC_VERSION=$(soc_ver)
 LOCAL_CFLAGS += -Wthread-safety
+
+ifeq ($(CLANG_COVERAGE),true)
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_WHOLE_STATIC_LIBRARIES += libprofile-clang-extras_ndk
+LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
+endif
 
 ifeq ($(BOARD_USES_HWC_SERVICES),true)
 LOCAL_CFLAGS += -DUSES_HWC_SERVICES

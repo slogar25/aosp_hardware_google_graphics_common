@@ -156,10 +156,10 @@ BrightnessController::~BrightnessController() {
     }
 }
 
-void BrightnessController::updateBrightnessTable(const IBrightnessTable* table) {
+void BrightnessController::updateBrightnessTable(std::unique_ptr<const IBrightnessTable>& table) {
     if (table && table->GetBrightnessRange(BrightnessMode::BM_NOMINAL)) {
         ALOGI("%s: apply brightness table from libdisplaycolor", __func__);
-        mBrightnessTable = table;
+        mBrightnessTable = std::move(table);
     } else {
         ALOGW("%s: table is not valid!", __func__);
     }
@@ -304,7 +304,7 @@ void BrightnessController::initBrightnessTable(const DrmDevice& drmDevice,
             reinterpret_cast<struct brightness_capability *>(blob->data);
     mKernelBrightnessTable.Init(cap);
     if (mKernelBrightnessTable.IsValid()) {
-        mBrightnessTable = &mKernelBrightnessTable;
+        mBrightnessTable = std::make_unique<LinearBrightnessTable>(mKernelBrightnessTable);
     }
 
     parseHbmModeEnums(connector.hbm_mode());
@@ -343,6 +343,14 @@ int BrightnessController::updateAclMode() {
         mAclMode.store(mAclModeDefault);
     }
 
+    if (applyAclViaSysfs() == HWC2_ERROR_NO_RESOURCES)
+        ALOGW("%s try to apply acl_mode when brightness changed", __func__);
+
+    return NO_ERROR;
+}
+
+int BrightnessController::applyAclViaSysfs() {
+    if (!mAclModeOfs.is_open()) return NO_ERROR;
     if (!mAclMode.is_dirty()) return NO_ERROR;
 
     mAclModeOfs.seekp(std::ios_base::beg);
@@ -376,6 +384,11 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     }
 
     ATRACE_CALL();
+
+    /* update ACL */
+    if (applyAclViaSysfs() == HWC2_ERROR_NO_RESOURCES)
+        ALOGE("%s failed to apply acl_mode", __func__);
+
     if (!mBrightnessIntfSupported) {
         level = brightness < 0 ? 0 : static_cast<uint32_t>(brightness * mMaxBrightness + 0.5f);
         return applyBrightnessViaSysfs(level);

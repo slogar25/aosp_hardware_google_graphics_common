@@ -1340,7 +1340,8 @@ int exynos_open(const struct hw_module_t *module, const char *name,
     dev = (struct exynos_hwc2_device_t *)malloc(sizeof(*dev));
     memset(dev, 0, sizeof(*dev));
 
-    dev->device = new ExynosDeviceModule;
+    // The legacy HIDL does not provide compatibility for the Vrr API as defined by AIDL.
+    dev->device = new ExynosDeviceModule(false);
     g_exynosDevice = dev->device;
 
     dev->base.common.tag = HARDWARE_DEVICE_TAG;

@@ -175,7 +175,7 @@ ndk::ScopedAStatus Display::setCompensationImageHandle(const NativeHandle &nativ
 
 ndk::ScopedAStatus Display::setMinIdleRefreshRate(int fps, int *_aidl_return) {
     if (mDisplay) {
-        *_aidl_return = mDisplay->setMinIdleRefreshRate(fps, VrrThrottleRequester::PIXEL_DISP);
+        *_aidl_return = mDisplay->setMinIdleRefreshRate(fps, RrThrottleRequester::PIXEL_DISP);
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
@@ -194,7 +194,7 @@ ndk::ScopedAStatus Display::setRefreshRateThrottle(int delayMs, int *_aidl_retur
                                                               std::chrono::nanoseconds>(
                                                               std::chrono::milliseconds(delayMs))
                                                               .count(),
-                                                      VrrThrottleRequester::PIXEL_DISP);
+                                                      RrThrottleRequester::PIXEL_DISP);
         return ndk::ScopedAStatus::ok();
     }
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
@@ -209,13 +209,13 @@ bool Display::runMediator(const RoiRect &roi, const Weight &weight, const Histog
         std::scoped_lock lock(mMediator.mConfigMutex);
         isConfigChanged = mMediator.mConfig != pendingConfig;
 
-        if (isConfigChanged &&
-            mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
-            ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
-            return false;
+        if (isConfigChanged) {
+            if (mMediator.setRoiWeightThreshold(roi, weight, pos) != HistogramErrorCode::NONE) {
+                ALOGE("histogram error, SET_ROI_WEIGHT_THRESHOLD ERROR\n");
+                return false;
+            }
+            mMediator.mConfig = pendingConfig;
         }
-
-        mMediator.mConfig = pendingConfig;
     }
 
     if (!mMediator.histRequested() &&

@@ -40,7 +40,6 @@ using namespace SOC_VERSION;
 constexpr uint32_t MAX_PLANE_NUM = 3;
 constexpr uint32_t CBCR_INDEX = 1;
 constexpr float DISPLAY_LUMINANCE_UNIT = 10000;
-constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
 constexpr auto vsyncPeriodTag = "VsyncPeriod";
 
 typedef struct _drmModeAtomicReqItem drmModeAtomicReqItem, *drmModeAtomicReqItemPtr;
@@ -61,6 +60,19 @@ using namespace vendor::graphics;
 
 extern struct exynos_hwc_control exynosHWCControl;
 static const int32_t kUmPerInch = 25400;
+
+int writeIntToKernelFile(const char* path, const int value) {
+    std::ofstream ofs(path);
+
+    if (!ofs.is_open()) {
+        ALOGW("%s(): unable to open %s (%s)", __func__, path, strerror(errno));
+        return -1;
+    }
+
+    ofs << value << std::endl;
+
+    return 0;
+}
 
 FramebufferManager::~FramebufferManager()
 {
@@ -449,6 +461,16 @@ void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayIdleTimerSupport(bool &outSupport) {
+    if (isFullVrrSupported()) {
+        outSupport = false;
+        return NO_ERROR;
+    } else if (isPseudoVrrSupported()) {
+        // Retuen true to avoid SF idle timer working. We insert frames manually
+        // for pseudo VRR, so ideally panel idle should be disabled in the driver.
+        outSupport = true;
+        return NO_ERROR;
+    }
+
     auto [ret, support] = mDrmConnector->panel_idle_support().value();
     if (ret) {
         ALOGI("no panel_idle_support drm property or invalid value (%d)", ret);
@@ -628,7 +650,7 @@ void ExynosDisplayDrmInterface::updateMountOrientation()
 
     for (auto &e : orientationEnums) {
         uint64_t enumValue;
-        std::tie(enumValue, err) = orientation.GetEnumValueWithName(e.second);
+        std::tie(enumValue, err) = orientation.getEnumValueWithName(e.second);
         if (!err && enumValue == drmOrientation) {
             mExynosDisplay->mMountOrientation = e.first;
             return;
@@ -723,7 +745,7 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
         auto &plane = mDrmDevice->planes().at(i);
         uint32_t plane_id = plane->id();
 
-        if (!plane->zpos_property().is_immutable()) {
+        if (!plane->zpos_property().isImmutable()) {
             /* Plane can be used for composition */
             ExynosMPP *exynosMPP =
                 mExynosDisplay->mResourceManager->getOtfMPPWithChannel(i);
@@ -760,10 +782,10 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
         parseRangeEnums(plane->range_property());
     }
 
-    chosePreferredConfig();
+    choosePreferredConfig();
 
-    // After chosePreferredConfig, the mDrmConnector->modes array is initialized, get the panel full
-    // resolution information here.
+    // After choosePreferredConfig, the mDrmConnector->modes array is initialized, get the panel
+    // full resolution information here.
     if (mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) {
         retrievePanelFullResolution();
     }
@@ -841,6 +863,8 @@ void ExynosDisplayDrmInterface::Callback(
         mExynosDisplay->mLastVsyncTimestamp = timestamp;
     }
 
+    mExynosDisplay->onVsync(timestamp);
+
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
 
     if (exynosDevice->onVsync_2_4(mExynosDisplay->mDisplayId, timestamp,
@@ -902,11 +926,13 @@ int32_t ExynosDisplayDrmInterface::setLowPowerMode() {
     mExynosDisplay->mXres = mDozeDrmMode.h_display();
     mExynosDisplay->mYres = mDozeDrmMode.v_display();
     // in nanoseconds
-    mExynosDisplay->mVsyncPeriod = nsecsPerSec / mDozeDrmMode.v_refresh();
+    mExynosDisplay->mVsyncPeriod = static_cast<uint32_t>(mDozeDrmMode.te_period());
     // Dots per 1000 inches
     mExynosDisplay->mXdpi = mm_width ? (mDozeDrmMode.h_display() * kUmPerInch) / mm_width : -1;
     // Dots per 1000 inches
     mExynosDisplay->mYdpi = mm_height ? (mDozeDrmMode.v_display() * kUmPerInch) / mm_height : -1;
+
+    mExynosDisplay->mRefreshRate = static_cast<int32_t>(mDozeDrmMode.v_refresh());
 
     return setActiveDrmMode(mDozeDrmMode);
 }
@@ -949,8 +975,7 @@ int32_t ExynosDisplayDrmInterface::setVsyncEnabled(uint32_t enabled)
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
-{
+int32_t ExynosDisplayDrmInterface::choosePreferredConfig() {
     uint32_t num_configs = 0;
     int32_t err = getDisplayConfigs(&num_configs, NULL);
     if (err != HWC2_ERROR_NONE || !num_configs)
@@ -959,9 +984,10 @@ int32_t ExynosDisplayDrmInterface::chosePreferredConfig()
     int32_t config = -1;
     char modeStr[PROPERTY_VALUE_MAX] = "\0";
     int32_t width = 0, height = 0, fps = 0;
+    // only legacy products use this property, kernel preferred mode will be used going forward
     if (property_get("vendor.display.preferred_mode", modeStr, "") > 0 &&
         sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
-        err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, &config);
+        err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, fps, &config);
     } else {
         err = HWC2_ERROR_BAD_CONFIG;
     }
@@ -997,19 +1023,25 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         uint32_t* outNumConfigs,
         hwc2_config_t* outConfigs)
 {
+    if (!mExynosDisplay || !(mExynosDisplay->mDevice)) {
+        return HWC2_ERROR_BAD_DISPLAY;
+    }
+
     std::lock_guard<std::recursive_mutex> lock(mDrmConnector->modesLock());
 
     if (!outConfigs) {
-        int ret = mDrmConnector->UpdateModes();
+        bool useVrrConfigs = isFullVrrSupported();
+        int ret = mDrmConnector->UpdateModes(useVrrConfigs);
         if (ret < 0) {
             ALOGE("Failed to update display modes %d", ret);
             return HWC2_ERROR_BAD_DISPLAY;
         }
-
         if (ret == 0) {
             // no need to update mExynosDisplay->mDisplayConfigs
             goto no_mode_changes;
         }
+        ALOGI("Select Vrr Config for display %s: %s", mExynosDisplay->mDisplayName.c_str(),
+              useVrrConfigs ? "full" : (isPseudoVrrSupported() ? "pseudo" : "non-Vrr"));
 
         if (mDrmConnector->state() == DRM_MODE_CONNECTED) {
             /*
@@ -1030,28 +1062,23 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
 
         uint32_t mm_width = mDrmConnector->mm_width();
         uint32_t mm_height = mDrmConnector->mm_height();
+        ALOGD("%s: mm_width(%u) mm_height(%u)",
+              mExynosDisplay->mDisplayName.c_str(), mm_width, mm_height);
 
-        /* key: (width<<32 | height) */
-        std::map<uint64_t, uint32_t> groupIds;
-        uint32_t groupId = 0;
+        DisplayConfigGroupIdGenerator groupIdGenerator;
         float peakRr = -1;
-
         for (const DrmMode &mode : mDrmConnector->modes()) {
             displayConfigs_t configs;
             float rr = mode.v_refresh();
-            configs.vsyncPeriod = nsecsPerSec / rr;
+            configs.refreshRate = static_cast<int32_t>(rr);
+            configs.vsyncPeriod = static_cast<int32_t>(mode.te_period());
+            if (configs.vsyncPeriod <= 0.0f) {
+                ALOGE("%s:: invalid vsync period", __func__);
+                return HWC2_ERROR_BAD_DISPLAY;
+            }
+            configs.isOperationRateToBts = mode.is_operation_rate_to_bts();
             configs.width = mode.h_display();
             configs.height = mode.v_display();
-            uint64_t key = ((uint64_t)configs.width<<32) | configs.height;
-            auto it = groupIds.find(key);
-            if (it != groupIds.end()) {
-                configs.groupId = it->second;
-            } else {
-                configs.groupId = groupId;
-                groupIds.insert(std::make_pair(key, groupId));
-                groupId++;
-            }
-
             // Dots per 1000 inches
             configs.Xdpi = mm_width ? (mode.h_display() * kUmPerInch) / mm_width : -1;
             // Dots per 1000 inches
@@ -1059,10 +1086,29 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             // find peak rr
             if (rr > peakRr)
                   peakRr = rr;
+            // Configure VRR if it's turned on.
+            if (mode.is_vrr_mode()) {
+                VrrConfig_t vrrConfig;
+                vrrConfig.minFrameIntervalNs = static_cast<int>(std::nano::den / rr);
+                // TODO(b/290843234): FrameIntervalPowerHint is currently optional and omitted.
+                // Supply initial values for notifyExpectedPresentConfig; potential changes may come
+                // later.
+                vrrConfig.notifyExpectedPresentConfig.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs;
+                vrrConfig.notifyExpectedPresentConfig.TimeoutNs = mNotifyExpectedPresentTimeoutNs;
+                configs.vrrConfig = std::make_optional(vrrConfig);
+                configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height,
+                                                              vrrConfig.minFrameIntervalNs,
+                                                              configs.vsyncPeriod);
+            } else {
+                configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height);
+            }
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
-            ALOGD("config group(%d), w(%d), h(%d), vsync(%d), xdpi(%d), ydpi(%d)",
-                    configs.groupId, configs.width, configs.height,
-                    configs.vsyncPeriod, configs.Xdpi, configs.Ydpi);
+            ALOGD("%s: config group(%d), w(%d), h(%d), rr(%f), TE(%d), xdpi(%d), ydpi(%d), "
+                  "vrr mode(%s), NS mode(%s)",
+                  mExynosDisplay->mDisplayName.c_str(),
+                  configs.groupId, configs.width, configs.height, rr, configs.vsyncPeriod,
+                  configs.Xdpi, configs.Ydpi, mode.is_vrr_mode() ? "true" : "false",
+                  mode.is_ns_mode() ? "true" : "false");
         }
         mExynosDisplay->setPeakRefreshRate(peakRr);
     }
@@ -1093,13 +1139,16 @@ void ExynosDisplayDrmInterface::dumpDisplayConfigs()
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
     for (uint32_t i = 0; i < num_modes; i++) {
         auto mode = mDrmConnector->modes().at(i);
-        ALOGD("%s display config[%d] %s:: id(%d), clock(%d), flags(%d), type(%d)",
-                mExynosDisplay->mDisplayName.c_str(), i, mode.name().c_str(), mode.id(), mode.clock(), mode.flags(), mode.type());
+        ALOGD("%s: config[%d] %s: id(%d), clock(%d), flags(0x%x), type(0x%x)",
+              mExynosDisplay->mDisplayName.c_str(), i, mode.name().c_str(), mode.id(),
+              mode.clock(), mode.flags(), mode.type());
         ALOGD("\th_display(%d), h_sync_start(%d), h_sync_end(%d), h_total(%d), h_skew(%d)",
-                mode.h_display(), mode.h_sync_start(), mode.h_sync_end(), mode.h_total(), mode.h_skew());
-        ALOGD("\tv_display(%d), v_sync_start(%d), v_sync_end(%d), v_total(%d), v_scan(%d), v_refresh(%f)",
-                mode.v_display(), mode.v_sync_start(), mode.v_sync_end(), mode.v_total(), mode.v_scan(), mode.v_refresh());
-
+              mode.h_display(), mode.h_sync_start(), mode.h_sync_end(), mode.h_total(),
+              mode.h_skew());
+        ALOGD("\tv_display(%d), v_sync_start(%d), v_sync_end(%d), v_total(%d), v_scan(%d), "
+              "v_refresh(%f)",
+              mode.v_display(), mode.v_sync_start(), mode.v_sync_end(), mode.v_total(),
+              mode.v_scan(), mode.v_refresh());
     }
 }
 
@@ -1110,7 +1159,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayVsyncPeriod(hwc2_vsync_period_t* ou
 
 int32_t ExynosDisplayDrmInterface::getConfigChangeDuration()
 {
-    const auto [ret, duration] = mDrmConnector->vrr_switch_duration().value();
+    const auto [ret, duration] = mDrmConnector->rr_switch_duration().value();
 
     if (!ret && duration > 0) {
         return duration;
@@ -1248,7 +1297,7 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
     } else if ((mActiveModeState.blob_id != 0) && (mActiveModeState.mode.id() == config)) {
         ALOGD("%s:: same mode %d", __func__, config);
         /* trigger resetConfigRequestStateLocked() */
-        mVsyncCallback.setDesiredVsyncPeriod(nsecsPerSec / mActiveModeState.mode.v_refresh());
+        mVsyncCallback.setDesiredVsyncPeriod(mActiveModeState.mode.te_period());
         mDrmVSyncWorker.VSyncControl(true);
         return HWC2_ERROR_NONE;
     }
@@ -1279,7 +1328,8 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
         }
     } else {
         if (!isResSwitch) {
-            ret = setDisplayMode(drmReq, modeBlob ? modeBlob : mDesiredModeState.blob_id);
+            ret = setDisplayMode(drmReq, modeBlob ? modeBlob : mDesiredModeState.blob_id,
+                                 modeBlob ? mode->id() : mDesiredModeState.mode.id());
             if (ret < 0) {
                 HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode", __func__);
                 return ret;
@@ -1325,7 +1375,7 @@ int32_t ExynosDisplayDrmInterface::setActiveDrmMode(DrmMode const &mode) {
         reconfig = true;
     }
 
-    if ((ret = setDisplayMode(drmReq, modeBlob)) != NO_ERROR) {
+    if ((ret = setDisplayMode(drmReq, modeBlob, mode.id())) != NO_ERROR) {
         drmReq.addOldBlob(modeBlob);
         HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
                 __func__);
@@ -1394,9 +1444,9 @@ int32_t ExynosDisplayDrmInterface::createModeBlob(const DrmMode &mode,
     return NO_ERROR;
 }
 
-int32_t ExynosDisplayDrmInterface::setDisplayMode(
-        DrmModeAtomicReq &drmReq, const uint32_t modeBlob)
-{
+int32_t ExynosDisplayDrmInterface::setDisplayMode(DrmModeAtomicReq& drmReq,
+                                                  const uint32_t& modeBlob,
+                                                  const uint32_t& modeId) {
     int ret = NO_ERROR;
 
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(),
@@ -1410,6 +1460,10 @@ int32_t ExynosDisplayDrmInterface::setDisplayMode(
     if ((ret = drmReq.atomicAddProperty(mDrmConnector->id(),
             mDrmConnector->crtc_id_property(), mDrmCrtc->id())) < 0)
         return ret;
+
+    if (mConfigChangeCallback) {
+        drmReq.setAckCallback(std::bind(mConfigChangeCallback, modeId));
+    }
 
     return NO_ERROR;
 }
@@ -1427,6 +1481,10 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     mExynosDisplay->mMaxAverageLuminance = 0;
     mExynosDisplay->mMinLuminance = 0;
 
+    if (mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL) {
+        int upd_res = mDrmConnector->UpdateLuminanceAndHdrProperties();
+        if (!upd_res) ALOGW("%s: UpdateLuminanceAndHdrProperties failed (%d)", __func__, upd_res);
+    }
     const DrmProperty &prop_max_luminance = mDrmConnector->max_luminance();
     const DrmProperty &prop_max_avg_luminance = mDrmConnector->max_avg_luminance();
     const DrmProperty &prop_min_luminance = mDrmConnector->min_luminance();
@@ -1442,9 +1500,11 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
         (prop_max_avg_luminance.id() == 0) ||
         (prop_min_luminance.id() == 0) ||
         (prop_hdr_formats.id() == 0)) {
-        ALOGE("%s:: there is no property for hdrCapabilities (max_luminance: %d, max_avg_luminance: %d, min_luminance: %d, hdr_formats: %d",
-                __func__, prop_max_luminance.id(), prop_max_avg_luminance.id(),
-                prop_min_luminance.id(), prop_hdr_formats.id());
+        HWC_LOGE(mExynosDisplay,
+                 "%s:: there is no property for hdrCapabilities (max_luminance: %d, "
+                 "max_avg_luminance: %d, min_luminance: %d, hdr_formats: %d",
+                 __func__, prop_max_luminance.id(), prop_max_avg_luminance.id(),
+                 prop_min_luminance.id(), prop_hdr_formats.id());
         return -1;
     }
 
@@ -1480,13 +1540,13 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
     }
 
     uint32_t typeBit;
-    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("Dolby Vision");
+    std::tie(typeBit, ret) = prop_hdr_formats.getEnumValueWithName("Dolby Vision");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_DOLBY_VISION);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.c_str(), HAL_HDR_DOLBY_VISION);
     }
-    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HDR10");
+    std::tie(typeBit, ret) = prop_hdr_formats.getEnumValueWithName("HDR10");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HDR10);
         if (mExynosDisplay->mDevice->mResourceManager->hasHDR10PlusMPP()) {
@@ -1495,7 +1555,7 @@ int32_t ExynosDisplayDrmInterface::updateHdrCapabilities()
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
                 mExynosDisplay->mDisplayName.c_str(), HAL_HDR_HDR10);
     }
-    std::tie(typeBit, ret) = prop_hdr_formats.GetEnumValueWithName("HLG");
+    std::tie(typeBit, ret) = prop_hdr_formats.getEnumValueWithName("HLG");
     if ((ret == 0) && (hdr_formats & (1 << typeBit))) {
         mExynosDisplay->mHdrTypes.push_back(HAL_HDR_HLG);
         HDEBUGLOGD(eDebugHWC, "%s: supported hdr types : %d",
@@ -1591,12 +1651,11 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
                     plane->blend_property(), drmEnum, true)) < 0)
         return ret;
 
-    if (plane->zpos_property().id() &&
-        !plane->zpos_property().is_immutable()) {
+    if (plane->zpos_property().id() && !plane->zpos_property().isImmutable()) {
         uint64_t min_zpos = 0;
 
         // Ignore ret and use min_zpos as 0 by default
-        std::tie(std::ignore, min_zpos) = plane->zpos_property().range_min();
+        std::tie(std::ignore, min_zpos) = plane->zpos_property().rangeMin();
 
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                 plane->zpos_property(), configIndex + min_zpos)) < 0)
@@ -1606,8 +1665,8 @@ int32_t ExynosDisplayDrmInterface::setupCommitFromDisplayConfig(
     if (plane->alpha_property().id()) {
         uint64_t min_alpha = 0;
         uint64_t max_alpha = 0;
-        std::tie(std::ignore, min_alpha) = plane->alpha_property().range_min();
-        std::tie(std::ignore, max_alpha) = plane->alpha_property().range_max();
+        std::tie(std::ignore, min_alpha) = plane->alpha_property().rangeMin();
+        std::tie(std::ignore, max_alpha) = plane->alpha_property().rangeMax();
         if ((ret = drmReq.atomicAddProperty(plane->id(),
                 plane->alpha_property(),
                 (uint64_t)(((max_alpha - min_alpha) * config.plane_alpha) + 0.5) + min_alpha, true)) < 0)
@@ -1855,7 +1914,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 1 << mMipiSyncEnums[toUnderlying(HalMipiSyncType::HAL_MIPI_CMD_SYNC_REFRESH_RATE)];
         }
 
-        if ((ret = setDisplayMode(drmReq, mDesiredModeState.blob_id)) < 0) {
+        if ((ret = setDisplayMode(drmReq, mDesiredModeState.blob_id, mDesiredModeState.mode.id())) <
+            0) {
             HWC_LOGE(mExynosDisplay, "%s: Fail to apply display mode",
                     __func__);
             return ret;
@@ -2091,8 +2151,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
             mDrmConnector->ResetLpMode();
             getLowPowerDrmModeModeInfo();
         }
-        mVsyncCallback.setDesiredVsyncPeriod(
-                nsecsPerSec/mActiveModeState.mode.v_refresh());
+        mVsyncCallback.setDesiredVsyncPeriod(mActiveModeState.mode.te_period());
         /* Enable vsync to check vsync period */
         mDrmVSyncWorker.VSyncControl(true);
     }
@@ -2137,6 +2196,15 @@ int32_t ExynosDisplayDrmInterface::triggerClearDisplayPlanes()
         return ret;
     }
     return ret;
+}
+
+void ExynosDisplayDrmInterface::setVrrSettings(const VrrSettings_t& vrrSettings) {
+    if (vrrSettings.enabled) {
+        mIsVrrModeSupported = true;
+        mNotifyExpectedPresentHeadsUpNs = vrrSettings.notifyExpectedPresentConfig.HeadsUpNs;
+        mNotifyExpectedPresentTimeoutNs = vrrSettings.notifyExpectedPresentConfig.TimeoutNs;
+        mConfigChangeCallback = vrrSettings.configChangeCallback;
+    }
 }
 
 int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)
@@ -2292,7 +2360,7 @@ int32_t ExynosDisplayDrmInterface::DrmModeAtomicReq::atomicAddProperty(
         return -EINVAL;
     }
 
-    if (property.id()) {
+    if (property.id() && property.validateChange(value)) {
         int ret = drmModeAtomicAddProperty(mPset, id,
                 property.id(), value);
         if (ret < 0) {
@@ -2401,11 +2469,44 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
         ALOGV("skip atomic commit error handling as kernel is in TUI");
         ret = NO_ERROR;
     } else if (ret < 0) {
+        if (ret == -EINVAL) {
+            dumpDrmAtomicCommitMessage(ret);
+        }
         HWC_LOGE(mDrmDisplayInterface->mExynosDisplay, "commit error: %d", ret);
         setError(ret);
     }
 
+    if (ret == 0 && mAckCallback) {
+        if (!(flags & DRM_MODE_ATOMIC_TEST_ONLY)) {
+            mAckCallback();
+        }
+    }
+
     return ret;
+}
+
+void ExynosDisplayDrmInterface::DrmModeAtomicReq::dumpDrmAtomicCommitMessage(int err) {
+    const nsecs_t now = systemTime(SYSTEM_TIME_MONOTONIC);
+    const nsecs_t diffMs = ns2ms(now - mDrmDisplayInterface->mLastDumpDrmAtomicMessageTime);
+    if (diffMs < kAllowDumpDrmAtomicMessageTimeMs) {
+        return;
+    }
+
+    if (writeIntToKernelFile(kDrmModuleParametersDebugNode, kEnableDrmAtomicMessage)) {
+        return;
+    }
+
+    HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+             "commit error, enable atomic message and test again");
+    int ret = drmModeAtomicCommit(mDrmDisplayInterface->mDrmDevice->fd(), mPset,
+                                  DRM_MODE_ATOMIC_TEST_ONLY, mDrmDisplayInterface->mDrmDevice);
+    if (ret != err) {
+        HWC_LOGE(mDrmDisplayInterface->mExynosDisplay,
+                 "re-try commit error(%d) is different from %d", ret, err);
+    }
+
+    writeIntToKernelFile(kDrmModuleParametersDebugNode, kDisableDrmDebugMessage);
+    mDrmDisplayInterface->mLastDumpDrmAtomicMessageTime = systemTime(SYSTEM_TIME_MONOTONIC);
 }
 
 int32_t ExynosDisplayDrmInterface::getReadbackBufferAttributes(
@@ -2559,9 +2660,9 @@ void ExynosDisplayDrmInterface::DrmReadbackInfo::pickFormatDataspace()
 
 int32_t ExynosDisplayDrmInterface::getDisplayFakeEdid(uint8_t &outPort, uint32_t &outDataSize,
                                                       uint8_t *outData) {
-    int width = mExynosDisplay->mXres;
-    int height = mExynosDisplay->mYres;
-    int clock = (width) * (height) * 60 / 10000;
+    uint32_t width = mExynosDisplay->mXres;
+    uint32_t height = mExynosDisplay->mYres;
+    uint32_t clock = (width * height * kDefaultRefreshRateFrequency) / 10000;
     std::array<uint8_t, 128> edid_buf{
             0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, /* header */
             0x1C, 0xEC,                                     /* manufacturer GGL */
@@ -2770,4 +2871,21 @@ int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoc
                                                              uint8_t channelId) const {
     ALOGE("%s: kernel doesn't support multi channel histogram ioctl", __func__);
     return INVALID_OPERATION;
+}
+
+static constexpr auto kDpHotplugErrorCodeSysfsPath =
+        "/sys/devices/platform/110f0000.drmdp/drm-displayport/dp_hotplug_error_code";
+
+int ExynosDisplayDrmInterface::readHotplugErrorCode() {
+    if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL) return 0;
+    int hotplug_error_code = 0;
+    std::ifstream ifs(kDpHotplugErrorCodeSysfsPath);
+    if (ifs.is_open()) ifs >> hotplug_error_code;
+    return hotplug_error_code;
+}
+
+void ExynosDisplayDrmInterface::resetHotplugErrorCode() {
+    if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL) return;
+    std::ofstream ofs(kDpHotplugErrorCodeSysfsPath);
+    if (ofs.is_open()) ofs << "0";
 }
