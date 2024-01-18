@@ -1,12 +1,12 @@
 #pragma once
 
-#include <aidl/android/hardware/graphics/common/PlanelayoutComponentType.h>
+#include <aidl/android/hardware/graphics/common/PlaneLayoutComponentType.h>
 
 #include <cstdint>
 
 namespace pixel::graphics {
 
-using aidl::android::hardware::graphics::common::PlanelayoutComponentType;
+using aidl::android::hardware::graphics::common::PlaneLayoutComponentType;
 
 // These are represented as bitwise in PlaneLayoutComponentType.aidl, but we
 // do not treat them as such. This helps in better separation of component type
