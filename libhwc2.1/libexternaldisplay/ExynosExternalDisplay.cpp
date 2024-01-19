@@ -153,7 +153,12 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
         if (err == HWC2_ERROR_NONE) {
             mActiveConfig = config;
         } else {
-            mActiveConfig = outConfigs[0];
+            err = lookupDisplayConfigsRelaxed(1920, 1080, 60, &config);
+            if (err == HWC2_ERROR_NONE) {
+                mActiveConfig = config;
+            } else {
+                mActiveConfig = outConfigs[0];
+            }
         }
 
         displayConfigs_t displayConfig = mDisplayConfigs[mActiveConfig];

@@ -6494,6 +6494,54 @@ int ExynosDisplay::lookupDisplayConfigs(const int32_t &width,
             return HWC2_ERROR_NONE;
         }
     }
+
+    return HWC2_ERROR_BAD_CONFIG;
+}
+
+int ExynosDisplay::lookupDisplayConfigsRelaxed(const int32_t &width,
+                                               const int32_t &height,
+                                               const int32_t &fps,
+                                               int32_t *outConfig) {
+    if (fps <= 1)
+        return HWC2_ERROR_BAD_CONFIG;
+
+    const auto vsyncPeriod = nsecsPerSec / fps;
+    const auto vsyncPeriodMin = nsecsPerSec / (fps + 1);
+    const auto vsyncPeriodMax = nsecsPerSec / (fps - 1);
+
+    // Search for exact match in resolution and vsync
+    for (auto const& [config, mode] : mDisplayConfigs) {
+        if (mode.width == width && mode.height == height && mode.vsyncPeriod == vsyncPeriod) {
+            ALOGD("%s: found exact match for mode %dx%d@%d -> config=%d",
+                 __func__, width, height, fps, config);
+            *outConfig = config;
+            return HWC2_ERROR_NONE;
+        }
+    }
+
+    // Search for exact match in resolution, allow small variance in vsync
+    for (auto const& [config, mode] : mDisplayConfigs) {
+        if (mode.width == width && mode.height == height &&
+            mode.vsyncPeriod >= vsyncPeriodMin && mode.vsyncPeriod <= vsyncPeriodMax) {
+            ALOGD("%s: found close match for mode %dx%d@%d -> config=%d",
+                 __func__, width, height, fps, config);
+            *outConfig = config;
+            return HWC2_ERROR_NONE;
+        }
+    }
+
+    // Search for smaller resolution, allow small variance in vsync
+    // mDisplayConfigs is sorted, so this will give the largest available option
+    for (auto const& [config, mode] : mDisplayConfigs) {
+        if (mode.width <= width && mode.height <= height &&
+            mode.vsyncPeriod >= vsyncPeriodMin && mode.vsyncPeriod <= vsyncPeriodMax) {
+            ALOGD("%s: found relaxed match for mode %dx%d@%d -> config=%d",
+                 __func__, width, height, fps, config);
+            *outConfig = config;
+            return HWC2_ERROR_NONE;
+        }
+    }
+
     return HWC2_ERROR_BAD_CONFIG;
 }
 

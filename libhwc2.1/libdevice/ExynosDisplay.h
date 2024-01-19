@@ -1386,6 +1386,10 @@ class ExynosDisplay {
                                  const int32_t& fps,
                                  const int32_t& vsyncRate,
                                  int32_t* outConfig);
+        int lookupDisplayConfigsRelaxed(const int32_t& width,
+                                        const int32_t& height,
+                                        const int32_t& fps,
+                                        int32_t* outConfig);
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
