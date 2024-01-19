@@ -53,6 +53,7 @@ public:
           void onHotplugEvent(int64_t display, common::DisplayHotplugEvent event) override;
 
       private:
+        void processDisplayResources(int64_t display, bool connected);
         void cleanDisplayResources(int64_t display);
 
         IComposerHal* mHal;
