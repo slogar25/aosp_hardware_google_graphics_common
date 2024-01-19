@@ -80,6 +80,8 @@ using ColorModesMap = std::map<hwc::ColorMode, std::vector<hwc::RenderIntent>>;
 /// Image data bit depths.
 enum class BitDepth { kEight, kTen };
 
+// deprecated by 'int64_t display_id' TODO: remove after all clients upgrade to
+// display_id
 /// Display type used to get pipeline or update display scene.
 enum DisplayType {
     /// builtin primary display
@@ -151,7 +153,9 @@ class IBrightnessTable {
  * @brief This structure holds data imported from HWC.
  */
 struct DisplayInfo {
-    DisplayType display_type;
+    // deprecated by display_id
+    DisplayType display_type{DISPLAY_MAX};
+    int64_t display_id{-1};
     std::string panel_name;
     std::string panel_serial;
 
@@ -180,7 +184,12 @@ struct LayerColorData {
                dynamic_metadata == rhs.dynamic_metadata &&
                dim_ratio == rhs.dim_ratio &&
                is_solid_color_layer == rhs.is_solid_color_layer &&
-               (!is_solid_color_layer || solid_color == rhs.solid_color);
+               (!is_solid_color_layer || solid_color == rhs.solid_color) &&
+               enabled == rhs.enabled;
+    }
+
+    bool operator!=(const LayerColorData &rhs) const {
+        return !operator==(rhs);
     }
 
     /**
@@ -208,6 +217,9 @@ struct LayerColorData {
 
         bool operator==(const HdrStaticMetadata &rhs) const {
             return data == rhs.data && is_valid == rhs.is_valid;
+        }
+        bool operator!=(const HdrStaticMetadata &rhs) const {
+            return !operator==(rhs);
         }
 
         /// Indicator for whether the data in this struct should be used.
@@ -249,6 +261,9 @@ struct LayerColorData {
                    tm_flag == rhs.tm_flag && tm_knee_x == rhs.tm_knee_x &&
                    tm_knee_y == rhs.tm_knee_y &&
                    bezier_curve_anchors == rhs.bezier_curve_anchors;
+        }
+        bool operator!=(const HdrDynamicMetadata &rhs) const {
+            return !operator==(rhs);
         }
 
         /// Indicator for whether the data in this struct should be used.
@@ -306,6 +321,12 @@ struct LayerColorData {
      *
      */
     bool is_client_target = false;
+
+    /**
+     * @brief indicates if this layer data has enabled. Do not compute the
+     * colordata if its false. true by default for backward compatibility.
+     */
+    bool enabled = true;
 };
 
 /**
@@ -427,7 +448,9 @@ class IDisplayColorGeneric {
      * @param scene Display scene data to use during the update.
      * @return OK if successful, error otherwise.
      */
+    //deprecated by the 'int64_t display' version
     virtual int Update(const DisplayType display, const DisplayScene &scene) = 0;
+    virtual int Update(const int64_t display, const DisplayScene &scene) = 0;
 
     /**
      * @brief Update display color data. This function is expected to be called
@@ -438,27 +461,35 @@ class IDisplayColorGeneric {
      * @param scene Display scene data to use during the update.
      * @return OK if successful, error otherwise.
      */
+    //deprecated by the 'int64_t display' version
     virtual int UpdatePresent(const DisplayType display, const DisplayScene &scene) = 0;
+    virtual int UpdatePresent(const int64_t display, const DisplayScene &scene) = 0;
 
     /**
      * @brief Check if refresh rate regamma compensation is enabled.
      *
      * @return true for yes.
      */
+    //deprecated by the 'int64_t display' version
     virtual bool IsRrCompensationEnabled(const DisplayType display) = 0;
+    virtual bool IsRrCompensationEnabled(const int64_t display) = 0;
 
     /**
      * @brief Get calibration information for each profiles.
      * @param display The display to get the calibration information.
      */
+    //deprecated by the 'int64_t display' version
     virtual const CalibrationInfo &GetCalibrationInfo(const DisplayType display) const = 0;
+    virtual const CalibrationInfo &GetCalibrationInfo(const int64_t display) const = 0;
 
     /**
      * @brief Get a map of supported ColorModes, and supported RenderIntents for
      * each ColorMode.
      * @param display The display to get the color modes and render intents.
      */
+    //deprecated by the 'int64_t display' version
     virtual const ColorModesMap &ColorModesAndRenderIntents(const DisplayType display) const = 0;
+    virtual const ColorModesMap &ColorModesAndRenderIntents(const int64_t display) const = 0;
 
     /**
      * @brief Get pixel format and dataspace of blending stage.
@@ -467,7 +498,12 @@ class IDisplayColorGeneric {
      * @param dataspace Dataspace of blending stage
      * @return OK if successful, error otherwise.
      */
+    //deprecated by the 'int64_t display' version
     virtual int GetBlendingProperty(const DisplayType display,
+                                    hwc::PixelFormat &pixel_format,
+                                    hwc::Dataspace &dataspace,
+                                    bool &dimming_linear) const = 0;
+    virtual int GetBlendingProperty(const int64_t display,
                                     hwc::PixelFormat &pixel_format,
                                     hwc::Dataspace &dataspace,
                                     bool &dimming_linear) const = 0;
@@ -477,7 +513,9 @@ class IDisplayColorGeneric {
      * @param display to get the calibrated serial number.
      * @return The calibrated serial number.
      */
+    //deprecated by the 'int64_t display' version
     virtual const std::string& GetCalibratedSerialNumber(DisplayType display) const = 0;
+    virtual const std::string& GetCalibratedSerialNumber(const int64_t display) const = 0;
 
     /**
      * @brief Get brightness table to do brightness conversion between {normalized brightness, nits,
@@ -486,9 +524,29 @@ class IDisplayColorGeneric {
      * @param table Return brightness table if successful, nullptr if the table is not valid.
      * @return OK if successful, error otherwise.
      */
+    //deprecated by the 'int64_t display' version
     virtual int GetBrightnessTable(DisplayType display,
                                    std::unique_ptr<const IBrightnessTable> &table) const = 0;
+    virtual int GetBrightnessTable(const int64_t display,
+                                   std::unique_ptr<const IBrightnessTable> &table) const = 0;
 
+    /**
+     * @brief Add a display for color pipeline configuration.
+     * @param display_info info of this display
+     * @return OK if successful, error otherwise.
+     */
+    virtual int AddDisplay(const DisplayInfo &display_info) = 0;
+
+    /**
+     * @brief Remove a display and release its resources.
+     */
+    virtual void RemoveDisplay(const int64_t display) = 0;
+
+    /**
+     * @brief request a Update call. For example, a debug command has changed
+     * the displaycolor internal states and need to apply to next frame update.
+     */
+    virtual bool CheckUpdateNeeded(const int64_t display) = 0;
 };
 
 extern "C" {
