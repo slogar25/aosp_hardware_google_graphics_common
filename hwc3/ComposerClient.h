@@ -50,6 +50,7 @@ public:
           void onVsyncIdle(int64_t display) override;
           void onSeamlessPossible(int64_t display) override;
           void onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) override;
+          void onHotplugEvent(int64_t display, common::DisplayHotplugEvent event) override;
 
       private:
         void cleanDisplayResources(int64_t display);
