@@ -46,7 +46,7 @@ class ComposerCommandEngine {
   private:
       void dispatchDisplayCommand(const DisplayCommand& displayCommand);
       void dispatchLayerCommand(int64_t display, const LayerCommand& displayCommand);
-
+      void dispatchBatchCreateDestroyLayerCommand(int64_t display, const LayerCommand& cmd);
       void executeSetColorTransform(int64_t display, const std::vector<float>& matrix);
       void executeSetClientTarget(int64_t display, const ClientTarget& command);
       void executeSetDisplayBrightness(uint64_t display, const DisplayBrightness& command);
