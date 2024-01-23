@@ -296,6 +296,10 @@ private:
     int32_t mDisplayActiveV = 0;
     ExynosDisplay* mDisplay = nullptr;
 
+    mutable std::mutex mInitDrmDoneMutex;
+    bool mInitDrmDone GUARDED_BY(mInitDrmDoneMutex) = false;
+    std::condition_variable mInitDrmDone_cv;
+
     /* Death recipient for the binderdied callback, would be deleted in the destructor */
     AIBinder_DeathRecipient* mDeathRecipient = nullptr;
 
@@ -325,6 +329,15 @@ private:
      * Initialize platform specific histogram capability.
      */
     virtual void initPlatformHistogramCapability() {}
+
+    /**
+     * waitInitDrmDone
+     *
+     * Wait until the initDrm is finished, or when the timeout expires.
+     *
+     * @return true if initDrm is finished, or false when the timeout expires.
+     */
+    bool waitInitDrmDone();
 
     /**
      * configHistogram

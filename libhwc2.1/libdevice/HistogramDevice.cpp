@@ -101,6 +101,28 @@ void HistogramDevice::initDrm(const DrmCrtc& crtc) {
     String8 logString;
     dumpHistogramCapability(logString);
     ALOGI("%s", logString.c_str());
+
+    std::unique_lock<std::mutex> lock(mInitDrmDoneMutex);
+    ::android::base::ScopedLockAssertion lock_assertion(mInitDrmDoneMutex);
+    mInitDrmDone = true;
+    mInitDrmDone_cv.notify_all();
+}
+
+bool HistogramDevice::waitInitDrmDone() {
+    ATRACE_CALL();
+    std::unique_lock<std::mutex> lock(mInitDrmDoneMutex);
+    ::android::base::ScopedLockAssertion lock_assertion(mInitDrmDoneMutex);
+
+    mInitDrmDone_cv.wait_for(lock, std::chrono::milliseconds(50), [this]() -> bool {
+        ::android::base::ScopedLockAssertion lock_assertion(mInitDrmDoneMutex);
+        return mInitDrmDone;
+    });
+
+    if (!mInitDrmDone) {
+        ALOGW("%s: HistogramDevice::mInitDrmDone is still false", __func__);
+    }
+
+    return mInitDrmDone;
 }
 
 ndk::ScopedAStatus HistogramDevice::getHistogramCapability(
@@ -117,10 +139,17 @@ ndk::ScopedAStatus HistogramDevice::getHistogramCapability(
     return ndk::ScopedAStatus::ok();
 }
 
+#if defined(EXYNOS_HISTOGRAM_CHANNEL_REQUEST)
 ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& token,
                                                       const HistogramConfig& histogramConfig,
                                                       HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
+
+    if (waitInitDrmDone() == false) {
+        ALOGE("%s: histogram initDrm is not completed yet", __func__);
+        // TODO: b/323158344 - add retry error in HistogramErrorCode and return here.
+        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    }
 
     if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
         ALOGE("%s: histogram interface is not supported", __func__);
@@ -129,6 +158,15 @@ ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& tok
 
     return configHistogram(token, histogramConfig, histogramErrorCode, false);
 }
+#else
+ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& token,
+                                                      const HistogramConfig& histogramConfig,
+                                                      HistogramErrorCode* histogramErrorCode) {
+    ATRACE_CALL();
+    ALOGE("%s: histogram interface is not supported", __func__);
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+#endif
 
 ndk::ScopedAStatus HistogramDevice::queryHistogram(const ndk::SpAIBinder& token,
                                                    std::vector<char16_t>* histogramBuffer,
