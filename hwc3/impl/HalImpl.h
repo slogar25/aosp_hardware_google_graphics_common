@@ -16,11 +16,8 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
 #include <unordered_set>
-
-#include <hardware/hwcomposer2.h>
 
 #include "include/IComposerHal.h"
 
@@ -48,8 +45,6 @@ class HalImpl : public IComposerHal {
 
     int32_t acceptDisplayChanges(int64_t display) override;
     int32_t createLayer(int64_t display, int64_t* outLayer) override;
-    int32_t batchedCreateDestroyLayer(int64_t display, int64_t layer,
-                                      LayerLifecycleBatchCommandType cmd) override;
     int32_t createVirtualDisplay(uint32_t width, uint32_t height, AidlPixelFormat format,
                                  VirtualDisplay* outDisplay) override;
     int32_t destroyLayer(int64_t display, int64_t layer) override;
@@ -170,7 +165,6 @@ class HalImpl : public IComposerHal {
 
     EventCallback* getEventCallback() { return mEventCallback; }
     int32_t setRefreshRateChangedCallbackDebugEnabled(int64_t display, bool enabled) override;
-    int32_t layerSf2Hwc(int64_t display, int64_t layer, hwc2_layer_t& outMappedLayer) override;
 
 private:
     void initCaps();
@@ -183,8 +177,6 @@ private:
     std::unique_ptr<ExynosHWCCtx> mHwcCtx;
 #endif
     std::unordered_set<Capability> mCaps;
-    std::map<int64_t, hwc2_layer_t> mSfLayerToHalLayerMap;
-    std::map<hwc2_layer_t, int64_t> mHalLayerToSfLayerMap;
 };
 
 } // namespace aidl::android::hardware::graphics::composer3::impl

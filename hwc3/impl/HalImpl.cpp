@@ -154,7 +154,6 @@ void HalImpl::initCaps() {
 
     mCaps.insert(Capability::BOOT_DISPLAY_CONFIG);
     mCaps.insert(Capability::REFRESH_RATE_CHANGED_CALLBACK_DEBUG);
-    mCaps.insert(Capability::LAYER_LIFECYCLE_BATCH_COMMAND);
 }
 
 int32_t HalImpl::getHalDisplay(int64_t display, ExynosDisplay*& halDisplay) {
@@ -172,24 +171,13 @@ int32_t HalImpl::getHalLayer(int64_t display, int64_t layer, ExynosLayer*& halLa
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
-    hwc2_layer_t mapped_layer;
-    RET_IF_ERR(layerSf2Hwc(display, layer, mapped_layer));
-    halLayer = halDisplay->checkLayer(mapped_layer);
+    hwc2_layer_t hwcLayer;
+    a2h::translate(layer, hwcLayer);
+    halLayer = halDisplay->checkLayer(hwcLayer);
     if (!halLayer) { [[unlikely]]
         return HWC2_ERROR_BAD_LAYER;
     }
 
-    return HWC2_ERROR_NONE;
-}
-
-int32_t HalImpl::layerSf2Hwc(int64_t display, int64_t layer, hwc2_layer_t& outMappedLayer) {
-    ExynosDisplay* halDisplay;
-    RET_IF_ERR(getHalDisplay(display, halDisplay));
-    auto iter = mSfLayerToHalLayerMap.find(layer);
-    if (iter == mSfLayerToHalLayerMap.end()) {
-        return HWC2_ERROR_BAD_LAYER;
-    }
-    outMappedLayer = iter->second;
     return HWC2_ERROR_NONE;
 }
 
@@ -264,73 +252,17 @@ int32_t HalImpl::createLayer(int64_t display, int64_t* outLayer) {
     RET_IF_ERR(halDisplay->createLayer(&hwcLayer));
 
     h2a::translate(hwcLayer, *outLayer);
-    // Adding this to stay backward compatible with new batching command,
-    // if HWC supports batching, and create does not.
-    mSfLayerToHalLayerMap[*outLayer] = hwcLayer;
-    mHalLayerToSfLayerMap[hwcLayer] = *outLayer;
     return HWC2_ERROR_NONE;
 }
 
-int32_t HalImpl::batchedCreateDestroyLayer(int64_t display, int64_t layer,
-                                           LayerLifecycleBatchCommandType cmd) {
-    int32_t err = HWC2_ERROR_NONE;
-    ExynosDisplay* halDisplay;
-    RET_IF_ERR(getHalDisplay(display, halDisplay));
-
-    if (cmd == LayerLifecycleBatchCommandType::CREATE) {
-        if (mSfLayerToHalLayerMap.find(layer) != mSfLayerToHalLayerMap.end()) {
-            return HWC2_ERROR_BAD_LAYER;
-        }
-        hwc2_layer_t hwcLayer = 0;
-        RET_IF_ERR(halDisplay->createLayer(&hwcLayer));
-        int64_t hwclayerAidl;
-        h2a::translate(hwcLayer, hwclayerAidl);
-        mSfLayerToHalLayerMap[layer] = hwclayerAidl;
-
-        mHalLayerToSfLayerMap[hwcLayer] = layer;
-    } else if (cmd == LayerLifecycleBatchCommandType::DESTROY) {
-        int64_t HalLayerAidl;
-        ExynosLayer* halLayer;
-        auto iter = mSfLayerToHalLayerMap.find(layer);
-        if (iter == mSfLayerToHalLayerMap.end()) {
-            return HWC2_ERROR_BAD_LAYER;
-        }
-        HalLayerAidl = iter->second;
-
-        RET_IF_ERR(getHalLayer(display, layer, halLayer));
-        err = halDisplay->destroyLayer(reinterpret_cast<hwc2_layer_t>(halLayer));
-        if (err != HWC2_ERROR_NONE) {
-            ALOGW("HalImpl: destroyLayer failed with error: %u", err);
-        }
-        mSfLayerToHalLayerMap.erase(iter);
-        auto iterator = mHalLayerToSfLayerMap.find(reinterpret_cast<hwc2_layer_t>(halLayer));
-        if (iterator == mHalLayerToSfLayerMap.end()) {
-            return HWC2_ERROR_BAD_LAYER;
-        }
-
-        mHalLayerToSfLayerMap.erase(iterator);
-    }
-    return err;
-}
-
 int32_t HalImpl::destroyLayer(int64_t display, int64_t layer) {
-    int32_t err = HWC2_ERROR_NONE;
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));
 
-    err = halDisplay->destroyLayer(reinterpret_cast<hwc2_layer_t>(halLayer));
-    auto iter = mSfLayerToHalLayerMap.find(layer);
-    if (iter != mSfLayerToHalLayerMap.end()) {
-        mSfLayerToHalLayerMap.erase(iter);
-    }
-    auto iterator = mHalLayerToSfLayerMap.find(reinterpret_cast<hwc2_layer_t>(halLayer));
-    if (iterator != mHalLayerToSfLayerMap.end()) {
-        mHalLayerToSfLayerMap.erase(iterator);
-    }
-    return err;
+    return halDisplay->destroyLayer(reinterpret_cast<hwc2_layer_t>(halLayer));
 }
 
 int32_t HalImpl::createVirtualDisplay(uint32_t width, uint32_t height, AidlPixelFormat format,
@@ -741,17 +673,7 @@ int32_t HalImpl::presentDisplay(int64_t display, ndk::ScopedFileDescriptor& fenc
     std::vector<int32_t> hwcFences(count);
     RET_IF_ERR(halDisplay->getReleaseFences(&count, hwcLayers.data(), hwcFences.data()));
 
-    std::vector<int64_t> sfLayers(count);
-
-    for (int i = 0; i < count; i++) {
-        auto iter = mHalLayerToSfLayerMap.find(hwcLayers[i]);
-        if (iter != mHalLayerToSfLayerMap.end()) {
-            sfLayers[i] = iter->second;
-        } else {
-            LOG(ERROR) << "HalImpl::presentDisplay incorrect hal mapping. ";
-        }
-    }
-    h2a::translate(sfLayers, *outLayers);
+    h2a::translate(hwcLayers, *outLayers);
     h2a::translate(hwcFences, *outReleaseFences);
 
     return HWC2_ERROR_NONE;
@@ -1179,17 +1101,7 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     RET_IF_ERR(halDisplay->getDisplayRequests(&displayReqs, &reqsCount,
                                               hwcRequestedLayers.data(), outRequestMasks->data()));
 
-    std::vector<int64_t> sfLayers(typesCount);
-
-    for (int i = 0; i < typesCount; i++) {
-        auto iter = mHalLayerToSfLayerMap.find(hwcChangedLayers[i]);
-        if (iter != mHalLayerToSfLayerMap.end()) {
-            sfLayers[i] = iter->second;
-        } else {
-            LOG(ERROR) << "HalImpl::validateDisplay incorrect hal mapping. ";
-        }
-    }
-    h2a::translate(sfLayers, *outChangedLayers);
+    h2a::translate(hwcChangedLayers, *outChangedLayers);
     h2a::translate(hwcCompositionTypes, *outCompositionTypes);
     *outDisplayRequestMask = displayReqs;
     h2a::translate(hwcRequestedLayers, *outRequestedLayers);
