@@ -183,7 +183,10 @@ int32_t ExynosExternalDisplay::getActiveConfig(hwc2_config_t* outConfig) {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
     if (!mHpdStatus)
-        return -1;
+        return HWC2_ERROR_BAD_DISPLAY;
+
+    if (mActiveConfig == UINT_MAX)
+        return HWC2_ERROR_BAD_CONFIG;
 
     *outConfig = mActiveConfig;
 
