@@ -1128,10 +1128,10 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
                 configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height);
             }
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
-            ALOGD("%s: config group(%d), w(%d), h(%d), rr(%f), TE(%d), xdpi(%d), ydpi(%d), "
-                  "vrr mode(%s), NS mode(%s)",
-                  mExynosDisplay->mDisplayName.c_str(),
-                  configs.groupId, configs.width, configs.height, rr, configs.vsyncPeriod,
+            ALOGD("%s: config group(%d), id(%d), w(%d), h(%d), rr(%f), vsync(%d), "
+                  "xdpi(%d), ydpi(%d), vrr(%s), ns(%s)",
+                  mExynosDisplay->mDisplayName.c_str(), configs.groupId, mode.id(),
+                  configs.width, configs.height, rr, configs.vsyncPeriod,
                   configs.Xdpi, configs.Ydpi, mode.is_vrr_mode() ? "true" : "false",
                   mode.is_ns_mode() ? "true" : "false");
         }
