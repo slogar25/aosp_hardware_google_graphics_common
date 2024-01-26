@@ -97,8 +97,8 @@ static std::string loadPanelGammaCalibration(const std::string &file) {
     return gamma;
 }
 
-ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
-                                           const std::string &displayName)
+ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
+                                           const std::string& displayName)
       : ExynosDisplay(HWC_DISPLAY_PRIMARY, index, device, displayName),
         mUseBlockingZoneForMinIdleRefreshRate(false),
         mMinIdleRefreshRate(0),
@@ -109,6 +109,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice *device,
         mAppliedActiveConfig(0),
         mDisplayIdleTimerEnabled(false),
         mDisplayIdleTimerNanos{0},
+        mDisplayIdleDelayNanos(-1),
         mDisplayNeedHandleIdleExit(false) {
     // TODO : Hard coded here
     mNumMaxPriorityAllowed = 5;
