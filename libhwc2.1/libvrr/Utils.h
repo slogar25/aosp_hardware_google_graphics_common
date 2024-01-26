@@ -47,7 +47,7 @@ T durationNsToFreq(T durationNs) {
 }
 
 template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
-T freqTodurationNs(T freq) {
+T freqToDurationNs(T freq) {
     auto res = roundDivide(std::nano::den, static_cast<int64_t>(freq));
     return static_cast<T>(res);
 }

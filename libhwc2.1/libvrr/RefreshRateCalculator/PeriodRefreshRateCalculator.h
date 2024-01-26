@@ -33,7 +33,7 @@ enum PeriodRefreshRateCalculatorType {
 
 struct PeriodRefreshRateCalculatorParameters {
     PeriodRefreshRateCalculatorType mType = PeriodRefreshRateCalculatorType::kAverage;
-    int64_t mMeasurePeriodNs = 500000000; // default is 500 ms.
+    int64_t mMeasurePeriodNs = 250000000; // default is 250 ms.
     // When the presented time percentage exceeds or equals to this value, the Calculator becomes
     // effective; otherwise, return kDefaultInvalidRefreshRate.
     int mConfidencePercentage = 50;

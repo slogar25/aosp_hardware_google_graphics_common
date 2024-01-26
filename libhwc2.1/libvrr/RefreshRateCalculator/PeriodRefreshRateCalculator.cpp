@@ -78,14 +78,8 @@ int PeriodRefreshRateCalculator::onMeasure() {
     if (totalPresent > 0 &&
         ((totalVsync * 100) > (mNumVsyncPerMeasure * mParams.mConfidencePercentage))) {
         if (mParams.mType == PeriodRefreshRateCalculatorType::kAverage) {
-            if (totalVsync >= mNumVsyncPerMeasure) {
-                // In certain instances, the total number of vsync may significantly exceed
-                // mNumVsyncPerMeasure. In such cases, fine-tuning adjustments are required.
-                currentRefreshRate = std::round(totalPresent / mMeasurePeriodRatio);
-            } else {
-                float averageVsync = (static_cast<float>(totalVsync) / totalPresent);
-                currentRefreshRate = std::round(mMaxFrameRate / averageVsync);
-            }
+            float averageVsync = (static_cast<float>(totalVsync) / totalPresent);
+            currentRefreshRate = std::round(mMaxFrameRate / averageVsync);
         } else {
             currentRefreshRate = roundDivide(mMaxFrameRate, majorVsync);
         }

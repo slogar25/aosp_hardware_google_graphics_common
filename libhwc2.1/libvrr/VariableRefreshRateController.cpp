@@ -556,7 +556,6 @@ void VariableRefreshRateController::handlePresentTimeout(const VrrControllerEven
 }
 
 void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
-    auto refreshPeriod = freqTodurationNs(refreshRate);
     if (!(mDisplay) || !(mDisplay->mDevice)) {
         LOG(ERROR) << "VrrController: absence of a device or display.";
         return;
@@ -565,7 +564,7 @@ void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
     mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
                                                  mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
-                                                 refreshPeriod);
+                                                 freqToDurationNs(refreshRate));
 }
 
 void VariableRefreshRateController::threadBody() {
