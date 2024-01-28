@@ -32,6 +32,7 @@
 #include "RefreshRateCalculator/RefreshRateCalculator.h"
 #include "RingBuffer.h"
 #include "Utils.h"
+#include "display/common/DisplayConfigurationOwner.h"
 #include "interface/DisplayContextProvider.h"
 #include "interface/VariableRefreshRateInterface.h"
 
@@ -39,12 +40,21 @@ namespace android::hardware::graphics::composer {
 
 class VariableRefreshRateController : public VsyncListener,
                                       public PresentListener,
-                                      public DisplayContextProvider {
+                                      public DisplayContextProvider,
+                                      public DisplayConfigurationsOwner {
 public:
     ~VariableRefreshRateController();
 
     auto static CreateInstance(ExynosDisplay* display, const std::string& panelName)
             -> std::shared_ptr<VariableRefreshRateController>;
+
+    const VrrConfig_t* getCurrentDisplayConfiguration() const override {
+        const auto& it = mVrrConfigs.find(mVrrActiveConfig);
+        if (it == mVrrConfigs.end()) {
+            return nullptr;
+        }
+        return &(it->second);
+    }
 
     int notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs);
 
@@ -65,9 +75,9 @@ public:
     int getAmbientLightSensorOutput() const override;
     BrightnessMode getBrightnessMode() const override;
     int getBrightnessNits() const override;
-    int getEstimatedPlaybackFrameRate() const override;
+    int getEstimatedVideoFrameRate() const override;
     OperationSpeedMode getOperationSpeedMode() const override;
-    bool isProximityThrottingEnabled() const override;
+    bool isProximityThrottlingEnabled() const override;
 
     const DisplayContextProviderInterface* getDisplayContextProviderInterface() const {
         return &mDisplayContextProviderInterface;
@@ -270,6 +280,8 @@ private:
 
     std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;
+
+    std::unique_ptr<DisplayContextProvider> mDisplayContextProvider;
 
     bool mEnabled = false;
     bool mThreadExit = false;

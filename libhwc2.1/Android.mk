@@ -144,6 +144,8 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
 	libvrr/DisplayStateResidencyWatcher.cpp \
 	libvrr/VariableRefreshRateController.cpp \
+	libvrr/display/common/CommonDisplayContextProvider.cpp \
+	libvrr/display/exynos/ExynosDisplayContextProvider.cpp \
 	libvrr/RefreshRateCalculator/InstantRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/PeriodRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/CombinedRefreshRateCalculator.cpp \

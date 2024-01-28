@@ -33,6 +33,8 @@
 
 #include "RefreshRateCalculator/RefreshRateCalculatorFactory.h"
 
+#include "display/DisplayContextProviderFactory.h"
+
 namespace android::hardware::graphics::composer {
 
 namespace {
@@ -59,10 +61,10 @@ static int getBrightnessNitsWrapper(void* host) {
     return controller->getBrightnessNits();
 }
 
-static int getEstimatePlaybackFrameRateWrapper(void* host) {
+static int getEstimateVideoFrameRateWrapper(void* host) {
     VariableRefreshRateController* controller =
             reinterpret_cast<VariableRefreshRateController*>(host);
-    return controller->getEstimatedPlaybackFrameRate();
+    return controller->getEstimatedVideoFrameRate();
 }
 
 static int getAmbientLightSensorOutputWrapper(void* host) {
@@ -71,10 +73,10 @@ static int getAmbientLightSensorOutputWrapper(void* host) {
     return controller->getAmbientLightSensorOutput();
 }
 
-static bool isProximityThrottingEnabledWrapper(void* host) {
+static bool isProximityThrottlingEnabledWrapper(void* host) {
     VariableRefreshRateController* controller =
             reinterpret_cast<VariableRefreshRateController*>(host);
-    return controller->isProximityThrottingEnabled();
+    return controller->isProximityThrottlingEnabled();
 }
 
 auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display,
@@ -115,12 +117,12 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     mDisplayContextProviderInterface.getOperationSpeedMode = (&getOperationSpeedModeWrapper);
     mDisplayContextProviderInterface.getBrightnessMode = (&getBrightnessModeWrapper);
     mDisplayContextProviderInterface.getBrightnessNits = (&getBrightnessNitsWrapper);
-    mDisplayContextProviderInterface.getEstimatedPlaybackFrameRate =
-            (&getEstimatePlaybackFrameRateWrapper);
+    mDisplayContextProviderInterface.getEstimatedVideoFrameRate =
+            (&getEstimateVideoFrameRateWrapper);
     mDisplayContextProviderInterface.getAmbientLightSensorOutput =
             (&getAmbientLightSensorOutputWrapper);
-    mDisplayContextProviderInterface.isProximityThrottingEnabled =
-            (&isProximityThrottingEnabledWrapper);
+    mDisplayContextProviderInterface.isProximityThrottlingEnabled =
+            (&isProximityThrottlingEnabledWrapper);
 
     mPresentTimeoutEventHandlerLoader.reset(
             new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),
@@ -149,6 +151,11 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     mRefreshRateCalculator->registerRefreshRateChangeCallback(
             std::bind(&VariableRefreshRateController::onRefreshRateChanged, this,
                       std::placeholders::_1));
+
+    DisplayContextProviderFactory displayContextProviderFactory(mDisplay, this, &mEventQueue);
+    mDisplayContextProvider = displayContextProviderFactory.buildDisplayContextProvider(
+            DisplayContextProviderType::kExynos);
+
     mResidencyWatcher = ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(display);
 }
 
@@ -308,27 +315,27 @@ void VariableRefreshRateController::setVrrConfigurations(
 }
 
 int VariableRefreshRateController::getAmbientLightSensorOutput() const {
-    return -1;
+    return mDisplayContextProvider->getAmbientLightSensorOutput();
 }
 
 BrightnessMode VariableRefreshRateController::getBrightnessMode() const {
-    return BrightnessMode::kInvalidBrightnessMode;
+    return mDisplayContextProvider->getBrightnessMode();
 }
 
 int VariableRefreshRateController::getBrightnessNits() const {
-    return -1;
+    return mDisplayContextProvider->getBrightnessNits();
 }
 
-int VariableRefreshRateController::getEstimatedPlaybackFrameRate() const {
-    return -1;
+int VariableRefreshRateController::getEstimatedVideoFrameRate() const {
+    return mDisplayContextProvider->getEstimatedVideoFrameRate();
 }
 
 OperationSpeedMode VariableRefreshRateController::getOperationSpeedMode() const {
-    return OperationSpeedMode::kHighSpeedMode;
+    return mDisplayContextProvider->getOperationSpeedMode();
 }
 
-bool VariableRefreshRateController::isProximityThrottingEnabled() const {
-    return false;
+bool VariableRefreshRateController::isProximityThrottlingEnabled() const {
+    return mDisplayContextProvider->isProximityThrottlingEnabled();
 }
 
 void VariableRefreshRateController::stopThread(bool exit) {

@@ -16,49 +16,35 @@
 
 #pragma once
 
+#include "../../interface/DisplayContextProvider.h"
+#include "../RefreshRateCalculator/VideoFrameRateCalculator.h"
+#include "DisplayConfigurationOwner.h"
+
 namespace android::hardware::graphics::composer {
 
-enum class OperationSpeedMode {
-    kHighSpeedMode = 0,
-    kNormalSpeedMode,
-    kInvalidSpeedMode,
-};
-
-enum class BrightnessMode {
-    kNormalBrightnessMode = 0,
-    kHighBrightnessMode,
-    kInvalidBrightnessMode,
-};
-
-class DisplayContextProvider {
+class CommonDisplayContextProvider : public DisplayContextProvider {
 public:
-    virtual ~DisplayContextProvider() = default;
+    CommonDisplayContextProvider(DisplayConfigurationsOwner* displayConfigurationOwner,
+                                 std::unique_ptr<RefreshRateCalculator> videoFrameRateCalculator)
+          : mDisplayConfigurationOwner(displayConfigurationOwner),
+            mVideoFrameRateCalculator(std::move(videoFrameRateCalculator)){};
 
-    virtual OperationSpeedMode getOperationSpeedMode() const = 0;
+    OperationSpeedMode getOperationSpeedMode() const override;
 
     virtual BrightnessMode getBrightnessMode() const = 0;
 
     virtual int getBrightnessNits() const = 0;
 
-    virtual int getEstimatedVideoFrameRate() const = 0;
+    int getEstimatedVideoFrameRate() const override;
 
     virtual int getAmbientLightSensorOutput() const = 0;
 
     virtual bool isProximityThrottlingEnabled() const = 0;
-};
 
-struct DisplayContextProviderInterface {
-    OperationSpeedMode (*getOperationSpeedMode)(void* host);
+private:
+    DisplayConfigurationsOwner* mDisplayConfigurationOwner;
 
-    BrightnessMode (*getBrightnessMode)(void* host);
-
-    int (*getBrightnessNits)(void* host);
-
-    int (*getEstimatedVideoFrameRate)(void* host);
-
-    int (*getAmbientLightSensorOutput)(void* hosts);
-
-    bool (*isProximityThrottlingEnabled)(void* hosts);
+    std::unique_ptr<RefreshRateCalculator> mVideoFrameRateCalculator;
 };
 
 } // namespace android::hardware::graphics::composer

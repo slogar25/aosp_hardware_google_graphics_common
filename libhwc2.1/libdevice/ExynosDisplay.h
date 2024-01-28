@@ -364,6 +364,7 @@ typedef struct NotifyExpectedPresentConfig {
 
 typedef struct VrrConfig {
     bool isFullySupported = false;
+    bool isNsMode = false;
     int vsyncPeriodNs = 0;
     int minFrameIntervalNs = 0;
     std::optional<std::vector<FrameIntervalPowerHint_t>> frameIntervalPowerHint;

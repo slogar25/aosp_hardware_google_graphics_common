@@ -1103,6 +1103,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             if (mIsVrrModeSupported) {
                 VrrConfig_t vrrConfig;
                 vrrConfig.minFrameIntervalNs = static_cast<int>(std::nano::den / rr);
+                vrrConfig.isNsMode = mode.is_ns_mode();
                 vrrConfig.vsyncPeriodNs = configs.vsyncPeriod;
                 configs.vrrConfig = std::make_optional(vrrConfig);
                 if (mode.is_vrr_mode()) {
