@@ -149,6 +149,7 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     mRefreshRateCalculator->registerRefreshRateChangeCallback(
             std::bind(&VariableRefreshRateController::onRefreshRateChanged, this,
                       std::placeholders::_1));
+    mResidencyWatcher = ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(display);
 }
 
 VariableRefreshRateController::~VariableRefreshRateController() {
@@ -202,6 +203,9 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
             return;
         }
         mVrrActiveConfig = config;
+        if (mResidencyWatcher) {
+            mResidencyWatcher->setActiveConfig(config);
+        }
         if (mState == VrrControllerState::kDisable) {
             return;
         }
@@ -277,6 +281,9 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
             }
         }
         mPowerMode = powerMode;
+    }
+    if (mResidencyWatcher) {
+        mResidencyWatcher->setPowerMode(powerMode);
     }
     mCondition.notify_all();
 }
@@ -567,6 +574,11 @@ void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
     }
     refreshRate =
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
+
+    if (mResidencyWatcher) {
+        mResidencyWatcher->setRefreshRate(refreshRate);
+    }
+
     if (!mDisplay->mDevice->isVrrApiSupported()) {
         // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,
         // refreshPeriodNanos is disregarded.

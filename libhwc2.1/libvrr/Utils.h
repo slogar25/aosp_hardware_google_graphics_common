@@ -52,6 +52,7 @@ T freqToDurationNs(T freq) {
     return static_cast<T>(res);
 }
 
+int64_t getNowMs();
 int64_t getNowNs();
 
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target);

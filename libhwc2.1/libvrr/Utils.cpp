@@ -22,6 +22,11 @@
 
 namespace android::hardware::graphics::composer {
 
+int64_t getNowMs() {
+    const auto t = std::chrono::high_resolution_clock::now();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
+}
+
 int64_t getNowNs() {
     const auto t = std::chrono::high_resolution_clock::now();
     return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();

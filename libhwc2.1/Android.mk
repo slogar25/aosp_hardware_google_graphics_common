@@ -80,7 +80,8 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 	libhardware_legacy libutils \
 	libsync libacryl libui libion_google libdrmresource libdrm \
 	libvendorgraphicbuffer libbinder_ndk \
-	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk
+	android.hardware.power-V2-ndk pixel-power-ext-V1-ndk \
+	pixel_stateresidency_provider_aidl_interface-ndk
 
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
                           android.hardware.drm-V1-ndk \
@@ -141,6 +142,7 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
+	libvrr/DisplayStateResidencyWatcher.cpp \
 	libvrr/VariableRefreshRateController.cpp \
 	libvrr/RefreshRateCalculator/InstantRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/PeriodRefreshRateCalculator.cpp \

@@ -26,6 +26,7 @@
 
 #include "../libdevice/ExynosDisplay.h"
 #include "../libdevice/ExynosLayer.h"
+#include "DisplayStateResidencyWatcher.h"
 #include "EventQueue.h"
 #include "ExternalEventHandlerLoader.h"
 #include "RefreshRateCalculator/RefreshRateCalculator.h"
@@ -268,6 +269,7 @@ private:
     std::string mPanelName;
 
     std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
+    std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;
 
     bool mEnabled = false;
     bool mThreadExit = false;
