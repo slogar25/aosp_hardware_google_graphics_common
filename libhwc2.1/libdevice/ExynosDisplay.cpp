@@ -758,7 +758,7 @@ ExynosDisplay::PowerHalHintWorker::SharedDisplayData
 
 std::mutex ExynosDisplay::PowerHalHintWorker::sSharedDisplayMutex;
 
-int ExynosSortedLayer::compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs)
+int ExynosSortedLayer::compare(void const *lhs, void const *rhs)
 {
     ExynosLayer *left = *((ExynosLayer**)(lhs));
     ExynosLayer *right = *((ExynosLayer**)(rhs));
@@ -780,7 +780,9 @@ ssize_t ExynosSortedLayer::remove(const ExynosLayer *item)
 
 status_t ExynosSortedLayer::vector_sort()
 {
-    return sort(compare);
+    int (*cmp)(ExynosLayer *const *, ExynosLayer *const *);
+    cmp = (int (*)(ExynosLayer *const *, ExynosLayer *const *)) &compare;
+    return sort(cmp);
 }
 
 ExynosLowFpsLayerInfo::ExynosLowFpsLayerInfo()

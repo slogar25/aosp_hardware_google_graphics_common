@@ -288,7 +288,7 @@ class ExynosSortedLayer : public Vector <ExynosLayer*>
     public:
         ssize_t remove(const ExynosLayer *item);
         status_t vector_sort();
-        static int compare(ExynosLayer * const *lhs, ExynosLayer *const *rhs);
+        static int compare(void const *lhs, void const *rhs);
 };
 
 class DisplayTDMInfo {
