@@ -391,8 +391,7 @@ class ExynosDisplayDrmInterface :
             /* cancel the histogram data request by calling histogram_channel_cancel_ioctl */
             CANCEL,
         };
-        virtual int32_t sendHistogramChannelIoctl(HistogramChannelIoctl_t control,
-                                                  uint8_t channelId) const;
+        int32_t sendHistogramChannelIoctl(HistogramChannelIoctl_t control, uint8_t channelId) const;
 
         int32_t getFrameCount() { return mFrameCounter; }
         virtual void registerHistogramInfo(const std::shared_ptr<IDLHistogram> &info) { return; }
