@@ -391,9 +391,15 @@ void VariableRefreshRateController::onPresent(int fence) {
                       getNowNs() +
                               mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
         }
-        // Post next frmae insertion event.
-        postEvent(VrrControllerEventType::kVendorRenderingTimeout,
-                  getNowNs() + kDefaultVendorPresentTimeoutNs);
+        if ((!mVendorPresentTimeoutOverride) ||
+            (mVendorPresentTimeoutOverride.value().mNumOfWorks > 0)) {
+            // Post next frame insertion event.
+            auto vendorPresentTimeoutNs = getNowNs() +
+                    (mVendorPresentTimeoutOverride
+                             ? mVendorPresentTimeoutOverride.value().mTimeoutNs
+                             : kDefaultVendorPresentTimeoutNs);
+            postEvent(VrrControllerEventType::kVendorRenderingTimeout, vendorPresentTimeoutNs);
+        }
     }
     mCondition.notify_all();
 }
@@ -623,11 +629,26 @@ void VariableRefreshRateController::threadBody() {
                     }
                     case VrrControllerEventType::kVendorRenderingTimeout: {
                         if (mPresentTimeoutEventHandler) {
-                            auto eventHandleContexts =
-                                    mPresentTimeoutEventHandler->getHandleEvents();
-                            for (auto& eventHandleContext : eventHandleContexts) {
-                                postEvent(VrrControllerEventType::kHandleVendorRenderingTimeout,
-                                          eventHandleContext);
+                            // Verify whether a present timeout override exists, and if so, execute
+                            // it first.
+                            if (mVendorPresentTimeoutOverride) {
+                                const auto& params = mVendorPresentTimeoutOverride.value();
+                                TimedEvent timedEvent("VendorPresentTimeoutOverride");
+                                timedEvent.mIsRelativeTime = true;
+                                timedEvent.mFunctor = params.mFunctor;
+                                int64_t whenFromNowNs = 0;
+                                for (int i = 0; i < params.mNumOfWorks; ++i) {
+                                    timedEvent.mWhenNs = whenFromNowNs;
+                                    postEvent(VrrControllerEventType::kHandleVendorRenderingTimeout,
+                                              timedEvent);
+                                    whenFromNowNs += params.mIntervalNs;
+                                }
+                            } else {
+                                auto handleEvents = mPresentTimeoutEventHandler->getHandleEvents();
+                                for (auto& event : handleEvents) {
+                                    postEvent(VrrControllerEventType::kHandleVendorRenderingTimeout,
+                                              event);
+                                }
                             }
                         }
                         break;

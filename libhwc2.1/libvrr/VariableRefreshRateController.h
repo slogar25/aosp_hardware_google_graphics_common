@@ -72,6 +72,24 @@ public:
         return &mDisplayContextProviderInterface;
     }
 
+    void setPresentTimeoutParameters(int numOfWorks, int timeoutNs, int intervalNs) {
+        const std::lock_guard<std::mutex> lock(mMutex);
+
+        if (!mPresentTimeoutEventHandler) {
+            return;
+        }
+        if (numOfWorks >= 0) {
+            auto functor = mPresentTimeoutEventHandler->getHandleFunction();
+            mVendorPresentTimeoutOverride =
+                    std::make_optional<PresentTimeoutSettings>({.mNumOfWorks = numOfWorks,
+                                                                .mTimeoutNs = timeoutNs,
+                                                                .mIntervalNs = intervalNs,
+                                                                .mFunctor = std::move(functor)});
+        } else {
+            mVendorPresentTimeoutOverride = std::nullopt;
+        }
+    }
+
 private:
     static constexpr int kDefaultRingBufferCapacity = 128;
     static constexpr int64_t kDefaultWakeUpTimeInPowerSaving =
@@ -95,6 +113,15 @@ private:
         int64_t mTime;
         int mDuration;
     } PresentEvent;
+
+    // The |PresentTimeoutSettings| will override the settings of the present timeout handler. Once
+    // it is set, the present timeout will be directly set by these parameters.
+    typedef struct PresentTimeoutSettings {
+        int mNumOfWorks;
+        int mTimeoutNs;
+        int mIntervalNs;
+        std::function<int()> mFunctor;
+    } PresentTimeoutSettings;
 
     typedef struct VsyncEvent {
         enum class Type {
@@ -207,6 +234,7 @@ private:
     DisplayContextProviderInterface mDisplayContextProviderInterface;
     std::unique_ptr<ExternalEventHandlerLoader> mPresentTimeoutEventHandlerLoader;
     ExternalEventHandler* mPresentTimeoutEventHandler = nullptr;
+    std::optional<PresentTimeoutSettings> mVendorPresentTimeoutOverride;
 
     std::string mPanelName;
 

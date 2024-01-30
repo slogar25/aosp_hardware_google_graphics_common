@@ -721,6 +721,16 @@ int32_t ExynosPrimaryDisplay::notifyExpectedPresent(int64_t timestamp, int32_t f
     return NO_ERROR;
 }
 
+int32_t ExynosPrimaryDisplay::setPresentTimeoutParameters(int numOfWorks, int timeoutNs,
+                                                          int intervalNs) {
+    if (mVariableRefreshRateController) {
+        mVariableRefreshRateController->setPresentTimeoutParameters(numOfWorks, timeoutNs,
+                                                                    intervalNs);
+        return NO_ERROR;
+    }
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmDisplayConfigLocked(uint32_t peakRate) {
     auto hwConfig = mDisplayInterface->getActiveModeId();
     auto config = getConfigId(peakRate, mDisplayConfigs[hwConfig].width,

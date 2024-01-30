@@ -111,6 +111,8 @@ public:
     virtual ~ExternalEventHandler() = default;
 
     virtual std::vector<TimedEvent> getHandleEvents() = 0;
+
+    virtual std::function<int()> getHandleFunction() = 0;
 };
 
 } // namespace android::hardware::graphics::composer
