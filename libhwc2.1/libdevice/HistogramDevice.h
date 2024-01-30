@@ -35,6 +35,26 @@
 #include "ExynosDisplayDrmInterface.h"
 #include "drmcrtc.h"
 
+#define HIST_BLOB_CH_LOG(LEVEL, blobId, channelId, msg, ...)              \
+    ALOG##LEVEL("[%s,pid=%d,blob#%u,chan#%d] HistogramDevice::%s: " msg,  \
+                ((mDisplay) ? (mDisplay->mDisplayName.c_str()) : "NULL"), \
+                AIBinder_getCallingPid(), blobId, channelId, __func__, ##__VA_ARGS__)
+
+#define HIST_BLOB_LOG(LEVEL, blobId, msg, ...)                            \
+    ALOG##LEVEL("[%s,pid=%d,blob#%u] HistogramDevice::%s: " msg,          \
+                ((mDisplay) ? (mDisplay->mDisplayName.c_str()) : "NULL"), \
+                AIBinder_getCallingPid(), blobId, __func__, ##__VA_ARGS__)
+
+#define HIST_CH_LOG(LEVEL, channelId, msg, ...)                           \
+    ALOG##LEVEL("[%s,pid=%d,chan#%d] HistogramDevice::%s: " msg,          \
+                ((mDisplay) ? (mDisplay->mDisplayName.c_str()) : "NULL"), \
+                AIBinder_getCallingPid(), channelId, __func__, ##__VA_ARGS__)
+
+#define HIST_LOG(LEVEL, msg, ...)                                         \
+    ALOG##LEVEL("[%s,pid=%d] HistogramDevice::%s: " msg,                  \
+                ((mDisplay) ? (mDisplay->mDisplayName.c_str()) : "NULL"), \
+                AIBinder_getCallingPid(), __func__, ##__VA_ARGS__)
+
 using namespace android;
 
 class HistogramDevice {
