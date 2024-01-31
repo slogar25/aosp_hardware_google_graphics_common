@@ -1345,6 +1345,10 @@ class ExynosDisplay {
             return HWC2_ERROR_UNSUPPORTED;
         }
 
+        virtual int32_t setPresentTimeoutController(uint32_t __unused controllerType) {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);

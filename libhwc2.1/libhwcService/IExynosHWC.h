@@ -83,6 +83,7 @@ public:
     virtual int32_t dumpBuffers(uint32_t displayId, int32_t count) = 0;
     virtual int32_t setPresentTimeoutParameters(uint32_t displayId, int numOfWorks, int timeoutNs,
                                                 int intervalNs) = 0;
+    virtual int32_t setPresentTimeoutController(uint32_t displayId, uint32_t controllerType) = 0;
 };
 
 /* Native Interface */

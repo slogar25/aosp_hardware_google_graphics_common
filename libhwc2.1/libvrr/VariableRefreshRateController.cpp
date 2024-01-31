@@ -391,8 +391,7 @@ void VariableRefreshRateController::onPresent(int fence) {
                       getNowNs() +
                               mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
         }
-        if ((!mVendorPresentTimeoutOverride) ||
-            (mVendorPresentTimeoutOverride.value().mNumOfWorks > 0)) {
+        if (shouldHandleVendorRenderingTimeout()) {
             // Post next frame insertion event.
             auto vendorPresentTimeoutNs = getNowNs() +
                     (mVendorPresentTimeoutOverride
@@ -571,6 +570,12 @@ void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
     mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
                                                  mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
                                                  freqToDurationNs(refreshRate));
+}
+
+bool VariableRefreshRateController::shouldHandleVendorRenderingTimeout() const {
+    return (mPresentTimeoutController == PresentTimeoutControllerType::kSoftware) &&
+            ((!mVendorPresentTimeoutOverride) ||
+             (mVendorPresentTimeoutOverride.value().mNumOfWorks > 0));
 }
 
 void VariableRefreshRateController::threadBody() {
