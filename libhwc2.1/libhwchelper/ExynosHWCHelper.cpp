@@ -1268,18 +1268,21 @@ int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
 
     png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, 0, 0);
     if (png_ptr == NULL) {
+        ALOGE("%s png_ptr create failed", filepath);
         fclose(fp);
         return -ENOMEM;
     }
 
     info_ptr = png_create_info_struct(png_ptr);
     if (info_ptr == NULL) {
+        ALOGE("%s info_ptr create failed", filepath);
         fclose(fp);
         png_destroy_read_struct(&png_ptr, NULL, NULL);
         return -ENOMEM;
     }
 
     if (setjmp(png_jmpbuf(png_ptr))) {
+        ALOGE("%s setjmp failed", filepath);
         fclose(fp);
         png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
         return -EIO;
@@ -1293,6 +1296,8 @@ int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
     width = png_get_image_width(png_ptr, info_ptr);
     height = png_get_image_height(png_ptr, info_ptr);
     if (width != gmeta.width || height != gmeta.height) {
+        ALOGE("%s source width/height (%dx%d) doesn't match with buffer (%dx%d)", filepath, width,
+              height, gmeta.width, gmeta.height);
         fclose(fp);
         png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
         return -EINVAL;
@@ -1301,6 +1306,9 @@ int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
     bpp = png_get_bit_depth(png_ptr, info_ptr) * png_get_channels(png_ptr, info_ptr);
     color_type = png_get_color_type(png_ptr, info_ptr);
     if (color_type != PNG_COLOR_TYPE_RGB_ALPHA || bpp != formatToBpp(gmeta.format)) {
+        ALOGE("%s color_type (%d) isn't rgb alpha (%d), or source bpp (%d) doesn't match with "
+              "buffer (%d)",
+              filepath, color_type, PNG_COLOR_TYPE_RGB_ALPHA, bpp, formatToBpp(gmeta.format));
         fclose(fp);
         png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
         return -EINVAL;
@@ -1309,6 +1317,8 @@ int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
     size_t bufferHandleSize = gmeta.stride * gmeta.vstride * formatToBpp(gmeta.format) / 8;
     size_t png_size = png_get_rowbytes(png_ptr, info_ptr) * height;
     if (bufferHandleSize > gmeta.size || (bufferHandleSize < png_size)) {
+        ALOGE("%s buffer handle size isn't within [png_size, gmeta.size]: %d vs [%d, %d]", filepath,
+              (int)bufferHandleSize, (int)png_size, gmeta.size);
         fclose(fp);
         png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
         return -EINVAL;
