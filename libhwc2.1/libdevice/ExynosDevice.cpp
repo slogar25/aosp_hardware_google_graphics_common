@@ -1282,6 +1282,12 @@ void ExynosDevice::handleHotplug() {
             continue;
         }
 
+        // Lock mDisplayMutex during hotplug processing.
+        // Must-have for unplug handling so that in-flight calls to
+        // validateDisplay() and presentDisplay() don't race with
+        // the display being removed.
+        Mutex::Autolock lock(mDisplays[i]->mDisplayMutex);
+
         if (mDisplays[i]->checkHotplugEventUpdated(hpdStatus)) {
             mDisplays[i]->handleHotplugEvent(hpdStatus);
             mDisplays[i]->hotplug();

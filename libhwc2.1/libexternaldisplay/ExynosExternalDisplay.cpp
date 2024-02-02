@@ -564,8 +564,6 @@ bool ExynosExternalDisplay::getHDRException(ExynosLayer* __unused layer)
 
 void ExynosExternalDisplay::handleHotplugEvent(bool hpdStatus)
 {
-    Mutex::Autolock lock(mDisplayMutex);
-
     mHpdStatus = hpdStatus;
     if (mHpdStatus) {
         if (openExternalDisplay() < 0) {

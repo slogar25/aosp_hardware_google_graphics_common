@@ -3673,13 +3673,17 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
 
     Mutex::Autolock lock(mDisplayMutex);
 
+    if (!mHpdStatus) {
+        ALOGD("presentDisplay: drop frame: mHpdStatus == false");
+    }
+
     mDropFrameDuringResSwitch =
             (mGeometryChanged & GEOMETRY_DISPLAY_RESOLUTION_CHANGED) && !isFullScreenComposition();
     if (mDropFrameDuringResSwitch) {
         ALOGD("presentDisplay: drop invalid frame during resolution switch");
     }
 
-    if (mDropFrameDuringResSwitch || mPauseDisplay || mDevice->isInTUI()) {
+    if (!mHpdStatus || mDropFrameDuringResSwitch || mPauseDisplay || mDevice->isInTUI()) {
         closeFencesForSkipFrame(RENDERING_STATE_PRESENTED);
         *outRetireFence = -1;
         mRenderingState = RENDERING_STATE_PRESENTED;
@@ -4872,6 +4876,11 @@ int32_t ExynosDisplay::validateDisplay(
     DISPLAY_ATRACE_CALL();
     gettimeofday(&updateTimeInfo.lastValidateTime, NULL);
     Mutex::Autolock lock(mDisplayMutex);
+
+    if (!mHpdStatus) {
+        ALOGD("validateDisplay: drop frame: mHpdStatus == false");
+        return HWC2_ERROR_NONE;
+    }
 
     if (mPauseDisplay) return HWC2_ERROR_NONE;
 
