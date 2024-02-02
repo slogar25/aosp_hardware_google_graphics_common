@@ -85,7 +85,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libhardware \
 
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
                           android.hardware.drm-V1-ndk \
-                          com.google.hardware.pixel.display-V10-ndk \
+                          com.google.hardware.pixel.display-V11-ndk \
                           android.frameworks.stats-V2-ndk \
                           libpixelatoms_defs \
                           pixelatoms-cpp \
@@ -136,6 +136,7 @@ LOCAL_SRC_FILES := \
 	libdevice/ExynosDevice.cpp \
 	libdevice/ExynosLayer.cpp \
 	libdevice/HistogramDevice.cpp \
+	libdevice/DisplayTe2Manager.cpp \
 	libmaindisplay/ExynosPrimaryDisplay.cpp \
 	libresource/ExynosMPP.cpp \
 	libresource/ExynosResourceManager.cpp \
@@ -217,7 +218,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libbinder libexynosdisplay l
 	android.hardware.graphics.composer3-V3-ndk \
 	android.hardware.drm-V1-ndk
 
-LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V10-ndk \
+LOCAL_SHARED_LIBRARIES += com.google.hardware.pixel.display-V11-ndk \
                           android.frameworks.stats-V2-ndk \
                           libpixelatoms_defs \
                           pixelatoms-cpp \
@@ -298,7 +299,7 @@ LOCAL_SHARED_LIBRARIES := liblog libcutils libutils libexynosdisplay libacryl \
 
 LOCAL_SHARED_LIBRARIES += android.hardware.graphics.composer3-V3-ndk \
                           android.hardware.drm-V1-ndk \
-                          com.google.hardware.pixel.display-V10-ndk \
+                          com.google.hardware.pixel.display-V11-ndk \
                           android.frameworks.stats-V2-ndk \
                           libpixelatoms_defs \
                           pixelatoms-cpp \
