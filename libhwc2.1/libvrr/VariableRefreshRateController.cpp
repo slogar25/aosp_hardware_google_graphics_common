@@ -567,9 +567,16 @@ void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
     }
     refreshRate =
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
-    mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
-                                                 mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
-                                                 freqToDurationNs(refreshRate));
+    if (!mDisplay->mDevice->isVrrApiSupported()) {
+        // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,
+        // refreshPeriodNanos is disregarded.
+        mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
+                                                     freqToDurationNs(refreshRate), -1);
+    } else {
+        mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
+                                                     mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
+                                                     freqToDurationNs(refreshRate));
+    }
 }
 
 bool VariableRefreshRateController::shouldHandleVendorRenderingTimeout() const {
