@@ -230,6 +230,10 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
         }
     }
 
+    // Call handleHotplug() to capture the initial coldplug state of each display.
+    // This is necessary because the hotplug uevent handler created in postInit()
+    // below does not get always triggered when HWC is restarting.
+    handleHotplug();
     mDeviceInterface->postInit();
 }
 
