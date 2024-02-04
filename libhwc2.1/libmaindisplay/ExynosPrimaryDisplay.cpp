@@ -25,6 +25,7 @@
 #include <chrono>
 #include <fstream>
 
+#include "../libvrr/interface/Panel_def.h"
 #include "BrightnessController.h"
 #include "ExynosDevice.h"
 #include "ExynosDisplayDrmInterface.h"
@@ -40,6 +41,11 @@ extern struct exynos_hwc_control exynosHWCControl;
 using namespace SOC_VERSION;
 
 namespace {
+
+using android::hardware::graphics::composer::kPanelRefreshCtrlFrameInsertionAutoMode;
+using android::hardware::graphics::composer::kPanelRefreshCtrlIdleEnabled;
+using android::hardware::graphics::composer::kPanelRefreshCtrlTeTypeChangeable;
+using android::hardware::graphics::composer::kRefreshControlNodeName;
 
 constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
 
@@ -160,6 +166,26 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
                     property_get_int32(pathBuffer, kDefaultNotifyExpectedPresentConfigTimeoutNs);
             mVrrSettings.configChangeCallback =
                     std::bind(&ExynosPrimaryDisplay::onConfigChange, this, std::placeholders::_1);
+        } else {
+            std::string displayFileNodePath = getPanelSysfsPath();
+            if (displayFileNodePath.empty()) {
+                ALOGE("%s(): cannot find file node %s of display %s", __func__,
+                      displayFileNodePath.c_str(), mDisplayName.c_str());
+            } else {
+                FileNodeWriter fileNodeWriter(displayFileNodePath);
+                auto content = fileNodeWriter.read(kRefreshControlNodeName);
+                if (content.has_value() && (content.value() == "Enabled")) {
+                    uint32_t cmd = kPanelRefreshCtrlFrameInsertionAutoMode |
+                            kPanelRefreshCtrlIdleEnabled | kPanelRefreshCtrlTeTypeChangeable;
+                    bool ret = fileNodeWriter.WriteCommandString(kRefreshControlNodeName, cmd);
+                    if (!ret) {
+                        ALOGE("%s(): write command to file node %s%s failed.", __func__,
+                              displayFileNodePath.c_str(), kRefreshControlNodeName.c_str());
+                    }
+                } else {
+                    ALOGI("%s(): refresh control is not supported", __func__);
+                }
+            }
         }
     }
 

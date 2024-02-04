@@ -682,6 +682,17 @@ public:
         }
     }
 
+    std::optional<std::string> read(const std::string& nodeName) {
+        std::string fullPath = mNodePath + nodeName;
+        std::ifstream ifs(fullPath);
+        if (ifs) {
+            std::ostringstream os;
+            os << ifs.rdbuf(); // reading data
+            return os.str();
+        }
+        return std::nullopt;
+    }
+
     template <typename T>
     bool WriteCommandString(const std::string& nodeName, T cmd) {
         // ref: https://elixir.bootlin.com/linux/latest/source/include/linux/kstrtox.h
