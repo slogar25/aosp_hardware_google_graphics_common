@@ -229,8 +229,9 @@ void HalImpl::registerEventCallback(EventCallback* callback) {
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug, this,
                                   reinterpret_cast<hwc2_function_pointer_t>(
                                           hook::refreshRateChangedDebug));
-    mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this,
-                                  reinterpret_cast<hwc2_function_pointer_t>(hook::hotplugEvent));
+    // Don't register onHotplugEvent until it's available in nextfood (b/323291596)
+    // mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this,
+    //                             reinterpret_cast<hwc2_function_pointer_t>(hook::hotplugEvent));
 }
 
 void HalImpl::unregisterEventCallback() {
@@ -244,7 +245,8 @@ void HalImpl::unregisterEventCallback() {
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onVsyncIdle, this, nullptr);
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug, this,
                                   nullptr);
-    mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this, nullptr);
+    // Don't register onHotplugEvent until it's available in nextfood (b/323291596)
+    // mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this, nullptr);
 
     mEventCallback = nullptr;
 }
