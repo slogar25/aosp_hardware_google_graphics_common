@@ -75,6 +75,7 @@ public:
     int getAmbientLightSensorOutput() const override;
     BrightnessMode getBrightnessMode() const override;
     int getBrightnessNits() const override;
+    const char* getDisplayFileNodePath() const override;
     int getEstimatedVideoFrameRate() const override;
     OperationSpeedMode getOperationSpeedMode() const override;
     bool isProximityThrottlingEnabled() const override;

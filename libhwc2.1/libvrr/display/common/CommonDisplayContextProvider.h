@@ -35,6 +35,8 @@ public:
 
     virtual int getBrightnessNits() const = 0;
 
+    virtual const char* getDisplayFileNodePath() const = 0;
+
     int getEstimatedVideoFrameRate() const override;
 
     virtual int getAmbientLightSensorOutput() const = 0;

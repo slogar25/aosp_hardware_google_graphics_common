@@ -61,6 +61,12 @@ static int getBrightnessNitsWrapper(void* host) {
     return controller->getBrightnessNits();
 }
 
+static const char* getDisplayFileNodePathWrapper(void* host) {
+    VariableRefreshRateController* controller =
+            reinterpret_cast<VariableRefreshRateController*>(host);
+    return controller->getDisplayFileNodePath();
+}
+
 static int getEstimateVideoFrameRateWrapper(void* host) {
     VariableRefreshRateController* controller =
             reinterpret_cast<VariableRefreshRateController*>(host);
@@ -117,18 +123,13 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     mDisplayContextProviderInterface.getOperationSpeedMode = (&getOperationSpeedModeWrapper);
     mDisplayContextProviderInterface.getBrightnessMode = (&getBrightnessModeWrapper);
     mDisplayContextProviderInterface.getBrightnessNits = (&getBrightnessNitsWrapper);
+    mDisplayContextProviderInterface.getDisplayFileNodePath = (&getDisplayFileNodePathWrapper);
     mDisplayContextProviderInterface.getEstimatedVideoFrameRate =
             (&getEstimateVideoFrameRateWrapper);
     mDisplayContextProviderInterface.getAmbientLightSensorOutput =
             (&getAmbientLightSensorOutputWrapper);
     mDisplayContextProviderInterface.isProximityThrottlingEnabled =
             (&isProximityThrottlingEnabledWrapper);
-
-    mPresentTimeoutEventHandlerLoader.reset(
-            new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),
-                                           &mDisplayContextProviderInterface, this,
-                                           mPanelName.c_str()));
-    mPresentTimeoutEventHandler = mPresentTimeoutEventHandlerLoader->getEventHandler();
 
     // Flow to build refresh rate calculator.
     RefreshRateCalculatorFactory refreshRateCalculatorFactory;
@@ -155,6 +156,12 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     DisplayContextProviderFactory displayContextProviderFactory(mDisplay, this, &mEventQueue);
     mDisplayContextProvider = displayContextProviderFactory.buildDisplayContextProvider(
             DisplayContextProviderType::kExynos);
+
+    mPresentTimeoutEventHandlerLoader.reset(
+            new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),
+                                           &mDisplayContextProviderInterface, this,
+                                           mPanelName.c_str()));
+    mPresentTimeoutEventHandler = mPresentTimeoutEventHandlerLoader->getEventHandler();
 
     mResidencyWatcher = ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(display);
 }
@@ -324,6 +331,10 @@ BrightnessMode VariableRefreshRateController::getBrightnessMode() const {
 
 int VariableRefreshRateController::getBrightnessNits() const {
     return mDisplayContextProvider->getBrightnessNits();
+}
+
+const char* VariableRefreshRateController::getDisplayFileNodePath() const {
+    return mDisplayContextProvider->getDisplayFileNodePath();
 }
 
 int VariableRefreshRateController::getEstimatedVideoFrameRate() const {

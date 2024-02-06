@@ -40,6 +40,8 @@ public:
 
     virtual int getBrightnessNits() const = 0;
 
+    virtual const char* getDisplayFileNodePath() const = 0;
+
     virtual int getEstimatedVideoFrameRate() const = 0;
 
     virtual int getAmbientLightSensorOutput() const = 0;
@@ -53,6 +55,8 @@ struct DisplayContextProviderInterface {
     BrightnessMode (*getBrightnessMode)(void* host);
 
     int (*getBrightnessNits)(void* host);
+
+    const char* (*getDisplayFileNodePath)(void* hosts);
 
     int (*getEstimatedVideoFrameRate)(void* host);
 

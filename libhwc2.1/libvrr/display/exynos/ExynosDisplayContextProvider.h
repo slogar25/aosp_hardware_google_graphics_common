@@ -28,11 +28,14 @@ public:
                                  std::unique_ptr<RefreshRateCalculator> videoFrameRateCalculator)
           : CommonDisplayContextProvider(displayConfigurationOwner,
                                          std::move(videoFrameRateCalculator)),
-            mDisplay(static_cast<ExynosDisplay*>(display)){};
+            mDisplay(static_cast<ExynosDisplay*>(display)),
+            mDisplayFileNodePath(mDisplay->getPanelSysfsPath()){};
 
     BrightnessMode getBrightnessMode() const final;
 
     int getBrightnessNits() const final;
+
+    const char* getDisplayFileNodePath() const final;
 
     int getAmbientLightSensorOutput() const final;
 
@@ -40,6 +43,8 @@ public:
 
 private:
     ExynosDisplay* mDisplay;
+
+    std::string mDisplayFileNodePath;
 };
 
 } // namespace android::hardware::graphics::composer

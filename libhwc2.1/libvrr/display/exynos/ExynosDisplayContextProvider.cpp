@@ -54,6 +54,10 @@ int ExynosDisplayContextProvider::getBrightnessNits() const {
     return std::round(std::get<float>(res.value()));
 }
 
+const char* ExynosDisplayContextProvider::getDisplayFileNodePath() const {
+    return mDisplayFileNodePath.c_str();
+}
+
 int ExynosDisplayContextProvider::getAmbientLightSensorOutput() const {
     return -1;
 }
