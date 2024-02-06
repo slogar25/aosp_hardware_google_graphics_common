@@ -17,11 +17,13 @@
 #ifndef __HARDWARE_EXYNOS_ACRYLIC_H__
 #define __HARDWARE_EXYNOS_ACRYLIC_H__
 
-#include <vector>
-#include <cstdint>
-#include <unistd.h>
-#include <system/graphics.h>
 #include <hardware/hwcomposer.h>
+#include <log/log.h>
+#include <system/graphics.h>
+#include <unistd.h>
+#include <cstdint>
+#include <vector>
+#include "android-base/macros.h"
 
 /* basic primitives */
 
@@ -379,6 +381,12 @@ public:
 private:
     bool supportedResampling(int16_t from, int16_t to, int16_t upfactor, int16_t downfactor) const
     {
+        if (UNLIKELY(from < 0 || to == 0 || upfactor == 0)) {
+            ALOGW("%s: unsupported args: (from=%d), (to=%d), (upfactor=%d)", __func__, from, to,
+                  upfactor);
+            return false;
+        }
+
         int64_t factor = static_cast<int64_t>(from);
 
         factor <<= RESAMPLING_FRACTION_BITS;
