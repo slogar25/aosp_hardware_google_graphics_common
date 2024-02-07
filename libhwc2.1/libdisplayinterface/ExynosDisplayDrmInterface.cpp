@@ -1045,7 +1045,9 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         bool useVrrConfigs = isFullVrrSupported();
         int ret = mDrmConnector->UpdateModes(useVrrConfigs);
         if (ret < 0) {
-            ALOGE("Failed to update display modes %d", ret);
+            ALOGE("%s: failed to update display modes (%d)",
+                  mExynosDisplay->mDisplayName.c_str(), ret);
+            *outNumConfigs = 0;
             return HWC2_ERROR_BAD_DISPLAY;
         }
         if (ret == 0) {
@@ -1063,6 +1065,15 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
              */
             if (mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL)
                 mDrmConnector->UpdateEdidProperty();
+
+            if (mDrmConnector->modes().size() == 0) {
+                ALOGE("%s: DRM_MODE_CONNECTED, but no modes available",
+                      mExynosDisplay->mDisplayName.c_str());
+                mExynosDisplay->mDisplayConfigs.clear();
+                mExynosDisplay->mPlugState = false;
+                *outNumConfigs = 0;
+                return HWC2_ERROR_BAD_DISPLAY;
+            }
 
             mExynosDisplay->mPlugState = true;
         } else
@@ -1143,7 +1154,7 @@ no_mode_changes:
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
     if (!outConfigs) {
         *outNumConfigs = num_modes;
-        return HWC2_ERROR_NONE;
+        return (*outNumConfigs > 0) ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_DISPLAY;
     }
 
     uint32_t idx = 0;
@@ -1155,7 +1166,7 @@ no_mode_changes:
     }
     *outNumConfigs = idx;
 
-    return 0;
+    return (*outNumConfigs > 0) ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_DISPLAY;
 }
 
 void ExynosDisplayDrmInterface::dumpDisplayConfigs()
@@ -2825,10 +2836,10 @@ bool ExynosDisplayDrmInterface::readHotplugStatus() {
         return false;
     }
 
-    uint32_t numConfigs;
-    getDisplayConfigs(&numConfigs, NULL);
+    uint32_t numConfigs = 0;
+    int32_t err = getDisplayConfigs(&numConfigs, NULL);
 
-    return (mDrmConnector->state() == DRM_MODE_CONNECTED);
+    return (err == HWC2_ERROR_NONE && numConfigs > 0 && mExynosDisplay->mPlugState);
 }
 
 void ExynosDisplayDrmInterface::retrievePanelFullResolution() {
