@@ -344,7 +344,7 @@ typedef struct restriction_size
         };
     };
 
-    restriction_size() = default;
+    restriction_size() { mData.fill(0); }
     restriction_size(std::array<uint32_t, kNumofRestriction> &&rdata) : mData(rdata){};
 
     bool operator==(const restriction_size &rhs) const { return rhs.mData == mData; }
