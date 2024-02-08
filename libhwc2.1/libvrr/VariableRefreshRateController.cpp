@@ -612,7 +612,7 @@ void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
 bool VariableRefreshRateController::shouldHandleVendorRenderingTimeout() const {
     return (mPresentTimeoutController == PresentTimeoutControllerType::kSoftware) &&
             ((!mVendorPresentTimeoutOverride) ||
-             (mVendorPresentTimeoutOverride.value().mNumOfWorks > 0));
+             (mVendorPresentTimeoutOverride.value().mSchedule.size() > 0));
 }
 
 void VariableRefreshRateController::threadBody() {
@@ -679,11 +679,15 @@ void VariableRefreshRateController::threadBody() {
                                 timedEvent.mIsRelativeTime = true;
                                 timedEvent.mFunctor = params.mFunctor;
                                 int64_t whenFromNowNs = 0;
-                                for (int i = 0; i < params.mNumOfWorks; ++i) {
-                                    timedEvent.mWhenNs = whenFromNowNs;
-                                    postEvent(VrrControllerEventType::kHandleVendorRenderingTimeout,
-                                              timedEvent);
-                                    whenFromNowNs += params.mIntervalNs;
+                                for (int i = 0; i < params.mSchedule.size(); ++i) {
+                                    uint32_t intervalNs = params.mSchedule[i].second;
+                                    for (int j = 0; j < params.mSchedule[i].first; ++j) {
+                                        timedEvent.mWhenNs = whenFromNowNs;
+                                        postEvent(VrrControllerEventType::
+                                                          kHandleVendorRenderingTimeout,
+                                                  timedEvent);
+                                        whenFromNowNs += intervalNs;
+                                    }
                                 }
                             } else {
                                 auto handleEvents = mPresentTimeoutEventHandler->getHandleEvents();

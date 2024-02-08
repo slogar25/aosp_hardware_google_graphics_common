@@ -26,6 +26,15 @@
 
 #include "IExynosHWC.h"
 
+#include <vector>
+
+#define RET_IF_ERR(expr)      \
+    do {                      \
+        auto err = (expr);    \
+        if (err) [[unlikely]] \
+            return err;       \
+    } while (0)
+
 namespace android {
 
 enum {
@@ -535,19 +544,6 @@ public:
         return result;
     }
 
-    int32_t setPresentTimeoutParameters(uint32_t displayId, int numOfWorks, int timeoutNs,
-                                        int intervalNs) override {
-        Parcel data, reply;
-        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
-        data.writeInt32(displayId);
-        data.writeInt32(numOfWorks);
-        data.writeInt32(timeoutNs);
-        data.writeInt32(intervalNs);
-        int result = remote()->transact(SET_PRESENT_TIMEOUT_PARAMETERS, data, &reply);
-        ALOGE_IF(result != NO_ERROR, "SET_PRESENT_TIMEOUT_PARAMETERS transact error(%d)", result);
-        return result;
-    }
-
     int32_t setPresentTimeoutController(uint32_t displayId, uint32_t controllerType) override {
         Parcel data, reply;
         data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
@@ -555,6 +551,24 @@ public:
         data.writeUint32(controllerType);
         int result = remote()->transact(SET_PRESENT_TIMEOUT_CONTROLLER, data, &reply);
         ALOGE_IF(result != NO_ERROR, "SET_PRESENT_TIMEOUT_CONTROLLER transact error(%d)", result);
+        return result;
+    }
+    int32_t setPresentTimeoutParameters(
+            uint32_t displayId, int timeoutNs,
+            const std::vector<std::pair<uint32_t, uint32_t>>& settings) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeInt32(displayId);
+        // The format is timeout, [ i32 <frames> i32 <intervalNs> ]+.
+        // E.g. if [2, 8333333], [1, 16666667] ..., the pattern is:
+        // last present <timeout> 1st task <8.3 ms> 2nd task <8.3 ms> 3rd task <16.67ms> ...
+        data.writeInt32(timeoutNs);
+        for (const auto& it : settings) {
+            data.writeUint32(it.first);  // frames
+            data.writeUint32(it.second); // intervalNs
+        }
+        int result = remote()->transact(SET_PRESENT_TIMEOUT_PARAMETERS, data, &reply);
+        ALOGE_IF(result != NO_ERROR, "SET_PRESENT_TIMEOUT_PARAMETERS transact error(%d)", result);
         return result;
     }
 };
@@ -861,23 +875,31 @@ status_t BnExynosHWCService::onTransact(
             return dumpBuffers(displayId, count);
         } break;
 
-        case SET_PRESENT_TIMEOUT_PARAMETERS: {
-            CHECK_INTERFACE(IExynosHWCService, data, reply);
-            int32_t displayId = data.readInt32();
-            int32_t numOfWorks = data.readInt32();
-            int32_t timeoutNs = data.readInt32();
-            int32_t intervalNs = data.readInt32();
-            int32_t error =
-                    setPresentTimeoutParameters(displayId, numOfWorks, timeoutNs, intervalNs);
-            reply->writeInt32(error);
-            return NO_ERROR;
-        } break;
-
         case SET_PRESENT_TIMEOUT_CONTROLLER: {
             CHECK_INTERFACE(IExynosHWCService, data, reply);
             int32_t displayId = data.readInt32();
             uint32_t controllerType = data.readUint32();
             int32_t error = setPresentTimeoutController(displayId, controllerType);
+            reply->writeInt32(error);
+            return NO_ERROR;
+        } break;
+
+        case SET_PRESENT_TIMEOUT_PARAMETERS: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            int32_t displayId;
+            uint32_t timeoutNs;
+            RET_IF_ERR(data.readInt32(&displayId));
+            RET_IF_ERR(data.readUint32(&timeoutNs));
+            std::vector<std::pair<uint32_t, uint32_t>> settings;
+            while (true) {
+                uint32_t numOfWorks, intervalNs;
+                if (data.readUint32(&numOfWorks)) {
+                    break;
+                }
+                RET_IF_ERR(data.readUint32(&intervalNs));
+                settings.emplace_back(std::make_pair(numOfWorks, intervalNs));
+            }
+            int32_t error = setPresentTimeoutParameters(displayId, timeoutNs, settings);
             reply->writeInt32(error);
             return NO_ERROR;
         } break;

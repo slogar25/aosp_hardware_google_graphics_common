@@ -84,19 +84,21 @@ public:
         return &mDisplayContextProviderInterface;
     }
 
-    void setPresentTimeoutParameters(int numOfWorks, int timeoutNs, int intervalNs) {
+    void setPresentTimeoutParameters(int timeoutNs,
+                                     const std::vector<std::pair<uint32_t, uint32_t>>& settings) {
         const std::lock_guard<std::mutex> lock(mMutex);
 
         if (!mPresentTimeoutEventHandler) {
             return;
         }
-        if (numOfWorks >= 0) {
+        if ((timeoutNs >= 0) && (!settings.empty())) {
             auto functor = mPresentTimeoutEventHandler->getHandleFunction();
-            mVendorPresentTimeoutOverride =
-                    std::make_optional<PresentTimeoutSettings>({.mNumOfWorks = numOfWorks,
-                                                                .mTimeoutNs = timeoutNs,
-                                                                .mIntervalNs = intervalNs,
-                                                                .mFunctor = std::move(functor)});
+            mVendorPresentTimeoutOverride = std::make_optional<PresentTimeoutSettingsNew>();
+            mVendorPresentTimeoutOverride.value().mTimeoutNs = timeoutNs;
+            mVendorPresentTimeoutOverride.value().mFunctor = std::move(functor);
+            for (const auto& setting : settings) {
+                mVendorPresentTimeoutOverride.value().mSchedule.emplace_back(setting);
+            }
         } else {
             mVendorPresentTimeoutOverride = std::nullopt;
         }
@@ -153,6 +155,13 @@ private:
         int mIntervalNs;
         std::function<int()> mFunctor;
     } PresentTimeoutSettings;
+
+    typedef struct PresentTimeoutSettingsNew {
+        PresentTimeoutSettingsNew() = default;
+        int mTimeoutNs = 0;
+        std::vector<std::pair<uint32_t, uint32_t>> mSchedule;
+        std::function<int()> mFunctor;
+    } PresentTimeoutSettingsNew;
 
     enum class PresentTimeoutControllerType {
         kNone = 0,
@@ -273,7 +282,8 @@ private:
     DisplayContextProviderInterface mDisplayContextProviderInterface;
     std::unique_ptr<ExternalEventHandlerLoader> mPresentTimeoutEventHandlerLoader;
     ExternalEventHandler* mPresentTimeoutEventHandler = nullptr;
-    std::optional<PresentTimeoutSettings> mVendorPresentTimeoutOverride;
+    std::optional<PresentTimeoutSettings> mVendorPresentTimeoutOverrideOld;
+    std::optional<PresentTimeoutSettingsNew> mVendorPresentTimeoutOverride;
     PresentTimeoutControllerType mPresentTimeoutController =
             PresentTimeoutControllerType::kSoftware;
 
