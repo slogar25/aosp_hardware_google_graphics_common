@@ -72,6 +72,8 @@ class ExynosExternalDisplay : public ExynosDisplay {
         int getDVTimingsIndex(int preset);
         virtual bool getHDRException(ExynosLayer *layer);
     private:
+        void reportUsage(bool enabled);
+        int64_t mStartTime;
 };
 
 #endif
