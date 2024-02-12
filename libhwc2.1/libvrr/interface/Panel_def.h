@@ -20,6 +20,7 @@ namespace android::hardware::graphics::composer {
 
 // Definition of panel refresh control.
 const std::string kRefreshControlNodeName = "refresh_ctrl";
+const std::string kRefreshControlNodeEnabled = "Enabled";
 
 static constexpr uint32_t kPanelRefreshCtrlFrameInsertionMaxFrameCount = (1U << 7);
 static constexpr uint32_t kPanelRefreshCtrlFrameInsertionFrameCountMask =
