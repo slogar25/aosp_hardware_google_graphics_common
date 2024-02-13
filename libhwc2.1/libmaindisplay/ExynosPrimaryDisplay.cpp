@@ -45,6 +45,7 @@ namespace {
 using android::hardware::graphics::composer::kPanelRefreshCtrlFrameInsertionAutoMode;
 using android::hardware::graphics::composer::kPanelRefreshCtrlIdleEnabled;
 using android::hardware::graphics::composer::kPanelRefreshCtrlTeTypeChangeable;
+using android::hardware::graphics::composer::kRefreshControlNodeEnabled;
 using android::hardware::graphics::composer::kRefreshControlNodeName;
 
 constexpr auto nsecsPerSec = std::chrono::nanoseconds(1s).count();
@@ -174,7 +175,9 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
             } else {
                 FileNodeWriter fileNodeWriter(displayFileNodePath);
                 auto content = fileNodeWriter.read(kRefreshControlNodeName);
-                if (content.has_value() && (content.value() == "Enabled")) {
+                if (content.has_value() &&
+                    !(content.value().compare(0, kRefreshControlNodeEnabled.length(),
+                                              kRefreshControlNodeEnabled))) {
                     uint32_t cmd = kPanelRefreshCtrlFrameInsertionAutoMode |
                             kPanelRefreshCtrlIdleEnabled | kPanelRefreshCtrlTeTypeChangeable;
                     bool ret = fileNodeWriter.WriteCommandString(kRefreshControlNodeName, cmd);
