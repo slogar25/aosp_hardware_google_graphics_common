@@ -1341,12 +1341,13 @@ class ExynosDisplay {
             return HWC2_ERROR_UNSUPPORTED;
         };
 
-        virtual int32_t setPresentTimeoutParameters(int __unused numOfWorks, int __unused timeoutNs,
-                                                    int __unused intervalNs) {
+        virtual int32_t setPresentTimeoutController(uint32_t __unused controllerType) {
             return HWC2_ERROR_UNSUPPORTED;
         }
 
-        virtual int32_t setPresentTimeoutController(uint32_t __unused controllerType) {
+        virtual int32_t setPresentTimeoutParameters(
+                int __unused timeoutNs,
+                const std::vector<std::pair<uint32_t, uint32_t>>& __unused settings) {
             return HWC2_ERROR_UNSUPPORTED;
         }
 

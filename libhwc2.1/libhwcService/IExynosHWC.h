@@ -81,9 +81,10 @@ public:
                                                    const bool& enable) = 0;
     virtual int32_t triggerRefreshRateIndicatorUpdate(uint32_t displayId, uint32_t refreshRate) = 0;
     virtual int32_t dumpBuffers(uint32_t displayId, int32_t count) = 0;
-    virtual int32_t setPresentTimeoutParameters(uint32_t displayId, int numOfWorks, int timeoutNs,
-                                                int intervalNs) = 0;
     virtual int32_t setPresentTimeoutController(uint32_t displayId, uint32_t controllerType) = 0;
+    virtual int32_t setPresentTimeoutParameters(
+            uint32_t displayId, int timeoutNs,
+            const std::vector<std::pair<uint32_t, uint32_t>>& settings) = 0;
 };
 
 /* Native Interface */

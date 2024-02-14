@@ -751,11 +751,10 @@ int32_t ExynosPrimaryDisplay::notifyExpectedPresent(int64_t timestamp, int32_t f
     return NO_ERROR;
 }
 
-int32_t ExynosPrimaryDisplay::setPresentTimeoutParameters(int numOfWorks, int timeoutNs,
-                                                          int intervalNs) {
+int32_t ExynosPrimaryDisplay::setPresentTimeoutParameters(
+        int timeoutNs, const std::vector<std::pair<uint32_t, uint32_t>>& settings) {
     if (mVariableRefreshRateController) {
-        mVariableRefreshRateController->setPresentTimeoutParameters(numOfWorks, timeoutNs,
-                                                                    intervalNs);
+        mVariableRefreshRateController->setPresentTimeoutParameters(timeoutNs, settings);
         return NO_ERROR;
     }
     return HWC2_ERROR_UNSUPPORTED;

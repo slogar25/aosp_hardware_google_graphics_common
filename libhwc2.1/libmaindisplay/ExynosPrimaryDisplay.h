@@ -84,7 +84,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
 
         int32_t notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs) override;
 
-        int32_t setPresentTimeoutParameters(int numOfWorks, int timeoutNs, int intervalNs) override;
+        int32_t setPresentTimeoutParameters(
+                int timeoutNs, const std::vector<std::pair<uint32_t, uint32_t>>& settings) override;
 
         int32_t setPresentTimeoutController(uint32_t controllerType) override;
 
