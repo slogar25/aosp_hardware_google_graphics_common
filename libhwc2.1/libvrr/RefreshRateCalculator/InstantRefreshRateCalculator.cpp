@@ -67,6 +67,15 @@ void InstantRefreshRateCalculator::reset() {
     setNewRefreshRate(kDefaultInvalidRefreshRate);
 }
 
+void InstantRefreshRateCalculator::setEnabled(bool isEnabled) {
+    if (!isEnabled) {
+        mEventQueue->dropEvent(VrrControllerEventType::kInstantRefreshRateCalculatorUpdate);
+    } else {
+        mTimeoutEvent.mWhenNs = getNowNs() + mMaxValidTimeNs;
+        mEventQueue->mPriorityQueue.emplace(mTimeoutEvent);
+    }
+}
+
 bool InstantRefreshRateCalculator::isOutdated(int64_t timeNs) const {
     return (mLastPresentTimeNs == kDefaultInvalidPresentTimeNs) ||
             ((timeNs - mLastPresentTimeNs) > mMaxValidTimeNs);

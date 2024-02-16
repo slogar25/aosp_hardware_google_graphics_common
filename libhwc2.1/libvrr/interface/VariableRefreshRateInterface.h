@@ -34,4 +34,11 @@ public:
     virtual void onVsync(int64_t timestamp, int32_t vsyncPeriodNanos) = 0;
 };
 
+class PowerModeListener {
+public:
+    virtual ~PowerModeListener() = default;
+
+    virtual void onPowerStateChange(int from, int to) = 0;
+};
+
 } // namespace android::hardware::graphics::composer

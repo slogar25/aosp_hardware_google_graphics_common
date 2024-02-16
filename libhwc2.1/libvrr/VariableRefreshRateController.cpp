@@ -153,6 +153,8 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
             std::bind(&VariableRefreshRateController::onRefreshRateChanged, this,
                       std::placeholders::_1));
 
+    mPowerModeListeners.push_back(mRefreshRateCalculator.get());
+
     DisplayContextProviderFactory displayContextProviderFactory(mDisplay, this, &mEventQueue);
     mDisplayContextProvider = displayContextProviderFactory.buildDisplayContextProvider(
             DisplayContextProviderType::kExynos);
@@ -292,6 +294,11 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
             default: {
                 LOG(ERROR) << "VrrController: Unknown power mode = " << powerMode;
                 return;
+            }
+        }
+        if (!mPowerModeListeners.empty()) {
+            for (const auto& listener : mPowerModeListeners) {
+                listener->onPowerStateChange(mPowerMode, powerMode);
             }
         }
         mPowerMode = powerMode;

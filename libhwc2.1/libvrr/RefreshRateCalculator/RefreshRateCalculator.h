@@ -22,9 +22,22 @@
 #include <functional>
 #include <string>
 
+#include <hardware/hwcomposer_defs.h>
+
 #include "../Utils.h"
+#include "../interface/VariableRefreshRateInterface.h"
 
 namespace android::hardware::graphics::composer {
+
+enum class RefreshRateCalculatorType : int {
+    kInvalid = -1,
+    kAod = 0,
+    kInstant,
+    kPeriodical,
+    kVideoPlayback,
+    kCombined,
+    kTotal,
+};
 
 constexpr int64_t kDefaultMinimumRefreshRate = 1;
 
@@ -32,7 +45,7 @@ constexpr int64_t kDefaultInvalidPresentTimeNs = -1;
 
 constexpr int64_t kDefaultInvalidRefreshRate = -1;
 
-class RefreshRateCalculator {
+class RefreshRateCalculator : public PowerModeListener {
 public:
     RefreshRateCalculator()
           : mMinFrameIntervalNs(roundDivide(std::nano::den, static_cast<int64_t>(mMaxFrameRate))) {}
@@ -43,6 +56,8 @@ public:
 
     virtual int getRefreshRate() const = 0;
 
+    virtual void onPowerStateChange(int __unused from, int to) override { mPowerMode = to; }
+
     virtual void onPresent(int64_t presentTimeNs, int flag) = 0;
 
     virtual void reset() = 0;
@@ -50,6 +65,8 @@ public:
     virtual void registerRefreshRateChangeCallback(std::function<void(int)> callback) {
         mRefreshRateChangeCallback = std::move(callback);
     }
+
+    virtual void setEnabled(bool __unused isEnabled){};
 
     // Should be invoked during the transition from HS to NS or vice versa.
     void setMinFrameInterval(int64_t minFrameIntervalNs) {
@@ -73,6 +90,7 @@ protected:
     int64_t mMinFrameIntervalNs;
 
     std::string mName;
+    int32_t mPowerMode = -1;
 };
 
 } // namespace android::hardware::graphics::composer

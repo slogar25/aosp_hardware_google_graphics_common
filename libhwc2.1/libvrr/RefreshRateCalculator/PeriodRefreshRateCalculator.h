@@ -50,9 +50,13 @@ public:
 
     int getRefreshRate() const final;
 
+    void onPowerStateChange(int from, int to) final;
+
     void onPresent(int64_t presentTimeNs, int flag) override;
 
-    virtual void reset() override;
+    void reset() override;
+
+    void setEnabled(bool isEnabled) final;
 
 private:
     int onMeasure();

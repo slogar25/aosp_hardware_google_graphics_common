@@ -26,15 +26,6 @@
 
 namespace android::hardware::graphics::composer {
 
-enum class RefreshRateCalculatorType {
-    kAod = 0,
-    kInstant,
-    kPeriodical,
-    kVideoPlayback,
-    kCombined,
-    kTotal,
-};
-
 class RefreshRateCalculatorFactory {
 public:
     RefreshRateCalculatorFactory() = default;

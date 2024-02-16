@@ -271,7 +271,10 @@ private:
     // The subsequent variables must be guarded by mMutex when accessed.
     EventQueue mEventQueue;
     VrrRecord mRecord;
+
     int32_t mPowerMode = -1;
+    std::vector<PowerModeListener*> mPowerModeListeners;
+
     VrrControllerState mState;
     hwc2_config_t mVrrActiveConfig = -1;
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;

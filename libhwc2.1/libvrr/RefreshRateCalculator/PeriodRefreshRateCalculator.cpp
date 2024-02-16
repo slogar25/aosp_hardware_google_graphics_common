@@ -39,6 +39,21 @@ int PeriodRefreshRateCalculator::getRefreshRate() const {
     return mLastRefreshRate;
 }
 
+void PeriodRefreshRateCalculator::onPowerStateChange(int from, int to) {
+    if (to != HWC_POWER_MODE_NORMAL) {
+        // We bypass inspection of the previous power state , as it is irrelevant to discard events
+        // when there is no event.
+        setEnabled(false);
+    } else {
+        if (from == HWC_POWER_MODE_NORMAL) {
+            ALOGE("Disregard power state change notification by staying current power state.");
+            return;
+        }
+        setEnabled(true);
+    }
+    mPowerMode = to;
+}
+
 void PeriodRefreshRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
@@ -57,6 +72,18 @@ void PeriodRefreshRateCalculator::reset() {
     mStatistics.clear();
     mLastRefreshRate = kDefaultInvalidRefreshRate;
     mLastPresentTimeNs = kDefaultInvalidPresentTimeNs;
+}
+
+void PeriodRefreshRateCalculator::setEnabled(bool isEnabled) {
+    if (!isEnabled) {
+        mEventQueue->dropEvent(VrrControllerEventType::kPeriodRefreshRateCalculatorUpdate);
+    } else {
+        mLastMeasureTimeNs = getNowNs() + mParams.mMeasurePeriodNs;
+        mMeasureEvent.mWhenNs = mLastMeasureTimeNs;
+        mMeasureEvent.mFunctor =
+                std::move(std::bind(&PeriodRefreshRateCalculator::onMeasure, this));
+        mEventQueue->mPriorityQueue.emplace(mMeasureEvent);
+    }
 }
 
 int PeriodRefreshRateCalculator::onMeasure() {
