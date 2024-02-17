@@ -16,11 +16,10 @@
 
 #define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
 
-#include <processgroup/sched_policy.h>
-
 #include "VariableRefreshRateController.h"
 
 #include <android-base/logging.h>
+#include <processgroup/sched_policy.h>
 #include <sync/sync.h>
 #include <utils/Trace.h>
 
@@ -166,6 +165,12 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     mPresentTimeoutEventHandler = mPresentTimeoutEventHandlerLoader->getEventHandler();
 
     mResidencyWatcher = ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(display);
+
+    mVariableRefreshRateStatistic = std::make_unique<
+            VariableRefreshRateStatistic>(static_cast<CommonDisplayContextProvider*>(
+                                                  mDisplayContextProvider.get()),
+                                          &mEventQueue, kMaxFrameRate, kMaxTefrequency, 1000000000);
+    mPowerModeListeners.push_back(mVariableRefreshRateStatistic.get());
 }
 
 VariableRefreshRateController::~VariableRefreshRateController() {
@@ -222,6 +227,12 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
         if (mResidencyWatcher) {
             mResidencyWatcher->setActiveConfig(config);
         }
+        if (mVariableRefreshRateStatistic) {
+            mVariableRefreshRateStatistic
+                    ->setActiveVrrConfiguration(config,
+                                                durationNsToFreq(mVrrConfigs[mVrrActiveConfig]
+                                                                         .vsyncPeriodNs));
+        }
         if (mState == VrrControllerState::kDisable) {
             return;
         }
@@ -258,7 +269,7 @@ void VariableRefreshRateController::setEnable(bool isEnabled) {
 
 void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
     ATRACE_CALL();
-    LOG(INFO) << "VrrController: Set power mode to " << powerMode;
+    LOG(INFO) << "VrrController: Set power mode to " << powerMode << " " << mPowerMode;
 
     {
         const std::lock_guard<std::mutex> lock(mMutex);
@@ -388,6 +399,12 @@ void VariableRefreshRateController::onPresent(int fence) {
             if (mRefreshRateCalculator) {
                 mRefreshRateCalculator->onPresent(mRecord.mPendingCurrentPresentTime.value().mTime,
                                                   getPresentFrameFlag());
+            }
+
+            if (mVariableRefreshRateStatistic) {
+                mVariableRefreshRateStatistic
+                        ->onPresent(mRecord.mPendingCurrentPresentTime.value().mTime,
+                                    getPresentFrameFlag());
             }
 
             mRecord.mPresentHistory.next() = mRecord.mPendingCurrentPresentTime.value();
