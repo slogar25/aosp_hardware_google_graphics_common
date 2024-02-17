@@ -50,6 +50,9 @@ private:
 
     void updateRefreshRate();
 
+    CombinedRefreshRateCalculator(const CombinedRefreshRateCalculator&) = delete;
+    CombinedRefreshRateCalculator& operator=(const CombinedRefreshRateCalculator&) = delete;
+
     std::vector<std::unique_ptr<RefreshRateCalculator>> mRefreshRateCalculators;
 
     VrrControllerEvent mMeasureEvent;

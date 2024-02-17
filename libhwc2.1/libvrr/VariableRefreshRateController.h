@@ -31,6 +31,7 @@
 #include "ExternalEventHandlerLoader.h"
 #include "RefreshRateCalculator/RefreshRateCalculator.h"
 #include "RingBuffer.h"
+#include "Statistics/VariableRefreshRateStatistic.h"
 #include "Utils.h"
 #include "display/common/DisplayConfigurationOwner.h"
 #include "interface/DisplayContextProvider.h"
@@ -124,6 +125,9 @@ public:
     }
 
 private:
+    static constexpr int kMaxFrameRate = 120;
+    static constexpr int kMaxTefrequency = 240;
+
     static constexpr int kDefaultRingBufferCapacity = 128;
     static constexpr int64_t kDefaultWakeUpTimeInPowerSaving =
             500 * (std::nano::den / std::milli::den); // 500 ms
@@ -294,6 +298,7 @@ private:
 
     std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;
+    std::unique_ptr<VariableRefreshRateStatistic> mVariableRefreshRateStatistic;
 
     std::unique_ptr<DisplayContextProvider> mDisplayContextProvider;
 

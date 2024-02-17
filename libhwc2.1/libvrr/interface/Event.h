@@ -38,13 +38,17 @@ enum class VrrControllerEventType {
     kHandleVendorRenderingTimeout,
     kHibernateTimeout,
     kNotifyExpectedPresentConfig,
-    // Refresh rate Calculator events.
+    kGeneralEventMax = 0x1FF,
+    // General callback events.
     kRefreshRateCalculatorUpdateMask = 0x200,
     kInstantRefreshRateCalculatorUpdate,
     kPeriodRefreshRateCalculatorUpdate,
     kVideoFrameRateCalculatorUpdate,
     kCombinedRefreshRateCalculatorUpdate,
     kAodRefreshRateCalculatorUpdate,
+    kStatisticPresentTimeout,
+    kStaticticUpdate,
+    kCallbackEventMax = 0x2FF,
     // Sensors, outer events...
 };
 
