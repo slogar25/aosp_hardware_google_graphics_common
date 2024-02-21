@@ -181,16 +181,17 @@ public:
         return result;
     }
 
-    virtual void getWFDOutputResolution(unsigned int *width, unsigned int *height)
-    {
+    virtual int getWFDOutputResolution(unsigned int* width, unsigned int* height) {
         Parcel data, reply;
         data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
         int result = remote()->transact(GET_WFD_OUTPUT_RESOLUTION, data, &reply);
         if (result == NO_ERROR) {
             *width  = reply.readInt32();
             *height = reply.readInt32();
+            result = reply.readInt32();
         } else
             ALOGE("GET_WFD_OUTPUT_RESOLUTION transact error(%d)", result);
+        return result;
     }
 
     virtual void setPresentationMode(bool use)
@@ -630,10 +631,11 @@ status_t BnExynosHWCService::onTransact(
         } break;
         case GET_WFD_OUTPUT_RESOLUTION: {
             CHECK_INTERFACE(IExynosHWCService, data, reply);
-            uint32_t width, height;
-            getWFDOutputResolution(&width, &height);
+            uint32_t width = 0, height = 0;
+            int res = getWFDOutputResolution(&width, &height);
             reply->writeInt32(width);
             reply->writeInt32(height);
+            reply->writeInt32(res);
             return NO_ERROR;
         } break;
         case SET_PRESENTATION_MODE: {

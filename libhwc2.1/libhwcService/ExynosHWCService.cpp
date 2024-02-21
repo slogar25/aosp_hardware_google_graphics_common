@@ -21,6 +21,7 @@
 #include "ExynosExternalDisplay.h"
 #include "ExynosVirtualDisplay.h"
 #include "ExynosVirtualDisplayModule.h"
+#include "android-base/macros.h"
 #define HWC_SERVICE_DEBUG 0
 
 namespace android {
@@ -121,17 +122,23 @@ int ExynosHWCService::setWFDOutputResolution(unsigned int width, unsigned int he
     return INVALID_OPERATION;
 }
 
-void ExynosHWCService::getWFDOutputResolution(unsigned int *width, unsigned int *height)
-{
+int ExynosHWCService::getWFDOutputResolution(unsigned int* width, unsigned int* height) {
     ALOGD_IF(HWC_SERVICE_DEBUG, "%s", __func__);
+    if (UNLIKELY(width == nullptr || height == nullptr)) {
+        ALOGE("%s: does not accept null pointers", __func__);
+        return INVALID_OPERATION;
+    }
     for (uint32_t i = 0; i < mHWCCtx->device->mDisplays.size(); i++) {
         if (mHWCCtx->device->mDisplays[i]->mType == HWC_DISPLAY_VIRTUAL) {
             ExynosVirtualDisplay *virtualdisplay =
                 (ExynosVirtualDisplay *)mHWCCtx->device->mDisplays[i];
             virtualdisplay->getWFDOutputResolution(width, height);
-            return;
+            return NO_ERROR;
         }
     }
+    *width = *height = 0;
+    ALOGE("%s: no virtual display found", __func__);
+    return INVALID_OPERATION;
 }
 
 void ExynosHWCService::setPresentationMode(bool use)

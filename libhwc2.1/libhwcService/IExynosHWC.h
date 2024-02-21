@@ -44,7 +44,7 @@ public:
     virtual int sendWFDCommand(int32_t cmd, int32_t ext1, int32_t ext2) = 0;
     virtual int setSecureVDSMode(unsigned int mode) = 0;
     virtual int setWFDOutputResolution(unsigned int width, unsigned int height) = 0;
-    virtual void getWFDOutputResolution(unsigned int *width, unsigned int *height) = 0;
+    virtual int getWFDOutputResolution(unsigned int* width, unsigned int* height) = 0;
     virtual void setPresentationMode(bool use) = 0;
     virtual int getPresentationMode(void) = 0;
     virtual int setVDSGlesFormat(int format) = 0;
