@@ -32,9 +32,13 @@ public:
 
     int getRefreshRate() const override;
 
+    void onPowerStateChange(int from, int to) final;
+
     void onPresent(int64_t presentTimeNs, int flag) override;
 
     void reset() override;
+
+    void setEnabled(bool isEnabled) final;
 
 private:
     static constexpr int kDefaultMinValidRefreshRate = 1;

@@ -45,6 +45,13 @@ int CombinedRefreshRateCalculator::getRefreshRate() const {
     return mLastRefreshRate;
 }
 
+void CombinedRefreshRateCalculator::onPowerStateChange(int from, int to) {
+    for (auto& refreshRateCalculator : mRefreshRateCalculators) {
+        refreshRateCalculator->onPowerStateChange(from, to);
+    }
+    mPowerMode = to;
+}
+
 void CombinedRefreshRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
     mHasRefreshRateChage = false;
 
@@ -65,6 +72,12 @@ void CombinedRefreshRateCalculator::reset() {
     }
     setNewRefreshRate(kDefaultInvalidRefreshRate);
     mHasRefreshRateChage = false;
+}
+
+void CombinedRefreshRateCalculator::setEnabled(bool isEnabled) {
+    for (auto& refreshRateCalculator : mRefreshRateCalculators) {
+        refreshRateCalculator->setEnabled(isEnabled);
+    }
 }
 
 void CombinedRefreshRateCalculator::onRefreshRateChanged(int refreshRate) {

@@ -45,6 +45,19 @@ int VideoFrameRateCalculator::getRefreshRate() const {
     return kDefaultInvalidRefreshRate;
 }
 
+void VideoFrameRateCalculator::onPowerStateChange(int from, int to) {
+    if (to != HWC_POWER_MODE_NORMAL) {
+        setEnabled(false);
+    } else {
+        if (from == HWC_POWER_MODE_NORMAL) {
+            ALOGE("Disregard power state change notification by staying current power state.");
+            return;
+        }
+        setEnabled(true);
+    }
+    mPowerMode = to;
+}
+
 void VideoFrameRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
@@ -57,6 +70,10 @@ void VideoFrameRateCalculator::reset() {
     mLastPeriodFrameRate = kDefaultInvalidRefreshRate;
     mLastPeriodFrameRateRuns = 0;
     mHistory.clear();
+}
+
+void VideoFrameRateCalculator::setEnabled(bool isEnabled) {
+    mRefreshRateCalculator->setEnabled(isEnabled);
 }
 
 int VideoFrameRateCalculator::onReportRefreshRate(int refreshRate) {

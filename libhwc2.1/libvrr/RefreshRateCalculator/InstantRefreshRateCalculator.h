@@ -35,6 +35,8 @@ public:
 
     void reset() override;
 
+    void setEnabled(bool isEnabled) final;
+
 private:
     static constexpr int64_t kDefaultMaxValidTimeNs = 1000000000; // 1 second.
 
