@@ -4605,7 +4605,7 @@ void ExynosDisplay::tryUpdateBtsFromOperationRate(bool beforeValidateDisplay) {
 inline int32_t ExynosDisplay::getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config) {
     int32_t frameScanoutPeriodNs;
     auto vrrConfig = getVrrConfigs(config);
-    if (vrrConfig.has_value()) {
+    if (vrrConfig.has_value() && vrrConfig->isFullySupported) {
         frameScanoutPeriodNs = vrrConfig->minFrameIntervalNs;
     } else {
         getDisplayAttribute(config, HWC2_ATTRIBUTE_VSYNC_PERIOD, &frameScanoutPeriodNs);
