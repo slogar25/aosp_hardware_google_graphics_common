@@ -66,23 +66,25 @@ static void set_dpp_ch_restriction(struct hwc_dpp_ch_restriction &hwc_dpp_restri
 
 using namespace SOC_VERSION;
 
-ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice *exynosDevice) {
+ExynosDeviceDrmInterface::ExynosDeviceDrmInterface(ExynosDevice* exynosDevice)
+      : mExynosDrmEventHandler(std::make_shared<ExynosDrmEventHandler>()) {
+    if (!mExynosDrmEventHandler) ALOGE("mExynosDrmEventHandler failed to create!");
     mType = INTERFACE_TYPE_DRM;
 }
 
 ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface() {
     mDrmDevice->event_listener()->UnRegisterPropertyUpdateHandler(
-            static_cast<DrmPropertyUpdateHandler*>(&mExynosDrmEventHandler));
+            std::static_pointer_cast<DrmPropertyUpdateHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterHotplugHandler(
-            static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
+            std::static_pointer_cast<DrmEventHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterHistogramHandler(
-            static_cast<DrmHistogramEventHandler *>(&mExynosDrmEventHandler));
+            std::static_pointer_cast<DrmHistogramEventHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterHistogramChannelHandler(
-            static_cast<DrmHistogramChannelEventHandler *>(&mExynosDrmEventHandler));
+            std::static_pointer_cast<DrmHistogramChannelEventHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterTUIHandler(
-            static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
+            std::static_pointer_cast<DrmTUIEventHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterPanelIdleHandler(
-            static_cast<DrmPanelIdleEventHandler *>(&mExynosDrmEventHandler));
+            std::static_pointer_cast<DrmPanelIdleEventHandler>(mExynosDrmEventHandler));
 }
 
 void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice) {
@@ -94,19 +96,23 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice) {
 
     updateRestrictions();
 
-    mExynosDrmEventHandler.init(mExynosDevice, mDrmDevice);
-    mDrmDevice->event_listener()->RegisterHotplugHandler(
-            static_cast<DrmEventHandler *>(&mExynosDrmEventHandler));
-    mDrmDevice->event_listener()->RegisterHistogramHandler(
-            static_cast<DrmHistogramEventHandler *>(&mExynosDrmEventHandler));
-    mDrmDevice->event_listener()->RegisterHistogramChannelHandler(
-            static_cast<DrmHistogramChannelEventHandler *>(&mExynosDrmEventHandler));
-    mDrmDevice->event_listener()->RegisterTUIHandler(
-            static_cast<DrmTUIEventHandler *>(&mExynosDrmEventHandler));
-    mDrmDevice->event_listener()->RegisterPanelIdleHandler(
-            static_cast<DrmPanelIdleEventHandler *>(&mExynosDrmEventHandler));
-    mDrmDevice->event_listener()->RegisterPropertyUpdateHandler(
-            static_cast<DrmPropertyUpdateHandler*>(&mExynosDrmEventHandler));
+    if (mExynosDrmEventHandler) {
+        mExynosDrmEventHandler->init(mExynosDevice, mDrmDevice);
+        mDrmDevice->event_listener()->RegisterHotplugHandler(
+                std::static_pointer_cast<DrmEventHandler>(mExynosDrmEventHandler));
+        mDrmDevice->event_listener()->RegisterHistogramHandler(
+                std::static_pointer_cast<DrmHistogramEventHandler>(mExynosDrmEventHandler));
+        mDrmDevice->event_listener()->RegisterHistogramChannelHandler(
+                std::static_pointer_cast<DrmHistogramChannelEventHandler>(mExynosDrmEventHandler));
+        mDrmDevice->event_listener()->RegisterTUIHandler(
+                std::static_pointer_cast<DrmTUIEventHandler>(mExynosDrmEventHandler));
+        mDrmDevice->event_listener()->RegisterPanelIdleHandler(
+                std::static_pointer_cast<DrmPanelIdleEventHandler>(mExynosDrmEventHandler));
+        mDrmDevice->event_listener()->RegisterPropertyUpdateHandler(
+                std::static_pointer_cast<DrmPropertyUpdateHandler>(mExynosDrmEventHandler));
+    } else {
+        ALOGE("mExynosDrmEventHandler is not available!");
+    }
 
     if (mDrmDevice->event_listener()->IsDrmInTUI()) {
         mExynosDevice->enterToTUI();

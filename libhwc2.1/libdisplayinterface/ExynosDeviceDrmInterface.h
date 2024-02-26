@@ -58,7 +58,7 @@ class ExynosDeviceDrmInterface : public ExynosDeviceInterface {
         };
         ResourceManager mDrmResourceManager;
         DrmDevice *mDrmDevice;
-        ExynosDrmEventHandler mExynosDrmEventHandler;
+        std::shared_ptr<ExynosDrmEventHandler> mExynosDrmEventHandler;
 };
 
 #endif //_EXYNOSDEVICEDRMINTERFACE_H
