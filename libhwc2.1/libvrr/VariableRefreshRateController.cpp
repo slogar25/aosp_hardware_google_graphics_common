@@ -282,6 +282,9 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
             case HWC_POWER_MODE_DOZE_SUSPEND: {
                 mState = VrrControllerState::kDisable;
                 dropEventLocked(VrrControllerEventType::kGeneralEventMask);
+                if (mPresentTimeoutEventHandler) {
+                    mPresentTimeoutEventHandler->enablePanelAutoFrameInsertionMode(true);
+                }
                 break;
             }
             case HWC_POWER_MODE_NORMAL: {
