@@ -42,7 +42,7 @@ public:
             mDisplayConfigurationsOwner(displayConfigurationsOwner),
             mEventQueue(eventQueue) {}
 
-    std::unique_ptr<DisplayContextProvider> buildDisplayContextProvider(
+    std::shared_ptr<CommonDisplayContextProvider> buildDisplayContextProvider(
             DisplayContextProviderType type) {
         RefreshRateCalculatorFactory refreshRateCalculatorFactory;
         VideoFrameRateCalculatorParameters params;
@@ -54,7 +54,7 @@ public:
                 refreshRateCalculatorFactory.BuildRefreshRateCalculator(mEventQueue, params);
 
         if (type == DisplayContextProviderType::kExynos) {
-            return std::make_unique<
+            return std::make_shared<
                     ExynosDisplayContextProvider>(mDisplay, mDisplayConfigurationsOwner,
                                                   std::move(videoFrameRateCalculator));
         } else {
