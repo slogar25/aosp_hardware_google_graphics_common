@@ -93,12 +93,47 @@ int32_t ComposerCommandEngine::execute(const std::vector<DisplayCommand>& comman
     return ::android::NO_ERROR;
 }
 
+void ComposerCommandEngine::dispatchBatchCreateDestroyLayerCommand(int64_t display,
+                                                                   const LayerCommand& layerCmd) {
+    auto cmdType = layerCmd.layerLifecycleBatchCommandType;
+    if ((cmdType != LayerLifecycleBatchCommandType::CREATE) &&
+        (cmdType != LayerLifecycleBatchCommandType::DESTROY)) {
+        return;
+    }
+    auto err = mHal->batchedCreateDestroyLayer(display, layerCmd.layer, cmdType);
+    if (err) {
+        mWriter->setError(mCommandIndex, err);
+        return;
+    }
+
+    if (cmdType == LayerLifecycleBatchCommandType::CREATE) {
+        err = mResources->addLayer(display, layerCmd.layer, layerCmd.newBufferSlotCount);
+    } else {
+        err = mResources->removeLayer(display, layerCmd.layer);
+    }
+
+    if (err) {
+        mWriter->setError(mCommandIndex, err);
+    }
+}
+
 void ComposerCommandEngine::dispatchDisplayCommand(const DisplayCommand& command) {
+    // place batched createLayer and destroyLayer commands before any other commands, so layers are
+    // properly created to operate on.
+    for (const auto& layerCmd : command.layers) {
+        if (layerCmd.layerLifecycleBatchCommandType == LayerLifecycleBatchCommandType::CREATE ||
+            layerCmd.layerLifecycleBatchCommandType == LayerLifecycleBatchCommandType::DESTROY) {
+            dispatchBatchCreateDestroyLayerCommand(command.display, layerCmd);
+        }
+    }
     //  place SetDisplayBrightness before SetLayerWhitePointNits since current
     //  display brightness is used to validate the layer white point nits.
     DISPATCH_DISPLAY_COMMAND(command, brightness, SetDisplayBrightness);
     for (const auto& layerCmd : command.layers) {
-        dispatchLayerCommand(command.display, layerCmd);
+        // ignore layer data update if command is DESTROY
+        if (layerCmd.layerLifecycleBatchCommandType != LayerLifecycleBatchCommandType::DESTROY) {
+            dispatchLayerCommand(command.display, layerCmd);
+        }
     }
 
     DISPATCH_DISPLAY_COMMAND(command, colorTransformMatrix, SetColorTransform);
