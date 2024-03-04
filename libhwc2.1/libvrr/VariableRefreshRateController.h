@@ -49,12 +49,15 @@ public:
     auto static CreateInstance(ExynosDisplay* display, const std::string& panelName)
             -> std::shared_ptr<VariableRefreshRateController>;
 
-    const VrrConfig_t* getCurrentDisplayConfiguration() const override {
-        const auto& it = mVrrConfigs.find(mVrrActiveConfig);
-        if (it == mVrrConfigs.end()) {
-            return nullptr;
+    const displayConfigs_t* getCurrentDisplayConfiguration() const override {
+        auto configs = mDisplayContextProvider->getDisplayConfigs();
+        if (configs) {
+            const auto& it = configs->find(mVrrActiveConfig);
+            if (it != configs->end()) {
+                return &(it->second);
+            }
         }
-        return &(it->second);
+        return nullptr;
     }
 
     int notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs);
@@ -300,7 +303,7 @@ private:
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;
     std::unique_ptr<VariableRefreshRateStatistic> mVariableRefreshRateStatistic;
 
-    std::unique_ptr<DisplayContextProvider> mDisplayContextProvider;
+    std::shared_ptr<CommonDisplayContextProvider> mDisplayContextProvider;
 
     bool mEnabled = false;
     bool mThreadExit = false;
