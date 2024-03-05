@@ -37,7 +37,7 @@ DisplayStateResidencyProvider::DisplayStateResidencyProvider(
         std::shared_ptr<StatisticsProvider> statisticsProvider)
       : mDisplayContextProvider(displayContextProvider),
         mStatisticsProvider(statisticsProvider),
-        mDisplayPresentProfileTokenGenerator(displayContextProvider.get()) {
+        mDisplayPresentProfileTokenGenerator(mDisplayContextProvider.get()) {
     if (parseDisplayStateResidencyPattern()) {
         generatePowerStatsStates();
     }
