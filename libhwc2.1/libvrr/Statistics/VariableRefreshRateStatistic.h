@@ -130,14 +130,15 @@ public:
     virtual DisplayPresentStatistics getUpdatedStatistics() = 0;
 };
 
-class VariableRefreshRateStatistic : public PowerModeListener {
+class VariableRefreshRateStatistic : public PowerModeListener, public StatisticsProvider {
 public:
     VariableRefreshRateStatistic(CommonDisplayContextProvider* displayContextProvider,
                                  EventQueue* eventQueue, int maxFrameRate, int maxTeFrequency,
                                  int64_t updatePeriodNs);
 
-    VariableRefreshRateStatistic(const VariableRefreshRateStatistic& other) = delete;
-    VariableRefreshRateStatistic& operator=(const VariableRefreshRateStatistic& other) = delete;
+    DisplayPresentStatistics getStatistics() const override REQUIRES(mMutex);
+
+    DisplayPresentStatistics getUpdatedStatistics() override REQUIRES(mMutex);
 
     void onPowerStateChange(int from, int to) final;
 
@@ -145,8 +146,12 @@ public:
 
     void setActiveVrrConfiguration(int activeConfigId, int teFrequency);
 
+    VariableRefreshRateStatistic(const VariableRefreshRateStatistic& other) = delete;
+    VariableRefreshRateStatistic& operator=(const VariableRefreshRateStatistic& other) = delete;
+
 private:
     static constexpr int64_t kMaxPresentIntervalNs = std::nano::den;
+    static constexpr uint32_t kFrameRateWhenPresentAtLpMode = 30;
 
     int onPresentTimeout();
 
@@ -173,6 +178,8 @@ private:
     VrrControllerEvent mUpdateEvent;
 
     DisplayPresentProfile mDisplayPresentProfile;
+
+    mutable std::mutex mMutex;
 };
 
 } // namespace android::hardware::graphics::composer

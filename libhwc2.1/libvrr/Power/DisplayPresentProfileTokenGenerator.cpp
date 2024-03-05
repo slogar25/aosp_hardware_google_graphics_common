@@ -58,7 +58,7 @@ std::string DisplayPresentProfileTokenGenerator::generateFpsToken() {
         return "";
     }
     if (mDisplayPresentProfile->mNumVsync == 0) {
-        return "others";
+        return "oth";
     }
     return std::to_string(mDisplayContextProvider->getTeFrequency(mDisplayId) /
                           mDisplayPresentProfile->mNumVsync);
@@ -73,15 +73,14 @@ std::optional<std::string> DisplayPresentProfileTokenGenerator::generateToken(
              {"fps", std::bind(&DisplayPresentProfileTokenGenerator::generateFpsToken, this)}};
 
     if (!mDisplayPresentProfile) {
-        ALOGE("DisplayPresentProfileTokenGenerator: haven't set target DisplayPresentProfile");
+        ALOGE("%s: haven't set target DisplayPresentProfile", __func__);
         return std::nullopt;
     }
 
     if (functors.find(tokenLabel) != functors.end()) {
         return (functors[tokenLabel])();
     } else {
-        ALOGE("DisplayPresentProfileTokenGenerator syntax error: unable to find token label = %s",
-              tokenLabel.c_str());
+        ALOGE("%s syntax error: unable to find token label = %s", __func__, tokenLabel.c_str());
         return std::nullopt;
     }
 }

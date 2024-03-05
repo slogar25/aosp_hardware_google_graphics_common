@@ -48,6 +48,21 @@ VariableRefreshRateStatistic::VariableRefreshRateStatistic(
     mStatistics[mDisplayPresentProfile] = DisplayPresentRecord();
 }
 
+DisplayPresentStatistics VariableRefreshRateStatistic::getStatistics() const {
+    return mStatistics;
+}
+
+DisplayPresentStatistics VariableRefreshRateStatistic::getUpdatedStatistics() {
+    DisplayPresentStatistics updatedStatistics;
+    for (auto& it : mStatistics) {
+        if (it.second.mUpdated) {
+            updatedStatistics[it.first] = it.second;
+            it.second.mUpdated = false;
+        }
+    }
+    return std::move(updatedStatistics);
+}
+
 void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
     if (mDisplayPresentProfile.mCurrentDisplayConfig.mPowerMode != from) {
         ALOGE("%s Power mode mismatch between storing state(%d) and actual mode(%d)", __func__,
@@ -57,8 +72,14 @@ void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
     auto tmp = mDisplayPresentProfile.mCurrentDisplayConfig;
     if ((to == HWC_POWER_MODE_OFF) || (to == HWC_POWER_MODE_DOZE_SUSPEND)) {
         mEventQueue->dropEvent(VrrControllerEventType::kStatisticPresentTimeout);
-        ++mStatistics[mDisplayPresentProfile].mCount;
-        mStatistics[mDisplayPresentProfile].mLastTimeStampNs = getNowNs();
+        {
+            std::scoped_lock lock(mMutex);
+
+            auto& record = mStatistics[mDisplayPresentProfile];
+            ++record.mCount;
+            record.mLastTimeStampNs = getNowNs();
+            record.mUpdated = true;
+        }
     } else {
         if ((from == HWC_POWER_MODE_OFF) || (from == HWC_POWER_MODE_DOZE_SUSPEND)) {
             mTimeoutEvent.mWhenNs = getNowNs() + kMaxPresentIntervalNs;
@@ -78,9 +99,22 @@ void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
     updateCurrentDisplayStatus();
     mDisplayPresentProfile.mNumVsync = numVsync;
 
-    ++mStatistics[mDisplayPresentProfile].mCount;
-    mStatistics[mDisplayPresentProfile].mLastTimeStampNs = presentTimeNs;
+    if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
+        // In low power mode, the available options for frame rates are limited to either 1 or 30
+        // fps.
+        mDisplayPresentProfile.mNumVsync = mTeFrequency / kFrameRateWhenPresentAtLpMode;
+    } else {
+        mDisplayPresentProfile.mNumVsync = numVsync;
+    }
     mLastPresentTimeNs = presentTimeNs;
+    {
+        std::scoped_lock lock(mMutex);
+
+        auto& record = mStatistics[mDisplayPresentProfile];
+        ++record.mCount;
+        record.mLastTimeStampNs = presentTimeNs;
+        record.mUpdated = true;
+    }
 }
 
 void VariableRefreshRateStatistic::setActiveVrrConfiguration(int activeConfigId, int teFrequency) {
@@ -95,9 +129,15 @@ void VariableRefreshRateStatistic::setActiveVrrConfiguration(int activeConfigId,
 
 int VariableRefreshRateStatistic::onPresentTimeout() {
     updateCurrentDisplayStatus();
-    mDisplayPresentProfile.mNumVsync = mTeFrequency;
-    ++mStatistics[mDisplayPresentProfile].mCount;
-    mStatistics[mDisplayPresentProfile].mLastTimeStampNs = getNowNs();
+    mDisplayPresentProfile.mNumVsync = mMaxFrameRate;
+    {
+        std::scoped_lock lock(mMutex);
+
+        auto& record = mStatistics[mDisplayPresentProfile];
+        ++record.mCount;
+        record.mLastTimeStampNs = getNowNs();
+        record.mUpdated = true;
+    }
 
     // Post next present timeout event.
     mTimeoutEvent.mWhenNs = getNowNs() + kMaxPresentIntervalNs;

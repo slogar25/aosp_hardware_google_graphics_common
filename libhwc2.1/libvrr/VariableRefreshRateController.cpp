@@ -115,7 +115,7 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
         LOG(WARNING) << "VrrController: Cannot find file node of display: "
                      << mDisplay->mDisplayName;
     } else {
-        mFileNodeWritter = std::make_unique<FileNodeWriter>(displayFileNodePath);
+        mFileNodeWriter = std::make_unique<FileNodeWriter>(displayFileNodePath);
     }
 
     // Initialize DisplayContextProviderInterface.
@@ -164,13 +164,16 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
                                            mPanelName.c_str()));
     mPresentTimeoutEventHandler = mPresentTimeoutEventHandlerLoader->getEventHandler();
 
-    mResidencyWatcher = ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(display);
-
-    mVariableRefreshRateStatistic = std::make_unique<
-            VariableRefreshRateStatistic>(static_cast<CommonDisplayContextProvider*>(
-                                                  mDisplayContextProvider.get()),
-                                          &mEventQueue, kMaxFrameRate, kMaxTefrequency, 1000000000);
+    mVariableRefreshRateStatistic =
+            std::make_shared<VariableRefreshRateStatistic>(mDisplayContextProvider.get(),
+                                                           &mEventQueue, kMaxFrameRate,
+                                                           kMaxTefrequency,
+                                                           (1 * std::nano::den /*1 second*/));
     mPowerModeListeners.push_back(mVariableRefreshRateStatistic.get());
+
+    mResidencyWatcher =
+            ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(mDisplayContextProvider,
+                                                                   mVariableRefreshRateStatistic);
 }
 
 VariableRefreshRateController::~VariableRefreshRateController() {
@@ -224,9 +227,6 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
             return;
         }
         mVrrActiveConfig = config;
-        if (mResidencyWatcher) {
-            mResidencyWatcher->setActiveConfig(config);
-        }
         if (mVariableRefreshRateStatistic) {
             mVariableRefreshRateStatistic
                     ->setActiveVrrConfiguration(config,
@@ -313,9 +313,6 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
             }
         }
         mPowerMode = powerMode;
-    }
-    if (mResidencyWatcher) {
-        mResidencyWatcher->setPowerMode(powerMode);
     }
     mCondition.notify_all();
 }
@@ -616,10 +613,6 @@ void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
     }
     refreshRate =
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
-
-    if (mResidencyWatcher) {
-        mResidencyWatcher->setRefreshRate(refreshRate);
-    }
 
     if (!mDisplay->mDevice->isVrrApiSupported()) {
         // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,

@@ -26,9 +26,9 @@
 
 #include "../libdevice/ExynosDisplay.h"
 #include "../libdevice/ExynosLayer.h"
-#include "DisplayStateResidencyWatcher.h"
 #include "EventQueue.h"
 #include "ExternalEventHandlerLoader.h"
+#include "Power/DisplayStateResidencyWatcher.h"
 #include "RefreshRateCalculator/RefreshRateCalculator.h"
 #include "RingBuffer.h"
 #include "Statistics/VariableRefreshRateStatistic.h"
@@ -287,7 +287,7 @@ private:
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
     std::optional<int> mLastPresentFence;
 
-    std::unique_ptr<FileNodeWriter> mFileNodeWritter;
+    std::unique_ptr<FileNodeWriter> mFileNodeWriter;
 
     DisplayContextProviderInterface mDisplayContextProviderInterface;
     std::unique_ptr<ExternalEventHandlerLoader> mPresentTimeoutEventHandlerLoader;
@@ -301,7 +301,7 @@ private:
 
     std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;
-    std::unique_ptr<VariableRefreshRateStatistic> mVariableRefreshRateStatistic;
+    std::shared_ptr<VariableRefreshRateStatistic> mVariableRefreshRateStatistic;
 
     std::shared_ptr<CommonDisplayContextProvider> mDisplayContextProvider;
 
