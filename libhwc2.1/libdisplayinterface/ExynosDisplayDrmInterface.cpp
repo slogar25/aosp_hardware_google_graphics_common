@@ -140,8 +140,7 @@ void FramebufferManager::checkShrink() {
     Mutex::Autolock lock(mMutex);
 
     mCacheShrinkPending = mCachedLayerBuffers.size() > MAX_CACHED_LAYERS;
-    mCacheM2mSecureShrinkPending =
-            mCachedM2mSecureLayerBuffers.size() > MAX_CACHED_M2M_SECURE_LAYERS;
+    mCacheSecureShrinkPending = mCachedSecureLayerBuffers.size() > MAX_CACHED_SECURE_LAYERS;
 }
 
 void FramebufferManager::cleanup(const ExynosLayer *layer) {
@@ -155,7 +154,7 @@ void FramebufferManager::cleanup(const ExynosLayer *layer) {
         }
     };
     clean(mCachedLayerBuffers);
-    clean(mCachedM2mSecureLayerBuffers);
+    clean(mCachedSecureLayerBuffers);
 }
 
 void FramebufferManager::removeFBsThreadRoutine()
@@ -182,7 +181,7 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     uint32_t bpp = 0;
     uint32_t bufferNum, planeNum = 0;
     uint32_t bufWidth, bufHeight = 0;
-    bool isM2mSecureLayer = (config.protection && config.layer && config.layer->mM2mMPP);
+    bool isSecureBuffer = config.protection;
     DrmArray<uint32_t> pitches = {0};
     DrmArray<uint32_t> offsets = {0};
     DrmArray<uint64_t> modifiers = {0};
@@ -217,10 +216,10 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
             return -EINVAL;
         }
 
-        fbId = findCachedFbId(config.layer, isM2mSecureLayer,
+        fbId = findCachedFbId(config.layer, isSecureBuffer,
                               [bufferDesc = Framebuffer::BufferDesc{config.buffer_id, drmFormat,
                                                                     config.protection}](
-                                      auto &buffer) { return buffer->bufferDesc == bufferDesc; });
+                                      auto& buffer) { return buffer->bufferDesc == bufferDesc; });
         if (fbId != 0) {
             return NO_ERROR;
         }
@@ -270,9 +269,9 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
         handles[0] = 0xff000000;
         bpp = getBytePerPixelOfPrimaryPlane(HAL_PIXEL_FORMAT_BGRA_8888);
         pitches[0] = config.dst.w * bpp;
-        fbId = findCachedFbId(config.layer, isM2mSecureLayer,
+        fbId = findCachedFbId(config.layer, isSecureBuffer,
                               [colorDesc = Framebuffer::SolidColorDesc{bufWidth, bufHeight}](
-                                      auto &buffer) { return buffer->colorDesc == colorDesc; });
+                                      auto& buffer) { return buffer->colorDesc == colorDesc; });
         if (fbId != 0) {
             return NO_ERROR;
         }
@@ -302,10 +301,11 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
 
     if (config.layer || config.buffer_id) {
         Mutex::Autolock lock(mMutex);
-        auto &cachedBuffers = (!isM2mSecureLayer) ? mCachedLayerBuffers[config.layer]
-                                                  : mCachedM2mSecureLayerBuffers[config.layer];
-        auto maxCachedBufferSize = (!isM2mSecureLayer) ? MAX_CACHED_BUFFERS_PER_LAYER
-                                                       : MAX_CACHED_M2M_SECURE_BUFFERS_PER_LAYER;
+        auto& cachedBuffers = (!isSecureBuffer) ? mCachedLayerBuffers[config.layer]
+                                                : mCachedSecureLayerBuffers[config.layer];
+        auto maxCachedBufferSize = (!isSecureBuffer) ? MAX_CACHED_BUFFERS_PER_LAYER
+                                                     : MAX_CACHED_SECURE_BUFFERS_PER_LAYER;
+        markInuseLayerLocked(config.layer, isSecureBuffer);
 
         if (cachedBuffers.size() > maxCachedBufferSize) {
             ALOGW("FBManager: cached buffers size %zu exceeds limitation(%zu) while adding fbId %d",
@@ -322,8 +322,6 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
                     new Framebuffer(mDrmFd, fbId,
                                     Framebuffer::BufferDesc{config.buffer_id, drmFormat,
                                                             config.protection}));
-            mHasSecureFramebuffer |= (isFramebuffer(config.layer) && config.protection);
-            mHasM2mSecureLayerBuffer |= isM2mSecureLayer;
         }
     } else {
         ALOGW("FBManager: possible leakage fbId %d was created", fbId);
@@ -332,18 +330,15 @@ int32_t FramebufferManager::getBuffer(const exynos_win_config_data &config, uint
     return 0;
 }
 
-void FramebufferManager::flip(const bool hasSecureFrameBuffer, const bool hasM2mSecureLayerBuffer) {
+void FramebufferManager::flip(const bool hasSecureBuffer) {
     bool needCleanup = false;
     {
         Mutex::Autolock lock(mMutex);
         destroyUnusedLayersLocked();
-        if (!hasSecureFrameBuffer) {
-            destroySecureFramebufferLocked();
+        if (!hasSecureBuffer) {
+            destroyAllSecureBuffersLocked();
         }
 
-        if (!hasM2mSecureLayerBuffer) {
-            destroyM2mSecureLayerBufferLocked();
-        }
         needCleanup = mCleanBuffers.size() > 0;
     }
 
@@ -356,7 +351,7 @@ void FramebufferManager::releaseAll()
 {
     Mutex::Autolock lock(mMutex);
     mCachedLayerBuffers.clear();
-    mCachedM2mSecureLayerBuffers.clear();
+    mCachedSecureLayerBuffers.clear();
     mCleanBuffers.clear();
 }
 
@@ -374,14 +369,13 @@ void FramebufferManager::freeBufHandle(uint32_t handle) {
     }
 }
 
-void FramebufferManager::markInuseLayerLocked(const ExynosLayer *layer,
-                                              const bool isM2mSecureLayer) {
-    if (!isM2mSecureLayer && mCacheShrinkPending) {
+void FramebufferManager::markInuseLayerLocked(const ExynosLayer* layer, const bool isSecureBuffer) {
+    if (!isSecureBuffer && mCacheShrinkPending) {
         mCachedLayersInuse.insert(layer);
     }
 
-    if (isM2mSecureLayer && mCacheM2mSecureShrinkPending) {
-        mCachedM2mSecureLayersInuse.insert(layer);
+    if (isSecureBuffer && mCacheSecureShrinkPending) {
+        mCachedSecureLayersInuse.insert(layer);
     }
 }
 
@@ -412,51 +406,22 @@ void FramebufferManager::destroyUnusedLayersLocked() {
               mCachedLayerBuffers.size());
     }
 
-    cachedLayerSize = mCachedM2mSecureLayerBuffers.size();
-    if (destroyUnusedLayers(mCacheM2mSecureShrinkPending, mCachedM2mSecureLayersInuse,
-                            mCachedM2mSecureLayerBuffers)) {
-        ALOGW("FBManager: shrink cached M2M secure layers from %zu to %zu", cachedLayerSize,
-              mCachedM2mSecureLayerBuffers.size());
+    cachedLayerSize = mCachedSecureLayerBuffers.size();
+    if (destroyUnusedLayers(mCacheSecureShrinkPending, mCachedSecureLayersInuse,
+                            mCachedSecureLayerBuffers)) {
+        ALOGW("FBManager: shrink cached secure layers from %zu to %zu", cachedLayerSize,
+              mCachedSecureLayerBuffers.size());
     }
 }
 
-void FramebufferManager::destroySecureFramebufferLocked() {
-    if (!mHasSecureFramebuffer) {
-        return;
-    }
-
-    mHasSecureFramebuffer = false;
-
-    for (auto &layer : mCachedLayerBuffers) {
-        if (isFramebuffer(layer.first)) {
-            auto &bufferList = layer.second;
-            for (auto it = bufferList.begin(); it != bufferList.end(); ++it) {
-                auto &buffer = *it;
-                if (buffer->bufferDesc.isSecure) {
-                    // Assume the latest non-secure buffer in the front
-                    // TODO: have a better way to keep in-used buffers
-                    mCleanBuffers.splice(mCleanBuffers.end(), bufferList, it, bufferList.end());
-                    return;
-                }
-            }
-        }
-    }
-}
-
-void FramebufferManager::destroyM2mSecureLayerBufferLocked() {
-    if (!mHasM2mSecureLayerBuffer) {
-        return;
-    }
-
-    mHasM2mSecureLayerBuffer = false;
-
-    for (auto &layer : mCachedM2mSecureLayerBuffers) {
-        auto &bufferList = layer.second;
+void FramebufferManager::destroyAllSecureBuffersLocked() {
+    for (auto& [layer, bufferList] : mCachedSecureLayerBuffers) {
         if (bufferList.size()) {
             mCleanBuffers.splice(mCleanBuffers.end(), bufferList, bufferList.begin(),
                                  bufferList.end());
         }
     }
+    mCachedSecureLayerBuffers.clear();
 }
 
 void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
@@ -1913,14 +1878,13 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
     DrmModeAtomicReq drmReq(this);
     std::unordered_map<uint32_t, uint32_t> planeEnableInfo;
     android::String8 result;
-    bool hasSecureFrameBuffer = false;
-    bool hasM2mSecureLayerBuffer = false;
+    bool hasSecureBuffer = false;
 
     mFrameCounter++;
 
     funcReturnCallback retCallback([&]() {
         if ((ret == NO_ERROR) && !drmReq.getError()) {
-            mFBManager.flip(hasSecureFrameBuffer, hasM2mSecureLayerBuffer);
+            mFBManager.flip(hasSecureBuffer);
         } else if (ret == -ENOMEM) {
             ALOGW("OOM, release all cached buffers by FBManager");
             mFBManager.releaseAll();
@@ -2019,8 +1983,7 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 HWC_LOGE(mExynosDisplay, "setupCommitFromDisplayConfig failed, config[%zu]", i);
                 return ret;
             }
-            hasSecureFrameBuffer |= (isFramebuffer(config.layer) && config.protection);
-            hasM2mSecureLayerBuffer |= (config.protection && config.layer && config.layer->mM2mMPP);
+            hasSecureBuffer |= config.protection;
             /* Set this plane is enabled */
             planeEnableInfo[plane->id()] = 1;
         }
