@@ -201,7 +201,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         PresentListener* getPresentListener();
         VsyncListener* getVsyncListener();
 
-        VrrSettings_t mVrrSettings;
+        XrrSettings_t mXrrSettings;
         std::shared_ptr<VariableRefreshRateController> mVariableRefreshRateController;
 };
 

@@ -21,12 +21,13 @@
 #include <sys/types.h>
 #include <utils/Errors.h>
 
+#include "../libvrr/VariableRefreshRateVersion.h"
 #include "ExynosHWCHelper.h"
 
 class ExynosDisplay;
 
-struct VrrSettings;
-typedef struct VrrSettings VrrSettings_t;
+struct XrrSettings;
+typedef struct XrrSettings XrrSettings_t;
 
 using namespace android;
 class ExynosDisplayInterface {
@@ -93,7 +94,7 @@ class ExynosDisplayInterface {
         virtual int readHotplugErrorCode() { return 0; };
         virtual void resetHotplugErrorCode(){};
 
-        virtual void setVrrSettings(const VrrSettings_t& vrrSettings);
+        virtual void setXrrSettings(const XrrSettings_t& __unused settings);
 
         virtual void setManufacturerInfo(uint8_t __unused edid8, uint8_t __unused edid9){};
         virtual uint32_t getManufacturerInfo() { return 0; }
