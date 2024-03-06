@@ -116,7 +116,7 @@ public:
             if (mPresentTimeoutEventHandler) {
                 // When |controllerType| is kNone, we select software to control present timeout,
                 // but without handling.
-                mPresentTimeoutEventHandler->setPanelFrameInsertionMode(
+                mPresentTimeoutEventHandler->enablePanelAutoFrameInsertionMode(
                         newControllerType == PresentTimeoutControllerType::kHardware);
             }
         }

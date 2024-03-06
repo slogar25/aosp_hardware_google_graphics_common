@@ -37,13 +37,13 @@ class ExynosJpegEncoderForCamera : public ExynosJpegEncoder {
         STATE_NO_BTBCOMP = STATE_BASE_MAX << 3,
     };
 
-    CHWJpegCompressor *m_phwjpeg4thumb;
+    CHWJpegCompressor* m_phwjpeg4thumb;
     std::unique_ptr<ThumbnailScaler> mThumbnailScaler;
     int m_fdIONClient;
     int m_fdIONThumbImgBuffer;
-    char *m_pIONThumbImgBuffer;
+    char* m_pIONThumbImgBuffer;
     size_t m_szIONThumbImgBuffer;
-    char *m_pIONThumbJpegBuffer;
+    char* m_pIONThumbJpegBuffer;
     int m_fdIONThumbJpegBuffer;
     size_t m_szIONThumbJpegBuffer;
 
@@ -57,18 +57,18 @@ class ExynosJpegEncoderForCamera : public ExynosJpegEncoder {
      * The following four placeholders and size vairables are used
      * by asynchronous(non-blocking) compression
      */
-    char *m_pStreamBase;
+    char* m_pStreamBase;
     size_t m_nStreamSize;
 
     char m_fThumbBufferType;
 
     union {
-        char *m_pThumbnailImageBuffer[3]; // checkInBufType() == JPEG_BUF_TYPE_USER_PTR
+        char* m_pThumbnailImageBuffer[3]; // checkInBufType() == JPEG_BUF_TYPE_USER_PTR
         int m_fdThumbnailImageBuffer[3];  // checkInBufType() == JPEG_BUF_TYPE_DMA_BUF
     };
     size_t m_szThumbnailImageLen[3];
 
-    CAppMarkerWriter *m_pAppWriter;
+    CAppMarkerWriter* m_pAppWriter;
 
     pthread_t m_threadWorker;
 
@@ -81,10 +81,10 @@ class ExynosJpegEncoderForCamera : public ExynosJpegEncoder {
     size_t CompressThumbnail();
     size_t CompressThumbnailOnly(size_t limit, int quality, unsigned int v4l2Format,
                                  int src_buftype);
-    size_t RemoveTrailingDummies(char *base, size_t len);
+    size_t RemoveTrailingDummies(char* base, size_t len);
     ssize_t FinishCompression(size_t mainlen, size_t thumblen);
-    bool ProcessExif(char *base, size_t limit, exif_attribute_t *exifInfo, extra_appinfo_t *extra);
-    static void *tCompressThumbnail(void *p);
+    bool ProcessExif(char* base, size_t limit, exif_attribute_t* exifInfo, extra_appinfo_t* extra);
+    static void* tCompressThumbnail(void* p);
     bool PrepareCompression(bool thumbnail);
 
     // IsThumbGenerationNeeded - true if thumbnail image needed to be generated from the main image
@@ -106,17 +106,17 @@ public:
     ExynosJpegEncoderForCamera(bool bBTBComp = true);
     virtual ~ExynosJpegEncoderForCamera();
 
-    int encode(int *size, exif_attribute_t *exifInfo, char **pcJpegBuffer,
-               debug_attribute_t *debugInfo = 0);
-    int encode(int *size, exif_attribute_t *exifInfo, int fdJpegBuffer, char **pcJpegBuffer,
-               debug_attribute_t *debugInfo = 0);
-    int encode(int *size, exif_attribute_t *exifInfo, int fdJpegBuffer, char **pcJpegBuffer,
-               extra_appinfo_t *appInfo = 0);
-    int setInBuf2(int *piBuf, int *iSize);
-    int setInBuf2(char **pcBuf, int *iSize);
+    int encode(int* size, exif_attribute_t* exifInfo, char** pcJpegBuffer,
+               debug_attribute_t* debugInfo = 0);
+    int encode(int* size, exif_attribute_t* exifInfo, int fdJpegBuffer, char** pcJpegBuffer,
+               debug_attribute_t* debugInfo = 0);
+    int encode(int* size, exif_attribute_t* exifInfo, int fdJpegBuffer, char** pcJpegBuffer,
+               extra_appinfo_t* appInfo = 0);
+    int setInBuf2(int* piBuf, int* iSize);
+    int setInBuf2(char** pcBuf, int* iSize);
     int setThumbnailSize(int w, int h);
     int setThumbnailQuality(int quality);
-    int setThumbnailPadding(const unsigned char *padding, unsigned int num_planes);
+    int setThumbnailPadding(const unsigned char* padding, unsigned int num_planes);
 
     void setExtScalerNum(int csc_hwscaler_id) { m_iHWScalerID = csc_hwscaler_id; }
 
@@ -131,9 +131,7 @@ public:
 
     ssize_t WaitForCompression();
 
-    size_t GetThumbnailImage(char *buffer, size_t buflen);
-
-    virtual int destroy(void);
+    size_t GetThumbnailImage(char* buffer, size_t buflen);
 };
 
 #endif //__HARDWARE_EXYNOS_JPEG_ENCODER_FOR_CAMERA_H__
