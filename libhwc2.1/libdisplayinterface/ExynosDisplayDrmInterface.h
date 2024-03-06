@@ -88,6 +88,7 @@ class FramebufferManager {
         void checkShrink();
 
         void cleanup(const ExynosLayer *layer);
+        void destroyAllSecureBuffers();
 
         // The flip function is to help clean up the cached fbIds of destroyed
         // layers after the previous fdIds were update successfully on the
