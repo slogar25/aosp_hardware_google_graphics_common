@@ -424,6 +424,18 @@ void FramebufferManager::destroyAllSecureBuffersLocked() {
     mCachedSecureLayerBuffers.clear();
 }
 
+void FramebufferManager::destroyAllSecureBuffers() {
+    bool needCleanup = false;
+    {
+        Mutex::Autolock lock(mMutex);
+        destroyAllSecureBuffersLocked();
+        needCleanup = mCleanBuffers.size() > 0;
+    }
+    if (needCleanup) {
+        mFlipDone.signal();
+    }
+}
+
 void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
     mFBManager.cleanup(layer);
 }
@@ -919,6 +931,10 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
     if ((ret = drmModeConnectorSetProperty(mDrmDevice->fd(), mDrmConnector->id(), prop.id(),
             dpms_value)) != NO_ERROR) {
         HWC_LOGE(mExynosDisplay, "setPower mode ret (%d)", ret);
+    }
+
+    if (mode == HWC_POWER_MODE_OFF) {
+        mFBManager.destroyAllSecureBuffers();
     }
 
     return ret;
