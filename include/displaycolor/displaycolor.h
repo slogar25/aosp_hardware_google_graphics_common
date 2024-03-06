@@ -86,8 +86,10 @@ enum DisplayType {
     DISPLAY_PRIMARY = 0,
     /// builtin secondary display
     DISPLAY_SECONDARY = 1,
+    /// external display
+    DISPLAY_EXTERNAL = 2,
     /// number of display
-    DISPLAY_MAX = 2,
+    DISPLAY_MAX = 3,
 };
 
 enum BrightnessMode {
@@ -149,6 +151,7 @@ class IBrightnessTable {
  * @brief This structure holds data imported from HWC.
  */
 struct DisplayInfo {
+    DisplayType display_type;
     std::string panel_name;
     std::string panel_serial;
 
@@ -362,7 +365,7 @@ struct DisplayScene {
     float refresh_rate = 60.0f;
 
     /// operation rate to switch between hs/ns mode
-    uint32_t operation_rate;
+    uint32_t operation_rate = 120;
 
     /// hdr layer state on screen
     HdrLayerState hdr_layer_state = HdrLayerState::kHdrNone;
@@ -483,7 +486,9 @@ class IDisplayColorGeneric {
      * @param table Return brightness table if successful, nullptr if the table is not valid.
      * @return OK if successful, error otherwise.
      */
-    virtual int GetBrightnessTable(DisplayType display, const IBrightnessTable *&table) const = 0;
+    virtual int GetBrightnessTable(DisplayType display,
+                                   std::unique_ptr<const IBrightnessTable> &table) const = 0;
+
 };
 
 extern "C" {

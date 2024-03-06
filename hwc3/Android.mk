@@ -32,11 +32,11 @@ LOCAL_CFLAGS += \
 	-Wthread-safety
 
 # hwc3 re-uses hwc2.2 ComposerResource and libexynosdisplay
-LOCAL_SHARED_LIBRARIES := android.hardware.graphics.composer3-V2-ndk \
+LOCAL_SHARED_LIBRARIES := android.hardware.graphics.composer3-V3-ndk \
 	android.hardware.graphics.composer@2.1-resources \
         android.hardware.graphics.composer@2.2-resources \
 	android.hardware.graphics.composer@2.4 \
-	com.google.hardware.pixel.display-V9-ndk \
+	com.google.hardware.pixel.display-V10-ndk \
 	libbase \
 	libbinder \
 	libbinder_ndk \
@@ -84,6 +84,20 @@ ifeq ($(BOARD_USES_HWC_SERVICES),true)
 LOCAL_CFLAGS += -DUSES_HWC_SERVICES
 LOCAL_SHARED_LIBRARIES += libExynosHWCService
 LOCAL_HEADER_LIBRARIES += libbinder_headers
+endif
+
+ifeq ($(CLANG_COVERAGE),true)
+# enable code coverage (these flags are copied from build/soong/cc/coverage.go)
+LOCAL_CFLAGS += -fprofile-instr-generate -fcoverage-mapping
+LOCAL_CFLAGS += -Wno-frame-larger-than=
+LOCAL_WHOLE_STATIC_LIBRARIES += libprofile-clang-extras_ndk
+LOCAL_LDFLAGS += -fprofile-instr-generate
+LOCAL_LDFLAGS += -Wl,--wrap,open
+
+ifeq ($(CLANG_COVERAGE_CONTINUOUS_MODE),true)
+LOCAL_CFLAGS += -mllvm -runtime-counter-relocation
+LOCAL_LDFLAGS += -Wl,-mllvm=-runtime-counter-relocation
+endif
 endif
 
 LOCAL_VINTF_FRAGMENTS = hwc3-default.xml

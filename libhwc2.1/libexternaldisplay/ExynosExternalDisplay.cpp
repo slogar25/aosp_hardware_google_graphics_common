@@ -48,6 +48,9 @@ ExynosExternalDisplay::ExynosExternalDisplay(uint32_t index, ExynosDevice* devic
     mIsSkipFrame = false;
     mVirtualDisplayState = 0;
 
+    mDRDefault = true;
+    mDREnable = false;
+
     //TODO : Hard coded currently
     mNumMaxPriorityAllowed = 1;
     mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
@@ -136,7 +139,7 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
 
         if (property_get("vendor.display.external.preferred_mode", modeStr, "") > 0) {
             if (sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
-                err = lookupDisplayConfigs(width, height, fps, &config);
+                err = lookupDisplayConfigs(width, height, fps, fps, &config);
                 if (err != HWC2_ERROR_NONE) {
                     DISPLAY_LOGW("%s: display does not support preferred mode %dx%d@%d",
                                  __func__, width, height, fps);
@@ -157,6 +160,7 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
         mXres = displayConfig.width;
         mYres = displayConfig.height;
         mVsyncPeriod = displayConfig.vsyncPeriod;
+        mRefreshRate = displayConfig.refreshRate;
 
         if (mDisplayInterface->mType == INTERFACE_TYPE_DRM) {
             ret = mDisplayInterface->setActiveConfig(mActiveConfig);
@@ -448,11 +452,16 @@ int ExynosExternalDisplay::disable()
 {
     ALOGI("[ExternalDisplay] %s +", __func__);
 
-    if (!mEnabled)
-        return HWC2_ERROR_NONE;
-
     if (mHpdStatus) {
-        clearDisplay(false);
+        /*
+         * DP cable is connected and link is up
+         *
+         * Currently, we don't power down here for two reasons:
+         * - power up would require DP link re-training (slow)
+         * - DP audio can continue playing while display is blank
+         */
+        if (mEnabled)
+            clearDisplay(false);
         return HWC2_ERROR_NONE;
     }
 
@@ -556,10 +565,13 @@ void ExynosExternalDisplay::handleHotplugEvent(bool hpdStatus)
             mHpdStatus = false;
             return;
         }
+        mDREnable = mDRDefault;
     } else {
         disable();
         closeExternalDisplay();
+        mDREnable = false;
     }
+    mDevice->checkDynamicRecompositionThread();
 
     ALOGI("HPD status changed to %s, mDisplayId %d, mDisplayFd %d", mHpdStatus ? "enabled" : "disabled", mDisplayId, mDisplayInterface->getDisplayFd());
 }

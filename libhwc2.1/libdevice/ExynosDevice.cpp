@@ -68,16 +68,16 @@ uint32_t getDeviceInterfaceType()
         return INTERFACE_TYPE_FB;
 }
 
-ExynosDevice::ExynosDevice()
-    : mGeometryChanged(0),
-    mVsyncFd(-1),
-    mExtVsyncFd(-1),
-    mVsyncDisplayId(getDisplayId(HWC_DISPLAY_PRIMARY, 0)),
-    mTimestamp(0),
-    mDisplayMode(0),
-    mInterfaceType(INTERFACE_TYPE_FB),
-    mIsInTUI(false)
-{
+ExynosDevice::ExynosDevice(bool vrrApiSupported)
+      : mGeometryChanged(0),
+        mVsyncFd(-1),
+        mExtVsyncFd(-1),
+        mVsyncDisplayId(getDisplayId(HWC_DISPLAY_PRIMARY, 0)),
+        mTimestamp(0),
+        mDisplayMode(0),
+        mInterfaceType(INTERFACE_TYPE_FB),
+        mIsInTUI(false),
+        mVrrApiSupported(vrrApiSupported) {
     exynosHWCControl.forceGpu = false;
     exynosHWCControl.windowUpdate = true;
     exynosHWCControl.forcePanic = false;
@@ -150,8 +150,7 @@ ExynosDevice::ExynosDevice()
         mDisplayMap.insert(std::make_pair(exynos_display->mDisplayId, exynos_display));
 
 #ifndef FORCE_DISABLE_DR
-        if (exynos_display->mDREnable)
-            exynosHWCControl.useDynamicRecomp = true;
+        if (exynos_display->mDRDefault) exynosHWCControl.useDynamicRecomp = true;
 #endif
     }
 
@@ -222,8 +221,7 @@ void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
     for (uint32_t i = 0; i < mDisplays.size();) {
         ExynosDisplay* display = mDisplays[i];
         display->initDisplayInterface(interfaceType);
-        if (mDeviceInterface->initDisplayInterface(
-                    display->mDisplayInterface) != NO_ERROR) {
+        if (mDeviceInterface->initDisplayInterface(display->mDisplayInterface) != NO_ERROR) {
             ALOGD("Remove display[%d], Failed to initialize display interface", i);
             mDisplays.removeAt(i);
             mDisplayMap.erase(display->mDisplayId);
@@ -312,6 +310,7 @@ void ExynosDevice::checkDynamicRecompositionThread()
             if (mDisplays[i]->mDREnable)
                 return;
         }
+        ALOGI("Destroying dynamic recomposition thread");
         mDRLoopStatus = false;
         mDRWakeUpCondition.notify_one();
         mDRThread.join();
@@ -321,6 +320,7 @@ void ExynosDevice::checkDynamicRecompositionThread()
 void ExynosDevice::dynamicRecompositionThreadCreate()
 {
     if (exynosHWCControl.useDynamicRecomp == true) {
+        ALOGI("Creating dynamic recomposition thread");
         mDRLoopStatus = true;
         mDRThread = std::thread(&dynamicRecompositionThreadLoop, this);
     }
@@ -520,10 +520,30 @@ bool ExynosDevice::isCallbackAvailable(int32_t descriptor) {
     return isCallbackRegisteredLocked(descriptor);
 }
 
-void ExynosDevice::onHotPlug(uint32_t displayId, bool status) {
+void ExynosDevice::onHotPlug(uint32_t displayId, bool status, int hotplugErrorCode) {
     Mutex::Autolock lock(mDeviceCallbackMutex);
 
     if (!isCallbackRegisteredLocked(HWC2_CALLBACK_HOTPLUG)) return;
+
+    if (hotplugErrorCode) {
+        // We need to pass the error code to SurfaceFlinger, but we cannot modify the HWC
+        // HAL interface, so for now we'll send the hotplug error via a onVsync callback with
+        // a negative time value indicating the hotplug error.
+        if (isCallbackRegisteredLocked(HWC2_CALLBACK_VSYNC_2_4)) {
+            ALOGD("%s: hotplugErrorCode=%d sending to SF via onVsync_2_4", __func__,
+                  hotplugErrorCode);
+            hwc2_callback_data_t vsyncCallbackData =
+                    mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4].callbackData;
+            HWC2_PFN_VSYNC_2_4 vsyncCallbackFunc = reinterpret_cast<HWC2_PFN_VSYNC_2_4>(
+                    mCallbackInfos[HWC2_CALLBACK_VSYNC_2_4].funcPointer);
+            vsyncCallbackFunc(vsyncCallbackData, displayId, -hotplugErrorCode, ~0);
+            return;
+        } else {
+            ALOGW("%s: onVsync_2_4 is not registered, ignoring hotplugErrorCode=%d", __func__,
+                  hotplugErrorCode);
+            return;
+        }
+    }
 
     hwc2_callback_data_t callbackData = mCallbackInfos[HWC2_CALLBACK_HOTPLUG].callbackData;
     HWC2_PFN_HOTPLUG callbackFunc =

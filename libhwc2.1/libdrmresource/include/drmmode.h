@@ -19,7 +19,23 @@
 
 #include <stdint.h>
 #include <xf86drmMode.h>
+
+#include <ratio>
 #include <string>
+
+// Alternative definitions(alias) of DRM modes and flags for VRR.
+// The kernel contains corresponding defines that MUST align with those specified here..
+#define DRM_MODE_TYPE_VRR DRM_MODE_TYPE_USERDEF
+#define DRM_MODE_FLAG_NS DRM_MODE_FLAG_CLKDIV2
+#define DRM_MODE_FLAG_TE_FREQ_X1 DRM_MODE_FLAG_PHSYNC
+#define DRM_MODE_FLAG_TE_FREQ_X2 DRM_MODE_FLAG_NHSYNC
+#define DRM_MODE_FLAG_TE_FREQ_X4 DRM_MODE_FLAG_PVSYNC
+
+// BTS needs to take operation rate into account
+#define DRM_MODE_FLAG_BTS_OP_RATE DRM_MODE_FLAG_NVSYNC
+
+#define PANEL_REFRESH_CTRL_FI (1 << 0)
+#define PANEL_REFRESH_CTRL_IDLE (1 << 1)
 
 namespace android {
 
@@ -30,6 +46,9 @@ class DrmMode {
 
   bool operator==(const drmModeModeInfo &m) const;
   void ToDrmModeModeInfo(drm_mode_modeinfo *m) const;
+
+  inline bool is_vrr_mode() const { return (type_ & DRM_MODE_TYPE_VRR); };
+  inline bool is_ns_mode() const { return (flags_ & DRM_MODE_FLAG_NS); };
 
   uint32_t id() const;
   void set_id(uint32_t id);
@@ -48,7 +67,12 @@ class DrmMode {
   uint32_t v_total() const;
   uint32_t v_scan() const;
   float v_refresh() const;
+  float te_frequency() const;
+  // Convert frequency to period, with the default unit being nanoseconds.
+  float v_period(int64_t unit = std::nano::den) const;
+  float te_period(int64_t unit = std::nano::den) const;
 
+  bool is_operation_rate_to_bts() const;
   uint32_t flags() const;
   uint32_t type() const;
 

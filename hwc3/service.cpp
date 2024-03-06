@@ -40,10 +40,7 @@ int main(int /*argc*/, char* argv[]) {
         LOG(ERROR) << "Couldn't set SCHED_FIFO: " << errno;
     }
 
-    std::unique_ptr<IComposerHal> halImpl = IComposerHal::create();
-    CHECK(halImpl != nullptr);
-
-    std::shared_ptr<Composer> composer = ndk::SharedRefBase::make<Composer>(std::move(halImpl));
+    std::shared_ptr<Composer> composer = ndk::SharedRefBase::make<Composer>();
     CHECK(composer != nullptr);
 
     const std::string instance = std::string() + Composer::descriptor + "/default";

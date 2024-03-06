@@ -25,6 +25,17 @@
 
 namespace aidl::android::hardware::graphics::composer3::impl {
 
+Composer::Composer() {
+    int32_t composerInterfaceVersion = 1;
+    const auto status = getInterfaceVersion(&composerInterfaceVersion);
+    if (!status.isOk()) {
+        ALOGE("Get interface version from Composer constructor failed %s",
+              status.getDescription().c_str());
+    }
+    mHal = IComposerHal::create(composerInterfaceVersion);
+    CHECK(mHal != nullptr);
+}
+
 ndk::ScopedAStatus Composer::createClient(std::shared_ptr<IComposerClient>* outClient) {
     DEBUG_FUNC();
     std::unique_lock<std::mutex> lock(mClientMutex);

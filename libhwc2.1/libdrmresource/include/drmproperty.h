@@ -41,21 +41,24 @@ class DrmProperty {
   DrmProperty(const DrmProperty &) = delete;
   DrmProperty &operator=(const DrmProperty &) = delete;
 
-  void Init(drmModePropertyPtr p, uint64_t value);
-  void SetName(std::string name) { name_ = name; };
-  std::tuple<uint64_t, int> GetEnumValueWithName(std::string name) const;
+  void init(drmModePropertyPtr p, uint64_t value);
+  void setName(std::string name) { name_ = name; };
+  std::tuple<uint64_t, int> getEnumValueWithName(std::string name) const;
 
   uint32_t id() const;
   std::string name() const;
 
   std::tuple<int, uint64_t> value() const;
-  bool is_immutable() const;
+  bool isImmutable() const;
+  bool isRange() const;
+  bool isSignedRange() const;
+  bool isBitmask() const;
 
-  bool is_range() const;
-  std::tuple<int, uint64_t> range_min() const;
-  std::tuple<int, uint64_t> range_max() const;
+  std::tuple<int, uint64_t> rangeMin() const;
+  std::tuple<int, uint64_t> rangeMax() const;
 
-  void UpdateValue(const uint64_t value);
+  bool validateChange(uint64_t value) const;
+  void updateValue(const uint64_t value);
   void printProperty() const;
 
  private:

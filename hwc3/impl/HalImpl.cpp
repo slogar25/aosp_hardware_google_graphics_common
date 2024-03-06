@@ -30,14 +30,20 @@
 
 using namespace SOC_VERSION;
 
+namespace {
+
+static constexpr int32_t kMinComposerInterfaceVersionForVrrApi = 3;
+
+};
+
 namespace aidl::android::hardware::graphics::composer3::impl {
 
-std::unique_ptr<IComposerHal> IComposerHal::create() {
-    auto device = std::make_unique<ExynosDeviceModule>();
+std::unique_ptr<IComposerHal> IComposerHal::create(int32_t composerInterfaceVersion) {
+    bool vrrApiSupported = composerInterfaceVersion >= kMinComposerInterfaceVersionForVrrApi;
+    auto device = std::make_unique<ExynosDeviceModule>(vrrApiSupported);
     if (!device) {
         return nullptr;
     }
-
     return std::make_unique<HalImpl>(std::move(device));
 }
 
@@ -107,9 +113,11 @@ void refreshRateChangedDebug(hwc2_callback_data_t callbackData, hwc2_display_t h
 
     h2a::translate(hwcDisplay, display);
     h2a::translate(hwcVsyncPeriodNanos, vsyncPeriodNanos);
+    // TODO (b/314527560) Update refreshPeriodNanos for VRR display
     hal->getEventCallback()->onRefreshRateChangedDebug(RefreshRateChangedDebugData{
             .display = display,
             .vsyncPeriodNanos = vsyncPeriodNanos,
+            .refreshPeriodNanos = vsyncPeriodNanos,
     });
 }
 
@@ -370,6 +378,67 @@ int32_t HalImpl::getDisplayConfigs(int64_t display, std::vector<int32_t>* config
     RET_IF_ERR(halDisplay->getDisplayConfigs(&count, hwcConfigs.data()));
 
     h2a::translate(hwcConfigs, *configs);
+    return HWC2_ERROR_NONE;
+}
+
+int32_t HalImpl::getDisplayConfigurations(int64_t display, int32_t,
+                                          std::vector<DisplayConfiguration>* outConfigs) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    std::vector<int32_t> configIds;
+    RET_IF_ERR(getDisplayConfigs(display, &configIds));
+
+    for (const auto configId : configIds) {
+        DisplayConfiguration config;
+        config.configId = configId;
+        // Get required display attributes
+        RET_IF_ERR(getDisplayAttribute(display, configId, DisplayAttribute::WIDTH, &config.width));
+        RET_IF_ERR(
+                getDisplayAttribute(display, configId, DisplayAttribute::HEIGHT, &config.height));
+        RET_IF_ERR(getDisplayAttribute(display, configId, DisplayAttribute::VSYNC_PERIOD,
+                                       &config.vsyncPeriod));
+        RET_IF_ERR(getDisplayAttribute(display, configId, DisplayAttribute::CONFIG_GROUP,
+                                       &config.configGroup));
+        // Get optional display attributes
+        int32_t dpiX, dpiY;
+        auto statusDpiX = getDisplayAttribute(display, configId, DisplayAttribute::DPI_X, &dpiX);
+        auto statusDpiY = getDisplayAttribute(display, configId, DisplayAttribute::DPI_Y, &dpiY);
+        // TODO(b/294120341): getDisplayAttribute for DPI should return dots per inch
+        if (statusDpiX == HWC2_ERROR_NONE && statusDpiY == HWC2_ERROR_NONE) {
+            config.dpi = {dpiX / 1000.0f, dpiY / 1000.0f};
+        }
+        // Determine whether there is a need to configure VRR.
+        hwc2_config_t hwcConfigId;
+        a2h::translate(configId, hwcConfigId);
+        std::optional<VrrConfig_t> vrrConfig = halDisplay->getVrrConfigs(hwcConfigId);
+        if (vrrConfig.has_value()) {
+            // TODO(b/290843234): complete the remaining values within vrrConfig.
+            VrrConfig hwc3VrrConfig;
+            VrrConfig::NotifyExpectedPresentConfig notifyExpectedPresentConfig;
+            hwc3VrrConfig.minFrameIntervalNs = vrrConfig->minFrameIntervalNs;
+            notifyExpectedPresentConfig.notifyExpectedPresentHeadsUpNs =
+                    vrrConfig->notifyExpectedPresentConfig.HeadsUpNs;
+            notifyExpectedPresentConfig.notifyExpectedPresentTimeoutNs =
+                    vrrConfig->notifyExpectedPresentConfig.TimeoutNs;
+            hwc3VrrConfig.notifyExpectedPresentConfig =
+                    std::make_optional(notifyExpectedPresentConfig);
+            config.vrrConfig = std::make_optional(hwc3VrrConfig);
+        }
+        outConfigs->push_back(config);
+    }
+
+    return HWC2_ERROR_NONE;
+}
+
+int32_t HalImpl::notifyExpectedPresent(int64_t display,
+                                       const ClockMonotonicTimestamp& expectedPresentTime,
+                                       int32_t frameIntervalNs) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    RET_IF_ERR(
+            halDisplay->notifyExpectedPresent(expectedPresentTime.timestampNanos, frameIntervalNs));
     return HWC2_ERROR_NONE;
 }
 
@@ -1045,7 +1114,8 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
 }
 
 int HalImpl::setExpectedPresentTime(
-        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime) {
+        int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime,
+        int frameIntervalNs) {
     ExynosDisplay* halDisplay;
     RET_IF_ERR(getHalDisplay(display, halDisplay));
 
@@ -1055,7 +1125,7 @@ int HalImpl::setExpectedPresentTime(
         ALOGW("HalImpl: set expected present time multiple times in one frame");
     }
 
-    halDisplay->setExpectedPresentTime(expectedPresentTime->timestampNanos);
+    halDisplay->setExpectedPresentTime(expectedPresentTime->timestampNanos, frameIntervalNs);
 
     return HWC2_ERROR_NONE;
 }

@@ -52,9 +52,11 @@ class ComposerCommandEngine {
       void executeSetDisplayBrightness(uint64_t display, const DisplayBrightness& command);
       void executeSetOutputBuffer(uint64_t display, const Buffer& buffer);
       void executeValidateDisplay(int64_t display,
-                                  const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
+                                  const std::optional<ClockMonotonicTimestamp> expectedPresentTime,
+                                  int frameIntervalNs);
       void executePresentOrValidateDisplay(
-              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
+              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime,
+              int frameIntervalNs);
       void executeAcceptDisplayChanges(int64_t display);
       int executePresentDisplay(int64_t display);
 
@@ -94,7 +96,8 @@ class ComposerCommandEngine {
 
       int32_t executeValidateDisplayInternal(int64_t display);
       void executeSetExpectedPresentTimeInternal(
-              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime);
+              int64_t display, const std::optional<ClockMonotonicTimestamp> expectedPresentTime,
+              int frameIntervalNs);
 
       IComposerHal* mHal;
       IResourceManager* mResources;
