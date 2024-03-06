@@ -464,10 +464,10 @@ void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayIdleTimerSupport(bool &outSupport) {
-    if (isFullVrrSupported()) {
+    if (isVrrSupported()) {
         outSupport = false;
         return NO_ERROR;
-    } else if (isPseudoVrrSupported()) {
+    } else if (isMrrV2()) {
         // Retuen true to avoid SF idle timer working. We insert frames manually
         // for pseudo VRR, so ideally panel idle should be disabled in the driver.
         outSupport = true;
@@ -1042,7 +1042,7 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
     std::lock_guard<std::recursive_mutex> lock(mDrmConnector->modesLock());
 
     if (!outConfigs) {
-        bool useVrrConfigs = isFullVrrSupported();
+        bool useVrrConfigs = isVrrSupported();
         int ret = mDrmConnector->UpdateModes(useVrrConfigs);
         if (ret < 0) {
             ALOGE("%s: failed to update display modes (%d)",
@@ -1054,8 +1054,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             // no need to update mExynosDisplay->mDisplayConfigs
             goto no_mode_changes;
         }
-        ALOGI("Select Vrr Config for display %s: %s", mExynosDisplay->mDisplayName.c_str(),
-              useVrrConfigs ? "full" : (isPseudoVrrSupported() ? "pseudo" : "non-Vrr"));
+        ALOGI("Select xRR Config for display %s: %s", mExynosDisplay->mDisplayName.c_str(),
+              useVrrConfigs ? "VRR" : "MRR");
 
         if (mDrmConnector->state() == DRM_MODE_CONNECTED) {
             /*
@@ -1111,14 +1111,14 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
                 peakRr = rr;
             }
             // Configure VRR if it's turned on.
-            if (mIsVrrModeSupported) {
+            if (mXrrSettings.versionInfo.needVrrParameters()) {
                 VrrConfig_t vrrConfig;
                 vrrConfig.minFrameIntervalNs = static_cast<int>(std::nano::den / rr);
                 vrrConfig.isNsMode = mode.is_ns_mode();
                 vrrConfig.vsyncPeriodNs = configs.vsyncPeriod;
                 configs.vrrConfig = std::make_optional(vrrConfig);
                 if (mode.is_vrr_mode()) {
-                    if (!isFullVrrSupported()) {
+                    if (!isVrrSupported()) {
                         return HWC2_ERROR_BAD_DISPLAY;
                     }
                     configs.vrrConfig->isFullySupported = true;
@@ -1126,8 +1126,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
                     // Supply initial values for notifyExpectedPresentConfig; potential changes may
                     // come later.
                     NotifyExpectedPresentConfig_t notifyExpectedPresentConfig =
-                            {.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs,
-                             .TimeoutNs = mNotifyExpectedPresentTimeoutNs};
+                            {.HeadsUpNs = mXrrSettings.notifyExpectedPresentConfig.HeadsUpNs,
+                             .TimeoutNs = mXrrSettings.notifyExpectedPresentConfig.TimeoutNs};
                     configs.vrrConfig->notifyExpectedPresentConfig =
                             std::make_optional(notifyExpectedPresentConfig);
                     configs.groupId =
@@ -1502,8 +1502,8 @@ int32_t ExynosDisplayDrmInterface::setDisplayMode(DrmModeAtomicReq& drmReq,
             mDrmConnector->crtc_id_property(), mDrmCrtc->id())) < 0)
         return ret;
 
-    if (mConfigChangeCallback) {
-        drmReq.setAckCallback(std::bind(mConfigChangeCallback, modeId));
+    if (mXrrSettings.configChangeCallback) {
+        drmReq.setAckCallback(std::bind(mXrrSettings.configChangeCallback, modeId));
     }
 
     return NO_ERROR;
@@ -2239,13 +2239,8 @@ int32_t ExynosDisplayDrmInterface::triggerClearDisplayPlanes()
     return ret;
 }
 
-void ExynosDisplayDrmInterface::setVrrSettings(const VrrSettings_t& vrrSettings) {
-    if (vrrSettings.enabled) {
-        mIsVrrModeSupported = true;
-        mNotifyExpectedPresentHeadsUpNs = vrrSettings.notifyExpectedPresentConfig.HeadsUpNs;
-        mNotifyExpectedPresentTimeoutNs = vrrSettings.notifyExpectedPresentConfig.TimeoutNs;
-        mConfigChangeCallback = vrrSettings.configChangeCallback;
-    }
+void ExynosDisplayDrmInterface::setXrrSettings(const XrrSettings_t& settings) {
+    mXrrSettings = settings;
 }
 
 int32_t ExynosDisplayDrmInterface::clearDisplayPlanes(DrmModeAtomicReq &drmReq)

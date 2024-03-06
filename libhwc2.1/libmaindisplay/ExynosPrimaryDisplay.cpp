@@ -19,12 +19,15 @@
 
 #include "ExynosPrimaryDisplay.h"
 
+#include <android-base/properties.h>
+
 #include <linux/fb.h>
 #include <poll.h>
 
 #include <chrono>
 #include <fstream>
 
+#include "../libvrr/VariableRefreshRateVersion.h"
 #include "../libvrr/interface/Panel_def.h"
 #include "BrightnessController.h"
 #include "ExynosDevice.h"
@@ -153,19 +156,24 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
     }
 #endif
     if (!displayTypeIdentifier.empty()) {
-        char pathBuffer[kMaximumPropertyIdentifierLength];
-        sprintf(pathBuffer, "ro.vendor.%s.vrr.enabled", displayTypeIdentifier.c_str());
-        mVrrSettings.enabled = property_get_bool(pathBuffer, false);
-        if (mVrrSettings.enabled) {
+        auto xrrVersion =
+                android::hardware::graphics::composer::getDisplayXrrVersion(displayTypeIdentifier);
+        mXrrSettings.versionInfo.majorVersion = xrrVersion.first;
+        mXrrSettings.versionInfo.minorVersion = xrrVersion.second;
+        ALOGI("%s() xRR version = %d.%d", __func__, mXrrSettings.versionInfo.majorVersion,
+              mXrrSettings.versionInfo.minorVersion);
+
+        if (mXrrSettings.versionInfo.needVrrParameters()) {
+            char pathBuffer[PROP_VALUE_MAX] = {0};
             sprintf(pathBuffer, "ro.vendor.%s.vrr.expected_present.headsup_ns",
                     displayTypeIdentifier.c_str());
-            mVrrSettings.notifyExpectedPresentConfig.HeadsUpNs =
+            mXrrSettings.notifyExpectedPresentConfig.HeadsUpNs =
                     property_get_int32(pathBuffer, kDefaultNotifyExpectedPresentConfigHeadsUpNs);
             sprintf(pathBuffer, "ro.vendor.%s.vrr.expected_present.timeout_ns",
                     displayTypeIdentifier.c_str());
-            mVrrSettings.notifyExpectedPresentConfig.TimeoutNs =
+            mXrrSettings.notifyExpectedPresentConfig.TimeoutNs =
                     property_get_int32(pathBuffer, kDefaultNotifyExpectedPresentConfigTimeoutNs);
-            mVrrSettings.configChangeCallback =
+            mXrrSettings.configChangeCallback =
                     std::bind(&ExynosPrimaryDisplay::onConfigChange, this, std::placeholders::_1);
         } else {
             std::string displayFileNodePath = getPanelSysfsPath();
@@ -581,8 +589,8 @@ void ExynosPrimaryDisplay::initDisplayInterface(uint32_t interfaceType)
                 __func__, interfaceType);
     mDisplayInterface->init(this);
 
-    if (mVrrSettings.enabled) {
-        mDisplayInterface->setVrrSettings(mVrrSettings);
+    if (mXrrSettings.versionInfo.needVrrParameters()) {
+        mDisplayInterface->setXrrSettings(mXrrSettings);
     }
 
     mDpuData.init(mMaxWindowNum, mDevice->getSpecialPlaneNum(mDisplayId));
@@ -703,7 +711,7 @@ int32_t ExynosPrimaryDisplay::getDisplayConfigs(uint32_t* outNumConfigs,
                                                 hwc2_config_t* outConfigs) {
     int32_t ret = ExynosDisplay::getDisplayConfigs(outNumConfigs, outConfigs);
     if (ret == HWC2_ERROR_NONE) {
-        if (mVrrSettings.enabled && mDisplayConfigs.size()) {
+        if (mXrrSettings.versionInfo.hasVrrController() && mDisplayConfigs.size()) {
             if (!mVariableRefreshRateController) {
                 mVariableRefreshRateController =
                         VariableRefreshRateController::CreateInstance(this, getPanelName());
