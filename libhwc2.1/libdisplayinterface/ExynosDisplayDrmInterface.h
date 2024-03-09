@@ -405,12 +405,11 @@ class ExynosDisplayDrmInterface :
         uint32_t getCrtcId() { return mDrmCrtc->id(); }
         int32_t triggerClearDisplayPlanes();
 
-        virtual void setVrrSettings(const VrrSettings_t& vrrSettings) override;
-        bool isFullVrrSupported() const {
-            return (mIsVrrModeSupported && mExynosDisplay->mDevice->isVrrApiSupported());
-        }
-        bool isPseudoVrrSupported() const {
-            return (mIsVrrModeSupported && !mExynosDisplay->mDevice->isVrrApiSupported());
+        virtual void setXrrSettings(const XrrSettings_t& settings) override;
+        bool isVrrSupported() const { return mXrrSettings.versionInfo.isVrr(); }
+        bool isMrrV2() const {
+            return (!mXrrSettings.versionInfo.isVrr()) &&
+                    (mXrrSettings.versionInfo.minorVersion == 2);
         }
 
         void handleDrmPropertyUpdate(uint32_t connector_id, uint32_t prop_id);
@@ -604,10 +603,7 @@ class ExynosDisplayDrmInterface :
         int32_t mPanelFullResolutionVSize = 0;
 
         // Vrr related settings.
-        bool mIsVrrModeSupported = false;
-        int32_t mNotifyExpectedPresentHeadsUpNs = 0;
-        int32_t mNotifyExpectedPresentTimeoutNs = 0;
-        std::function<void(int)> mConfigChangeCallback;
+        XrrSettings_t mXrrSettings;
 
         /**
          * retrievePanelFullResolution

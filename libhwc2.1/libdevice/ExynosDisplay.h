@@ -371,11 +371,11 @@ typedef struct VrrConfig {
     std::optional<NotifyExpectedPresentConfig_t> notifyExpectedPresentConfig;
 } VrrConfig_t;
 
-typedef struct VrrSettings {
-    bool enabled;
+typedef struct XrrSettings {
+    android::hardware::graphics::composer::XrrVersionInfo_t versionInfo;
     NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
     std::function<void(int)> configChangeCallback;
-} VrrSettings_t;
+} XrrSettings_t;
 
 typedef struct displayConfigs {
     // HWC2_ATTRIBUTE_VSYNC_PERIOD
