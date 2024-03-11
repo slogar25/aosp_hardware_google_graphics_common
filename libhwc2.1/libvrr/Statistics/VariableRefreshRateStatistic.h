@@ -125,6 +125,8 @@ class StatisticsProvider {
 public:
     virtual ~StatisticsProvider() = default;
 
+    virtual uint64_t getPowerOffDurationNs() const = 0;
+
     virtual DisplayPresentStatistics getStatistics() const = 0;
 
     virtual DisplayPresentStatistics getUpdatedStatistics() = 0;
@@ -136,9 +138,11 @@ public:
                                  EventQueue* eventQueue, int maxFrameRate, int maxTeFrequency,
                                  int64_t updatePeriodNs);
 
-    DisplayPresentStatistics getStatistics() const override REQUIRES(mMutex);
+    uint64_t getPowerOffDurationNs() const override;
 
-    DisplayPresentStatistics getUpdatedStatistics() override REQUIRES(mMutex);
+    DisplayPresentStatistics getStatistics() const override;
+
+    DisplayPresentStatistics getUpdatedStatistics() override;
 
     void onPowerStateChange(int from, int to) final;
 
@@ -152,6 +156,8 @@ public:
 private:
     static constexpr int64_t kMaxPresentIntervalNs = std::nano::den;
     static constexpr uint32_t kFrameRateWhenPresentAtLpMode = 30;
+
+    bool isPowerModeOffNowLocked() const REQUIRES(mMutex);
 
     int onPresentTimeout();
 
@@ -178,6 +184,8 @@ private:
     VrrControllerEvent mUpdateEvent;
 
     DisplayPresentProfile mDisplayPresentProfile;
+
+    uint64_t mPowerOffDurationNs = 0;
 
     mutable std::mutex mMutex;
 };

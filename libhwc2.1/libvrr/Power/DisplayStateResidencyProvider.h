@@ -51,7 +51,7 @@ private:
 
     // The format of pattern is: ([token label]'delimiter'?)*
     static constexpr std::string_view kDisplayStateResidencyPattern =
-            "[mode]( )[width](x)[height](@)[fps]()";
+            "[mode](:)[width](x)[height](@)[fps]()";
 
     static constexpr char kTokenLabelStart = '[';
     static constexpr char kTokenLabelEnd = ']';
@@ -76,6 +76,10 @@ private:
 
     std::vector<State> mStates;
     std::map<DisplayPresentProfile, int> mDisplayPresentProfileToIdMap;
+
+    // For calculating the |Total time| for 'others'.
+    DisplayPresentStatistics mLastOthersStatistics;
+    std::map<DisplayPresentProfile, int64_t> mOthersTotalTimeNs;
 
     std::vector<StateResidency> mStateResidency;
 };

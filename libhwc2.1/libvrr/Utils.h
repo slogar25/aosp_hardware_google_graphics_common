@@ -57,6 +57,8 @@ int64_t getNowNs();
 
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target);
 
+bool isPowerModeOff(int powerMode);
+
 void setTimedEventWithAbsoluteTime(TimedEvent& event);
 
 } // namespace android::hardware::graphics::composer
