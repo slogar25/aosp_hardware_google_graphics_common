@@ -57,11 +57,18 @@ const std::vector<State>& DisplayStateResidencyProvider::getStates() const {
 
 void DisplayStateResidencyProvider::mapStatistics() {
     auto mUpdatedStatistics = mStatisticsProvider->getUpdatedStatistics();
-
     for (const auto& item : mUpdatedStatistics) {
         const auto& displayPresentProfile = item.first;
         int configId = displayPresentProfile.mCurrentDisplayConfig.mActiveConfigId;
         auto teFrequency = mDisplayContextProvider->getTeFrequency(configId);
+        if (displayPresentProfile.mNumVsync <
+            0) { // To address the specific scenario of powering off.
+            mOthersTotalTimeNs[displayPresentProfile] =
+                    mStatisticsProvider->getPowerOffDurationNs();
+            mRemappedStatistics[displayPresentProfile] = item.second;
+            mRemappedStatistics[displayPresentProfile].mUpdated = true;
+            continue;
+        }
         if (teFrequency % displayPresentProfile.mNumVsync) {
             ALOGE("There should NOT be a frame rate including decimals, TE = %d, number of vsync = "
                   "%d",
@@ -75,9 +82,18 @@ void DisplayStateResidencyProvider::mapStatistics() {
         } else {
             // Others.
             auto key = displayPresentProfile;
+            const auto& value = item.second;
+            auto& lastStatistic = mLastOthersStatistics[key];
             key.mNumVsync = 0;
-            mRemappedStatistics[key] += item.second;
             mRemappedStatistics[key].mUpdated = true;
+            // Compute the difference from the previous statistic and accumulate it.
+            auto diffCount = value.mCount - lastStatistic.mCount;
+            mRemappedStatistics[key].mCount += diffCount;
+            mRemappedStatistics[key].mLastTimeStampNs =
+                    std::max(mRemappedStatistics[key].mLastTimeStampNs, value.mLastTimeStampNs);
+            auto durationNs = freqToDurationNs(fps);
+            mOthersTotalTimeNs[key] += (diffCount * durationNs);
+            lastStatistic = value;
         }
     }
 }
@@ -92,17 +108,17 @@ void DisplayStateResidencyProvider::aggregateStatistics() {
         const auto& displayPresentRecord = statistic.second;
         int configId = displayPresentProfile.mCurrentDisplayConfig.mActiveConfigId;
         auto teFrequency = mDisplayContextProvider->getTeFrequency(configId);
-        // TODO(b/328962277): given the updated entries, calculate "others" statistics and metrics.
-        // Here handle "non-others" only.
+
+        auto fps = teFrequency / displayPresentProfile.mNumVsync;
+        auto durationNs = freqToDurationNs(fps);
+        auto& stateResidency = mStateResidency[id];
+        stateResidency.totalStateEntryCount = displayPresentRecord.mCount;
+        stateResidency.lastEntryTimestampMs = displayPresentRecord.mLastTimeStampNs / MilliToNano;
         if (displayPresentProfile.mNumVsync > 0) {
-            auto fps = teFrequency / displayPresentProfile.mNumVsync;
-            auto durationNs = freqToDurationNs(fps);
-            auto& stateResidency = mStateResidency[id];
-            stateResidency.totalStateEntryCount = displayPresentRecord.mCount;
-            stateResidency.lastEntryTimestampMs =
-                    displayPresentRecord.mLastTimeStampNs / MilliToNano;
             stateResidency.totalTimeInStateMs =
                     (stateResidency.totalStateEntryCount * durationNs) / MilliToNano;
+        } else {
+            stateResidency.totalTimeInStateMs = mOthersTotalTimeNs[statistic.first] / MilliToNano;
         }
         statistic.second.mUpdated = false;
     }
