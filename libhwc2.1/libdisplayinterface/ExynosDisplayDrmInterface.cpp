@@ -1091,11 +1091,11 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             if (rr > peakRr) {
                 peakRr = rr;
             }
+            configs.isNsMode = mode.is_ns_mode();
             // Configure VRR if it's turned on.
             if (mXrrSettings.versionInfo.needVrrParameters()) {
                 VrrConfig_t vrrConfig;
                 vrrConfig.minFrameIntervalNs = static_cast<int>(std::nano::den / rr);
-                vrrConfig.isNsMode = mode.is_ns_mode();
                 vrrConfig.vsyncPeriodNs = configs.vsyncPeriod;
                 configs.vrrConfig = std::make_optional(vrrConfig);
                 if (mode.is_vrr_mode()) {

@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <map>
+
 #include "../common/CommonDisplayContextProvider.h"
 #include "libdevice/ExynosDisplay.h"
 
@@ -31,6 +33,7 @@ public:
             mDisplay(static_cast<ExynosDisplay*>(display)),
             mDisplayFileNodePath(mDisplay->getPanelSysfsPath()){};
 
+    // Implement DisplayContextProvider
     BrightnessMode getBrightnessMode() const final;
 
     int getBrightnessNits() const final;
@@ -40,6 +43,21 @@ public:
     int getAmbientLightSensorOutput() const final;
 
     bool isProximityThrottlingEnabled() const final;
+    // End of DisplayContextProvider implementation.
+
+    const std::map<uint32_t, displayConfigs_t>* getDisplayConfigs() const final;
+
+    const displayConfigs_t* getDisplayConfig(hwc2_config_t id) const final;
+
+    bool isHsMode(hwc2_config_t id) const final;
+
+    int getTeFrequency(hwc2_config_t id) const final;
+
+    int getMaxFrameRate(hwc2_config_t id) const final;
+
+    int getWidth(hwc2_config_t id) const final;
+
+    int getHeight(hwc2_config_t id) const final;
 
 private:
     ExynosDisplay* mDisplay;

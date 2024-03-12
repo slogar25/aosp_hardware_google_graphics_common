@@ -24,7 +24,7 @@ class DisplayConfigurationsOwner {
 public:
     virtual ~DisplayConfigurationsOwner() = default;
 
-    virtual const VrrConfig_t* getCurrentDisplayConfiguration() const = 0;
+    virtual const displayConfigs_t* getCurrentDisplayConfiguration() const = 0;
 };
 
 } // namespace android::hardware::graphics::composer

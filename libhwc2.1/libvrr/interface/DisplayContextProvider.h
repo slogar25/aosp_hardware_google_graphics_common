@@ -24,7 +24,7 @@ enum class OperationSpeedMode {
     kInvalidSpeedMode,
 };
 
-enum class BrightnessMode {
+enum BrightnessMode {
     kNormalBrightnessMode = 0,
     kHighBrightnessMode,
     kInvalidBrightnessMode,

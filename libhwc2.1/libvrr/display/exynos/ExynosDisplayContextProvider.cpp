@@ -21,6 +21,7 @@
 
 namespace android::hardware::graphics::composer {
 
+// Implement DisplayContextProvider
 BrightnessMode ExynosDisplayContextProvider::getBrightnessMode() const {
     if (!mDisplay || !(mDisplay->mBrightnessController)) {
         return BrightnessMode::kInvalidBrightnessMode;
@@ -64,6 +65,47 @@ int ExynosDisplayContextProvider::getAmbientLightSensorOutput() const {
 
 bool ExynosDisplayContextProvider::isProximityThrottlingEnabled() const {
     return false;
+}
+// End of DisplayContextProvider implementation.
+
+const std::map<uint32_t, displayConfigs_t>* ExynosDisplayContextProvider::getDisplayConfigs()
+        const {
+    if (!mDisplay) return nullptr;
+    return &(mDisplay->mDisplayConfigs);
+}
+
+const displayConfigs_t* ExynosDisplayContextProvider::getDisplayConfig(hwc2_config_t id) const {
+    const auto configs = getDisplayConfigs();
+    if ((!configs) || configs->count(id) == 0) {
+        return nullptr;
+    }
+    const auto& config = configs->find(id);
+    return &(config->second);
+}
+
+bool ExynosDisplayContextProvider::isHsMode(hwc2_config_t id) const {
+    auto config = getDisplayConfig(id);
+    return config ? (!config->isNsMode) : false;
+}
+
+int ExynosDisplayContextProvider::getTeFrequency(hwc2_config_t id) const {
+    auto config = getDisplayConfig(id);
+    return config ? durationNsToFreq(config->vsyncPeriod) : -1;
+}
+
+int ExynosDisplayContextProvider::getMaxFrameRate(hwc2_config_t id) const {
+    auto config = getDisplayConfig(id);
+    return config ? durationNsToFreq(config->refreshRate) : -1;
+}
+
+int ExynosDisplayContextProvider::getWidth(hwc2_config_t id) const {
+    auto config = getDisplayConfig(id);
+    return config ? config->width : -1;
+}
+
+int ExynosDisplayContextProvider::getHeight(hwc2_config_t id) const {
+    auto config = getDisplayConfig(id);
+    return config ? config->height : -1;
 }
 
 } // namespace android::hardware::graphics::composer

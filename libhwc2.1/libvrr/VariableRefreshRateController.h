@@ -26,11 +26,12 @@
 
 #include "../libdevice/ExynosDisplay.h"
 #include "../libdevice/ExynosLayer.h"
-#include "DisplayStateResidencyWatcher.h"
 #include "EventQueue.h"
 #include "ExternalEventHandlerLoader.h"
+#include "Power/DisplayStateResidencyWatcher.h"
 #include "RefreshRateCalculator/RefreshRateCalculator.h"
 #include "RingBuffer.h"
+#include "Statistics/VariableRefreshRateStatistic.h"
 #include "Utils.h"
 #include "display/common/DisplayConfigurationOwner.h"
 #include "interface/DisplayContextProvider.h"
@@ -48,12 +49,15 @@ public:
     auto static CreateInstance(ExynosDisplay* display, const std::string& panelName)
             -> std::shared_ptr<VariableRefreshRateController>;
 
-    const VrrConfig_t* getCurrentDisplayConfiguration() const override {
-        const auto& it = mVrrConfigs.find(mVrrActiveConfig);
-        if (it == mVrrConfigs.end()) {
-            return nullptr;
+    const displayConfigs_t* getCurrentDisplayConfiguration() const override {
+        auto configs = mDisplayContextProvider->getDisplayConfigs();
+        if (configs) {
+            const auto& it = configs->find(mVrrActiveConfig);
+            if (it != configs->end()) {
+                return &(it->second);
+            }
         }
-        return &(it->second);
+        return nullptr;
     }
 
     int notifyExpectedPresent(int64_t timestamp, int32_t frameIntervalNs);
@@ -124,6 +128,9 @@ public:
     }
 
 private:
+    static constexpr int kMaxFrameRate = 120;
+    static constexpr int kMaxTefrequency = 240;
+
     static constexpr int kDefaultRingBufferCapacity = 128;
     static constexpr int64_t kDefaultWakeUpTimeInPowerSaving =
             500 * (std::nano::den / std::milli::den); // 500 ms
@@ -280,7 +287,7 @@ private:
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
     std::optional<int> mLastPresentFence;
 
-    std::unique_ptr<FileNodeWriter> mFileNodeWritter;
+    std::unique_ptr<FileNodeWriter> mFileNodeWriter;
 
     DisplayContextProviderInterface mDisplayContextProviderInterface;
     std::unique_ptr<ExternalEventHandlerLoader> mPresentTimeoutEventHandlerLoader;
@@ -294,8 +301,9 @@ private:
 
     std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;
+    std::shared_ptr<VariableRefreshRateStatistic> mVariableRefreshRateStatistic;
 
-    std::unique_ptr<DisplayContextProvider> mDisplayContextProvider;
+    std::shared_ptr<CommonDisplayContextProvider> mDisplayContextProvider;
 
     bool mEnabled = false;
     bool mThreadExit = false;
