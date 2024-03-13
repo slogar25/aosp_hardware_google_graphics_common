@@ -3781,9 +3781,12 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         }
     }
 
-    if (updatePresentColorConversionInfo() != NO_ERROR) {
-        ALOGE("%s:: updatePresentColorConversionInfo() fail, ret(%d)",
-                __func__, ret);
+    if (mBrightnessController) {
+        if (updatePresentColorConversionInfo(mBrightnessController->isLhbmOn(),
+                                             mBrightnessController->getBrightnessLevel()) !=
+            NO_ERROR) {
+            ALOGE("%s:: updatePresentColorConversionInfo() fail, ret(%d)", __func__, ret);
+        }
     }
 
     if ((mLayers.size() == 0) &&
