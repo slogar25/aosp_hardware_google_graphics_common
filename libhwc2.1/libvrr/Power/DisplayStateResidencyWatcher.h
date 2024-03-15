@@ -58,6 +58,8 @@ private:
 
     std::shared_ptr<StatisticsProvider> mStatisticsProvider;
     std::unique_ptr<DisplayStateResidencyProvider> mDisplayPresentStatisticsProvider;
+
+    std::string mEntityName;
 };
 
 } // namespace android::hardware::graphics::composer
