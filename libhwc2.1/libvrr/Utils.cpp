@@ -16,6 +16,7 @@
 
 #include "Utils.h"
 
+#include <hardware/hwcomposer2.h>
 #include <chrono>
 
 #include "interface/Event.h"
@@ -34,6 +35,10 @@ int64_t getNowNs() {
 
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target) {
     return flag & static_cast<int>(target);
+}
+
+bool isPowerModeOff(int powerMode) {
+    return ((powerMode == HWC_POWER_MODE_OFF) || (powerMode == HWC_POWER_MODE_DOZE_SUSPEND));
 }
 
 void setTimedEventWithAbsoluteTime(TimedEvent& event) {
