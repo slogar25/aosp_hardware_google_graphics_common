@@ -55,6 +55,10 @@ T freqToDurationNs(T freq) {
 int64_t getNowMs();
 int64_t getNowNs();
 
+uint32_t getPanelRefreshCtrlMinimumRefreshRateCmd(uint32_t minimumRefreshRate);
+uint32_t getPanelRefreshCtrlIdleEnabledCmd(bool enabled);
+uint32_t getPanelRefreshCtrlFrameInsertionAutoModeCmd(bool isAuto);
+
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target);
 
 bool isPowerModeOff(int powerMode);

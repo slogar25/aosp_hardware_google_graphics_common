@@ -672,11 +672,11 @@ struct RollingAverage {
     }
 };
 
-class FileNodeWriter {
+class FileNode {
 public:
-    FileNodeWriter(const std::string& nodePath) : mNodePath(nodePath) {}
+    FileNode(const std::string& nodePath) : mNodePath(nodePath) {}
 
-    ~FileNodeWriter() {
+    ~FileNode() {
         for (auto& node : mOperateNodes) {
             close(node.second);
         }

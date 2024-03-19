@@ -110,6 +110,12 @@ void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
 }
 
 void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
+    // If the minimum refresh rate has been set, we update statistics based on the duration rather
+    // than individual presents.
+    if (mFixedRefreshRate > 0) {
+        return;
+    }
+
     mEventQueue->dropEvent(VrrControllerEventType::kStatisticPresentTimeout);
     mTimeoutEvent.mWhenNs = getNowNs() + kMaxPresentIntervalNs;
     mEventQueue->mPriorityQueue.emplace(mTimeoutEvent);
@@ -148,6 +154,24 @@ void VariableRefreshRateStatistic::setActiveVrrConfiguration(int activeConfigId,
     mTeIntervalNs = roundDivide(std::nano::den, static_cast<int64_t>(mTeFrequency));
 }
 
+void VariableRefreshRateStatistic::setFixedRefreshRate(uint32_t rate) {
+    if (rate > 0) {
+        if (mFixedRefreshRate > 0) { // If we are updating the minimum refresh rate.
+            // Update statistics.
+            updateMinimumRefreshRateStatistic();
+        }
+        mEventQueue->dropEvent(VrrControllerEventType::kStatisticPresentTimeout);
+        int64_t frameIntervalNs = roundDivide(std::nano::den, static_cast<int64_t>(rate));
+        mDisplayPresentProfile.mNumVsync = roundDivide(frameIntervalNs, mTeIntervalNs);
+        mFixedRefreshRate = rate;
+        mFixedRefreshRateStartNs = getNowNs();
+    } else {
+        updateMinimumRefreshRateStatistic();
+        mFixedRefreshRate = 0;
+        mFixedRefreshRateStartNs = -1;
+    }
+}
+
 bool VariableRefreshRateStatistic::isPowerModeOffNowLocked() const {
     return isPowerModeOff(mDisplayPresentProfile.mCurrentDisplayConfig.mPowerMode);
 }
@@ -177,6 +201,19 @@ void VariableRefreshRateStatistic::updateCurrentDisplayStatus() {
         BrightnessMode::kInvalidBrightnessMode) {
         mDisplayPresentProfile.mCurrentDisplayConfig.mBrightnessMode =
                 BrightnessMode::kNormalBrightnessMode;
+    }
+}
+
+void VariableRefreshRateStatistic::updateMinimumRefreshRateStatistic() {
+    auto durationNs = getNowNs() - mFixedRefreshRateStartNs;
+    {
+        std::scoped_lock lock(mMutex);
+
+        auto& record = mStatistics[mDisplayPresentProfile];
+        // Convert duration to the number of TE.
+        record.mCount += roundDivide(durationNs, mTeIntervalNs);
+        record.mLastTimeStampNs = getNowNs();
+        record.mUpdated = true;
     }
 }
 

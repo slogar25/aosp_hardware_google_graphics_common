@@ -22,15 +22,26 @@ namespace android::hardware::graphics::composer {
 const std::string kRefreshControlNodeName = "refresh_ctrl";
 const std::string kRefreshControlNodeEnabled = "Enabled";
 
-static constexpr uint32_t kPanelRefreshCtrlFrameInsertionMaxFrameCount = (1U << 7);
+static constexpr uint32_t kPanelRefreshCtrlFrameInsertionFrameCountOffset = 0;
+static constexpr uint32_t kPanelRefreshCtrlFrameInsertionFrameCountBits = 7;
+static constexpr uint32_t kPanelRefreshCtrlFrameInsertionFrameCountMax =
+        (1U << kPanelRefreshCtrlFrameInsertionFrameCountBits) - 1;
 static constexpr uint32_t kPanelRefreshCtrlFrameInsertionFrameCountMask =
-        (kPanelRefreshCtrlFrameInsertionMaxFrameCount - 1);
-static constexpr uint32_t kPanelRefreshCtrlFrameInsertionPeakFrameRate = (1U << 8);
-static constexpr uint32_t kPanelRefreshCtrlFrameInsertionFrameRateMask =
-        ((kPanelRefreshCtrlFrameInsertionPeakFrameRate - 1) << 7);
-static constexpr uint32_t kPanelRefreshCtrlFrameInsertionAutoMode = (1U << 31);
-static constexpr uint32_t kPanelRefreshCtrlIdleEnabled = (1U << 30);
+        kPanelRefreshCtrlFrameInsertionFrameCountMax
+        << kPanelRefreshCtrlFrameInsertionFrameCountOffset;
+
+static constexpr uint32_t kPanelRefreshCtrlMinimumRefreshRateOffset =
+        kPanelRefreshCtrlFrameInsertionFrameCountOffset +
+        kPanelRefreshCtrlFrameInsertionFrameCountBits;
+static constexpr uint32_t kPanelRefreshCtrlMinimumRefreshRateBits = 8;
+static constexpr uint32_t kPanelRefreshCtrlMinimumRefreshRateMax =
+        (1U << kPanelRefreshCtrlMinimumRefreshRateBits) - 1;
+static constexpr uint32_t kPanelRefreshCtrlMinimumRefreshRateMask =
+        (kPanelRefreshCtrlMinimumRefreshRateMax << kPanelRefreshCtrlMinimumRefreshRateOffset);
+
 static constexpr uint32_t kPanelRefreshCtrlTeTypeChangeable = (1U << 29);
+static constexpr uint32_t kPanelRefreshCtrlIdleEnabled = (1U << 30);
+static constexpr uint32_t kPanelRefreshCtrlFrameInsertionAutoMode = (1U << 31);
 
 // Definition of protobuf path
 static constexpr char kDefaultConfigPathPrefix[] = "/vendor/etc/panel_ctrl_";

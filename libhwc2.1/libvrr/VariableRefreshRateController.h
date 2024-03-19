@@ -89,43 +89,19 @@ public:
     }
 
     void setPresentTimeoutParameters(int timeoutNs,
-                                     const std::vector<std::pair<uint32_t, uint32_t>>& settings) {
-        const std::lock_guard<std::mutex> lock(mMutex);
+                                     const std::vector<std::pair<uint32_t, uint32_t>>& settings);
 
-        if (!mPresentTimeoutEventHandler) {
-            return;
-        }
-        if ((timeoutNs >= 0) && (!settings.empty())) {
-            auto functor = mPresentTimeoutEventHandler->getHandleFunction();
-            mVendorPresentTimeoutOverride = std::make_optional<PresentTimeoutSettingsNew>();
-            mVendorPresentTimeoutOverride.value().mTimeoutNs = timeoutNs;
-            mVendorPresentTimeoutOverride.value().mFunctor = std::move(functor);
-            for (const auto& setting : settings) {
-                mVendorPresentTimeoutOverride.value().mSchedule.emplace_back(setting);
-            }
-        } else {
-            mVendorPresentTimeoutOverride = std::nullopt;
-        }
-    }
+    void setPresentTimeoutController(uint32_t controllerType);
 
-    void setPresentTimeoutController(uint32_t controllerType) {
-        const std::lock_guard<std::mutex> lock(mMutex);
-
-        PresentTimeoutControllerType newControllerType =
-                static_cast<PresentTimeoutControllerType>(controllerType);
-        if (newControllerType != mPresentTimeoutController) {
-            if (mPresentTimeoutController == PresentTimeoutControllerType::kSoftware) {
-                dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
-            }
-            if (mPresentTimeoutEventHandler) {
-                // When |controllerType| is kNone, we select software to control present timeout,
-                // but without handling.
-                mPresentTimeoutEventHandler->enablePanelAutoFrameInsertionMode(
-                        newControllerType == PresentTimeoutControllerType::kHardware);
-            }
-        }
-        mPresentTimeoutController = newControllerType;
-    }
+    // Set refresh rate within the range [minimumRefreshRate, maximumRefreshRateOfCurrentConfig].
+    // The maximum refresh rate, |maximumRefreshRateOfCurrentConfig|, is intrinsic to the current
+    // configuration, hence only |minimumRefreshRate| needs to be specified. If
+    // |peakRefreshRateTimeoutNs| does not equal zero, upon arrival of new frames, the current
+    // refresh rate will be set to |maximumRefreshRateOfCurrentConfig| and will remain so for
+    // |peakRefreshRateTimeoutNs| duration. Afterward, the current refresh rate will revert to
+    // |minimumRefreshRate|. Alternatively, if |peakRefreshRateTimeoutNs| equals zero, new frames
+    // coming will maintain refresh rate at |minimumRefreshRate|.
+    int setFixedRefreshRateRange(uint32_t minimumRefreshRate, uint64_t peakRefreshRateTimeoutNs);
 
 private:
     static constexpr int kMaxFrameRate = 120;
@@ -154,26 +130,17 @@ private:
         int mDuration;
     } PresentEvent;
 
-    // The |PresentTimeoutSettings| will override the settings of the present timeout handler. Once
-    // it is set, the present timeout will be directly set by these parameters.
     typedef struct PresentTimeoutSettings {
-        int mNumOfWorks;
-        int mTimeoutNs;
-        int mIntervalNs;
-        std::function<int()> mFunctor;
-    } PresentTimeoutSettings;
-
-    typedef struct PresentTimeoutSettingsNew {
-        PresentTimeoutSettingsNew() = default;
+        PresentTimeoutSettings() = default;
         int mTimeoutNs = 0;
         std::vector<std::pair<uint32_t, uint32_t>> mSchedule;
         std::function<int()> mFunctor;
-    } PresentTimeoutSettingsNew;
+    } PresentTimeoutSettings;
 
-    enum class PresentTimeoutControllerType {
+    enum PresentTimeoutControllerType {
         kNone = 0,
-        kHardware,
         kSoftware,
+        kHardware,
     };
 
     typedef struct VsyncEvent {
@@ -251,7 +218,7 @@ private:
     void handleHibernate();
     void handleStayHibernate();
 
-    void handleGeneralEventLocked(VrrControllerEvent& event) {
+    void handleCallbackEventLocked(VrrControllerEvent& event) {
         if (event.mFunctor) {
             event.mFunctor();
         }
@@ -260,6 +227,7 @@ private:
     void handlePresentTimeout(const VrrControllerEvent& event);
 
     void onRefreshRateChanged(int refreshRate);
+    void onRefreshRateChangedInternal(int refreshRate);
 
     void postEvent(VrrControllerEventType type, TimedEvent& timedEvent);
     void postEvent(VrrControllerEventType type, int64_t when);
@@ -287,15 +255,12 @@ private:
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
     std::optional<int> mLastPresentFence;
 
-    std::unique_ptr<FileNodeWriter> mFileNodeWriter;
+    std::unique_ptr<FileNode> mFileNode;
 
     DisplayContextProviderInterface mDisplayContextProviderInterface;
     std::unique_ptr<ExternalEventHandlerLoader> mPresentTimeoutEventHandlerLoader;
     ExternalEventHandler* mPresentTimeoutEventHandler = nullptr;
-    std::optional<PresentTimeoutSettings> mVendorPresentTimeoutOverrideOld;
-    std::optional<PresentTimeoutSettingsNew> mVendorPresentTimeoutOverride;
-    PresentTimeoutControllerType mPresentTimeoutController =
-            PresentTimeoutControllerType::kSoftware;
+    std::optional<PresentTimeoutSettings> mVendorPresentTimeoutOverride;
 
     std::string mPanelName;
 
@@ -307,6 +272,13 @@ private:
 
     bool mEnabled = false;
     bool mThreadExit = false;
+
+    PresentTimeoutControllerType mPresentTimeoutController =
+            PresentTimeoutControllerType::kSoftware;
+    uint32_t mMinimumRefreshRate = 0;
+    uint64_t mMaximumPeakRefreshRateTimeoutNs = 0;
+    std::optional<TimedEvent> mPeakRefreshRateTimeoutEvent;
+    bool mAtPeakRefreshRate = false;
 
     std::mutex mMutex;
     std::condition_variable mCondition;
