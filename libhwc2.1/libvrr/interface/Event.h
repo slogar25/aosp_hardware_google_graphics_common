@@ -40,6 +40,7 @@ enum class VrrControllerEventType {
     kNotifyExpectedPresentConfig,
     kGeneralEventMax = 0x1FF,
     // General callback events.
+    kCallbackEventMask = 0x200,
     kRefreshRateCalculatorUpdateMask = 0x200,
     kInstantRefreshRateCalculatorUpdate,
     kPeriodRefreshRateCalculatorUpdate,
@@ -48,6 +49,7 @@ enum class VrrControllerEventType {
     kAodRefreshRateCalculatorUpdate,
     kStatisticPresentTimeout,
     kStaticticUpdate,
+    kPeakRefreshRateTimeout,
     kCallbackEventMax = 0x2FF,
     // Sensors, outer events...
 };
@@ -91,6 +93,12 @@ struct VrrControllerEvent {
                 return "kCombinedRefreshRateCalculatorUpdate";
             case VrrControllerEventType::kAodRefreshRateCalculatorUpdate:
                 return "kAodRefreshRateCalculatorUpdate";
+            case VrrControllerEventType::kStatisticPresentTimeout:
+                return "kStatisticPresentTimeout";
+            case VrrControllerEventType::kStaticticUpdate:
+                return "kStaticticUpdate";
+            case VrrControllerEventType::kPeakRefreshRateTimeout:
+                return "kPeakRefreshRateTimeout";
             default:
                 return "Unknown";
         }

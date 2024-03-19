@@ -181,7 +181,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
                 ALOGE("%s(): cannot find file node %s of display %s", __func__,
                       displayFileNodePath.c_str(), mDisplayName.c_str());
             } else {
-                FileNodeWriter fileNodeWriter(displayFileNodePath);
+                FileNode fileNodeWriter(displayFileNodePath);
                 auto content = fileNodeWriter.read(kRefreshControlNodeName);
                 if (content.has_value() &&
                     !(content.value().compare(0, kRefreshControlNodeEnabled.length(),

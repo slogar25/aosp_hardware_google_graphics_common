@@ -150,6 +150,10 @@ public:
 
     void setActiveVrrConfiguration(int activeConfigId, int teFrequency);
 
+    // If |minimumRefreshRate| is not equal to zero, enforce the minimum (fixed) refresh rate;
+    // otherwise, revert to a variable refresh rate.
+    void setFixedRefreshRate(uint32_t minimumRefreshRate);
+
     VariableRefreshRateStatistic(const VariableRefreshRateStatistic& other) = delete;
     VariableRefreshRateStatistic& operator=(const VariableRefreshRateStatistic& other) = delete;
 
@@ -162,6 +166,12 @@ private:
     int onPresentTimeout();
 
     void updateCurrentDisplayStatus();
+
+    // When the minimum refresh rate is set, the hardware will continuously render according to the
+    // minimum refresh rate.
+    // |updateMinimumRefreshRateStatistic| is responsible for updating statistics based on the
+    // duration when the minimum refresh rate is set.
+    void updateMinimumRefreshRateStatistic();
 
     int updateStatistic();
 
@@ -186,6 +196,10 @@ private:
     DisplayPresentProfile mDisplayPresentProfile;
 
     uint64_t mPowerOffDurationNs = 0;
+
+    // For minimum refresh rate.
+    uint32_t mFixedRefreshRate = 0;
+    int64_t mFixedRefreshRateStartNs = -1;
 
     mutable std::mutex mMutex;
 };
