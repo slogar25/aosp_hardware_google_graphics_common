@@ -126,7 +126,7 @@ std::optional<float> BrightnessController::LinearBrightnessTable::DbvToNits(Brig
 }
 
 BrightnessController::BrightnessController(int32_t panelIndex, std::function<void(void)> refresh,
-                                           std::function<void(bool, uint32_t)> updateDcLhbm)
+                                           std::function<void(void)> updateDcLhbm)
       : mPanelIndex(panelIndex),
         mEnhanceHbmReq(false),
         mLhbmReq(false),
@@ -202,10 +202,7 @@ int BrightnessController::initDrm(const DrmDevice& drmDevice, const DrmConnector
     mGhbmSupported = connector.hbm_mode().id() != 0;
 
     /* allow the first brightness to apply */
-    {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
-        mBrightnessFloatReq.set_dirty();
-    }
+    mBrightnessFloatReq.set_dirty();
     return NO_ERROR;
 }
 
@@ -221,7 +218,6 @@ void BrightnessController::initDimmingUsage() {
     mHbmDimmingTimeUs = property_get_int32(propName.c_str(), kHbmDimmingTimeUs);
 
     if (mBrightnessDimmingUsage == BrightnessDimmingUsage::NORMAL) {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
         mDimming.store(true);
     }
 
@@ -321,7 +317,7 @@ int BrightnessController::processEnhancedHbm(bool on) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mEnhanceHbmReq.store(on);
     if (mEnhanceHbmReq.is_dirty()) {
         updateStates();
@@ -330,7 +326,7 @@ int BrightnessController::processEnhancedHbm(bool on) {
 }
 
 void BrightnessController::processDimmingOff() {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     if (mHbmDimming) {
         mHbmDimming = false;
         updateStates();
@@ -378,7 +374,6 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     bool ghbm;
 
     if (mIgnoreBrightnessUpdateRequests) {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
         ALOGI("%s: Brightness update is ignored. requested: %f, current: %f",
             __func__, brightness, mBrightnessFloatReq.get());
         return NO_ERROR;
@@ -400,7 +395,7 @@ int BrightnessController::processDisplayBrightness(float brightness, const nsecs
     }
 
     {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         /* apply the first brightness */
         if (mBrightnessFloatReq.is_dirty()) mBrightnessLevel.set_dirty();
 
@@ -494,7 +489,7 @@ int BrightnessController::applyPendingChangeViaSysfs(const nsecs_t vsyncNs) {
     ATRACE_CALL();
     uint32_t level;
     {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
 
         if (!mBrightnessLevel.is_dirty()) {
             return NO_ERROR;
@@ -541,7 +536,7 @@ int BrightnessController::processLocalHbm(bool on) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mLhbmReq.store(on);
     // As kernel timeout timer might disable LHBM without letting HWC know, enforce mLhbmReq and
     // mLhbm dirty to ensure the enabling request can be passed through kernel unconditionally.
@@ -563,7 +558,7 @@ void BrightnessController::updateFrameStates(HdrLayerState hdrState, bool sdrDim
         return;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mPrevSdrDim.store(mSdrDim.get());
     mSdrDim.store(sdrDim);
     if (mSdrDim.is_dirty() || mPrevSdrDim.is_dirty()) {
@@ -585,7 +580,7 @@ int BrightnessController::processInstantHbm(bool on) {
         return HWC2_ERROR_UNSUPPORTED;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mInstantHbmReq.store(on);
     if (mInstantHbmReq.is_dirty()) {
         updateStates();
@@ -594,7 +589,7 @@ int BrightnessController::processInstantHbm(bool on) {
 }
 
 int BrightnessController::processDimBrightness(bool on) {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mDimBrightnessReq.store(on);
     if (mDimBrightnessReq.is_dirty()) {
         updateStates();
@@ -608,7 +603,7 @@ float BrightnessController::getSdrDimRatioForInstantHbm() {
         return 1.0f;
     }
 
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     if (!mInstantHbmReq.get()) {
         return 1.0f;
     }
@@ -639,7 +634,7 @@ float BrightnessController::getSdrDimRatioForInstantHbm() {
 }
 
 int BrightnessController::processOperationRate(int32_t hz) {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     if (mOperationRate.get() != hz) {
         ATRACE_CALL();
         ALOGI("%s: store operation rate %d", __func__, hz);
@@ -653,13 +648,13 @@ int BrightnessController::processOperationRate(int32_t hz) {
 
 void BrightnessController::onClearDisplay(bool needModeClear) {
     resetLhbmState();
-    std::lock_guard<std::mutex> brightnessLock(mBrightnessMutex);
     mInstantHbmReq.reset(false);
 
     if (mBrightnessLevel.is_dirty()) applyBrightnessViaSysfs(mBrightnessLevel.get());
 
     if (!needModeClear) return;
 
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mEnhanceHbmReq.reset(false);
     mBrightnessFloatReq.reset(-1);
 
@@ -674,7 +669,7 @@ void BrightnessController::onClearDisplay(bool needModeClear) {
     }
     mOperationRate.reset(0);
 
-    std::lock_guard<std::mutex> cabcLock(mCabcModeMutex);
+    std::lock_guard<std::recursive_mutex> lock1(mCabcModeMutex);
     mCabcMode.reset(CabcMode::OFF);
 }
 
@@ -690,7 +685,7 @@ int BrightnessController::prepareFrameCommit(ExynosDisplay& display, const DrmCo
     opRateSync = false;
 
     ATRACE_CALL();
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
 
     bool sync = false;
     if (mixedComposition && mPrevDisplayWhitePointNits > 0 && mDisplayWhitePointNits > 0) {
@@ -722,7 +717,7 @@ int BrightnessController::prepareFrameCommit(ExynosDisplay& display, const DrmCo
         auto dbv = mBrightnessLevel.get();
         auto old_dbv = dbv;
         if (mLhbm.get()) {
-            mUpdateDcLhbm(mLhbm.get(), mBrightnessLevel.get());
+            mUpdateDcLhbm();
             uint32_t dbv_adj = 0;
             if (display.getColorAdjustedDbv(dbv_adj)) {
                 ALOGW("failed to get adjusted dbv");
@@ -1071,21 +1066,21 @@ int BrightnessController::checkSysfsStatus(const std::string& file,
 }
 
 void BrightnessController::resetLhbmState() {
-    std::lock_guard<std::mutex> brightnessLock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     mLhbmReq.reset(false);
     mLhbm.reset(false);
     mLhbmBrightnessAdj = false;
 }
 
 void BrightnessController::setOutdoorVisibility(LbeState state) {
-    std::lock_guard<std::mutex> lock(mCabcModeMutex);
+    std::lock_guard<std::recursive_mutex> lock(mCabcModeMutex);
     mOutdoorVisibility = (state != LbeState::OFF);
 }
 
 int BrightnessController::updateCabcMode() {
     if (!mCabcSupport || mCabcModeOfs.fail()) return HWC2_ERROR_UNSUPPORTED;
 
-    std::lock_guard<std::mutex> lock(mCabcModeMutex);
+    std::lock_guard<std::recursive_mutex> lock(mCabcModeMutex);
     CabcMode mode;
     if (mOutdoorVisibility)
         mode = CabcMode::OFF;
@@ -1115,7 +1110,7 @@ int BrightnessController::applyBrightnessViaSysfs(uint32_t level) {
         }
 
         {
-            std::lock_guard<std::mutex> lock(mBrightnessMutex);
+            std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
             mBrightnessLevel.reset(level);
             mPrevDisplayWhitePointNits = mDisplayWhitePointNits;
             printBrightnessStates("sysfs");
@@ -1145,7 +1140,7 @@ int BrightnessController::applyCabcModeViaSysfs(uint8_t mode) {
 
 // brightness is normalized to current display brightness
 bool BrightnessController::validateLayerBrightness(float brightness) {
-    std::lock_guard<std::mutex> lock(mBrightnessMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
     if (!std::isfinite(brightness)) {
         ALOGW("%s layer brightness %f is not a valid floating value", __func__, brightness);
         return false;
@@ -1186,11 +1181,7 @@ void BrightnessController::printBrightnessStates(const char* path) {
 }
 
 void BrightnessController::dump(String8& result) {
-    // clang thread safety analysis currently does not support scoped_lock with multiple mutexes
-    // add ScopedLockAssertion to hint the analysis instead
-    std::scoped_lock<std::mutex, std::mutex> lock(mBrightnessMutex, mCabcModeMutex);
-    ::android::base::ScopedLockAssertion brightnessLockAssertion(mBrightnessMutex);
-    ::android::base::ScopedLockAssertion cabcLockAssertion(mCabcModeMutex);
+    std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
 
     result.appendFormat("BrightnessController:\n");
     result.appendFormat("\tsysfs support %d, max %d, valid brightness table %d, "

@@ -60,7 +60,7 @@ public:
     };
 
     BrightnessController(int32_t panelIndex, std::function<void(void)> refresh,
-                         std::function<void(bool, uint32_t)> updateDcLhbm);
+                         std::function<void(void)> updateDcLhbm);
     ~BrightnessController();
 
     BrightnessController(int32_t panelIndex);
@@ -121,12 +121,12 @@ public:
     bool isLhbmSupported() { return mLhbmSupported; }
 
     bool isGhbmOn() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mGhbm.get() != HbmMode::OFF;
     }
 
     bool isLhbmOn() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mLhbm.get();
     }
     int checkSysfsStatus(const std::string& file, const std::vector<std::string>& expectedValue,
@@ -138,12 +138,12 @@ public:
     void resetLhbmState();
 
     uint32_t getBrightnessLevel() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mBrightnessLevel.get();
     }
 
     std::optional<std::tuple<float, BrightnessMode>> getBrightnessNitsAndMode() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         BrightnessMode brightnessMode;
         if (mBrightnessTable == nullptr) {
             return std::nullopt;
@@ -161,7 +161,7 @@ public:
     }
 
     bool isDimSdr() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mInstantHbmReq.get();
     }
 
@@ -170,12 +170,12 @@ public:
     }
 
     uint32_t getOperationRate() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mOperationRate.get();
     }
 
     bool isOperationRatePending() {
-        std::lock_guard<std::mutex> lock(mBrightnessMutex);
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mOperationRate.is_dirty();
     }
 
@@ -388,21 +388,21 @@ private:
             "vendor.display.%d.brightness.acl.default";
 
     int queryBrightness(float brightness, bool* ghbm = nullptr, uint32_t* level = nullptr,
-                        float* nits = nullptr) REQUIRES(mBrightnessMutex);
+                        float *nits = nullptr);
     void initBrightnessTable(const DrmDevice& device, const DrmConnector& connector);
     void initBrightnessSysfs();
     void initCabcSysfs();
     void initDimmingUsage();
     int applyBrightnessViaSysfs(uint32_t level);
     int applyCabcModeViaSysfs(uint8_t mode);
-    int updateStates() REQUIRES(mBrightnessMutex);
+    int updateStates(); // REQUIRES(mBrightnessMutex)
     void dimmingThread();
     void processDimmingOff();
     int updateAclMode();
 
     void parseHbmModeEnums(const DrmProperty& property);
 
-    void printBrightnessStates(const char* path) REQUIRES(mBrightnessMutex);
+    void printBrightnessStates(const char* path); // REQUIRES(mBrightnessMutex)
 
     bool mLhbmSupported = false;
     bool mGhbmSupported = false;
@@ -416,21 +416,21 @@ private:
     DrmEnumParser::MapHal2DrmEnum mHbmModeEnums;
 
     // brightness state
-    std::mutex mBrightnessMutex;
+    std::recursive_mutex mBrightnessMutex;
     // requests
-    CtrlValue<bool> mEnhanceHbmReq GUARDED_BY(mBrightnessMutex);
-    CtrlValue<bool> mLhbmReq GUARDED_BY(mBrightnessMutex);
-    CtrlValue<float> mBrightnessFloatReq GUARDED_BY(mBrightnessMutex);
-    CtrlValue<bool> mInstantHbmReq GUARDED_BY(mBrightnessMutex);
+    CtrlValue<bool> mEnhanceHbmReq;       // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<bool> mLhbmReq;             // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<float> mBrightnessFloatReq; // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<bool> mInstantHbmReq;       // GUARDED_BY(mBrightnessMutex)
     // states to drm after updateStates call
-    CtrlValue<uint32_t> mBrightnessLevel GUARDED_BY(mBrightnessMutex);
-    CtrlValue<HbmMode> mGhbm GUARDED_BY(mBrightnessMutex);
-    CtrlValue<bool> mDimming GUARDED_BY(mBrightnessMutex);
-    CtrlValue<bool> mLhbm GUARDED_BY(mBrightnessMutex);
-    CtrlValue<bool> mSdrDim GUARDED_BY(mBrightnessMutex);
-    CtrlValue<bool> mPrevSdrDim GUARDED_BY(mBrightnessMutex);
-    CtrlValue<bool> mDimBrightnessReq GUARDED_BY(mBrightnessMutex);
-    CtrlValue<uint32_t> mOperationRate GUARDED_BY(mBrightnessMutex);
+    CtrlValue<uint32_t> mBrightnessLevel; // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<HbmMode> mGhbm;             // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<bool> mDimming;             // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<bool> mLhbm;                // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<bool> mSdrDim;              // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<bool> mPrevSdrDim;          // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<bool> mDimBrightnessReq;    // GUARDED_BY(mBrightnessMutex)
+    CtrlValue<uint32_t> mOperationRate;   // GUARDED_BY(mBrightnessMutex)
 
     // Indicating if the last LHBM on has changed the brightness level
     bool mLhbmBrightnessAdj = false;
@@ -455,7 +455,7 @@ private:
 
     // these are dimming related
     BrightnessDimmingUsage mBrightnessDimmingUsage = BrightnessDimmingUsage::NORMAL;
-    bool mHbmDimming GUARDED_BY(mBrightnessMutex) = false;
+    bool mHbmDimming = false; // GUARDED_BY(mBrightnessMutex)
     int32_t mHbmDimmingTimeUs = 0;
     std::thread mDimmingThread;
     std::atomic<bool> mDimmingThreadRunning;
@@ -473,7 +473,7 @@ private:
     float mDisplayWhitePointNits = 0;
     float mPrevDisplayWhitePointNits = 0;
 
-    std::function<void(bool, uint32_t)> mUpdateDcLhbm;
+    std::function<void(void)> mUpdateDcLhbm;
 
     // state for control ACL state
     enum class AclMode {
@@ -496,10 +496,10 @@ private:
 
     static constexpr const char* kLocalCabcModeFileNode =
             "/sys/class/backlight/panel%d-backlight/cabc_mode";
-    std::mutex mCabcModeMutex;
-    bool mOutdoorVisibility GUARDED_BY(mCabcModeMutex) = false;
+    std::recursive_mutex mCabcModeMutex;
+    bool mOutdoorVisibility = false; // GUARDED_BY(mCabcModeMutex)
     bool isHdrLayerOn() { return mHdrLayerState.get() == HdrLayerState::kHdrLarge; }
-    CtrlValue<CabcMode> mCabcMode GUARDED_BY(mCabcModeMutex);
+    CtrlValue<CabcMode> mCabcMode; // GUARDED_BY(mCabcModeMutex)
 };
 
 #endif // _BRIGHTNESS_CONTROLLER_H_
