@@ -116,7 +116,7 @@ void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
 
     int numVsync = roundDivide((presentTimeNs - mLastPresentTimeNs), mTeIntervalNs);
     numVsync = std::max(1, numVsync);
-    numVsync = std::min(mMaxFrameRate, numVsync);
+    numVsync = std::min(mMaxTeFrequency, numVsync);
     updateCurrentDisplayStatus();
     mDisplayPresentProfile.mNumVsync = numVsync;
 
@@ -154,7 +154,7 @@ bool VariableRefreshRateStatistic::isPowerModeOffNowLocked() const {
 
 int VariableRefreshRateStatistic::onPresentTimeout() {
     updateCurrentDisplayStatus();
-    mDisplayPresentProfile.mNumVsync = mMaxFrameRate;
+    mDisplayPresentProfile.mNumVsync = mMaxTeFrequency;
     {
         std::scoped_lock lock(mMutex);
 

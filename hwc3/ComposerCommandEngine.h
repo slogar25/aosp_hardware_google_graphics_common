@@ -38,7 +38,7 @@ class ComposerCommandEngine {
       template <typename InputType, typename Functor>
       void dispatchLayerCommand(int64_t display, int64_t layer, const std::string& funcName,
                                 const InputType input, const Functor func);
-
+      void dispatchBatchCreateDestroyLayerCommand(int64_t display, const LayerCommand& cmd);
       void reset() {
           mWriter->reset();
       }
