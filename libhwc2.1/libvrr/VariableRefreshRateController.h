@@ -264,6 +264,8 @@ private:
     void postEvent(VrrControllerEventType type, TimedEvent& timedEvent);
     void postEvent(VrrControllerEventType type, int64_t when);
 
+    bool setUp();
+
     bool shouldHandleVendorRenderingTimeout() const;
 
     void stopThread(bool exit);
@@ -274,6 +276,7 @@ private:
     void updateVsyncHistory();
 
     ExynosDisplay* mDisplay;
+    std::string mPanelName;
 
     // The subsequent variables must be guarded by mMutex when accessed.
     EventQueue mEventQueue;
@@ -282,7 +285,7 @@ private:
     int32_t mPowerMode = -1;
     std::vector<PowerModeListener*> mPowerModeListeners;
 
-    VrrControllerState mState;
+    VrrControllerState mState = VrrControllerState::kDisable;
     hwc2_config_t mVrrActiveConfig = -1;
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
     std::optional<int> mLastPresentFence;
@@ -296,8 +299,6 @@ private:
     std::optional<PresentTimeoutSettingsNew> mVendorPresentTimeoutOverride;
     PresentTimeoutControllerType mPresentTimeoutController =
             PresentTimeoutControllerType::kSoftware;
-
-    std::string mPanelName;
 
     std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;
