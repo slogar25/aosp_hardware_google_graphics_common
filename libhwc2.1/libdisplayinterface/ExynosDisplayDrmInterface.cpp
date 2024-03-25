@@ -2131,6 +2131,8 @@ int32_t ExynosDisplayDrmInterface::deliverWinConfigData()
                 (((currentVsyncPeriod % desiredVsyncPeriod) < nsecsPerMs) ||
                  (desiredVsyncPeriod - (currentVsyncPeriod % desiredVsyncPeriod)) < nsecsPerMs)) {
                 ignoreExpectedPresentTime = false;
+            } else if (currentVsyncPeriod == desiredVsyncPeriod) {
+                ignoreExpectedPresentTime = false;
             }
         }
 
