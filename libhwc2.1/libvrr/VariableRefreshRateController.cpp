@@ -34,8 +34,6 @@
 
 #include "display/DisplayContextProviderFactory.h"
 
-#include "interface/Panel_def.h"
-
 namespace android::hardware::graphics::composer {
 
 namespace {
@@ -96,9 +94,6 @@ auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display,
     }
     auto controller = std::shared_ptr<VariableRefreshRateController>(
             new VariableRefreshRateController(display, panelName));
-    if (!controller->setUp()) {
-        return nullptr;
-    }
     std::thread thread = std::thread(&VariableRefreshRateController::threadBody, controller.get());
     std::string threadName = "VrrCtrl_";
     threadName += display->mIndex == 0 ? "Primary" : "Second";
@@ -113,7 +108,73 @@ auto VariableRefreshRateController::CreateInstance(ExynosDisplay* display,
 
 VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* display,
                                                              const std::string& panelName)
-      : mDisplay(display), mPanelName(panelName) {}
+      : mDisplay(display), mPanelName(panelName) {
+    mState = VrrControllerState::kDisable;
+    std::string displayFileNodePath = mDisplay->getPanelSysfsPath();
+    if (displayFileNodePath.empty()) {
+        LOG(WARNING) << "VrrController: Cannot find file node of display: "
+                     << mDisplay->mDisplayName;
+    } else {
+        mFileNodeWriter = std::make_unique<FileNodeWriter>(displayFileNodePath);
+    }
+
+    // Initialize DisplayContextProviderInterface.
+    mDisplayContextProviderInterface.getOperationSpeedMode = (&getOperationSpeedModeWrapper);
+    mDisplayContextProviderInterface.getBrightnessMode = (&getBrightnessModeWrapper);
+    mDisplayContextProviderInterface.getBrightnessNits = (&getBrightnessNitsWrapper);
+    mDisplayContextProviderInterface.getDisplayFileNodePath = (&getDisplayFileNodePathWrapper);
+    mDisplayContextProviderInterface.getEstimatedVideoFrameRate =
+            (&getEstimateVideoFrameRateWrapper);
+    mDisplayContextProviderInterface.getAmbientLightSensorOutput =
+            (&getAmbientLightSensorOutputWrapper);
+    mDisplayContextProviderInterface.isProximityThrottlingEnabled =
+            (&isProximityThrottlingEnabledWrapper);
+
+    // Flow to build refresh rate calculator.
+    RefreshRateCalculatorFactory refreshRateCalculatorFactory;
+    std::vector<std::unique_ptr<RefreshRateCalculator>> Calculators;
+
+    Calculators.emplace_back(std::move(
+            refreshRateCalculatorFactory
+                    .BuildRefreshRateCalculator(&mEventQueue, RefreshRateCalculatorType::kAod)));
+    Calculators.emplace_back(std::move(
+            refreshRateCalculatorFactory
+                    .BuildRefreshRateCalculator(&mEventQueue,
+                                                RefreshRateCalculatorType::kVideoPlayback)));
+
+    PeriodRefreshRateCalculatorParameters peridParams;
+    peridParams.mConfidencePercentage = 0;
+    Calculators.emplace_back(std::move(
+            refreshRateCalculatorFactory.BuildRefreshRateCalculator(&mEventQueue, peridParams)));
+
+    mRefreshRateCalculator = refreshRateCalculatorFactory.BuildRefreshRateCalculator(Calculators);
+    mRefreshRateCalculator->registerRefreshRateChangeCallback(
+            std::bind(&VariableRefreshRateController::onRefreshRateChanged, this,
+                      std::placeholders::_1));
+
+    mPowerModeListeners.push_back(mRefreshRateCalculator.get());
+
+    DisplayContextProviderFactory displayContextProviderFactory(mDisplay, this, &mEventQueue);
+    mDisplayContextProvider = displayContextProviderFactory.buildDisplayContextProvider(
+            DisplayContextProviderType::kExynos);
+
+    mPresentTimeoutEventHandlerLoader.reset(
+            new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),
+                                           &mDisplayContextProviderInterface, this,
+                                           mPanelName.c_str()));
+    mPresentTimeoutEventHandler = mPresentTimeoutEventHandlerLoader->getEventHandler();
+
+    mVariableRefreshRateStatistic =
+            std::make_shared<VariableRefreshRateStatistic>(mDisplayContextProvider.get(),
+                                                           &mEventQueue, kMaxFrameRate,
+                                                           kMaxTefrequency,
+                                                           (1 * std::nano::den /*1 second*/));
+    mPowerModeListeners.push_back(mVariableRefreshRateStatistic.get());
+
+    mResidencyWatcher =
+            ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(mDisplayContextProvider,
+                                                                   mVariableRefreshRateStatistic);
+}
 
 VariableRefreshRateController::~VariableRefreshRateController() {
     stopThread(true);
@@ -566,93 +627,6 @@ void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
                                                      mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
                                                      freqToDurationNs(refreshRate));
     }
-}
-
-bool VariableRefreshRateController::setUp() {
-    // Generate the file node for operating the panel..
-    std::string displayFileNodePath = mDisplay->getPanelSysfsPath();
-    if (displayFileNodePath.empty()) {
-        LOG(ERROR) << "VrrController: Cannot find file node of display: " << mDisplay->mDisplayName;
-        return false;
-    } else {
-        mFileNodeWriter = std::make_unique<FileNodeWriter>(displayFileNodePath);
-        auto content = mFileNodeWriter->read(kRefreshControlNodeName);
-        if (!(content.has_value()) ||
-            (content.value().compare(0, kRefreshControlNodeEnabled.length(),
-                                     kRefreshControlNodeEnabled))) {
-            LOG(ERROR) << "VrrController: RefreshControlNode is not enabled";
-            return false;
-        }
-    }
-
-    // Bbuild refresh rate calculator.
-    RefreshRateCalculatorFactory refreshRateCalculatorFactory;
-    std::vector<std::unique_ptr<RefreshRateCalculator>> Calculators;
-
-    Calculators.emplace_back(std::move(
-            refreshRateCalculatorFactory
-                    .BuildRefreshRateCalculator(&mEventQueue, RefreshRateCalculatorType::kAod)));
-    Calculators.emplace_back(std::move(
-            refreshRateCalculatorFactory
-                    .BuildRefreshRateCalculator(&mEventQueue,
-                                                RefreshRateCalculatorType::kVideoPlayback)));
-
-    PeriodRefreshRateCalculatorParameters peridParams;
-    peridParams.mConfidencePercentage = 0;
-    Calculators.emplace_back(std::move(
-            refreshRateCalculatorFactory.BuildRefreshRateCalculator(&mEventQueue, peridParams)));
-
-    mRefreshRateCalculator = refreshRateCalculatorFactory.BuildRefreshRateCalculator(Calculators);
-    mRefreshRateCalculator->registerRefreshRateChangeCallback(
-            std::bind(&VariableRefreshRateController::onRefreshRateChanged, this,
-                      std::placeholders::_1));
-
-    mPowerModeListeners.push_back(mRefreshRateCalculator.get());
-
-    // Build display context provider.
-    DisplayContextProviderFactory displayContextProviderFactory(mDisplay, this, &mEventQueue);
-    mDisplayContextProvider = displayContextProviderFactory.buildDisplayContextProvider(
-            DisplayContextProviderType::kExynos);
-    if (!mDisplayContextProvider) {
-        return false;
-    }
-
-    // Initialize DisplayContextProviderInterface.
-    mDisplayContextProviderInterface.getOperationSpeedMode = (&getOperationSpeedModeWrapper);
-    mDisplayContextProviderInterface.getBrightnessMode = (&getBrightnessModeWrapper);
-    mDisplayContextProviderInterface.getBrightnessNits = (&getBrightnessNitsWrapper);
-    mDisplayContextProviderInterface.getDisplayFileNodePath = (&getDisplayFileNodePathWrapper);
-    mDisplayContextProviderInterface.getEstimatedVideoFrameRate =
-            (&getEstimateVideoFrameRateWrapper);
-    mDisplayContextProviderInterface.getAmbientLightSensorOutput =
-            (&getAmbientLightSensorOutputWrapper);
-    mDisplayContextProviderInterface.isProximityThrottlingEnabled =
-            (&isProximityThrottlingEnabledWrapper);
-
-    // Setup external present timeout event handler.
-    mPresentTimeoutEventHandlerLoader.reset(
-            new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),
-                                           &mDisplayContextProviderInterface, this,
-                                           mPanelName.c_str()));
-    mPresentTimeoutEventHandler = mPresentTimeoutEventHandlerLoader->getEventHandler();
-    if (!mPresentTimeoutEventHandler) {
-        return false;
-    }
-
-    // Create VariableRefreshRateStatistic.
-    mVariableRefreshRateStatistic =
-            std::make_shared<VariableRefreshRateStatistic>(mDisplayContextProvider.get(),
-                                                           &mEventQueue, kMaxFrameRate,
-                                                           kMaxTefrequency,
-                                                           (1 * std::nano::den /*1 second*/));
-    mPowerModeListeners.push_back(mVariableRefreshRateStatistic.get());
-
-    // Create DisplayStateResidencyWatcher.
-    mResidencyWatcher =
-            ndk::SharedRefBase::make<DisplayStateResidencyWatcher>(mDisplayContextProvider,
-                                                                   mVariableRefreshRateStatistic);
-
-    return true;
 }
 
 bool VariableRefreshRateController::shouldHandleVendorRenderingTimeout() const {
