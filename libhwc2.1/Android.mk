@@ -150,7 +150,7 @@ LOCAL_SRC_FILES := \
 	libvrr/VariableRefreshRateVersion.cpp \
 	libvrr/display/common/CommonDisplayContextProvider.cpp \
 	libvrr/display/exynos/ExynosDisplayContextProvider.cpp \
-	libvrr/Power/DisplayPresentProfileTokenGenerator.cpp \
+	libvrr/Power/PowerStatsPresentProfileTokenGenerator.cpp \
 	libvrr/Power/DisplayStateResidencyProvider.cpp \
 	libvrr/Power/DisplayStateResidencyWatcher.cpp \
 	libvrr/RefreshRateCalculator/InstantRefreshRateCalculator.cpp \

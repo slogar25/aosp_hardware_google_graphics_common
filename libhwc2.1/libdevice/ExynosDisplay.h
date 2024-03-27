@@ -381,6 +381,19 @@ typedef struct XrrSettings {
 } XrrSettings_t;
 
 typedef struct displayConfigs {
+    std::string toString() const {
+        std::ostringstream os;
+        os << "vsyncPeriod = " << vsyncPeriod;
+        os << ", w = " << width;
+        os << ", h = " << height;
+        os << ", Xdpi = " << Xdpi;
+        os << ", Ydpi = " << Ydpi;
+        os << ", groupId = " << groupId;
+        os << (isNsMode ? ", NS " : ", HS ");
+        os << ", refreshRate = " << refreshRate;
+        return os.str();
+    }
+
     // HWC2_ATTRIBUTE_VSYNC_PERIOD
     VsyncPeriodNanos vsyncPeriod;
     // HWC2_ATTRIBUTE_WIDTH

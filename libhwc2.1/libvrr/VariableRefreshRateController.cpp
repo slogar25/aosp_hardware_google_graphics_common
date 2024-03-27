@@ -429,10 +429,12 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         // Configure panel to maintain the minimum refresh rate.
         command |= getPanelRefreshCtrlMinimumRefreshRateCmd(minimumRefreshRate);
         command |= getPanelRefreshCtrlIdleEnabledCmd(true);
+        // TODO(b/333204544): ensure the correct refresh rate is set when calling
+        // setFixedRefreshRate().
         // Inform Statistics to stay at the minimum refresh rate change.
-        if (mVariableRefreshRateStatistic) {
-            mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
-        }
+        // if (mVariableRefreshRateStatistic) {
+        //     mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
+        // }
         if (mMaximumPeakRefreshRateTimeoutNs > 0) {
             // Set up peak refresh rate timeout event accordingly.
             mPeakRefreshRateTimeoutEvent = std::make_optional<TimedEvent>("PeakRefreshRateTimeout");
@@ -444,9 +446,11 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
                 uint32_t command = getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
                 command |= getPanelRefreshCtrlMinimumRefreshRateCmd(mMinimumRefreshRate);
                 command |= getPanelRefreshCtrlIdleEnabledCmd(true);
-                if (mVariableRefreshRateStatistic) {
-                    mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
-                }
+                // TODO(b/333204544): ensure the correct refresh rate is set when calling
+                // setFixedRefreshRate().
+                // if (mVariableRefreshRateStatistic) {
+                //     mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
+                // }
                 return mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command);
             };
             mAtPeakRefreshRate = false;
@@ -468,9 +472,11 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         if (!mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command)) {
             return -1;
         }
-        if (mVariableRefreshRateStatistic) {
-            mVariableRefreshRateStatistic->setFixedRefreshRate(0);
-        }
+        // TODO(b/333204544): ensure the correct refresh rate is set when calling
+        // setFixedRefreshRate().
+        // if (mVariableRefreshRateStatistic) {
+        //    mVariableRefreshRateStatistic->setFixedRefreshRate(0);
+        // }
         onRefreshRateChangedInternal(1);
         mPeakRefreshRateTimeoutEvent = std::nullopt;
         mAtPeakRefreshRate = false;
