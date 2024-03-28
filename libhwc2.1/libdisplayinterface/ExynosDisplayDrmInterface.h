@@ -373,11 +373,10 @@ class ExynosDisplayDrmInterface :
         }
 
         /* For Histogram Multi Channel support */
-        int32_t setDisplayHistogramChannelSetting(
-                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId,
-                void *blobData, size_t blobLength);
-        int32_t clearDisplayHistogramChannelSetting(
-                ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId);
+        int32_t setHistogramChannelConfigBlob(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
+                                              uint8_t channelId, uint32_t blobId);
+        int32_t clearHistogramChannelConfigBlob(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
+                                                uint8_t channelId);
         enum class HistogramChannelIoctl_t {
             /* send the histogram data request by calling histogram_channel_request_ioctl */
             REQUEST = 0,
