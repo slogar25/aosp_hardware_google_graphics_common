@@ -85,6 +85,7 @@ public:
     virtual int32_t setPresentTimeoutParameters(
             uint32_t displayId, int timeoutNs,
             const std::vector<std::pair<uint32_t, uint32_t>>& settings) = 0;
+    virtual int32_t setFixedTe2Rate(uint32_t displayId, int32_t rateHz) = 0;
 };
 
 /* Native Interface */

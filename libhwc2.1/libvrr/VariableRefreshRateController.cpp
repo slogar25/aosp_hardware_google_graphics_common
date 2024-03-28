@@ -759,6 +759,11 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
     }
     refreshRate =
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
+    // TODO: move to outside of VariableRefreshRateController
+    if (refreshRate > 0 && mMinimumRefreshRate > 0 && mDisplay->mDisplayTe2Manager &&
+        !mDisplay->mDisplayTe2Manager->isOptionFixedTe2()) {
+        mDisplay->mDisplayTe2Manager->setChangeableTe2Rate(refreshRate);
+    }
     if (!mDisplay->mDevice->isVrrApiSupported()) {
         // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,
         // refreshPeriodNanos is disregarded.

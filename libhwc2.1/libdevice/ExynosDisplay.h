@@ -60,6 +60,7 @@ class ExynosDevice;
 class ExynosMPP;
 class ExynosMPPSource;
 class HistogramController;
+class DisplayTe2Manager;
 
 namespace aidl {
 namespace google {
@@ -575,6 +576,8 @@ class ExynosDisplay {
 
         /* For histogram */
         std::unique_ptr<HistogramController> mHistogramController;
+
+        std::unique_ptr<DisplayTe2Manager> mDisplayTe2Manager;
 
         /* For debugging */
         hwc_display_contents_1_t *mHWC1LayerList;
@@ -1350,6 +1353,8 @@ class ExynosDisplay {
                 const std::vector<std::pair<uint32_t, uint32_t>>& __unused settings) {
             return HWC2_ERROR_UNSUPPORTED;
         }
+
+        virtual int32_t setFixedTe2Rate(const int __unused rateHz) { return NO_ERROR; }
 
     protected:
         virtual bool getHDRException(ExynosLayer *layer);

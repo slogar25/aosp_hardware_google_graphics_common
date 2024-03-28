@@ -30,6 +30,7 @@
 #include "../libvrr/VariableRefreshRateVersion.h"
 #include "../libvrr/interface/Panel_def.h"
 #include "BrightnessController.h"
+#include "DisplayTe2Manager.h"
 #include "ExynosDevice.h"
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosDisplayDrmInterfaceModule.h"
@@ -242,6 +243,13 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
     mHistogramController = std::make_unique<HistogramController>(this);
 
     mDisplayControl.multiThreadedPresent = true;
+
+    int fixedTe2DefaultRateHz =
+            property_get_int32("vendor.primarydisplay.fixed_te2.default_rate_hz", 0);
+    if (fixedTe2DefaultRateHz) {
+        mDisplayTe2Manager =
+                std::make_unique<DisplayTe2Manager>(this, mIndex, fixedTe2DefaultRateHz);
+    }
 }
 
 ExynosPrimaryDisplay::~ExynosPrimaryDisplay()
@@ -1205,6 +1213,14 @@ void ExynosPrimaryDisplay::handleDisplayIdleEnter(const uint32_t idleTeRefreshRa
     setDisplayNeedHandleIdleExit(needed, false);
 }
 
+int32_t ExynosPrimaryDisplay::setFixedTe2Rate(const int targetTe2RateHz) {
+    if (mDisplayTe2Manager) {
+        return mDisplayTe2Manager->setFixedTe2Rate(targetTe2RateHz);
+    } else {
+        return HWC2_ERROR_UNSUPPORTED;
+    }
+}
+
 int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
                                                     const RrThrottleRequester requester) {
     int fps = (targetFps <= 0) ? mDefaultMinIdleRefreshRate : targetFps;
@@ -1226,6 +1242,28 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
         }
     }
     if (maxMinIdleFps == mMinIdleRefreshRate) return NO_ERROR;
+
+    // Currently only proximity sensor will request the min refresh rate via this API with
+    // PIXEL_DISP (or TEST for the debugging command). It will request a non-zero value, e.g. 30Hz,
+    // if it's active, and request zero if it's inactive. So we can know its state and update the
+    // TE2 option accordingly.
+    if (mDisplayTe2Manager &&
+        (requester == RrThrottleRequester::PIXEL_DISP || requester == RrThrottleRequester::TEST)) {
+        bool proximityActive = !!targetFps;
+        ALOGD("%s: proximity state: %s (min %dhz)", __func__,
+              proximityActive ? "active" : "inactive", targetFps);
+        mDisplayTe2Manager->updateTe2Option(proximityActive, targetFps);
+    }
+
+    if (mVariableRefreshRateController) {
+        int ret = mVariableRefreshRateController->setFixedRefreshRateRange(maxMinIdleFps,
+                                                                           mRefreshRateDelayNanos);
+        if (ret >= 0) {
+            mMinIdleRefreshRate = maxMinIdleFps;
+            return NO_ERROR;
+        }
+        return ret;
+    }
 
     const std::string path = getPanelSysfsPath() + "min_vrefresh";
     std::ofstream ofs(path);
@@ -1271,6 +1309,16 @@ int32_t ExynosPrimaryDisplay::setRefreshRateThrottleNanos(const int64_t delayNan
         DISPLAY_ATRACE_INT64("RefreshRateDelay", ns2ms(maxDelayNanos));
         if (mRefreshRateDelayNanos == maxDelayNanos) {
             return NO_ERROR;
+        }
+
+        if (mVariableRefreshRateController) {
+            int ret = mVariableRefreshRateController->setFixedRefreshRateRange(mMinIdleRefreshRate,
+                                                                               maxDelayNanos);
+            if (ret >= 0) {
+                mRefreshRateDelayNanos = maxDelayNanos;
+                return NO_ERROR;
+            }
+            return ret;
         }
 
         ret = setDisplayIdleDelayNanos(maxDelayNanos, DispIdleTimerRequester::RR_THROTTLE);

@@ -76,6 +76,7 @@ public:
                                          HistogramErrorCode *_aidl_return) override;
     ndk::ScopedAStatus unregisterHistogram(const ndk::SpAIBinder &token,
                                            HistogramErrorCode *_aidl_return) override;
+    ndk::ScopedAStatus setFixedTe2Rate(int rateHz, int* _aidl_return) override;
 
 private:
     bool runMediator(const RoiRect &roi, const Weight &weight, const HistogramPos &pos,

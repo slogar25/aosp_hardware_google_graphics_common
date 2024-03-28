@@ -589,4 +589,16 @@ int32_t ExynosHWCService::setPresentTimeoutParameters(
     return NO_ERROR;
 }
 
+int32_t ExynosHWCService::setFixedTe2Rate(uint32_t displayId, int32_t rateHz) {
+    ALOGD("ExynosHWCService::%s() displayID(%u) rateHz(%d)", __func__, displayId, rateHz);
+
+    auto display = mHWCCtx->device->getDisplay(displayId);
+
+    if (display != nullptr) {
+        return display->setFixedTe2Rate(rateHz);
+    }
+
+    return -EINVAL;
+}
+
 } //namespace android
