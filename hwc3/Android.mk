@@ -37,7 +37,7 @@ LOCAL_SHARED_LIBRARIES := android.hardware.graphics.composer3-V3-ndk \
         android.hardware.graphics.composer@2.2-resources \
 	android.hardware.graphics.composer@2.4 \
 	android.hardware.drm-V1-ndk \
-	com.google.hardware.pixel.display-V10-ndk \
+	com.google.hardware.pixel.display-V11-ndk \
 	android.frameworks.stats-V2-ndk \
 	libpixelatoms_defs \
 	pixelatoms-cpp \
