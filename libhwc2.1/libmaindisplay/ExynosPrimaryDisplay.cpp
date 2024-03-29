@@ -1551,3 +1551,15 @@ const std::string& ExynosPrimaryDisplay::getPanelName() {
     }
     return mPanelName;
 }
+
+int32_t ExynosPrimaryDisplay::registerRefreshRateChangeListener(
+        std::shared_ptr<RefreshRateChangeListener> listener) {
+    if (!mXrrSettings.versionInfo.hasVrrController()) return HWC2_ERROR_UNSUPPORTED;
+
+    if (mVariableRefreshRateController) {
+        mVariableRefreshRateController->registerRefreshRateChangeListener(listener);
+        return NO_ERROR;
+    } else {
+        return -EINVAL;
+    }
+}

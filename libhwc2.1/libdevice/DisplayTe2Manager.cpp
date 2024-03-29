@@ -22,7 +22,8 @@ DisplayTe2Manager::DisplayTe2Manager(ExynosDisplay* display, int32_t panelIndex,
         mPanelIndex(panelIndex),
         mMinRefreshRateForFixedTe2(0),
         mFixedTe2RateHz(fixedTe2DefaultRateHz),
-        mIsOptionFixedTe2(true) {}
+        mIsOptionFixedTe2(true),
+        mRefreshRateChangeListenerRegistered(false) {}
 
 int32_t DisplayTe2Manager::setTe2Rate(int targetTe2RateHz) {
     int32_t ret = writeIntToFile(getPanelTe2RatePath(), targetTe2RateHz);
@@ -88,11 +89,27 @@ void DisplayTe2Manager::updateTe2Option(bool proximityActive, int minRefreshRate
         mIsOptionFixedTe2 = isOptionFixed;
         if (isOptionFixed) {
             setFixedTe2RateInternal(mFixedTe2RateHz, true);
+        } else if (!mRefreshRateChangeListenerRegistered) {
+            // register listener for changeable TE2
+            if (!mDisplay) {
+                ALOGW("DisplayTe2Manager::%s unable to register refresh rate change listener",
+                      __func__);
+            } else if (!mDisplay->registerRefreshRateChangeListener(
+                               static_cast<std::shared_ptr<RefreshRateChangeListener>>(this))) {
+                mRefreshRateChangeListenerRegistered = true;
+            } else {
+                ALOGW("DisplayTe2Manager::%s failed to register refresh rate change listener",
+                      __func__);
+            }
         }
     } else {
         ALOGW("DisplayTe2Manager::%s failed to write te2_option(%d) to the sysfs node", __func__,
               isOptionFixed);
     }
+}
+
+void DisplayTe2Manager::onRefreshRateChange(int refreshRate) {
+    if (!mIsOptionFixedTe2 && refreshRate) setChangeableTe2Rate(refreshRate);
 }
 
 void DisplayTe2Manager::dump(String8& result) const {

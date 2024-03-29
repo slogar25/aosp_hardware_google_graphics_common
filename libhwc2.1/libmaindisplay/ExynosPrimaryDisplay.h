@@ -20,7 +20,6 @@
 
 #include "../libdevice/ExynosDisplay.h"
 #include "../libvrr/VariableRefreshRateController.h"
-#include "../libvrr/interface/VariableRefreshRateInterface.h"
 
 using android::hardware::graphics::composer::PresentListener;
 using android::hardware::graphics::composer::VariableRefreshRateController;
@@ -90,6 +89,9 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
                 int timeoutNs, const std::vector<std::pair<uint32_t, uint32_t>>& settings) override;
 
         int32_t setPresentTimeoutController(uint32_t controllerType) override;
+
+        int32_t registerRefreshRateChangeListener(
+                std::shared_ptr<RefreshRateChangeListener> listener) override;
 
     protected:
         /* setPowerMode(int32_t mode)

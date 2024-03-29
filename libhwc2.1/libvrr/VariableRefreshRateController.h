@@ -24,7 +24,6 @@
 #include <queue>
 #include <thread>
 
-#include "../libdevice/DisplayTe2Manager.h"
 #include "../libdevice/ExynosDisplay.h"
 #include "../libdevice/ExynosLayer.h"
 #include "EventQueue.h"

@@ -39,12 +39,15 @@
 #include "drmeventlistener.h"
 #include "worker.h"
 
+#include "../libvrr/interface/VariableRefreshRateInterface.h"
+
 #define HWC_CLEARDISPLAY_WITH_COLORMAP
 #define HWC_PRINT_FRAME_NUM     10
 
 #define LOW_FPS_THRESHOLD     5
 
 using ::aidl::android::hardware::drm::HdcpLevels;
+using ::android::hardware::graphics::composer::RefreshRateChangeListener;
 using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
 using namespace std::chrono_literals;
 
@@ -1355,6 +1358,11 @@ class ExynosDisplay {
         }
 
         virtual int32_t setFixedTe2Rate(const int __unused rateHz) { return NO_ERROR; }
+
+        virtual int32_t registerRefreshRateChangeListener(
+                std::shared_ptr<RefreshRateChangeListener> listener) {
+            return NO_ERROR;
+        }
 
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
