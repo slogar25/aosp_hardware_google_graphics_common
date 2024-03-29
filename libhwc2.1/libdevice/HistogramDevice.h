@@ -72,6 +72,8 @@ public:
     using HistogramWeights = aidl::com::google::hardware::pixel::display::Weight;
     using HistogramChannelIoctl_t = ExynosDisplayDrmInterface::HistogramChannelIoctl_t;
 
+    class PropertyBlob;
+
     /* For blocking roi and roi, (0, 0, 0, 0) means disabled */
     static constexpr HistogramRoiRect DISABLED_ROI = {0, 0, 0, 0};
 
@@ -539,4 +541,45 @@ private:
     static std::string toString(const ChannelStatus_t& status);
     static std::string toString(const HistogramRoiRect& roi);
     static std::string toString(const HistogramWeights& weights);
+};
+
+// PropertyBlob is the RAII class to manage the histogram PropertyBlob creation and deletion.
+class HistogramDevice::PropertyBlob {
+public:
+    /**
+     * PropertyBlob
+     *
+     * Construct the PropertyBlob to mange the histogram PropertyBlob.
+     *
+     * @drmDevice the object to call the CreatePropertyBlob.
+     * @blobData pointer to the buffer that contains requested property blob data to be created.
+     * @blobLength size of the buffer pointed by blobData.
+     */
+    PropertyBlob(DrmDevice* const drmDevice, const void* const blobData, const size_t blobLength);
+
+    /**
+     * ~PropertyBlob
+     *
+     * Destruct the PropertyBlob and release the allocated blob in constructor.
+     */
+    ~PropertyBlob();
+
+    /**
+     * getId
+     *
+     * @return blobId of this PropertyBlob
+     */
+    uint32_t getId() const;
+
+    /**
+     * getError
+     *
+     * @return any error in the constructor if any, otherwise return 0.
+     */
+    int getError() const;
+
+private:
+    DrmDevice* const mDrmDevice;
+    uint32_t mBlobId = 0;
+    int mError = NO_ERROR;
 };

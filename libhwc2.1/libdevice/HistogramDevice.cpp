@@ -1064,3 +1064,37 @@ std::string HistogramDevice::toString(const HistogramWeights& weights) {
     os << ")";
     return os.str();
 }
+
+HistogramDevice::PropertyBlob::PropertyBlob(DrmDevice* const drmDevice, const void* const blobData,
+                                            const size_t blobLength)
+      : mDrmDevice(drmDevice) {
+    if (!mDrmDevice) {
+        ALOGE("%s: mDrmDevice is nullptr", __func__);
+        mError = BAD_VALUE;
+        return;
+    }
+
+    if ((mError = mDrmDevice->CreatePropertyBlob(blobData, blobLength, &mBlobId))) {
+        mBlobId = 0;
+        ALOGE("%s: failed to create histogram config blob, ret(%d)", __func__, mError);
+    } else if (!mBlobId) {
+        mError = BAD_VALUE;
+        ALOGE("%s: create histogram config blob successful, but blobId is 0", __func__);
+    }
+}
+
+HistogramDevice::PropertyBlob::~PropertyBlob() {
+    if (mError) return;
+
+    int ret = mDrmDevice->DestroyPropertyBlob(mBlobId);
+    if (ret)
+        ALOGE("%s: failed to destroy histogram config blob %d, ret(%d)", __func__, mBlobId, ret);
+}
+
+uint32_t HistogramDevice::PropertyBlob::getId() const {
+    return mBlobId;
+}
+
+int HistogramDevice::PropertyBlob::getError() const {
+    return mError;
+}
