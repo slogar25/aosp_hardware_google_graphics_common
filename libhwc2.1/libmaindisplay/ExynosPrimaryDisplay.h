@@ -175,13 +175,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
                 hwc_vsync_period_change_timeline_t* outTimeline) override;
         void recalculateTimelineLocked(int64_t refreshRateDelayNanos);
 
-        // min idle refresh rate
-        int mDefaultMinIdleRefreshRate;
-        // the min refresh rate in the blocking zone, e.g. 10 means 10Hz in the zone
-        int mMinIdleRefreshRateForBlockingZone;
-        // blocking zone threshold, e.g. 492 means entering the zone if DBV < 492
-        uint32_t mDbvThresholdForBlockingZone;
-        bool mUseBlockingZoneForMinIdleRefreshRate;
+        std::map<int, int> mBrightnessBlockingZonesLookupTable;
+
         int mMinIdleRefreshRate;
         int mRrThrottleFps[toUnderlying(RrThrottleRequester::MAX)];
         std::mutex mMinIdleRefreshRateMutex;
