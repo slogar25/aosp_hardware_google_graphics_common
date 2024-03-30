@@ -365,6 +365,14 @@ ndk::ScopedAStatus Display::unregisterHistogram(const ndk::SpAIBinder &token,
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 
+ndk::ScopedAStatus Display::setFixedTe2Rate(int rateHz, int* _aidl_return) {
+    if (mDisplay) {
+        *_aidl_return = mDisplay->setFixedTe2Rate(rateHz);
+        return ndk::ScopedAStatus::ok();
+    }
+    return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+}
+
 } // namespace display
 } // namespace pixel
 } // namespace hardware

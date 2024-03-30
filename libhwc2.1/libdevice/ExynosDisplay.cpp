@@ -38,6 +38,7 @@
 #include <map>
 
 #include "BrightnessController.h"
+#include "DisplayTe2Manager.h"
 #include "ExynosExternalDisplay.h"
 #include "ExynosLayer.h"
 #include "HistogramController.h"
@@ -1033,6 +1034,7 @@ ExynosDisplay::ExynosDisplay(uint32_t type, uint32_t index, ExynosDevice* device
         mMaxLuminance(0),
         mMaxAverageLuminance(0),
         mMinLuminance(0),
+        mDisplayTe2Manager(nullptr),
         mHWC1LayerList(NULL),
         /* Support DDI scalser */
         mOldScalerMode(0),
@@ -5137,6 +5139,9 @@ void ExynosDisplay::dumpLocked(String8& result) {
     }
     if (mHistogramController) {
         mHistogramController->dump(result);
+    }
+    if (mDisplayTe2Manager) {
+        mDisplayTe2Manager->dump(result);
     }
 }
 
