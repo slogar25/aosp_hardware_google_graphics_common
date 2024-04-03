@@ -41,4 +41,11 @@ public:
     virtual void onPowerStateChange(int from, int to) = 0;
 };
 
+class RefreshRateChangeListener {
+public:
+    virtual ~RefreshRateChangeListener() = default;
+
+    virtual void onRefreshRateChange(int refreshRate) = 0;
+};
+
 } // namespace android::hardware::graphics::composer

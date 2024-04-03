@@ -759,6 +759,9 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
     }
     refreshRate =
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
+    for (const auto& listener : mRefreshRateChangeListeners) {
+        listener->onRefreshRateChange(refreshRate);
+    }
     // TODO: move to outside of VariableRefreshRateController
     if (refreshRate > 0 && mMinimumRefreshRate > 0 && mDisplay->mDisplayTe2Manager &&
         !mDisplay->mDisplayTe2Manager->isOptionFixedTe2()) {

@@ -89,6 +89,10 @@ public:
         return &mDisplayContextProviderInterface;
     }
 
+    void registerRefreshRateChangeListener(std::shared_ptr<RefreshRateChangeListener> listener) {
+        mRefreshRateChangeListeners.emplace_back(listener);
+    }
+
     void setPresentTimeoutParameters(int timeoutNs,
                                      const std::vector<std::pair<uint32_t, uint32_t>>& settings);
 
@@ -280,6 +284,8 @@ private:
     uint64_t mMaximumPeakRefreshRateTimeoutNs = 0;
     std::optional<TimedEvent> mPeakRefreshRateTimeoutEvent;
     bool mAtPeakRefreshRate = false;
+
+    std::vector<std::shared_ptr<RefreshRateChangeListener>> mRefreshRateChangeListeners;
 
     std::mutex mMutex;
     std::condition_variable mCondition;
