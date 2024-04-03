@@ -21,7 +21,7 @@
 #include "ExynosHWCHelper.h"
 
 // TODO: Rename this and integrate with refresh rate throttler related features into this class.
-class DisplayTe2Manager {
+class DisplayTe2Manager : public RefreshRateChangeListener {
 public:
     DisplayTe2Manager(ExynosDisplay* display, int32_t panelIndex, int fixedTe2DefaultRateHz);
     ~DisplayTe2Manager() = default;
@@ -57,6 +57,8 @@ private:
     int32_t setTe2Rate(int targetTe2RateHz);
     int32_t setFixedTe2RateInternal(int targetTe2RateHz, bool enforce);
 
+    virtual void onRefreshRateChange(int refreshRate) override;
+
     ExynosDisplay* mDisplay;
     int32_t mPanelIndex;
     // The min refresh rate of fixed TE2. For the refresh rates lower than this, the changeable
@@ -65,6 +67,10 @@ private:
     int mFixedTe2RateHz;
     // True when the current option is fixed TE2, otherwise it's changeable TE2.
     bool mIsOptionFixedTe2;
+    // True when the refresh rate change listener of VariableRefreshRateController is
+    // registered successfully. Thus we can receive the notification of refresh rate change
+    // for changeable TE2 usage.
+    bool mRefreshRateChangeListenerRegistered;
 
     static constexpr const char* kTe2RateFileNode =
             "/sys/devices/platform/exynos-drm/%s-panel/te2_rate_hz";
