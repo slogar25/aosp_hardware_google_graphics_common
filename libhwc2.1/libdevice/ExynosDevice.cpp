@@ -190,8 +190,10 @@ ExynosDevice::ExynosDevice(bool vrrApiSupported)
     property_get("vendor.display.lbe.supported", value, "0");
     const bool lbe_supported = atoi(value) ? true : false;
 
+    mNumPrimaryDisplays = 0;
     for (size_t i = 0; i < mDisplays.size(); i++) {
         if (mDisplays[i]->mType == HWC_DISPLAY_PRIMARY) {
+            ++mNumPrimaryDisplays;
             auto iter = pixelDisplayIntfName.find(getDisplayId(HWC_DISPLAY_PRIMARY, i));
             if (iter != pixelDisplayIntfName.end()) {
                 PixelDisplayInit(mDisplays[i], iter->second);
@@ -535,8 +537,56 @@ DisplayHotplugEvent hotplug_event_to_aidl(bool connected, int hotplugErrorCode) 
     }
 }
 
+ExynosDisplay* ExynosDevice::findPoweredOffPrimaryDisplay(ExynosDisplay* excludeDisplay) {
+    for (auto disp : mDisplays) {
+        if (disp != excludeDisplay && disp->mType == HWC_DISPLAY_PRIMARY &&
+            disp->mPowerModeState == HWC_POWER_MODE_OFF)
+            return disp;
+    }
+    return nullptr;
+}
+
 void ExynosDevice::onHotPlug(uint32_t displayId, bool status, int hotplugErrorCode) {
     Mutex::Autolock lock(mDeviceCallbackMutex);
+
+    // If we detect a hotplug of an external display on a foldable device, and we have a
+    // primary/built-in display in a powered off state, we need to use the powered off display's
+    // crtc/decon for the external display, to ensure color management is working properly
+    // (color management is supported only on decon0/decon1). See b/329034082.
+    ExynosDisplay* hotpluggedDisplay = getDisplay(displayId);
+    if (mNumPrimaryDisplays >= 2 && hotpluggedDisplay &&
+        hotpluggedDisplay->mType == HWC_DISPLAY_EXTERNAL) {
+        ALOGD("%s: display %s pluggedIn=%d hotplugErrorCode=%d", __func__,
+              hotpluggedDisplay->mDisplayTraceName.c_str(), status, hotplugErrorCode);
+        auto hotpluggedDisplayIntf = hotpluggedDisplay->mDisplayInterface.get();
+        ExynosDisplay* borrowedCrtcFrom = hotpluggedDisplayIntf->borrowedCrtcFrom();
+        if (status && hotplugErrorCode == 0) {
+            // The external display has been connected successfully, check if we can find an
+            // available decon for it, before we start initializing it.
+            if (borrowedCrtcFrom) {
+                ALOGW("%s: external display is already using decon of %s", __func__,
+                      borrowedCrtcFrom->mDisplayTraceName.c_str());
+                // Restore the original decon of the external display before proceeding.
+                hotpluggedDisplayIntf->swapCrtcs(borrowedCrtcFrom);
+            }
+            ExynosDisplay* poweredOffPrimaryDisplay = findPoweredOffPrimaryDisplay(nullptr);
+            if (poweredOffPrimaryDisplay) {
+                hotpluggedDisplayIntf->swapCrtcs(poweredOffPrimaryDisplay);
+            } else {
+                // There is no powered off primary display/available decon at the moment,
+                // this means hotplug of external display happened while the foldable device
+                // was in dual concurrent display mode. We will try to switch decon assignment
+                // for the external display later, when one of primary displays is turned off.
+                ALOGD("onHotPlug: No powered off primary displays found!");
+            }
+        } else {
+            // The external display has been unplugged, or plugged in, but ran into an error.
+            // Restore the original decon assigned to it, if we previously switched decons.
+            if (borrowedCrtcFrom) {
+                hotpluggedDisplayIntf->swapCrtcs(borrowedCrtcFrom);
+            }
+        }
+    }
 
     // If the new HotplugEvent API is available, use it, otherwise fall back
     // to the old V2 API with onVsync hack, if necessary.
