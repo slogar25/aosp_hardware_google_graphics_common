@@ -24,7 +24,6 @@
 #include <queue>
 #include <thread>
 
-#include "../libdevice/DisplayTe2Manager.h"
 #include "../libdevice/ExynosDisplay.h"
 #include "../libdevice/ExynosLayer.h"
 #include "EventQueue.h"
@@ -87,6 +86,10 @@ public:
 
     const DisplayContextProviderInterface* getDisplayContextProviderInterface() const {
         return &mDisplayContextProviderInterface;
+    }
+
+    void registerRefreshRateChangeListener(std::shared_ptr<RefreshRateChangeListener> listener) {
+        mRefreshRateChangeListeners.emplace_back(listener);
     }
 
     void setPresentTimeoutParameters(int timeoutNs,
@@ -280,6 +283,8 @@ private:
     uint64_t mMaximumPeakRefreshRateTimeoutNs = 0;
     std::optional<TimedEvent> mPeakRefreshRateTimeoutEvent;
     bool mAtPeakRefreshRate = false;
+
+    std::vector<std::shared_ptr<RefreshRateChangeListener>> mRefreshRateChangeListeners;
 
     std::mutex mMutex;
     std::condition_variable mCondition;
