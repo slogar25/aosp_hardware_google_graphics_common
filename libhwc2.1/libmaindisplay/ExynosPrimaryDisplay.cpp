@@ -1260,7 +1260,7 @@ int32_t ExynosPrimaryDisplay::setFixedTe2Rate(const int targetTe2RateHz) {
 
 int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
                                                     const RrThrottleRequester requester) {
-    int fps = (targetFps <= 0) ? 1 /*minimum refresh rate*/ : targetFps;
+    int fps = (targetFps < 0) ? 1 /*minimum refresh rate*/ : targetFps;
     if ((requester == RrThrottleRequester::BRIGHTNESS) &&
         (!mBrightnessBlockingZonesLookupTable.empty())) {
         auto res = mBrightnessController->getBrightnessNitsAndMode();

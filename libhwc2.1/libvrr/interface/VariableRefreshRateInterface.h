@@ -22,9 +22,12 @@ class PresentListener {
 public:
     virtual ~PresentListener() = default;
 
-    virtual void setExpectedPresentTime(int64_t timestampNanos, int frameIntervalNs) = 0;
+    virtual void setExpectedPresentTime(int64_t __unused timestampNanos,
+                                        int __unused frameIntervalNs) {}
 
-    virtual void onPresent(int32_t fence) = 0;
+    virtual void onPresent(int32_t __unused fence) {}
+
+    virtual void onPresent(int64_t __unused presentTimeNs, __unused int flag) {}
 };
 
 class VsyncListener {
