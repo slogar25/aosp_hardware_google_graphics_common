@@ -3,6 +3,8 @@
 #include <android/hardware/graphics/mapper/4.0/IMapper.h>
 #include <log/log.h>
 
+#include "format.h"
+#include "format_type.h"
 #include "metadata.h"
 #include "utils.h"
 
@@ -76,10 +78,20 @@ static std::optional<typename ReturnType<T>::type> get(buffer_handle_t /*handle*
         return utils::decode<return_type>(vec);                                          \
     }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-function"
+
 GET(PLANE_DMA_BUFS, std::vector<int>);
 GET(VIDEO_HDR, void*);
 GET(VIDEO_ROI, void*);
 GET(VIDEO_GMV, VideoGMV);
+
+GET(COMPRESSED_PLANE_LAYOUTS, std::vector<CompressedPlaneLayout>);
+GET(PIXEL_FORMAT_ALLOCATED, Format);
+GET(FORMAT_TYPE, FormatType);
+
+#pragma clang diagnostic pop
+
 #undef GET
 
 template <MetadataType T>

@@ -64,6 +64,19 @@ enum class MetadataType : int64_t {
     // Returns: std::vector<int>
     PLANE_DMA_BUFS,
 
+    // PLANE_LAYOUTS from gralloc reply with the actual offset of the plane from the start of the
+    // header if any. But some IPs require the offset starting from the body of a plane.
+    // Returns: std::vector<CompressedPlaneLayout>
+    COMPRESSED_PLANE_LAYOUTS,
+
+    // Ideally drivers should be using fourcc to identify an allocation, but some of the drivers
+    // depend upon the format too much that updating them will require longer time.
+    // Returns: ::pixel::graphics::Format
+    PIXEL_FORMAT_ALLOCATED,
+
+    // Returns: ::pixel::graphics::FormatType
+    FORMAT_TYPE,
+
     // This is a experimental feature
     VIDEO_GMV,
 };
@@ -74,5 +87,22 @@ struct VideoGMV {
 };
 
 #undef MapMetadataType
+
+// There is no backward compatibility guarantees, all dependencies must be built together.
+struct CompressedPlaneLayout {
+    uint64_t header_offset_in_bytes;
+    uint64_t header_size_in_bytes;
+    uint64_t body_offset_in_bytes;
+    uint64_t body_size_in_bytes;
+
+    bool operator==(const CompressedPlaneLayout& other) const {
+        return header_offset_in_bytes == other.header_offset_in_bytes &&
+                header_size_in_bytes == other.header_size_in_bytes &&
+                body_offset_in_bytes == other.body_offset_in_bytes &&
+                body_size_in_bytes == other.body_size_in_bytes;
+    }
+
+    bool operator!=(const CompressedPlaneLayout& other) const { return !(*this == other); }
+};
 
 } // namespace pixel::graphics
