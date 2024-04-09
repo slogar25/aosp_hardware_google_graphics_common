@@ -180,6 +180,7 @@ ExynosDevice::ExynosDevice(bool vrrApiSupported)
         setVBlankOffDelay(1);
     }
 
+    mDisplayOffAsync = property_get_bool("vendor.display.async_off.supported", false);
     initDeviceInterface(mInterfaceType);
 
     // registerRestrictions();
@@ -201,8 +202,6 @@ ExynosDevice::ExynosDevice(bool vrrApiSupported)
             }
         }
     }
-
-    mDisplayOffAsync = property_get_bool("vendor.display.async_off.supported", false);
 }
 
 void ExynosDevice::initDeviceInterface(uint32_t interfaceType)
