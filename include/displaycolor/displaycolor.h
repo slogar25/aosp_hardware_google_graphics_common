@@ -112,19 +112,19 @@ enum class HdrLayerState {
 
 struct DisplayBrightnessRange {
     // inclusive lower bound
-    float nits_min;
+    float nits_min{};
     // inclusive upper bound
-    float nits_max;
+    float nits_max{};
 
     // inclusive lower bound
-    uint32_t dbv_min;
+    uint32_t dbv_min{};
     // inclusive upper bound
-    uint32_t dbv_max;
+    uint32_t dbv_max{};
 
     bool brightness_min_exclusive;
-    float brightness_min;
+    float brightness_min{};
     // inclusive upper bound
-    float brightness_max;
+    float brightness_max{};
 
     bool IsValid() const {
         // Criteria
@@ -164,10 +164,10 @@ struct DisplayInfo {
 };
 
 struct Color {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-    uint8_t a;
+    uint8_t r{};
+    uint8_t g{};
+    uint8_t b{};
+    uint8_t a{};
 
     bool operator==(const Color &rhs) const {
         return r == rhs.r &&
@@ -269,13 +269,13 @@ struct LayerColorData {
         /// Indicator for whether the data in this struct should be used.
         bool is_valid = false;
 
-        uint32_t display_maximum_luminance;
+        uint32_t display_maximum_luminance{};
         std::array<uint32_t, 3> maxscl;
         std::vector<uint8_t> maxrgb_percentages;
         std::vector<uint32_t> maxrgb_percentiles;
-        uint16_t tm_flag;
-        uint16_t tm_knee_x;
-        uint16_t tm_knee_y;
+        uint16_t tm_flag{};
+        uint16_t tm_knee_x{};
+        uint16_t tm_knee_y{};
         std::vector<uint16_t> bezier_curve_anchors;
     };
 
@@ -309,7 +309,7 @@ struct LayerColorData {
     /**
      * @brief is layer solid color
      */
-    bool is_solid_color_layer;
+    bool is_solid_color_layer{};
 
     /**
      * @brief color for solid color layer

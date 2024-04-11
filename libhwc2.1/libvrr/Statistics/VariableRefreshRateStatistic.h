@@ -186,12 +186,6 @@ private:
 
     void updateCurrentDisplayStatus();
 
-    // When the minimum refresh rate is set, the hardware will continuously render according to the
-    // minimum refresh rate.
-    // |updateMinimumRefreshRateStatistic| is responsible for updating statistics based on the
-    // duration when the minimum refresh rate is set.
-    void updateMinimumRefreshRateStatistic();
-
     int updateStatistic();
 
     CommonDisplayContextProvider* mDisplayContextProvider;
@@ -216,9 +210,8 @@ private:
 
     uint64_t mPowerOffDurationNs = 0;
 
-    // For minimum refresh rate.
-    uint32_t mFixedRefreshRate = 0;
-    int64_t mFixedRefreshRateStartNs = -1;
+    uint32_t mMinimumRefreshRate = 1;
+    uint64_t mMaximumFrameIntervalNs = kMaxPresentIntervalNs; // 1 second.
 
     uint64_t mStartStatisticTimeNs;
 
