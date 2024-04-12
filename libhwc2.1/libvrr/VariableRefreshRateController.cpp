@@ -506,20 +506,20 @@ void VariableRefreshRateController::onPresent(int fence) {
         if (mState == VrrControllerState::kDisable) {
             return;
         }
-        if (mRefreshRateCalculator) {
-            mRefreshRateCalculator->onPresent(mRecord.mPendingCurrentPresentTime.value().mTime,
-                                              getPresentFrameFlag());
-        }
-        if (mVariableRefreshRateStatistic) {
-            mVariableRefreshRateStatistic
-                    ->onPresent(mRecord.mPendingCurrentPresentTime.value().mTime,
-                                getPresentFrameFlag());
-        }
         if (!mRecord.mPendingCurrentPresentTime.has_value()) {
             LOG(WARNING) << "VrrController: VrrController: Present without expected present time "
                             "information";
             return;
         } else {
+            if (mRefreshRateCalculator) {
+                mRefreshRateCalculator->onPresent(mRecord.mPendingCurrentPresentTime.value().mTime,
+                                                  getPresentFrameFlag());
+            }
+            if (mVariableRefreshRateStatistic) {
+                mVariableRefreshRateStatistic
+                        ->onPresent(mRecord.mPendingCurrentPresentTime.value().mTime,
+                                    getPresentFrameFlag());
+            }
             mRecord.mPresentHistory.next() = mRecord.mPendingCurrentPresentTime.value();
             mRecord.mPendingCurrentPresentTime = std::nullopt;
         }
