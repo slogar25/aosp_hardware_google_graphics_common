@@ -418,11 +418,22 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         uint32_t minimumRefreshRate, uint64_t maximumPeakRefreshRateTimeoutNs) {
     const std::lock_guard<std::mutex> lock(mMutex);
 
+    // If the new setting is equivalent to the old setting.
+    if ((minimumRefreshRate) <= 1 && (mMinimumRefreshRate <= 1)) {
+        // When |mMinimumRefreshRate| is 0 or 1, it is normal mode; there's no need to compare
+        // |mMaximumPeakRefreshRateTimeoutNs|.
+        return NO_ERROR;
+    } else {
+        if ((minimumRefreshRate == mMinimumRefreshRate) &&
+            (mMaximumPeakRefreshRateTimeoutNs == maximumPeakRefreshRateTimeoutNs)) {
+            return NO_ERROR;
+        }
+    }
     uint32_t command = 0;
+    mMinimumRefreshRate = minimumRefreshRate;
     mMaximumPeakRefreshRateTimeoutNs = maximumPeakRefreshRateTimeoutNs;
     dropEventLocked(VrrControllerEventType::kPeakRefreshRateTimeout);
-    if (minimumRefreshRate > 0) {
-        mMinimumRefreshRate = minimumRefreshRate;
+    if (mMinimumRefreshRate > 1) {
         // Delegate timeout management to hardware.
         command |= getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
         dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
@@ -463,7 +474,6 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         // Report refresh rate change.
         onRefreshRateChangedInternal(mMinimumRefreshRate);
     } else {
-        mMinimumRefreshRate = 0;
         command |= getPanelRefreshCtrlFrameInsertionAutoModeCmd(false);
         // Configure panel with the minimum refresh rate = 1.
         command |= getPanelRefreshCtrlMinimumRefreshRateCmd(1);
@@ -477,6 +487,7 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         if (mVariableRefreshRateStatistic) {
             mVariableRefreshRateStatistic->setFixedRefreshRate(0);
         }
+        mMaximumPeakRefreshRateTimeoutNs = 0;
         onRefreshRateChangedInternal(1);
         mPeakRefreshRateTimeoutEvent = std::nullopt;
         mAtPeakRefreshRate = false;
@@ -530,7 +541,7 @@ void VariableRefreshRateController::onPresent(int fence) {
             dropEventLocked(VrrControllerEventType::kHibernateTimeout);
         }
 
-        if (mMinimumRefreshRate > 0) {
+        if (mMinimumRefreshRate > 1) {
             if (!mAtPeakRefreshRate) {
                 uint32_t command = 0;
                 auto maxFrameRate =
@@ -748,7 +759,7 @@ void VariableRefreshRateController::handlePresentTimeout(const VrrControllerEven
 }
 
 void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {
-    if (mMinimumRefreshRate > 0) {
+    if (mMinimumRefreshRate > 1) {
         // If the minimum refresh rate has been set, the refresh rate remains fixed at a specific
         // value.
         return;

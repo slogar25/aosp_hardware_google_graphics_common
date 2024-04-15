@@ -279,7 +279,14 @@ private:
 
     PresentTimeoutControllerType mPresentTimeoutController =
             PresentTimeoutControllerType::kSoftware;
+
+    // When |mMinimumRefreshRate| is 0 or equal to 1, we are in normal mode.
+    // when |mMinimumRefreshRate| is greater than 1. we are in a special mode where the minimum idle
+    // refresh rate is |mMinimumRefreshRate|.
     uint32_t mMinimumRefreshRate = 0;
+    // |mMaximumPeakRefreshRateTimeoutNs| sets the minimum duration for which we should maintain the
+    // peak refresh rate when transitioning to idle. |mMaximumPeakRefreshRateTimeoutNs| takes effect
+    // only when |mMinimumRefreshRate| is greater than 1.
     uint64_t mMaximumPeakRefreshRateTimeoutNs = 0;
     std::optional<TimedEvent> mPeakRefreshRateTimeoutEvent;
     bool mAtPeakRefreshRate = false;
