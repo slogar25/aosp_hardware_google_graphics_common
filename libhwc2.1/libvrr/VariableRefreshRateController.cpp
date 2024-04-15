@@ -816,6 +816,9 @@ void VariableRefreshRateController::threadBody() {
             }
 
             auto event = mEventQueue.mPriorityQueue.top();
+            if (event.mWhenNs > getNowNs()) {
+                continue;
+            }
             mEventQueue.mPriorityQueue.pop();
             if (static_cast<int>(event.mEventType) &
                 static_cast<int>(VrrControllerEventType::kCallbackEventMask)) {

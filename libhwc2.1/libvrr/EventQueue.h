@@ -64,6 +64,7 @@ public:
             if (it.mEventType == eventType) {
                 ++res;
             }
+            q.push(it);
             mPriorityQueue.pop();
         }
         mPriorityQueue = std::move(q);
