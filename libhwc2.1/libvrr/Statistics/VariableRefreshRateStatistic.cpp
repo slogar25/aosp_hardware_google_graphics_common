@@ -100,10 +100,9 @@ void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
     }
 
     std::scoped_lock lock(mMutex);
-    mDisplayPresentProfile.mCurrentDisplayConfig.mPowerMode = to;
     if (isPowerModeOff(to)) {
         // Currently the for power stats both |HWC_POWER_MODE_OFF| and |HWC_POWER_MODE_DOZE_SUSPEND|
-        // are classified as "off". states in power statistics. Consequently,we assign the value of
+        // are classified as "off" states in power statistics. Consequently,we assign the value of
         // |HWC_POWER_MODE_OFF| to |mPowerMode| when it is |HWC_POWER_MODE_DOZE_SUSPEND|.
         mDisplayPresentProfile.mCurrentDisplayConfig.mPowerMode = HWC_POWER_MODE_OFF;
         mEventQueue->dropEvent(VrrControllerEventType::kStatisticPresentTimeout);
@@ -112,6 +111,8 @@ void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
         ++record.mCount;
         record.mLastTimeStampNs = getNowNs();
         record.mUpdated = true;
+
+        mLastPresentTimeNs = kDefaultInvalidPresentTimeNs;
     } else {
         if (isPowerModeOff(from)) {
             mTimeoutEvent.mWhenNs = getNowNs() + mMaximumFrameIntervalNs;
@@ -119,14 +120,20 @@ void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
             mPowerOffDurationNs +=
                     (getNowNs() - mStatistics[mDisplayPresentProfile].mLastTimeStampNs);
         }
+        mDisplayPresentProfile.mCurrentDisplayConfig.mPowerMode = to;
     }
 }
 
 void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
     mEventQueue->dropEvent(VrrControllerEventType::kStatisticPresentTimeout);
-    mTimeoutEvent.mWhenNs = getNowNs() + mMaximumFrameIntervalNs;
+    mTimeoutEvent.mWhenNs = presentTimeNs + mMaximumFrameIntervalNs;
     mEventQueue->mPriorityQueue.emplace(mTimeoutEvent);
 
+    if (mLastPresentTimeNs == kDefaultInvalidPresentTimeNs) {
+        mLastPresentTimeNs = presentTimeNs;
+        // Ignore first present after resume
+        return;
+    }
     int numVsync = roundDivide((presentTimeNs - mLastPresentTimeNs), mTeIntervalNs);
     numVsync = std::max(1, numVsync);
     numVsync = std::min(mTeFrequency, numVsync);
