@@ -200,7 +200,7 @@ private:
 
     const int64_t mUpdatePeriodNs;
 
-    int64_t mLastPresentTimeNs;
+    int64_t mLastPresentTimeNs = kDefaultInvalidPresentTimeNs;
 
     DisplayPresentStatistics mStatistics;
     VrrControllerEvent mTimeoutEvent;
