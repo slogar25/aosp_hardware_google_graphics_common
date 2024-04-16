@@ -715,6 +715,7 @@ void HistogramDevice::getChanIdBlobId(const ndk::SpAIBinder& token,
         channelId = configInfo->mChannelId;
     else
         channelId = -1;
+#if defined(HISTOGRAM_QUERY_USE_BLOBID)
     blobId = getActiveBlobId(configInfo->mBlobsList);
 
     if (!blobId) {
@@ -722,6 +723,14 @@ void HistogramDevice::getChanIdBlobId(const ndk::SpAIBinder& token,
         *histogramErrorCode = HistogramErrorCode::CONFIG_HIST_ERROR;
         return;
     }
+#else
+    blobId = channelId;
+    if (channelId < 0) {
+        HIST_BLOB_CH_LOG(E, blobId, channelId, "CONFIG_HIST_ERROR, no channel executes config");
+        *histogramErrorCode = HistogramErrorCode::CONFIG_HIST_ERROR;
+        return;
+    }
+#endif
 }
 
 void HistogramDevice::getHistogramData(const ndk::SpAIBinder& token,
