@@ -24,7 +24,6 @@
 #include <utils/Trace.h>
 
 #include "ExynosHWCHelper.h"
-#include "Utils.h"
 #include "drmmode.h"
 
 #include <chrono>
@@ -115,8 +114,10 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
         LOG(WARNING) << "VrrController: Cannot find file node of display: "
                      << mDisplay->mDisplayName;
     } else {
-        mFileNode = std::make_unique<FileNode>(displayFileNodePath);
-        auto content = mFileNode->read(kRefreshControlNodeName);
+        auto& fileNodeManager =
+                android::hardware::graphics::composer::FileNodeManager::getInstance();
+        mFileNode = fileNodeManager.getFileNode(displayFileNodePath);
+        auto content = mFileNode->readString(kRefreshControlNodeName);
         if (!(content.has_value()) ||
             (content.value().compare(0, kRefreshControlNodeEnabled.length(),
                                      kRefreshControlNodeEnabled))) {
@@ -273,10 +274,39 @@ void VariableRefreshRateController::setEnable(bool isEnabled) {
     mCondition.notify_all();
 }
 
-void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
+void VariableRefreshRateController::preSetPowerMode(int32_t powerMode) {
     ATRACE_CALL();
-    LOG(INFO) << "VrrController: Set power mode to " << powerMode << " " << mPowerMode;
+    LOG(INFO) << "VrrController: preSet power mode to " << powerMode << ", from " << mPowerMode;
+    {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        if (mPowerMode == powerMode) {
+            return;
+        }
+        switch (powerMode) {
+            case HWC_POWER_MODE_DOZE:
+            case HWC_POWER_MODE_DOZE_SUSPEND: {
+                uint32_t command = getCurrentRefreshControlStateLocked();
+                setBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+                if (!mFileNode->WriteUint32(kRefreshControlNodeName, command)) {
+                    LOG(ERROR) << "VrrController: write file node error, command = " << command;
+                }
+                return;
+            }
+            case HWC_POWER_MODE_OFF:
+            case HWC_POWER_MODE_NORMAL: {
+                return;
+            }
+            default: {
+                LOG(ERROR) << "VrrController: Unknown power mode = " << powerMode;
+                return;
+            }
+        }
+    }
+}
 
+void VariableRefreshRateController::postSetPowerMode(int32_t powerMode) {
+    ATRACE_CALL();
+    LOG(INFO) << "VrrController: postSet power mode to " << powerMode << ", from " << mPowerMode;
     {
         const std::lock_guard<std::mutex> lock(mMutex);
         if (mPowerMode == powerMode) {
@@ -288,11 +318,6 @@ void VariableRefreshRateController::setPowerMode(int32_t powerMode) {
             case HWC_POWER_MODE_DOZE_SUSPEND: {
                 mState = VrrControllerState::kDisable;
                 dropEventLocked(VrrControllerEventType::kGeneralEventMask);
-                if (mPresentTimeoutEventHandler) {
-                    // We don't need to call enablePanelAutoFrameInsertionMode() with false since SW
-                    // frame insertion implicitly disables it.
-                    mPresentTimeoutEventHandler->enablePanelAutoFrameInsertionMode(true);
-                }
                 break;
             }
             case HWC_POWER_MODE_NORMAL: {
@@ -405,11 +430,14 @@ void VariableRefreshRateController::setPresentTimeoutController(uint32_t control
             dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
         }
         mPresentTimeoutController = newControllerType;
-        if (mPresentTimeoutEventHandler) {
-            // When |controllerType| is kNone, we select software to control present timeout,
-            // but without handling.
-            mPresentTimeoutEventHandler->enablePanelAutoFrameInsertionMode(
-                    newControllerType == PresentTimeoutControllerType::kHardware);
+        uint32_t command = getCurrentRefreshControlStateLocked();
+        if (newControllerType == PresentTimeoutControllerType::kHardware) {
+            setBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+        } else {
+            clearBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+        }
+        if (!mFileNode->WriteUint32(composer::kRefreshControlNodeName, command)) {
+            LOG(ERROR) << "VrrController: write file node error, command = " << command;
         }
     }
 }
@@ -429,17 +457,17 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
             return NO_ERROR;
         }
     }
-    uint32_t command = 0;
+    uint32_t command = getCurrentRefreshControlStateLocked();
     mMinimumRefreshRate = minimumRefreshRate;
     mMaximumRefreshRateTimeoutNs = minLockTimeForPeakRefreshRate;
     dropEventLocked(VrrControllerEventType::kMinLockTimeForPeakRefreshRate);
     if (mMinimumRefreshRate > 1) {
         dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
         // Delegate timeout management to hardware.
-        command |= getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
+        setBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
         // Configure panel to maintain the minimum refresh rate.
-        command |= getPanelRefreshCtrlMinimumRefreshRateCmd(minimumRefreshRate);
-        command |= getPanelRefreshCtrlIdleEnabledCmd(true);
+        setBitField(command, minimumRefreshRate, kPanelRefreshCtrlMinimumRefreshRateOffset,
+                    kPanelRefreshCtrlMinimumRefreshRateMask);
         // TODO(b/333204544): ensure the correct refresh rate is set when calling
         // setFixedRefreshRate().
         // Inform Statistics to stay at the minimum refresh rate change.
@@ -474,27 +502,28 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
                     if (mVariableRefreshRateStatistic) {
                         mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
                     }
-                    uint32_t command = getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
-                    command |= getPanelRefreshCtrlMinimumRefreshRateCmd(mMinimumRefreshRate);
-                    command |= getPanelRefreshCtrlIdleEnabledCmd(true);
+                    uint32_t command = getCurrentRefreshControlStateLocked();
+                    setBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+                    setBitField(command, mMinimumRefreshRate,
+                                kPanelRefreshCtrlMinimumRefreshRateOffset,
+                                kPanelRefreshCtrlMinimumRefreshRateMask);
                     onRefreshRateChangedInternal(mMinimumRefreshRate);
-                    return mFileNode->WriteCommandString(composer::kRefreshControlNodeName,
-                                                         command);
+                    return mFileNode->WriteUint32(composer::kRefreshControlNodeName, command);
                 }
             };
         }
-        if (!mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command)) {
+        if (!mFileNode->WriteUint32(composer::kRefreshControlNodeName, command)) {
             return -1;
         }
         // Report refresh rate change.
         onRefreshRateChangedInternal(mMinimumRefreshRate);
     } else {
-        command |= getPanelRefreshCtrlFrameInsertionAutoModeCmd(false);
+        clearBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
         // Configure panel with the minimum refresh rate = 1.
-        command |= getPanelRefreshCtrlMinimumRefreshRateCmd(1);
-        command |= getPanelRefreshCtrlIdleEnabledCmd(false);
+        setBitField(command, 1, kPanelRefreshCtrlMinimumRefreshRateOffset,
+                    kPanelRefreshCtrlMinimumRefreshRateMask);
         // Inform Statistics about the minimum refresh rate change.
-        if (!mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command)) {
+        if (!mFileNode->WriteUint32(composer::kRefreshControlNodeName, command)) {
             return -1;
         }
         // TODO(b/333204544): ensure the correct refresh rate is set when calling
@@ -505,7 +534,6 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         mMaximumRefreshRateTimeoutNs = 0;
         onRefreshRateChangedInternal(1);
         mMinimumRefreshRateTimeoutEvent = std::nullopt;
-        // mAtPeakRefreshRate = false;
         mMinimumRefreshRatePresentStates = kMinRefreshRateUnset;
     }
     return 1;
@@ -556,39 +584,45 @@ void VariableRefreshRateController::onPresent(int fence) {
         }
 
         if ((mMaximumRefreshRateTimeoutNs > 0) && (mMinimumRefreshRate > 1)) {
-            if (mMinimumRefreshRatePresentStates == kAtMinimumRefreshRate) {
-                uint32_t command = 0;
-                auto maxFrameRate =
-                        durationNsToFreq(mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
-                // Delegate timeout management to hardware.
-                command |= getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
-                // Configure panel to maintain the minimum refresh rate.
-                command |= getPanelRefreshCtrlMinimumRefreshRateCmd(maxFrameRate);
-                command |= getPanelRefreshCtrlIdleEnabledCmd(false);
-                // mAtPeakRefreshRate = true;
-                if (!mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command)) {
-                    LOG(WARNING) << "VrrController: write file node error, command = " << command;
-                    return;
+            auto maxFrameRate = durationNsToFreq(mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
+            // If the target minimum refresh rate equals the maxFrameRate, there's no need to
+            // promote the refresh rate to maxFrameRate during presentation.
+            // E.g. in low-light conditions, with |maxFrameRate| and |mMinimumRefreshRate| both at
+            // 120, no refresh rate promotion is needed.
+            if (maxFrameRate != mMinimumRefreshRate) {
+                if (mMinimumRefreshRatePresentStates == kAtMinimumRefreshRate) {
+                    uint32_t command = getCurrentRefreshControlStateLocked();
+                    // Delegate timeout management to hardware.
+                    setBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+                    // Configure panel to maintain the minimum refresh rate.
+                    setBitField(command, maxFrameRate, kPanelRefreshCtrlMinimumRefreshRateOffset,
+                                kPanelRefreshCtrlMinimumRefreshRateMask);
+                    if (!mFileNode->WriteUint32(composer::kRefreshControlNodeName, command)) {
+                        LOG(WARNING)
+                                << "VrrController: write file node error, command = " << command;
+                        return;
+                    }
+                    mMinimumRefreshRatePresentStates = kAtMaximumRefreshRate;
+                    onRefreshRateChangedInternal(maxFrameRate);
+                    mMinimumRefreshRateTimeoutEvent->mIsRelativeTime = false;
+                    mMinimumRefreshRateTimeoutEvent->mWhenNs =
+                            mRecord.mPendingCurrentPresentTime.value().mTime +
+                            mMaximumRefreshRateTimeoutNs;
+                    postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
+                              mMinimumRefreshRateTimeoutEvent.value());
+                } else if (mMinimumRefreshRatePresentStates == kTransitionToMinimumRefreshRate) {
+                    dropEventLocked(VrrControllerEventType::kMinLockTimeForPeakRefreshRate);
+                    mMinimumRefreshRateTimeoutEvent->mIsRelativeTime = false;
+                    auto delayNs =
+                            (std::nano::den / mMinimumRefreshRate) + kMillisecondToNanoSecond;
+                    mMinimumRefreshRateTimeoutEvent->mWhenNs =
+                            mRecord.mPendingCurrentPresentTime.value().mTime + delayNs;
+                    postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
+                              mMinimumRefreshRateTimeoutEvent.value());
+                } else {
+                    LOG(ERROR) << "VrrController: wrong state when setting min refresh rate: "
+                               << mMinimumRefreshRatePresentStates;
                 }
-                mMinimumRefreshRatePresentStates = kAtMaximumRefreshRate;
-                onRefreshRateChangedInternal(maxFrameRate);
-                mMinimumRefreshRateTimeoutEvent->mIsRelativeTime = false;
-                mMinimumRefreshRateTimeoutEvent->mWhenNs =
-                        mRecord.mPendingCurrentPresentTime.value().mTime +
-                        mMaximumRefreshRateTimeoutNs;
-                postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
-                          mMinimumRefreshRateTimeoutEvent.value());
-            } else if (mMinimumRefreshRatePresentStates == kTransitionToMinimumRefreshRate) {
-                dropEventLocked(VrrControllerEventType::kMinLockTimeForPeakRefreshRate);
-                mMinimumRefreshRateTimeoutEvent->mIsRelativeTime = false;
-                auto delayNs = (std::nano::den / mMinimumRefreshRate) + kMillisecondToNanoSecond;
-                mMinimumRefreshRateTimeoutEvent->mWhenNs =
-                        mRecord.mPendingCurrentPresentTime.value().mTime + delayNs;
-                postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
-                          mMinimumRefreshRateTimeoutEvent.value());
-            } else {
-                LOG(ERROR) << "VrrController: wrong state when setting min refresh rate: "
-                           << mMinimumRefreshRatePresentStates;
             }
             return;
         }
@@ -689,6 +723,11 @@ std::string VariableRefreshRateController::dumpEventQueueLocked() {
     return content;
 }
 
+uint32_t VariableRefreshRateController::getCurrentRefreshControlStateLocked() const {
+    return (mFileNode->getLastWrittenValue(kRefreshControlNodeName) &
+            kPanelRefreshCtrlStateBitsMask);
+}
+
 int64_t VariableRefreshRateController::getLastFenceSignalTimeUnlocked(int fd) {
     if (fd == -1) {
         return SIGNAL_TIME_INVALID;
@@ -786,7 +825,11 @@ void VariableRefreshRateController::handlePresentTimeout(const VrrControllerEven
         cancelPresentTimeoutHandlingLocked();
         return;
     }
-    event.mFunctor();
+    uint32_t command = mFileNode->getLastWrittenValue(composer::kRefreshControlNodeName);
+    clearBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+    setBitField(command, 1, kPanelRefreshCtrlFrameInsertionFrameCountOffset,
+                kPanelRefreshCtrlFrameInsertionFrameCountMask);
+    mFileNode->WriteUint32(composer::kRefreshControlNodeName, command);
 }
 
 void VariableRefreshRateController::onRefreshRateChanged(int refreshRate) {

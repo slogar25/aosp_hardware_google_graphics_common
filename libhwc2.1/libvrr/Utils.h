@@ -22,6 +22,18 @@
 
 #include "interface/Event.h"
 
+inline void clearBit(uint32_t& data, uint32_t bit) {
+    data &= ~(1L << (bit));
+}
+
+inline void setBit(uint32_t& data, uint32_t bit) {
+    data |= (1L << (bit));
+}
+
+inline void setBitField(uint32_t& data, uint32_t value, uint32_t offset, uint32_t fieldMask) {
+    data = (data & ~fieldMask) | (((value << offset) & fieldMask));
+}
+
 namespace android::hardware::graphics::composer {
 
 struct TimedEvent;
@@ -56,10 +68,6 @@ T freqToDurationNs(T freq) {
 
 int64_t getNowMs();
 int64_t getNowNs();
-
-uint32_t getPanelRefreshCtrlMinimumRefreshRateCmd(uint32_t minimumRefreshRate);
-uint32_t getPanelRefreshCtrlIdleEnabledCmd(bool enabled);
-uint32_t getPanelRefreshCtrlFrameInsertionAutoModeCmd(bool isAuto);
 
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target);
 

@@ -39,9 +39,14 @@ static constexpr uint32_t kPanelRefreshCtrlMinimumRefreshRateMax =
 static constexpr uint32_t kPanelRefreshCtrlMinimumRefreshRateMask =
         (kPanelRefreshCtrlMinimumRefreshRateMax << kPanelRefreshCtrlMinimumRefreshRateOffset);
 
-static constexpr uint32_t kPanelRefreshCtrlTeTypeChangeable = (1U << 29);
-static constexpr uint32_t kPanelRefreshCtrlIdleEnabled = (1U << 30);
-static constexpr uint32_t kPanelRefreshCtrlFrameInsertionAutoMode = (1U << 31);
+static constexpr uint32_t kPanelRefreshCtrlMrrV1OverV2Offset = 30;
+static constexpr uint32_t kPanelRefreshCtrlMrrV1OverV2 = (1U << kPanelRefreshCtrlMrrV1OverV2Offset);
+static constexpr uint32_t kPanelRefreshCtrlFrameInsertionAutoModeOffset = 31;
+static constexpr uint32_t kPanelRefreshCtrlFrameInsertionAutoMode =
+        (1U << kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+
+static constexpr uint32_t kPanelRefreshCtrlStateBitsMask = kPanelRefreshCtrlMrrV1OverV2 |
+        kPanelRefreshCtrlFrameInsertionAutoMode | kPanelRefreshCtrlMinimumRefreshRateMask;
 
 // Definition of protobuf path
 static constexpr char kDefaultConfigPathPrefix[] = "/vendor/etc/panel_ctrl_";

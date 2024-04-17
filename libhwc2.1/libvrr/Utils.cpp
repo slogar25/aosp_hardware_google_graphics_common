@@ -33,19 +33,6 @@ int64_t getNowNs() {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
 }
 
-uint32_t getPanelRefreshCtrlMinimumRefreshRateCmd(uint32_t minimumRefreshRate) {
-    return ((minimumRefreshRate << kPanelRefreshCtrlMinimumRefreshRateOffset) &
-            kPanelRefreshCtrlMinimumRefreshRateMask);
-}
-
-uint32_t getPanelRefreshCtrlIdleEnabledCmd(bool enabled) {
-    return enabled ? kPanelRefreshCtrlIdleEnabled : 0;
-}
-
-uint32_t getPanelRefreshCtrlFrameInsertionAutoModeCmd(bool isAuto) {
-    return isAuto ? kPanelRefreshCtrlFrameInsertionAutoMode : 0;
-}
-
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target) {
     return flag & static_cast<int>(target);
 }
