@@ -142,8 +142,9 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
 #endif
     if (!displayTypeIdentifier.empty()) {
         // Blocking zone
-        auto minRefreshRateByBrightnessString = android::base::
-                GetProperty("ro.vendor.primarydisplay.blocking_zone.min_refresh_rate_by_nits", "");
+        auto propertyName =
+                "ro.vendor." + displayTypeIdentifier + ".blocking_zone.min_refresh_rate_by_nits";
+        auto minRefreshRateByBrightnessString = android::base::GetProperty(propertyName, "");
         ALOGD("%s brightness blocking zone propterty = %s", __func__,
               minRefreshRateByBrightnessString.c_str());
         if (!minRefreshRateByBrightnessString.empty()) {
