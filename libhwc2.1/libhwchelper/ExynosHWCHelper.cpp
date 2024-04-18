@@ -16,6 +16,7 @@
 #include "ExynosHWCHelper.h"
 
 #include <android-base/properties.h>
+#include <cutils/properties.h>
 #include <linux/videodev2.h>
 #include <linux/videodev2_exynos_media.h>
 #include <png.h>
@@ -1319,10 +1320,23 @@ int32_t load_png_image(const char* filepath, buffer_handle_t buffer) {
     if (bufferHandleData != MAP_FAILED && bufferHandleData != NULL) {
         int strideBytes = gmeta.stride * (formatToBpp(gmeta.format) / 8);
         png_bytep row_ptr = (png_bytep)bufferHandleData;
+
         for (int y = 0; y < height; ++y) {
-            png_read_row(png_ptr, row_ptr, NULL);
-            row_ptr += strideBytes;
+            png_read_row(png_ptr, row_ptr + strideBytes * y, NULL);
         }
+
+        const bool premultiplied =
+                static_cast<bool>(property_get_bool("vendor.display.png.premultiplied", 0));
+        ALOGD("premultiplied=%s", premultiplied ? "true" : "false");
+        if (premultiplied) {
+            const auto& premul = [](int a, int v) { return (unsigned char)(v * a / 255.0 + 0.5); };
+            for (int i = 0; i + 3 < height * strideBytes; i += 4) {
+                row_ptr[i + 0] = premul(row_ptr[i + 3], row_ptr[i + 0]);
+                row_ptr[i + 1] = premul(row_ptr[i + 3], row_ptr[i + 1]);
+                row_ptr[i + 2] = premul(row_ptr[i + 3], row_ptr[i + 2]);
+            }
+        }
+
         munmap(bufferHandleData, bufferHandleSize);
     }
 
