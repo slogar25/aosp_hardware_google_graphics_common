@@ -49,7 +49,7 @@ enum class VrrControllerEventType {
     kAodRefreshRateCalculatorUpdate,
     kStatisticPresentTimeout,
     kStaticticUpdate,
-    kPeakRefreshRateTimeout,
+    kMinLockTimeForPeakRefreshRate,
     kCallbackEventMax = 0x2FF,
     // Sensors, outer events...
 };
@@ -97,8 +97,8 @@ struct VrrControllerEvent {
                 return "kStatisticPresentTimeout";
             case VrrControllerEventType::kStaticticUpdate:
                 return "kStaticticUpdate";
-            case VrrControllerEventType::kPeakRefreshRateTimeout:
-                return "kPeakRefreshRateTimeout";
+            case VrrControllerEventType::kMinLockTimeForPeakRefreshRate:
+                return "kMinLockTimeForPeakRefreshRate";
             default:
                 return "Unknown";
         }
