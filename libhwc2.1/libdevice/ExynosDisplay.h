@@ -1736,7 +1736,7 @@ class ExynosDisplay {
 
         bool mHpdStatus;
 
-        void invalidate();
+        virtual void invalidate();
         virtual bool checkHotplugEventUpdated(bool &hpdStatus);
         virtual void handleHotplugEvent(bool hpdStatus);
         virtual void hotplug();

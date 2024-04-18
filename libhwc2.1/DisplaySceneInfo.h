@@ -59,6 +59,12 @@ public:
         layerDataMappingInfo.clear();
     };
 
+    void clear() {
+        colorSettingChanged = false;
+        layerDataMappingInfo.clear();
+        prev_layerDataMappingInfo.clear();
+    }
+
     template <typename T, typename M>
     void updateInfoSingleVal(T& dst, M& src) {
         if (src != dst) {
