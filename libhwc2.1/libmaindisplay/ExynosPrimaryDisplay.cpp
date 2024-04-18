@@ -153,7 +153,6 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
                 patterns.emplace_back(minRefreshRateByBrightnessString.substr(0, pos));
                 minRefreshRateByBrightnessString.erase(0, pos + 1);
             }
-            patterns.emplace_back(minRefreshRateByBrightnessString);
             std::string brightnessString, fpsString;
             for (auto& pattern : patterns) {
                 int brightness, fps;
@@ -1269,9 +1268,7 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
         (!mBrightnessBlockingZonesLookupTable.empty())) {
         auto res = mBrightnessController->getBrightnessNitsAndMode();
         if (res != std::nullopt) {
-            const auto it =
-                    mBrightnessBlockingZonesLookupTable.upper_bound(std::get<0>(res.value()));
-            fps = std::max(fps, it->second);
+            fps = std::max(fps, mBrightnessBlockingZonesLookupTable[std::get<0>(res.value())]);
         }
     }
 
