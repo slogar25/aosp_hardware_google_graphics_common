@@ -36,8 +36,17 @@ public:
     // refresh rate of fixed TE2. It equals to the refresh rate while display is idle after
     // switching to changeable TE2, and we can use it for the notification of refresh rate
     // change.
-    void updateTe2Option(bool proximityActive, int minRefreshRate);
+    void updateTe2OptionForProximity(bool proximityActive, int minRefreshRate, bool dozeMode);
     bool isOptionFixedTe2() { return mIsOptionFixedTe2; }
+
+    // By default we will continue the TE2 setting after entering doze mode. The ALSP may not
+    // work properly if it's changeable TE2 with lower refresh rates, e.g. 1Hz. To avoid this
+    // problem, we should update the setting to fixed TE2 no matter the proximity sensor is
+    // active or not.
+    void updateTe2ForDozeMode();
+    // The TE2 might be enforced to different settings after entering doze mode. We should
+    // restore the previous settings to keep the request from ALSP.
+    void restoreTe2FromDozeMode();
 
     void dump(String8& result) const;
 
@@ -54,6 +63,7 @@ private:
         return String8::format(kTe2OptionFileNode, getPanelString());
     }
 
+    void setTe2Option(bool fixedTe2);
     int32_t setTe2Rate(int targetTe2RateHz);
     int32_t setFixedTe2RateInternal(int targetTe2RateHz, bool enforce);
 
@@ -71,6 +81,18 @@ private:
     // registered successfully. Thus we can receive the notification of refresh rate change
     // for changeable TE2 usage.
     bool mRefreshRateChangeListenerRegistered;
+
+    // Indicates that TE2 was changed from changeable to fixed after entering doze mode. We
+    // should restore the setting after exiting doze mode.
+    bool mPendingOptionChangeableTe2;
+    // After entering doze mode, the TE2 rate will be enforced to mFixedTe2RateForDozeMode.
+    // We should save the previous rate as a pending value and restore it after exiting doze
+    // mode.
+    int mPendingFixedTe2Rate;
+    // After entering doze mode, the TE2 will be enforced to fixed 30Hz.
+    const int kFixedTe2RateForDozeMode = 30;
+
+    Mutex mTe2Mutex;
 
     static constexpr const char* kTe2RateFileNode =
             "/sys/devices/platform/exynos-drm/%s-panel/te2_rate_hz";

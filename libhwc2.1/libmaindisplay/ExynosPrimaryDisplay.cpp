@@ -153,6 +153,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
                 patterns.emplace_back(minRefreshRateByBrightnessString.substr(0, pos));
                 minRefreshRateByBrightnessString.erase(0, pos + 1);
             }
+            patterns.emplace_back(minRefreshRateByBrightnessString);
             std::string brightnessString, fpsString;
             for (auto& pattern : patterns) {
                 int brightness, fps;
@@ -483,6 +484,8 @@ int32_t ExynosPrimaryDisplay::setPowerOn() {
         }
     }
 
+    if (mDisplayTe2Manager) mDisplayTe2Manager->restoreTe2FromDozeMode();
+
     if (mFirstPowerOn) {
         firstPowerOn();
     }
@@ -545,6 +548,8 @@ int32_t ExynosPrimaryDisplay::setPowerDoze(hwc2_power_mode_t mode) {
     mLhbmOn = false;
 
     ExynosDisplay::updateRefreshRateHint();
+
+    if (mDisplayTe2Manager) mDisplayTe2Manager->updateTe2ForDozeMode();
 
     return HWC2_ERROR_NONE;
 }
@@ -1268,7 +1273,9 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
         (!mBrightnessBlockingZonesLookupTable.empty())) {
         auto res = mBrightnessController->getBrightnessNitsAndMode();
         if (res != std::nullopt) {
-            fps = std::max(fps, mBrightnessBlockingZonesLookupTable[std::get<0>(res.value())]);
+            const auto it =
+                    mBrightnessBlockingZonesLookupTable.upper_bound(std::get<0>(res.value()));
+            fps = std::max(fps, it->second);
         }
     }
 
@@ -1292,9 +1299,12 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
     if (mDisplayTe2Manager &&
         (requester == RrThrottleRequester::PIXEL_DISP || requester == RrThrottleRequester::TEST)) {
         bool proximityActive = !!targetFps;
-        ALOGD("%s: proximity state: %s (min %dhz)", __func__,
-              proximityActive ? "active" : "inactive", targetFps);
-        mDisplayTe2Manager->updateTe2Option(proximityActive, targetFps);
+        bool dozeMode = (mPowerModeState.has_value() &&
+                         (*mPowerModeState == HWC2_POWER_MODE_DOZE ||
+                          *mPowerModeState == HWC2_POWER_MODE_DOZE_SUSPEND));
+        ALOGD("%s: proximity state %s, min %dhz, doze mode %d", __func__,
+              proximityActive ? "active" : "inactive", targetFps, dozeMode);
+        mDisplayTe2Manager->updateTe2OptionForProximity(proximityActive, targetFps, dozeMode);
     }
 
     if (mVariableRefreshRateController) {
