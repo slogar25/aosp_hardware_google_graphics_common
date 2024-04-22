@@ -178,6 +178,7 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         std::map<int, int> mBrightnessBlockingZonesLookupTable;
 
         int mMinIdleRefreshRate;
+        const int kMinIdleRefreshRateForDozeMode = 1;
         int mRrThrottleFps[toUnderlying(RrThrottleRequester::MAX)];
         std::mutex mMinIdleRefreshRateMutex;
 
