@@ -81,6 +81,8 @@ public:
     /* Histogram weight constraint: weightR + weightG + weightB = WEIGHT_SUM */
     static constexpr size_t WEIGHT_SUM = 1024;
 
+    static constexpr size_t HISTOGRAM_BINS_SIZE = 256;
+
     struct BlobInfo {
         const int mDisplayActiveH, mDisplayActiveV;
         const std::shared_ptr<PropertyBlob> mBlob;
@@ -298,6 +300,18 @@ public:
             EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
+     * queryOPR
+     *
+     * Query the linear space OPR.
+     *
+     * @oprVals will store the [OPR_R, OPR_G, OPR_B], 0 <= OPR_R, OPR_G, OPR_B <= 1
+     */
+    virtual ndk::ScopedAStatus queryOPR(std::vector<double>& oprVals)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex) {
+        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    }
+
+    /**
      * handleDrmEvent
      *
      * Handle the histogram blob drm event (EXYNOS_DRM_HISTOGRAM_CHANNEL_EVENT) and copy the
@@ -327,6 +341,17 @@ public:
      */
     void postAtomicCommit() EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
+    virtual void postAtomicCommitCleanup()
+            EXCLUDES(mHistogramMutex, mInitDrmDoneMutex, mBlobIdDataMutex) {}
+
+    inline ndk::ScopedAStatus errorToStatus(const HistogramErrorCode histogramErrorCode) const {
+        return ndk::ScopedAStatus::
+                fromServiceSpecificErrorWithMessage(static_cast<int>(histogramErrorCode),
+                                                    aidl::com::google::hardware::pixel::display::
+                                                            toString(histogramErrorCode)
+                                                                    .c_str());
+    }
+
     /**
      * dump
      *
@@ -340,7 +365,6 @@ protected:
     mutable std::shared_mutex mHistogramCapabilityMutex;
     HistogramCapability mHistogramCapability;
 
-private:
     ExynosDisplay* const mDisplay;
     DrmDevice* mDrmDevice = nullptr;
 
@@ -440,14 +464,25 @@ private:
             EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
+     * swapOutConfigInfo
+     *
+     * Swap out the configInfo from the specified histogram channel to mInactiveConfigItList.
+     *
+     * @channelId histogram channel to be swapped out
+     */
+    void swapOutConfigInfo(uint8_t channelId) REQUIRES(mHistogramMutex)
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+
+    /**
      * addConfigToInactiveList
      *
      * Add the configInfo (status is NOT_READY) into mInactiveConfigItList.
      *
      * @configInfo operated configino
      */
-    void addConfigToInactiveList(const std::shared_ptr<ConfigInfo>& configInfo)
-            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+    void addConfigToInactiveList(const std::shared_ptr<ConfigInfo>& configInfo,
+                                 bool addToFront = false) REQUIRES(mHistogramMutex)
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
      * scheduler
@@ -693,6 +728,9 @@ private:
                             std::shared_ptr<PropertyBlob>& drmConfigBlob) const
             EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
+    void resetConfigInfoStatus(std::shared_ptr<ConfigInfo>& configInfo) REQUIRES(mHistogramMutex)
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+
     std::pair<int, int> snapDisplayActiveSize() const
             EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
@@ -713,6 +751,9 @@ private:
 
     void dumpHistogramCapability(String8& result) const
             EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    virtual void dumpInternalConfigs(String8& result) const REQUIRES(mHistogramMutex)
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex) {}
 
     void dumpChannel(TableBuilder& tb, const uint8_t channelId) const REQUIRES(mHistogramMutex)
             EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
