@@ -100,12 +100,13 @@ public:
     // Set refresh rate within the range [minimumRefreshRate, maximumRefreshRateOfCurrentConfig].
     // The maximum refresh rate, |maximumRefreshRateOfCurrentConfig|, is intrinsic to the current
     // configuration, hence only |minimumRefreshRate| needs to be specified. If
-    // |peakRefreshRateTimeoutNs| does not equal zero, upon arrival of new frames, the current
-    // refresh rate will be set to |maximumRefreshRateOfCurrentConfig| and will remain so for
-    // |peakRefreshRateTimeoutNs| duration. Afterward, the current refresh rate will revert to
-    // |minimumRefreshRate|. Alternatively, if |peakRefreshRateTimeoutNs| equals zero, new frames
-    // coming will maintain refresh rate at |minimumRefreshRate|.
-    int setFixedRefreshRateRange(uint32_t minimumRefreshRate, uint64_t peakRefreshRateTimeoutNs);
+    // |minLockTimeForPeakRefreshRate| does not equal zero, upon arrival of new frames, the
+    // current refresh rate will be set to |maximumRefreshRateOfCurrentConfig| and will remain so
+    // for |minLockTimeForPeakRefreshRate| duration. Afterward, the current refresh rate will
+    // revert to |minimumRefreshRate|. Alternatively, when |minLockTimeForPeakRefreshRate| equals
+    // zero, if no new frame update, refresh rate will drop to |minimumRefreshRate| immediately.
+    int setFixedRefreshRateRange(uint32_t minimumRefreshRate,
+                                 uint64_t minLockTimeForPeakRefreshRate);
 
 private:
     static constexpr int kMaxFrameRate = 120;
@@ -145,6 +146,29 @@ private:
         kNone = 0,
         kSoftware,
         kHardware,
+    };
+
+    // 0: If the minimum refresh rate is unset, the state is set to |kMinRefreshRateUnset|.
+    //
+    // Otherwise, if the minimum refresh rate has been set:
+    // 1: The state is set to |kAtMinRefreshRate|.
+    // 2: If a presentation occurs when the state is |kAtMinRefreshRate|.
+    // 2.1: If |mMaximumRefreshRateTimeoutNs| = 0, no action is taken.
+    // 2.2: If |mMaximumRefreshRateTimeoutNs| > 0, the frame rate is promoted to the maximum refresh
+    //      rate and maintained for |mMaximumRefreshRateTimeoutNs| by setting a timer. During this
+    //      period, the state is set to |kAtMaximumRefreshRate|.
+    // 3: When a timeout occurs at step 2.2, state is set to |kTransitionToMinimumRefreshRate|.
+    //    It remains in this state until there are no further presentations after a period =
+    //    |kGotoMinimumRefreshRateIfNoPresentTimeout|.
+    // 4. Then, frame rate reverts to the minimum refresh rate, state is set to |kAtMinRefreshRate|.
+    //    Returns to step 1.
+    // Steps 1, 2, 3 and 4 continue until the minimum refresh rate is unset (by inputting 0 or 1);
+    // at this point, the state is set to |kMinRefreshRateUnset| and goto 0.
+    enum MinimumRefreshRatePresentStates {
+        kMinRefreshRateUnset = 0,
+        kAtMinimumRefreshRate,
+        kAtMaximumRefreshRate,
+        kTransitionToMinimumRefreshRate,
     };
 
     typedef struct VsyncEvent {
@@ -284,12 +308,13 @@ private:
     // when |mMinimumRefreshRate| is greater than 1. we are in a special mode where the minimum idle
     // refresh rate is |mMinimumRefreshRate|.
     uint32_t mMinimumRefreshRate = 0;
-    // |mMaximumPeakRefreshRateTimeoutNs| sets the minimum duration for which we should maintain the
-    // peak refresh rate when transitioning to idle. |mMaximumPeakRefreshRateTimeoutNs| takes effect
+    // |mMaximumRefreshRateTimeoutNs| sets the minimum duration for which we should maintain the
+    // peak refresh rate when transitioning to idle. |mMaximumRefreshRateTimeoutNs| takes effect
     // only when |mMinimumRefreshRate| is greater than 1.
-    uint64_t mMaximumPeakRefreshRateTimeoutNs = 0;
-    std::optional<TimedEvent> mPeakRefreshRateTimeoutEvent;
-    bool mAtPeakRefreshRate = false;
+    uint64_t mMaximumRefreshRateTimeoutNs = 0;
+    std::optional<TimedEvent> mMinimumRefreshRateTimeoutEvent;
+    // bool mAtPeakRefreshRate = false;
+    MinimumRefreshRatePresentStates mMinimumRefreshRatePresentStates = kMinRefreshRateUnset;
 
     std::vector<std::shared_ptr<RefreshRateChangeListener>> mRefreshRateChangeListeners;
 

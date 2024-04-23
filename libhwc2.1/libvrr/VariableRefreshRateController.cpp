@@ -415,28 +415,28 @@ void VariableRefreshRateController::setPresentTimeoutController(uint32_t control
 }
 
 int VariableRefreshRateController::setFixedRefreshRateRange(
-        uint32_t minimumRefreshRate, uint64_t maximumPeakRefreshRateTimeoutNs) {
+        uint32_t minimumRefreshRate, uint64_t minLockTimeForPeakRefreshRate) {
     const std::lock_guard<std::mutex> lock(mMutex);
 
     // If the new setting is equivalent to the old setting.
     if ((minimumRefreshRate) <= 1 && (mMinimumRefreshRate <= 1)) {
         // When |mMinimumRefreshRate| is 0 or 1, it is normal mode; there's no need to compare
-        // |mMaximumPeakRefreshRateTimeoutNs|.
+        // |mMaximumRefreshRateTimeoutNs|.
         return NO_ERROR;
     } else {
         if ((minimumRefreshRate == mMinimumRefreshRate) &&
-            (mMaximumPeakRefreshRateTimeoutNs == maximumPeakRefreshRateTimeoutNs)) {
+            (mMaximumRefreshRateTimeoutNs == minLockTimeForPeakRefreshRate)) {
             return NO_ERROR;
         }
     }
     uint32_t command = 0;
     mMinimumRefreshRate = minimumRefreshRate;
-    mMaximumPeakRefreshRateTimeoutNs = maximumPeakRefreshRateTimeoutNs;
-    dropEventLocked(VrrControllerEventType::kPeakRefreshRateTimeout);
+    mMaximumRefreshRateTimeoutNs = minLockTimeForPeakRefreshRate;
+    dropEventLocked(VrrControllerEventType::kMinLockTimeForPeakRefreshRate);
     if (mMinimumRefreshRate > 1) {
+        dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
         // Delegate timeout management to hardware.
         command |= getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
-        dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
         // Configure panel to maintain the minimum refresh rate.
         command |= getPanelRefreshCtrlMinimumRefreshRateCmd(minimumRefreshRate);
         command |= getPanelRefreshCtrlIdleEnabledCmd(true);
@@ -446,27 +446,42 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         if (mVariableRefreshRateStatistic) {
             mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
         }
-        if (mMaximumPeakRefreshRateTimeoutNs > 0) {
+        mMinimumRefreshRatePresentStates = kAtMinimumRefreshRate;
+        if (mMaximumRefreshRateTimeoutNs > 0) {
             // Set up peak refresh rate timeout event accordingly.
-            mPeakRefreshRateTimeoutEvent = std::make_optional<TimedEvent>("PeakRefreshRateTimeout");
-            mPeakRefreshRateTimeoutEvent->mIsRelativeTime = true;
-            mPeakRefreshRateTimeoutEvent->mWhenNs = mMaximumPeakRefreshRateTimeoutNs;
-            mPeakRefreshRateTimeoutEvent->mFunctor = [this]() -> int {
-                mAtPeakRefreshRate = false;
-                onRefreshRateChangedInternal(mMinimumRefreshRate);
-                uint32_t command = getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
-                command |= getPanelRefreshCtrlMinimumRefreshRateCmd(mMinimumRefreshRate);
-                command |= getPanelRefreshCtrlIdleEnabledCmd(true);
-                // TODO(b/333204544): ensure the correct refresh rate is set when calling
-                // setFixedRefreshRate().
-                if (mVariableRefreshRateStatistic) {
-                    mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
+            mMinimumRefreshRateTimeoutEvent =
+                    std::make_optional<TimedEvent>("MinimumRefreshRateTimeout");
+            mMinimumRefreshRateTimeoutEvent->mFunctor = [this]() -> int {
+                if (mMinimumRefreshRatePresentStates == kAtMaximumRefreshRate) {
+                    mMinimumRefreshRatePresentStates = kTransitionToMinimumRefreshRate;
+                    mMinimumRefreshRateTimeoutEvent->mIsRelativeTime = false;
+                    auto delayNs =
+                            (std::nano::den / mMinimumRefreshRate) + kMillisecondToNanoSecond;
+                    mMinimumRefreshRateTimeoutEvent->mWhenNs = getNowNs() + delayNs;
+                    postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
+                              mMinimumRefreshRateTimeoutEvent.value());
+                    return 1;
+                } else {
+                    if (mMinimumRefreshRatePresentStates != kTransitionToMinimumRefreshRate) {
+                        LOG(ERROR) << "VrrController: expect mMinimumRefreshRatePresentStates is "
+                                      "kTransitionToMinimumRefreshRate, but it is "
+                                   << mMinimumRefreshRatePresentStates;
+                        return -1;
+                    }
+                    mMinimumRefreshRatePresentStates = kAtMinimumRefreshRate;
+                    // TODO(b/333204544): ensure the correct refresh rate is set when calling
+                    // setFixedRefreshRate().
+                    if (mVariableRefreshRateStatistic) {
+                        mVariableRefreshRateStatistic->setFixedRefreshRate(mMinimumRefreshRate);
+                    }
+                    uint32_t command = getPanelRefreshCtrlFrameInsertionAutoModeCmd(true);
+                    command |= getPanelRefreshCtrlMinimumRefreshRateCmd(mMinimumRefreshRate);
+                    command |= getPanelRefreshCtrlIdleEnabledCmd(true);
+                    onRefreshRateChangedInternal(mMinimumRefreshRate);
+                    return mFileNode->WriteCommandString(composer::kRefreshControlNodeName,
+                                                         command);
                 }
-                return mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command);
             };
-            mAtPeakRefreshRate = false;
-        } else {
-            mAtPeakRefreshRate = true;
         }
         if (!mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command)) {
             return -1;
@@ -487,11 +502,11 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
         if (mVariableRefreshRateStatistic) {
             mVariableRefreshRateStatistic->setFixedRefreshRate(0);
         }
-        mMaximumPeakRefreshRateTimeoutNs = 0;
+        mMaximumRefreshRateTimeoutNs = 0;
         onRefreshRateChangedInternal(1);
-        mPeakRefreshRateTimeoutEvent = std::nullopt;
-        mAtPeakRefreshRate = false;
-        dropEventLocked(VrrControllerEventType::kPeakRefreshRateTimeout);
+        mMinimumRefreshRateTimeoutEvent = std::nullopt;
+        // mAtPeakRefreshRate = false;
+        mMinimumRefreshRatePresentStates = kMinRefreshRateUnset;
     }
     return 1;
 }
@@ -532,7 +547,6 @@ void VariableRefreshRateController::onPresent(int fence) {
                                     getPresentFrameFlag());
             }
             mRecord.mPresentHistory.next() = mRecord.mPendingCurrentPresentTime.value();
-            mRecord.mPendingCurrentPresentTime = std::nullopt;
         }
         if (mState == VrrControllerState::kHibernate) {
             LOG(WARNING) << "VrrController: Present during hibernation without prior notification "
@@ -541,8 +555,8 @@ void VariableRefreshRateController::onPresent(int fence) {
             dropEventLocked(VrrControllerEventType::kHibernateTimeout);
         }
 
-        if (mMinimumRefreshRate > 1) {
-            if (!mAtPeakRefreshRate) {
+        if ((mMaximumRefreshRateTimeoutNs > 0) && (mMinimumRefreshRate > 1)) {
+            if (mMinimumRefreshRatePresentStates == kAtMinimumRefreshRate) {
                 uint32_t command = 0;
                 auto maxFrameRate =
                         durationNsToFreq(mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
@@ -551,17 +565,34 @@ void VariableRefreshRateController::onPresent(int fence) {
                 // Configure panel to maintain the minimum refresh rate.
                 command |= getPanelRefreshCtrlMinimumRefreshRateCmd(maxFrameRate);
                 command |= getPanelRefreshCtrlIdleEnabledCmd(false);
-                mAtPeakRefreshRate = true;
+                // mAtPeakRefreshRate = true;
                 if (!mFileNode->WriteCommandString(composer::kRefreshControlNodeName, command)) {
                     LOG(WARNING) << "VrrController: write file node error, command = " << command;
                     return;
                 }
+                mMinimumRefreshRatePresentStates = kAtMaximumRefreshRate;
                 onRefreshRateChangedInternal(maxFrameRate);
-                postEvent(VrrControllerEventType::kPeakRefreshRateTimeout,
-                          mPeakRefreshRateTimeoutEvent.value());
+                mMinimumRefreshRateTimeoutEvent->mIsRelativeTime = false;
+                mMinimumRefreshRateTimeoutEvent->mWhenNs =
+                        mRecord.mPendingCurrentPresentTime.value().mTime +
+                        mMaximumRefreshRateTimeoutNs;
+                postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
+                          mMinimumRefreshRateTimeoutEvent.value());
+            } else if (mMinimumRefreshRatePresentStates == kTransitionToMinimumRefreshRate) {
+                dropEventLocked(VrrControllerEventType::kMinLockTimeForPeakRefreshRate);
+                mMinimumRefreshRateTimeoutEvent->mIsRelativeTime = false;
+                auto delayNs = (std::nano::den / mMinimumRefreshRate) + kMillisecondToNanoSecond;
+                mMinimumRefreshRateTimeoutEvent->mWhenNs =
+                        mRecord.mPendingCurrentPresentTime.value().mTime + delayNs;
+                postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
+                          mMinimumRefreshRateTimeoutEvent.value());
+            } else {
+                LOG(ERROR) << "VrrController: wrong state when setting min refresh rate: "
+                           << mMinimumRefreshRatePresentStates;
             }
             return;
         }
+        mRecord.mPendingCurrentPresentTime = std::nullopt;
     }
 
     // Prior to pushing the most recent fence update, verify the release timestamps of all preceding
