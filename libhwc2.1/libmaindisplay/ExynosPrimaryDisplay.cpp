@@ -1272,11 +1272,18 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
     int fps = targetFps;
     if ((requester == RrThrottleRequester::BRIGHTNESS) &&
         (!mBrightnessBlockingZonesLookupTable.empty())) {
-        auto res = mBrightnessController->getBrightnessNitsAndMode();
-        if (res != std::nullopt) {
-            const auto it =
-                    mBrightnessBlockingZonesLookupTable.upper_bound(std::get<0>(res.value()));
-            fps = std::max(fps, it->second);
+        std::unique_lock<std::mutex> lock(mPowerModeMutex);
+        // Only check the BRIGHTNESS vote when the power is on.
+        if (mPowerModeState.has_value() && (*mPowerModeState == HWC2_POWER_MODE_ON)) {
+            auto res = mBrightnessController->getBrightnessNitsAndMode();
+            if (res != std::nullopt) {
+                const auto it =
+                        mBrightnessBlockingZonesLookupTable.upper_bound(std::get<0>(res.value()));
+                ALOGD("%s requester = BRIGHTNESS, brightness = %f nits, vote minimum refresh rate "
+                      "to %d",
+                      __func__, std::get<0>(res.value()), it->second);
+                fps = std::max(fps, it->second);
+            }
         }
     }
 
