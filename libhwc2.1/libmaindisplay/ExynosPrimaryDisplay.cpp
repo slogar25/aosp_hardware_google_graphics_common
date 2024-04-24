@@ -615,6 +615,16 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     ExynosDisplay::updateRefreshRateHint();
     if (mVariableRefreshRateController) {
         mVariableRefreshRateController->setPowerMode(mode);
+        if (mode != HWC2_POWER_MODE_OFF) {
+            if (mode != HWC2_POWER_MODE_ON) {
+                mVariableRefreshRateController
+                        ->setFixedRefreshRateRange(kMinIdleRefreshRateForDozeMode, 0);
+            } else {
+                std::lock_guard<std::mutex> lock(mMinIdleRefreshRateMutex);
+                mVariableRefreshRateController->setFixedRefreshRateRange(mMinIdleRefreshRate,
+                                                                         mRefreshRateDelayNanos);
+            }
+        }
     }
     return res;
 }
@@ -1300,29 +1310,38 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
     }
     if (maxMinIdleFps == mMinIdleRefreshRate) return NO_ERROR;
 
-    // Currently only proximity sensor will request the min refresh rate via this API with
-    // PIXEL_DISP (or TEST for the debugging command). It will request a non-zero value, e.g. 30Hz,
-    // if it's active, and request zero if it's inactive. So we can know its state and update the
-    // TE2 option accordingly.
-    if (mDisplayTe2Manager &&
-        (requester == RrThrottleRequester::PIXEL_DISP || requester == RrThrottleRequester::TEST)) {
-        bool proximityActive = !!targetFps;
+    {
+        std::lock_guard<std::mutex> lock(mPowerModeMutex);
         bool dozeMode = (mPowerModeState.has_value() &&
                          (*mPowerModeState == HWC2_POWER_MODE_DOZE ||
                           *mPowerModeState == HWC2_POWER_MODE_DOZE_SUSPEND));
-        ALOGD("%s: proximity state %s, min %dhz, doze mode %d", __func__,
-              proximityActive ? "active" : "inactive", targetFps, dozeMode);
-        mDisplayTe2Manager->updateTe2OptionForProximity(proximityActive, targetFps, dozeMode);
-    }
-
-    if (mVariableRefreshRateController) {
-        int ret = mVariableRefreshRateController->setFixedRefreshRateRange(maxMinIdleFps,
-                                                                           mRefreshRateDelayNanos);
-        if (ret >= 0) {
-            mMinIdleRefreshRate = maxMinIdleFps;
-            return NO_ERROR;
+        // Currently only proximity sensor will request the min refresh rate via this API with
+        // PIXEL_DISP (or TEST for the debugging command). It will request a non-zero value,
+        // e.g. 30Hz, if it's active, and request zero if it's inactive. So we can know its state
+        // and update the TE2 option accordingly.
+        if (mDisplayTe2Manager &&
+            (requester == RrThrottleRequester::PIXEL_DISP ||
+             requester == RrThrottleRequester::TEST)) {
+            bool proximityActive = !!targetFps;
+            ALOGD("%s: proximity state %s, min %dhz, doze mode %d", __func__,
+                  proximityActive ? "active" : "inactive", targetFps, dozeMode);
+            mDisplayTe2Manager->updateTe2OptionForProximity(proximityActive, targetFps, dozeMode);
         }
-        return ret;
+
+        if (mVariableRefreshRateController) {
+            if (dozeMode && maxMinIdleFps != kMinIdleRefreshRateForDozeMode) {
+                ALOGW("%s: setting %dhz in doze mode (expect %dhz)", __func__, maxMinIdleFps,
+                      kMinIdleRefreshRateForDozeMode);
+            }
+
+            int ret = mVariableRefreshRateController
+                              ->setFixedRefreshRateRange(maxMinIdleFps, mRefreshRateDelayNanos);
+            if (ret >= 0) {
+                mMinIdleRefreshRate = maxMinIdleFps;
+                return NO_ERROR;
+            }
+            return ret;
+        }
     }
 
     const std::string path = getPanelSysfsPath() + "min_vrefresh";
@@ -1406,10 +1425,10 @@ void ExynosPrimaryDisplay::dump(String8 &result) {
     if (!mBrightnessBlockingZonesLookupTable.empty()) {
         int upperBound;
         int lowerBound = INT_MIN;
-        result.appendFormat("Brightness blocking zone lookup table:");
+        result.appendFormat("Brightness blocking zone lookup table:\n");
         for (const auto& brightnessBlockingZone : mBrightnessBlockingZonesLookupTable) {
             upperBound = brightnessBlockingZone.first;
-            result.appendFormat("Brightness blocking zone: range [%s %s) fps = %d",
+            result.appendFormat("\tBrightness blocking zone: range [%s %s) fps = %d\n",
                                 (lowerBound == INT_MIN ? "Min"
                                                        : std::to_string(lowerBound).c_str()),
                                 (upperBound == INT_MAX ? "Max"
@@ -1421,6 +1440,7 @@ void ExynosPrimaryDisplay::dump(String8 &result) {
         result.appendFormat("\n");
     }
 
+    result.appendFormat("Min idle refresh rate: %d\n", mMinIdleRefreshRate);
     for (uint32_t i = 0; i < toUnderlying(RrThrottleRequester::MAX); i++) {
         result.appendFormat("\t[%u] vote to %d hz\n", i, mRrThrottleFps[i]);
     }
