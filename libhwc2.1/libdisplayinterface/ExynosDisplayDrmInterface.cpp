@@ -782,7 +782,7 @@ int32_t ExynosDisplayDrmInterface::initDrmDevice(DrmDevice *drmDevice)
     }
 
     if (mExynosDisplay->mHistogramController) {
-        mExynosDisplay->mHistogramController->initDrm(*mDrmCrtc);
+        mExynosDisplay->mHistogramController->initDrm(*mDrmDevice, *mDrmCrtc);
     }
 
     return NO_ERROR;
