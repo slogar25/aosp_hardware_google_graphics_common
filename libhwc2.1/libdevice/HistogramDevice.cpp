@@ -475,36 +475,43 @@ void HistogramDevice::dump(String8& result) const {
         }
     }
 
-    /* print the histogram capability */
+    // print the histogram capability
     dumpHistogramCapability(result);
+    result.append("\n");
 
-    result.appendFormat("\n");
+    SCOPED_HIST_LOCK(mHistogramMutex);
 
-    /* print the histogram channel info*/
-    result.appendFormat("Histogram channel info:\n");
+    // print the tokens and the requested configs
+    for (const auto& [_, tokenInfo] : mTokenInfoMap) {
+        tokenInfo.dump(result);
+        if (tokenInfo.mConfigInfo) {
+            tokenInfo.mConfigInfo->dump(result, "\t");
+        }
+    }
+    result.append("\n");
+
+    // print the histogram channel info
+    result.append("Histogram channel info (applied to kernel):\n");
     for (uint8_t channelId = 0; channelId < mChannels.size(); ++channelId) {
         // TODO: b/294489887 - Use buildForMiniDump can eliminate the redundant rows.
         TableBuilder tb;
-        const ChannelInfo& channel = mChannels[channelId];
-        std::scoped_lock lock(channel.channelInfoMutex);
-        tb.add("ID", (int)channelId);
-        tb.add("status", toString(channel.status));
-        tb.add("token", channel.token.get());
-        tb.add("pid", channel.pid);
-        tb.add("requestedRoi", toString(channel.requestedRoi));
-        tb.add("workingRoi", toString(channel.workingConfig.roi));
-        tb.add("requestedBlockRoi", toString(channel.requestedBlockingRoi));
-        tb.add("workingBlockRoi",
-               toString(channel.workingConfig.blockingRoi.value_or(DISABLED_ROI)));
-        tb.add("threshold", channel.threshold);
-        tb.add("weightRGB", toString(channel.workingConfig.weights));
-        tb.add("samplePos",
-               aidl::com::google::hardware::pixel::display::toString(
-                       channel.workingConfig.samplePos));
+        dumpChannel(tb, channelId);
         result.append(tb.build().c_str());
     }
+    result.append("\n");
 
-    result.appendFormat("\n");
+    // print the inactive list
+    result.append("Histogram inactive list:");
+    if (mInactiveConfigItList.empty()) {
+        result.append(" none\n");
+    } else {
+        result.append("\n");
+        int i = 1;
+        for (const auto& configInfo : mInactiveConfigItList)
+            result.appendFormat("\t%d. configInfo: %p\n", i++, configInfo.lock().get());
+    }
+    result.append("\n");
+    result.append("-----End of Histogram dump-----\n");
 }
 
 void HistogramDevice::initChannels(const uint8_t channelCount,
@@ -1126,23 +1133,78 @@ int HistogramDevice::convertRoi(const HistogramRoiRect& requestedRoi,
 void HistogramDevice::dumpHistogramCapability(String8& result) const {
     std::shared_lock lock(mHistogramCapabilityMutex);
     // Append the histogram capability info to the dump string
-    result.appendFormat("Histogram capability:\n");
-    result.appendFormat("\tsupportMultiChannel: %s\n",
+    result.appendFormat("Histogram capability(%s):\n",
+                        (mDisplay) ? (mDisplay->mDisplayName.c_str()) : "NULL");
+    result.appendFormat("\tsupportMultiChannel: %s, ",
                         mHistogramCapability.supportMultiChannel ? "true" : "false");
-    result.appendFormat("\tsupportBlockingRoi: %s\n",
+    result.appendFormat("supportBlockingRoi: %s, ",
                         mHistogramCapability.supportBlockingRoi ? "true" : "false");
-    result.appendFormat("\tchannelCount: %d\n", mHistogramCapability.channelCount);
-    result.appendFormat("\tfullscreen roi: (0,0)x(%dx%d)\n",
-                        mHistogramCapability.fullResolutionWidth,
-                        mHistogramCapability.fullResolutionHeight);
-    result.appendFormat("\tsupportSamplePosList:");
+    result.appendFormat("supportSamplePosList:");
     for (HistogramSamplePos samplePos : mHistogramCapability.supportSamplePosList) {
         result.appendFormat(" %s",
                             aidl::com::google::hardware::pixel::display::toString(samplePos)
                                     .c_str());
     }
     result.appendFormat("\n");
+    result.appendFormat("\tchannelCount: %d, ", mHistogramCapability.channelCount);
+    result.appendFormat("fullscreen roi: (0,0)x(%dx%d)\n", mHistogramCapability.fullResolutionWidth,
+                        mHistogramCapability.fullResolutionHeight);
 }
+
+// TODO: b/295990513 - Remove the if defined after kernel prebuilts are merged.
+#if defined(EXYNOS_HISTOGRAM_CHANNEL_REQUEST)
+void HistogramDevice::dumpChannel(TableBuilder& tb, const uint8_t channelId) const {
+    const ChannelInfo& channel = mChannels[channelId];
+    auto configInfo = channel.mConfigInfo.lock();
+    uint32_t blobId = configInfo ? getActiveBlobId(configInfo->mBlobsList) : 0;
+    drmModePropertyBlobPtr blob = nullptr;
+
+    // Get the histogram config blob
+    if (blobId && mDrmDevice) {
+        if ((blob = drmModeGetPropertyBlob(mDrmDevice->fd(), blobId)) == nullptr) {
+            HIST_BLOB_CH_LOG(E, blobId, channelId,
+                             "drmModeGetPropertyBlob failed, blob is nullptr");
+        }
+    }
+
+    tb.add("ID", (int)channelId);
+    tb.add("status", toString(channel.mStatus));
+    tb.add("configInfo", configInfo.get());
+
+    if (!blob) {
+        if (blobId)
+            tb.add("blobId", String8::format("%u (Get failed)", blobId));
+        else
+            tb.add("blobId", "N/A");
+        tb.add("workingRoi", "N/A");
+        tb.add("workingBlockRoi", "N/A");
+        tb.add("threshold", "N/A");
+        tb.add("weightRGB", "N/A");
+        tb.add("samplePos", "N/A");
+        return;
+    }
+
+    const struct histogram_channel_config* config =
+            reinterpret_cast<struct histogram_channel_config*>(blob->data);
+    HistogramRoiRect workingRoi = {config->roi.start_x, config->roi.start_y,
+                                   config->roi.start_x + config->roi.hsize,
+                                   config->roi.start_y + config->roi.vsize};
+    HistogramRoiRect workingBlockRoi = {config->blocked_roi.start_x, config->blocked_roi.start_y,
+                                        config->blocked_roi.start_x + config->blocked_roi.hsize,
+                                        config->blocked_roi.start_y + config->blocked_roi.vsize};
+    tb.add("blobId", blobId);
+    tb.add("workingRoi", toString(workingRoi));
+    tb.add("workingBlockRoi", toString(workingBlockRoi));
+    tb.add("threshold", config->threshold);
+    tb.add("weightRGB",
+           String8::format("(%" PRIu16 ",%" PRIu16 ",%" PRIu16 ")", config->weights.weight_r,
+                           config->weights.weight_g, config->weights.weight_b));
+    tb.add("samplePos", config->pos == POST_DQE ? "POST_DQE" : "PRE_DQE");
+    drmModeFreePropertyBlob(blob);
+}
+#else
+void HistogramDevice::dumpChannel(TableBuilder& tb, const uint8_t channelId) const {}
+#endif
 
 ndk::ScopedAStatus HistogramDevice::validateHistogramRequest(
         const ndk::SpAIBinder& token, const HistogramConfig& histogramConfig,
@@ -1297,6 +1359,45 @@ std::string HistogramDevice::toString(const HistogramWeights& weights) {
     os << (int)weights.weightB;
     os << ")";
     return os.str();
+}
+
+std::string HistogramDevice::toString(const HistogramConfig& config) {
+    std::ostringstream os;
+    os << "roi:" << toString(config.roi) << ", ";
+    os << "blockRoi:" << toString(config.blockingRoi.value_or(DISABLED_ROI)) << ", ";
+    os << "weightRGB:" << toString(config.weights) << ", ";
+    os << "samplePos:" << aidl::com::google::hardware::pixel::display::toString(config.samplePos);
+    return os.str();
+}
+
+void HistogramDevice::TokenInfo::dump(String8& result, const char* prefix) const {
+    result.appendFormat("%sHistogram token %p:\n", prefix, mToken.get());
+    result.appendFormat("%s\tpid: %d\n", prefix, mPid);
+    if (!mConfigInfo) {
+        result.append("%s\tconfigInfo: (nullptr)\n");
+    }
+}
+
+void HistogramDevice::ConfigInfo::dump(String8& result, const char* prefix) const {
+    result.appendFormat("%sconfigInfo: %p -> ", prefix, this);
+    if (mStatus == Status_t::HAS_CHANNEL_ASSIGNED)
+        result.appendFormat("channelId: %d\n", mChannelId);
+    else if (mStatus == Status_t::IN_INACTIVE_LIST)
+        result.appendFormat("inactive list: queued\n");
+    else
+        result.appendFormat("inactive list: N/A\n");
+    result.appendFormat("%s\trequestedConfig: %s\n", prefix, toString(mRequestedConfig).c_str());
+    result.appendFormat("%s\tblobsList: ", prefix);
+    if (!mBlobsList.empty()) {
+        result.append("*");
+        for (auto it = mBlobsList.begin(); it != mBlobsList.end(); ++it) {
+            result.appendFormat("blob#%u(%dx%d) ", it->mBlob->getId(), it->mDisplayActiveH,
+                                it->mDisplayActiveV);
+        }
+    } else {
+        result.append("none");
+    }
+    result.append("\n");
 }
 
 HistogramDevice::PropertyBlob::PropertyBlob(DrmDevice* const drmDevice, const void* const blobData,

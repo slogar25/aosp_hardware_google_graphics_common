@@ -104,6 +104,7 @@ public:
         std::list<const BlobInfo> mBlobsList;
         std::list<std::weak_ptr<ConfigInfo>>::iterator mInactiveListIt;
         ConfigInfo(const HistogramConfig& histogramConfig) : mRequestedConfig(histogramConfig) {}
+        void dump(String8& result, const char* prefix = "") const;
     };
 
     /* Histogram channel status */
@@ -162,6 +163,7 @@ public:
 
         TokenInfo(HistogramDevice* histogramDevice, const ndk::SpAIBinder& token, pid_t pid)
               : mHistogramDevice(histogramDevice), mToken(token), mPid(pid) {}
+        void dump(String8& result, const char* prefix = "") const;
     };
 
     enum class CollectStatus_t : uint8_t {
@@ -328,11 +330,11 @@ public:
     /**
      * dump
      *
-     * Dump every histogram channel information.
+     * Dump histogram information.
      *
-     * @result histogram channel dump information would be appended to this string
+     * @result histogram dump information would be appended to this string
      */
-    void dump(String8& result) const;
+    void dump(String8& result) const EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
 protected:
     mutable std::shared_mutex mHistogramCapabilityMutex;
@@ -709,7 +711,11 @@ private:
                    const int displayActiveH, const int displayActiveV, const char* roiType) const
             EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
-    void dumpHistogramCapability(String8& result) const;
+    void dumpHistogramCapability(String8& result) const
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    void dumpChannel(TableBuilder& tb, const uint8_t channelId) const REQUIRES(mHistogramMutex)
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     ndk::ScopedAStatus validateHistogramRequest(const ndk::SpAIBinder& token,
                                                 const HistogramConfig& histogramConfig,
@@ -727,6 +733,7 @@ private:
     static std::string toString(const ChannelStatus_t& status);
     static std::string toString(const HistogramRoiRect& roi);
     static std::string toString(const HistogramWeights& weights);
+    static std::string toString(const HistogramConfig& config);
 };
 
 // PropertyBlob is the RAII class to manage the histogram PropertyBlob creation and deletion.
