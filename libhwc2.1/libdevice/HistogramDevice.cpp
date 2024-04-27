@@ -223,62 +223,24 @@ ndk::ScopedAStatus HistogramDevice::queryHistogram(const ndk::SpAIBinder& token,
     {
         std::shared_lock lock(mHistogramCapabilityMutex);
         if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-            ALOGE("%s: histogram interface is not supported", __func__);
+            HIST_LOG(E, "multi-channel interface is not supported");
             return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
         }
     }
 
-    /* No need to validate the argument (token), if the token is not correct it cannot be converted
-     * to the channel id later. */
-
-    /* validate the argument (histogramBuffer) */
+    // validate the argument (histogramBuffer)
     if (!histogramBuffer) {
-        ALOGE("%s: binder error, histogramBuffer is nullptr", __func__);
+        HIST_LOG(E, "binder error, histogramBuffer is nullptr");
         return ndk::ScopedAStatus::fromExceptionCode(EX_NULL_POINTER);
     }
 
-    /* validate the argument (histogramErrorCode) */
+    // validate the argument (histogramErrorCode)
     if (!histogramErrorCode) {
-        ALOGE("%s: binder error, histogramErrorCode is nullptr", __func__);
+        HIST_LOG(E, "binder error, histogramErrorCode is nullptr");
         return ndk::ScopedAStatus::fromExceptionCode(EX_NULL_POINTER);
     }
 
-    /* default histogramErrorCode: no error */
-    *histogramErrorCode = HistogramErrorCode::NONE;
-
-    if (mDisplay->isPowerModeOff()) {
-        ALOGW("%s: DISPLAY_POWEROFF, histogram is not available when display is off", __func__);
-        *histogramErrorCode = HistogramErrorCode::DISPLAY_POWEROFF;
-        return ndk::ScopedAStatus::ok();
-    }
-
-    if (mDisplay->isSecureContentPresenting()) {
-        ALOGV("%s: DRM_PLAYING, histogram is not available when secure content is presenting",
-              __func__);
-        *histogramErrorCode = HistogramErrorCode::DRM_PLAYING;
-        return ndk::ScopedAStatus::ok();
-    }
-
-    uint8_t channelId;
-
-    /* Hold the mAllocatorMutex for a short time just to convert the token to channel id. Prevent
-     * holding the mAllocatorMutex when waiting for the histogram data back which may takes several
-     * milliseconds */
-    {
-        ATRACE_NAME("getChannelId");
-        std::scoped_lock lock(mAllocatorMutex);
-        if ((*histogramErrorCode = getChannelIdByTokenLocked(token, channelId)) !=
-            HistogramErrorCode::NONE) {
-            return ndk::ScopedAStatus::ok();
-        }
-    }
-
-    getHistogramData(channelId, histogramBuffer, histogramErrorCode);
-
-    /* Clear the histogramBuffer when error occurs */
-    if (*histogramErrorCode != HistogramErrorCode::NONE) {
-        histogramBuffer->assign(HISTOGRAM_BIN_COUNT, 0);
-    }
+    getHistogramData(token, histogramBuffer, histogramErrorCode);
 
     return ndk::ScopedAStatus::ok();
 }
@@ -412,32 +374,34 @@ ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder& t
 
 void HistogramDevice::handleDrmEvent(void* event) {
     int ret = NO_ERROR;
-    uint8_t channelId;
+    uint32_t blobId = 0;
     char16_t* buffer;
 
-    if ((ret = parseDrmEvent(event, channelId, buffer))) {
-        ALOGE("%s: failed to parseDrmEvent, ret %d", __func__, ret);
+    if ((ret = parseDrmEvent(event, blobId, buffer))) {
+        HIST_LOG(E, "parseDrmEvent failed, ret(%d)", ret);
         return;
     }
 
-    ATRACE_NAME(String8::format("handleHistogramDrmEvent #%u", channelId).c_str());
-    if (channelId >= mChannels.size()) {
-        ALOGE("%s: histogram channel #%u: invalid channelId", __func__, channelId);
+    ATRACE_NAME(String8::format("handleHistogramEvent(blob#%u)", blobId).c_str());
+
+    std::shared_ptr<BlobIdData> blobIdData;
+    searchOrCreateBlobIdData(blobId, false, blobIdData);
+    if (!blobIdData) {
+        HIST_BLOB_LOG(W, blobId, "no condition var allocated, ignore the event(%p)", event);
         return;
     }
 
-    ChannelInfo& channel = mChannels[channelId];
-    std::unique_lock<std::mutex> lock(channel.histDataCollectingMutex);
-
-    /* Check if the histogram channel is collecting the histogram data */
-    if (channel.histDataCollecting == true) {
-        std::memcpy(channel.histData, buffer, HISTOGRAM_BIN_COUNT * sizeof(char16_t));
-        channel.histDataCollecting = false;
+    std::unique_lock<std::mutex> lock(blobIdData->mDataCollectingMutex);
+    ::android::base::ScopedLockAssertion lock_assertion(blobIdData->mDataCollectingMutex);
+    ATRACE_NAME(String8::format("mDataCollectingMutex(blob#%u)", blobId));
+    // Check if the histogram blob is collecting the histogram data
+    if (UNLIKELY(blobIdData->mCollectStatus == CollectStatus_t::NOT_STARTED)) {
+        HIST_BLOB_LOG(W, blobId, "ignore the event(%p), collectStatus is NOT_STARTED", event);
     } else {
-        ALOGW("%s: histogram channel #%u: ignore the histogram channel event", __func__, channelId);
+        std::memcpy(blobIdData->mData, buffer, HISTOGRAM_BIN_COUNT * sizeof(char16_t));
+        blobIdData->mCollectStatus = CollectStatus_t::COLLECTED;
+        blobIdData->mDataCollecting_cv.notify_all();
     }
-
-    channel.histDataCollecting_cv.notify_all();
 }
 
 void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq) {
@@ -633,6 +597,13 @@ void HistogramDevice::replaceConfigInfo(std::shared_ptr<ConfigInfo>& configInfo,
 
         oldConfigInfo->mStatus = ConfigInfo::Status_t::INITIALIZED;
     }
+
+    // Cleanup the blobIdData
+    if (oldConfigInfo) {
+        SCOPED_HIST_LOCK(mBlobIdDataMutex);
+        for (const auto& blobInfo : oldConfigInfo->mBlobsList)
+            mBlobIdDataMap.erase(blobInfo.mBlob->getId());
+    }
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::searchTokenInfo(const ndk::SpAIBinder& token,
@@ -702,107 +673,220 @@ bool HistogramDevice::scheduler() {
     return needRefresh;
 }
 
-void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t>* histogramBuffer,
+void HistogramDevice::searchOrCreateBlobIdData(uint32_t blobId, bool create,
+                                               std::shared_ptr<BlobIdData>& blobIdData) {
+    blobIdData = nullptr;
+    SCOPED_HIST_LOCK(mBlobIdDataMutex);
+
+    auto it = mBlobIdDataMap.find(blobId);
+    if (it != mBlobIdDataMap.end()) {
+        blobIdData = it->second;
+    } else if (create) {
+        std::shared_ptr<BlobIdData> blobIdDataTmp = std::make_shared<BlobIdData>();
+        mBlobIdDataMap.emplace(blobId, blobIdDataTmp);
+        blobIdData = blobIdDataTmp;
+    }
+}
+
+void HistogramDevice::getChanIdBlobId(const ndk::SpAIBinder& token,
+                                      HistogramErrorCode* histogramErrorCode, int& channelId,
+                                      uint32_t& blobId) {
+    TokenInfo* tokenInfo = nullptr;
+    channelId = -1;
+    blobId = 0;
+
+    SCOPED_HIST_LOCK(mHistogramMutex);
+    if ((*histogramErrorCode = searchTokenInfo(token, tokenInfo)) != HistogramErrorCode::NONE) {
+        HIST_LOG(E, "searchTokenInfo failed, ret(%s)",
+                 aidl::com::google::hardware::pixel::display::toString(*histogramErrorCode)
+                         .c_str());
+        return;
+    }
+
+    std::shared_ptr<ConfigInfo>& configInfo = tokenInfo->mConfigInfo;
+    if (configInfo->mStatus == ConfigInfo::Status_t::HAS_CHANNEL_ASSIGNED)
+        channelId = configInfo->mChannelId;
+    else
+        channelId = -1;
+    blobId = getActiveBlobId(configInfo->mBlobsList);
+
+    if (!blobId) {
+        HIST_BLOB_CH_LOG(E, blobId, channelId, "CONFIG_HIST_ERROR, blob is not created yet");
+        *histogramErrorCode = HistogramErrorCode::CONFIG_HIST_ERROR;
+        return;
+    }
+}
+
+void HistogramDevice::getHistogramData(const ndk::SpAIBinder& token,
+                                       std::vector<char16_t>* histogramBuffer,
                                        HistogramErrorCode* histogramErrorCode) {
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
-    int32_t ret;
-    ExynosDisplayDrmInterface* moduleDisplayInterface =
-            static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
-    if (!moduleDisplayInterface) {
-        *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
-        ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, moduleDisplayInterface is nullptr",
-              __func__, channelId);
-        return;
-    }
+    ATRACE_CALL();
 
-    ChannelInfo& channel = mChannels[channelId];
+    // default histogramErrorCode: no error
+    *histogramErrorCode = HistogramErrorCode::NONE;
 
-    std::unique_lock<std::mutex> lock(channel.histDataCollectingMutex);
+    // Get the current channelId and active blobId
+    int channelId;
+    uint32_t blobId;
+    getChanIdBlobId(token, histogramErrorCode, channelId, blobId);
+    if (*histogramErrorCode != HistogramErrorCode::NONE) return;
 
-    /* Check if the previous queryHistogram is finished */
-    if (channel.histDataCollecting) {
-        *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
-        ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, previous %s not finished", __func__,
-              channelId, __func__);
-        return;
-    }
-
-    /* Send the ioctl request (histogram_channel_request_ioctl) which allocate the drm event and
-     * send back the drm event with data when available. */
-    if ((ret = moduleDisplayInterface->sendHistogramChannelIoctl(HistogramChannelIoctl_t::REQUEST,
-                                                                 channelId)) != NO_ERROR) {
-        *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
-        ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, sendHistogramChannelIoctl (REQUEST) "
-              "error "
-              "(%d)",
-              __func__, channelId, ret);
-        return;
-    }
-    channel.histDataCollecting = true;
+    std::cv_status cv_status;
 
     {
-        ATRACE_NAME(String8::format("waitDrmEvent #%u", channelId).c_str());
-        /* Wait until the condition variable is notified or timeout. */
-        channel.histDataCollecting_cv.wait_for(lock, std::chrono::milliseconds(50),
-                                               [this, &channel]() {
-                                                   return (!mDisplay->isPowerModeOff() &&
-                                                           !channel.histDataCollecting);
-                                               });
+        // Get the moduleDisplayInterface pointer
+        ExynosDisplayDrmInterface* moduleDisplayInterface =
+                static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
+        if (!moduleDisplayInterface) {
+            *histogramErrorCode = HistogramErrorCode::ENABLE_HIST_ERROR;
+            HIST_BLOB_CH_LOG(E, blobId, channelId,
+                             "ENABLE_HIST_ERROR, moduleDisplayInterface is NULL");
+            return;
+        }
+
+        // Use shared_ptr to keep the blobIdData which will be used by receiveBlobIdData and
+        // receiveBlobIdData.
+        std::shared_ptr<BlobIdData> blobIdData;
+        searchOrCreateBlobIdData(blobId, true, blobIdData);
+
+        std::unique_lock<std::mutex> lock(blobIdData->mDataCollectingMutex);
+        ::android::base::ScopedLockAssertion lock_assertion(blobIdData->mDataCollectingMutex);
+        ATRACE_NAME(String8::format("mDataCollectingMutex(blob#%u)", blobId));
+
+        // Request the drmEvent of the blobId (with mDataCollectingMutex held)
+        requestBlobIdData(moduleDisplayInterface, histogramErrorCode, channelId, blobId,
+                          blobIdData);
+        if (*histogramErrorCode != HistogramErrorCode::NONE) return;
+
+        // Receive the drmEvent of the blobId (with mDataCollectingMutex held)
+        cv_status = receiveBlobIdData(moduleDisplayInterface, histogramBuffer, histogramErrorCode,
+                                      channelId, blobId, blobIdData, lock);
     }
 
-    /* If the histDataCollecting is not cleared, check the reason and clear the histogramBuffer.
+    // Check the query result and clear the buffer if needed (no lock is held now)
+    checkQueryResult(histogramBuffer, histogramErrorCode, channelId, blobId, cv_status);
+}
+
+void HistogramDevice::requestBlobIdData(ExynosDisplayDrmInterface* const moduleDisplayInterface,
+                                        HistogramErrorCode* histogramErrorCode, const int channelId,
+                                        const uint32_t blobId,
+                                        const std::shared_ptr<BlobIdData>& blobIdData) {
+    ATRACE_CALL();
+    int ret;
+
+    /* Send the ioctl request (histogram_channel_request_ioctl) which increases the ref_cnt of the
+     * blobId request. The drm event is sent back with data when available. Must call
+     * sendHistogramChannelIoctl(CANCEL) to decrease the ref_cnt after the request. */
+    if ((ret = moduleDisplayInterface->sendHistogramChannelIoctl(HistogramChannelIoctl_t::REQUEST,
+                                                                 blobId)) != NO_ERROR) {
+        *histogramErrorCode = HistogramErrorCode::ENABLE_HIST_ERROR;
+        HIST_BLOB_CH_LOG(E, blobId, channelId,
+                         "ENABLE_HIST_ERROR, sendHistogramChannelIoctl(REQUEST) failed, ret(%d)",
+                         ret);
+        return;
+    }
+    blobIdData->mCollectStatus = CollectStatus_t::COLLECTING;
+}
+
+std::cv_status HistogramDevice::receiveBlobIdData(
+        ExynosDisplayDrmInterface* const moduleDisplayInterface,
+        std::vector<char16_t>* histogramBuffer, HistogramErrorCode* histogramErrorCode,
+        const int channelId, const uint32_t blobId, const std::shared_ptr<BlobIdData>& blobIdData,
+        std::unique_lock<std::mutex>& lock) {
+    ATRACE_CALL();
+
+    // Wait until the condition variable is notified or timeout.
+    std::cv_status cv_status = std::cv_status::no_timeout;
+    if (blobIdData->mCollectStatus != CollectStatus_t::COLLECTED) {
+        ATRACE_NAME(String8::format("waitDrmEvent(noMutex,blob#%u)", blobId).c_str());
+        cv_status = blobIdData->mDataCollecting_cv.wait_for(lock, std::chrono::milliseconds(50));
+    }
+
+    // Wait for the drm event is finished, decrease ref_cnt.
+    int ret;
+    if ((ret = moduleDisplayInterface->sendHistogramChannelIoctl(HistogramChannelIoctl_t::CANCEL,
+                                                                 blobId)) != NO_ERROR) {
+        HIST_BLOB_CH_LOG(W, blobId, channelId, "sendHistogramChannelIoctl(CANCEL) failed, ret(%d)",
+                         ret);
+    }
+
+    /*
+     * Case #1: timeout occurs, status is not COLLECTED
+     * Case #2: no timeout, status is not COLLECTED
+     * Case #3: timeout occurs, status is COLLECTED
+     * Case #4: no timeout, status is COLLECTED
      */
-    if (channel.histDataCollecting) {
-        if (mDisplay->isPowerModeOff()) {
-            *histogramErrorCode = HistogramErrorCode::DISPLAY_POWEROFF;
-            ALOGW("%s: histogram channel #%u: DISPLAY_POWEROFF, histogram is not available "
-                  "when "
-                  "display is off",
-                  __func__, channelId);
-        } else {
-            *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
-            ALOGE("%s: histogram channel #%u: BAD_HIST_DATA, no histogram channel event is "
-                  "handled",
-                  __func__, channelId);
-        }
-
-        /* Cancel the histogram data request */
-        ALOGI("%s: histogram channel #%u: cancel histogram data request", __func__, channelId);
-        if ((ret = moduleDisplayInterface
-                           ->sendHistogramChannelIoctl(HistogramChannelIoctl_t::CANCEL,
-                                                       channelId)) != NO_ERROR) {
-            ALOGE("%s: histogram channel #%u: sendHistogramChannelIoctl (CANCEL) error (%d)",
-                  __func__, channelId, ret);
-        }
-
-        channel.histDataCollecting = false;
-        return;
+    if (blobIdData->mCollectStatus == CollectStatus_t::COLLECTED) {
+        cv_status = std::cv_status::no_timeout; // ignore the timeout in Case #3
+        // Copy the histogram data from histogram info to histogramBuffer
+        histogramBuffer->assign(blobIdData->mData, blobIdData->mData + HISTOGRAM_BIN_COUNT);
+    } else {
+        // Case #1 and Case #2 will be checked by checkQueryResult
+        *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
+        blobIdData->mCollectStatus = CollectStatus_t::NOT_STARTED;
     }
 
+    return cv_status;
+}
+
+void HistogramDevice::checkQueryResult(std::vector<char16_t>* histogramBuffer,
+                                       HistogramErrorCode* histogramErrorCode, const int channelId,
+                                       const uint32_t blobId,
+                                       const std::cv_status cv_status) const {
+    ATRACE_CALL();
+
+    /*
+     * It may take for a while in isSecureContentPresenting() and isPowerModeOff().
+     * We should not hold any lock from the caller.
+     */
     if (mDisplay->isSecureContentPresenting()) {
-        ALOGV("%s: histogram channel #%u: DRM_PLAYING, histogram is not available when secure "
-              "content is presenting",
-              __func__, channelId);
+        HIST_BLOB_CH_LOG(V, blobId, channelId,
+                         "DRM_PLAYING, data is not available when secure content is presenting");
         *histogramErrorCode = HistogramErrorCode::DRM_PLAYING;
-        return;
+    } else if (*histogramErrorCode != HistogramErrorCode::NONE) {
+        if (cv_status == std::cv_status::timeout) {
+            if (mDisplay->isPowerModeOff()) {
+                HIST_BLOB_CH_LOG(W, blobId, channelId, "DISPLAY_POWEROFF, data is not available");
+                *histogramErrorCode = HistogramErrorCode::DISPLAY_POWEROFF;
+            } else {
+                HIST_BLOB_CH_LOG(E, blobId, channelId, "BAD_HIST_DATA, no event is handled");
+                *histogramErrorCode = HistogramErrorCode::BAD_HIST_DATA;
+            }
+        } else {
+            HIST_BLOB_CH_LOG(I, blobId, channelId, "RRS detected, cv is notified without data");
+        }
     }
 
-    /* Copy the histogram data from histogram info to histogramBuffer */
-    histogramBuffer->assign(channel.histData, channel.histData + HISTOGRAM_BIN_COUNT);
+    if (*histogramErrorCode != HistogramErrorCode::NONE) {
+        // Clear the histogramBuffer when error occurs
+        histogramBuffer->assign(HISTOGRAM_BIN_COUNT, 0);
+    }
+
+    ATRACE_NAME(aidl::com::google::hardware::pixel::display::toString(*histogramErrorCode).c_str());
 }
 
 // TODO: b/295990513 - Remove the if defined after kernel prebuilts are merged.
 #if defined(EXYNOS_HISTOGRAM_CHANNEL_REQUEST)
-int HistogramDevice::parseDrmEvent(void* event, uint8_t& channelId, char16_t*& buffer) const {
-    struct exynos_drm_histogram_channel_event* histogram_channel_event =
+int HistogramDevice::parseDrmEvent(const void* const event, uint32_t& blobId,
+                                   char16_t*& buffer) const {
+    ATRACE_NAME(String8::format("parseHistogramDrmEvent(%p)", event).c_str());
+    if (!event) {
+        HIST_LOG(E, "event is NULL");
+        return BAD_VALUE;
+    }
+
+    const struct exynos_drm_histogram_channel_event* const histogram_channel_event =
             (struct exynos_drm_histogram_channel_event*)event;
-    channelId = histogram_channel_event->hist_id;
+    blobId = histogram_channel_event->hist_id;
     buffer = (char16_t*)&histogram_channel_event->bins;
     return NO_ERROR;
 }
 #else
-int HistogramDevice::parseDrmEvent(void* event, uint8_t& channelId, char16_t*& buffer) const {
-    channelId = 0;
+int HistogramDevice::parseDrmEvent(const void* const event, uint32_t& blobId,
+                                   char16_t*& buffer) const {
+    HIST_LOG(E,
+             "not supported by kernel, struct exynos_drm_histogram_channel_event is not defined");
+    blobId = 0;
     buffer = nullptr;
     return INVALID_OPERATION;
 }
@@ -902,6 +986,10 @@ uint32_t HistogramDevice::getMatchBlobId(std::list<const BlobInfo>& blobsList,
     }
 
     return blobsList.begin()->mBlob->getId();
+}
+
+uint32_t HistogramDevice::getActiveBlobId(const std::list<const BlobInfo>& blobsList) const {
+    return blobsList.empty() ? 0 : blobsList.begin()->mBlob->getId();
 }
 
 // TODO: b/295990513 - Remove the if defined after kernel prebuilts are merged.

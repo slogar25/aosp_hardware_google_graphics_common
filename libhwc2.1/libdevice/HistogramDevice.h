@@ -164,6 +164,20 @@ public:
               : mHistogramDevice(histogramDevice), mToken(token), mPid(pid) {}
     };
 
+    enum class CollectStatus_t : uint8_t {
+        NOT_STARTED = 0,
+        COLLECTING,
+        COLLECTED,
+    };
+
+    struct BlobIdData {
+        mutable std::mutex mDataCollectingMutex;
+        uint16_t mData[HISTOGRAM_BIN_COUNT] GUARDED_BY(mDataCollectingMutex);
+        CollectStatus_t mCollectStatus GUARDED_BY(mDataCollectingMutex) =
+                CollectStatus_t::NOT_STARTED;
+        std::condition_variable mDataCollecting_cv GUARDED_BY(mDataCollectingMutex);
+    };
+
     /**
      * HistogramDevice
      *
@@ -194,7 +208,7 @@ public:
      * @crtc drm crtc object which would contain histogram related information.
      */
     void initDrm(DrmDevice& device, const DrmCrtc& crtc)
-            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * getHistogramCapability
@@ -205,7 +219,7 @@ public:
      * @return ok() when the interface is supported and arguments are valid, else otherwise.
      */
     ndk::ScopedAStatus getHistogramCapability(HistogramCapability* histogramCapability) const
-            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * registerHistogram
@@ -226,7 +240,7 @@ public:
     ndk::ScopedAStatus registerHistogram(const ndk::SpAIBinder& token,
                                          const HistogramConfig& histogramConfig,
                                          HistogramErrorCode* histogramErrorCode)
-            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * queryHistogram
@@ -244,7 +258,8 @@ public:
      */
     ndk::ScopedAStatus queryHistogram(const ndk::SpAIBinder& token,
                                       std::vector<char16_t>* histogramBuffer,
-                                      HistogramErrorCode* histogramErrorCode);
+                                      HistogramErrorCode* histogramErrorCode)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * reconfigHistogram
@@ -262,7 +277,7 @@ public:
     ndk::ScopedAStatus reconfigHistogram(const ndk::SpAIBinder& token,
                                          const HistogramConfig& histogramConfig,
                                          HistogramErrorCode* histogramErrorCode)
-            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * unregisterHistogram
@@ -278,17 +293,17 @@ public:
      */
     ndk::ScopedAStatus unregisterHistogram(const ndk::SpAIBinder& token,
                                            HistogramErrorCode* histogramErrorCode)
-            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * handleDrmEvent
      *
-     * Handle the histogram channel drm event (EXYNOS_DRM_HISTOGRAM_CHANNEL_EVENT) and copy the
+     * Handle the histogram blob drm event (EXYNOS_DRM_HISTOGRAM_CHANNEL_EVENT) and copy the
      * histogram data from event struct to channel info.
      *
-     * @event histogram channel drm event pointer (struct exynos_drm_histogram_channel_event *)
+     * @event histogram blob drm event pointer (struct exynos_drm_histogram_channel_event *)
      */
-    void handleDrmEvent(void* event);
+    void handleDrmEvent(void* event) EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * prepareAtomicCommit
@@ -334,6 +349,10 @@ private:
     std::vector<ChannelInfo> mChannels GUARDED_BY(mHistogramMutex);
     std::list<std::weak_ptr<ConfigInfo>> mInactiveConfigItList GUARDED_BY(mHistogramMutex);
 
+    mutable std::mutex mBlobIdDataMutex;
+    std::unordered_map<uint32_t, const std::shared_ptr<BlobIdData>> mBlobIdDataMap
+            GUARDED_BY(mBlobIdDataMutex);
+
     mutable std::mutex mInitDrmDoneMutex;
     bool mInitDrmDone GUARDED_BY(mInitDrmDoneMutex) = false;
     std::condition_variable mInitDrmDone_cv GUARDED_BY(mInitDrmDoneMutex);
@@ -350,7 +369,7 @@ private:
      * @reservedChannels a list of channel id that are reserved by the driver.
      */
     void initChannels(const uint8_t channelCount, const std::vector<uint8_t>& reservedChannels)
-            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * initHistogramCapability
@@ -360,7 +379,8 @@ private:
      *
      * @supportMultiChannel true if the kernel support multi channel property, false otherwise.
      */
-    void initHistogramCapability(const bool supportMultiChannel) EXCLUDES(mHistogramMutex);
+    void initHistogramCapability(const bool supportMultiChannel)
+            EXCLUDES(mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * initPlatformHistogramCapability
@@ -376,7 +396,7 @@ private:
      *
      * @return true if initDrm is finished, or false when the timeout expires.
      */
-    bool waitInitDrmDone() EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
+    bool waitInitDrmDone() EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * replaceConfigInfo
@@ -391,7 +411,7 @@ private:
      */
     void replaceConfigInfo(std::shared_ptr<ConfigInfo>& configInfo,
                            const HistogramConfig* histogramConfig) REQUIRES(mHistogramMutex)
-            EXCLUDES(mInitDrmDoneMutex);
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
      * searchTokenInfo
@@ -402,7 +422,7 @@ private:
      * @tokenInfo is the result pointer to the corresponding TokenInfo.
      */
     HistogramErrorCode searchTokenInfo(const ndk::SpAIBinder& token, TokenInfo*& tokenInfo)
-            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
      * swapInConfigInfo
@@ -415,7 +435,7 @@ private:
      */
     std::list<std::weak_ptr<ConfigInfo>>::iterator swapInConfigInfo(
             std::shared_ptr<ConfigInfo>& configInfo) REQUIRES(mHistogramMutex)
-            EXCLUDES(mInitDrmDoneMutex);
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
      * addConfigToInactiveList
@@ -425,7 +445,7 @@ private:
      * @configInfo operated configino
      */
     void addConfigToInactiveList(const std::shared_ptr<ConfigInfo>& configInfo)
-            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
      * scheduler
@@ -435,34 +455,126 @@ private:
      *
      * @return true if there is any configInfo moved to histogram channel, false otherwise.
      */
-    bool scheduler() REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
+    bool scheduler() REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+
+    /**
+     * searchOrCreateBlobIdData
+     *
+     * Search the corresponding blobIdData of blobId from mBlobIdDataMap.
+     *
+     * @blobId is the blob id to be searched in mBlobIdDataMap.
+     * @create is true if the caller would like to create blobIdData when doesn't exist.
+     * @blobIdData stores the pointer to the blobIdData if any, else point to nullptr.
+     */
+    void searchOrCreateBlobIdData(uint32_t blobId, bool create,
+                                  std::shared_ptr<BlobIdData>& blobIdData)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
+     * getChanIdBlobId
+     *
+     * Convert the token into the channelId and the blobId. ChannelId means the current applied
+     * channel (-1 if config is inactive) of the config registered by token. BlobId is the first
+     * blob id in the mBlobsList. Caller should check the histogram before using the channelId and
+     * blobId.
+     *
+     * @token is the token object registered by registerHistogram.
+     * @histogramErrorCode stores any error during query.
+     * @channelId is the channel id.
+     * @blobId is the blob id.
+     */
+    void getChanIdBlobId(const ndk::SpAIBinder& token, HistogramErrorCode* histogramErrorCode,
+                         int& channelId, uint32_t& blobId)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * getHistogramData
      *
      * Get the histogram data by sending ioctl request which will allocate the drm event for
-     * histogram, and wait on the condition variable histDataCollecting_cv until the drm event is
-     * handled or timeout. Copy the histogram data from channel info to histogramBuffer.
+     * histogram, and wait on the condition variable until the drm event is handled or timeout. Copy
+     * the histogram data from blobIdData->data to histogramBuffer.
      *
-     * @channelId histogram channel id.
+     * @token is the handle registered by the registerHistogram.
      * @histogramBuffer AIDL created buffer which will be sent back to the client.
      * @histogramErrorCode::NONE when success, or else otherwise.
      */
-    void getHistogramData(uint8_t channelId, std::vector<char16_t>* histogramBuffer,
-                          HistogramErrorCode* histogramErrorCode);
+    void getHistogramData(const ndk::SpAIBinder& token, std::vector<char16_t>* histogramBuffer,
+                          HistogramErrorCode* histogramErrorCode)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
+     * requestBlobIdData
+     *
+     * Request the drm event of the blobId via sending the ioctl which increases the ref_cnt of the
+     * blobId event request. Set the query status of blobIdData to COLLECTING.
+     *
+     * @moduleDisplayInterface display drm interface pointer
+     * @histogramErrorCode::NONE when success, or else otherwise.
+     * @channelId is the channel id of the request
+     * @blobId is the blob id of the request
+     * @blobIdData is the histogram data query related struct of the blobId
+     */
+    void requestBlobIdData(ExynosDisplayDrmInterface* const moduleDisplayInterface,
+                           HistogramErrorCode* histogramErrorCode, const int channelId,
+                           const uint32_t blobId, const std::shared_ptr<BlobIdData>& blobIdData)
+            REQUIRES(blobIdData->mDataCollectingMutex)
+                    EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
+     * receiveBlobIdData
+     *
+     * Wait for the drm event of the blobId, and copy the data into histogramBuffer if no error.
+     * Note: It may take for a while, this function should be called without any mutex held except
+     * the mDataCollectingMutex.
+     *
+     * @moduleDisplayInterface display drm interface pointer
+     * @histogramBuffer AIDL created buffer which will be sent back to the client.
+     * @histogramErrorCode::NONE when success, or else otherwise.
+     * @channelId is the channel id of the request
+     * @blobId is the blob id of the request
+     * @blobIdData is the histogram data query related struct of the blobId
+     * @lock is the unique lock of the data query request.
+     */
+    std::cv_status receiveBlobIdData(ExynosDisplayDrmInterface* const moduleDisplayInterface,
+                                     std::vector<char16_t>* histogramBuffer,
+                                     HistogramErrorCode* histogramErrorCode, const int channelId,
+                                     const uint32_t blobId,
+                                     const std::shared_ptr<BlobIdData>& blobIdData,
+                                     std::unique_lock<std::mutex>& lock)
+            REQUIRES(blobIdData->mDataCollectingMutex)
+                    EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
+     * checkQueryResult
+     *
+     * Check the query result of the receiveBlobIdData. If there is any error, store to the
+     * histogramErrorCode and clear the histogramBuffer.
+     * Note: It may take for a while, no mutex should be held from the caller.
+     *
+     * @histogramBuffer AIDL created buffer which will be sent back to the client.
+     * @histogramErrorCode::NONE when success, or else otherwise.
+     * @channelId is the channel id of the request
+     * @blobId is the blob id of the request
+     * @cv_status represents if the timeout occurs in receiveBlobIdData
+     */
+    void checkQueryResult(std::vector<char16_t>* histogramBuffer,
+                          HistogramErrorCode* histogramErrorCode, const int channelId,
+                          const uint32_t blobId, const std::cv_status cv_status) const
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * parseDrmEvent
      *
-     * Parse the histogram drm event. This function should get the histogram channel id
+     * Parse the histogram drm event. This function should get the histogram blob id
      * and the histogram buffer address from the event struct.
      *
      * @event histogram drm event struct.
-     * @channelId stores the extracted channel id from the event.
+     * @blobId stores the extracted blob id from the event.
      * @buffer stores the extracted buffer address from the event.
      * @return NO_ERROR on success, else otherwise.
      */
-    int parseDrmEvent(void* event, uint8_t& channelId, char16_t*& buffer) const;
+    int parseDrmEvent(const void* const event, uint32_t& blobId, char16_t*& buffer) const
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * cleanupChannelInfo
@@ -474,7 +586,7 @@ private:
      * @return next iterator of mUsedChannels after deletion.
      */
     std::set<const uint8_t>::iterator cleanupChannelInfo(const uint8_t channelId)
-            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
      * setChannelConfigBlob
@@ -533,6 +645,17 @@ private:
      */
     uint32_t getMatchBlobId(std::list<const BlobInfo>& blobsList, const int displayActiveH,
                             const int displayActiveV, bool& isPositionChanged) const
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+
+    /**
+     * getActiveBlobId
+     *
+     * Get the current active blob id from the blobsList. The active blob is the first blob in the
+     * list.
+     *
+     * @return the first blod id from the blobsList if any, else return 0.
+     */
+    uint32_t getActiveBlobId(const std::list<const BlobInfo>& blobsList) const
             REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
