@@ -81,6 +81,16 @@ public:
     /* Histogram weight constraint: weightR + weightG + weightB = WEIGHT_SUM */
     static constexpr size_t WEIGHT_SUM = 1024;
 
+    struct BlobInfo {
+        const int mDisplayActiveH, mDisplayActiveV;
+        const std::shared_ptr<PropertyBlob> mBlob;
+        BlobInfo(const int displayActiveH, const int displayActiveV,
+                 const std::shared_ptr<PropertyBlob>& drmConfigBlob)
+              : mDisplayActiveH(displayActiveH),
+                mDisplayActiveV(displayActiveV),
+                mBlob(drmConfigBlob) {}
+    };
+
     struct ConfigInfo {
         enum class Status_t : uint8_t {
             INITIALIZED, // Not in the inactive list and no channel assigned
@@ -91,6 +101,7 @@ public:
         const HistogramConfig mRequestedConfig;
         Status_t mStatus = Status_t::INITIALIZED;
         int mChannelId = -1;
+        std::list<const BlobInfo> mBlobsList;
         std::list<std::weak_ptr<ConfigInfo>>::iterator mInactiveListIt;
         ConfigInfo(const HistogramConfig& histogramConfig) : mRequestedConfig(histogramConfig) {}
     };
@@ -286,7 +297,8 @@ public:
      *
      * @drmReq drm atomic request object
      */
-    void prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq);
+    void prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * postAtomicCommit
@@ -296,7 +308,7 @@ public:
      *     CONFIG_BLOB_ADDED  -> CONFIG_COMMITTED
      *     DISABLE_BLOB_ADDED -> DISABLED
      */
-    void postAtomicCommit();
+    void postAtomicCommit() EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * dump
@@ -321,8 +333,6 @@ private:
     std::set<const uint8_t> mUsedChannels GUARDED_BY(mHistogramMutex);  // all - free - reserved
     std::vector<ChannelInfo> mChannels GUARDED_BY(mHistogramMutex);
     std::list<std::weak_ptr<ConfigInfo>> mInactiveConfigItList GUARDED_BY(mHistogramMutex);
-    int32_t mDisplayActiveH = 0;
-    int32_t mDisplayActiveV = 0;
 
     mutable std::mutex mInitDrmDoneMutex;
     bool mInitDrmDone GUARDED_BY(mInitDrmDoneMutex) = false;
@@ -467,48 +477,102 @@ private:
             REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
 
     /**
-     * prepareChannelCommit
+     * setChannelConfigBlob
      *
-     * For the histogram channel needed to be configured, prepare the histogram channel config into
-     * the struct histogram_channel_config which will be used to creating the drm blob in
-     * setDisplayHistogramChannelSetting.
-     * ChannelStatus_t:
-     *     CONFIG_PENDING -> CONFIG_BLOB_ADDED
-     *     CONFIG_DONE (detect roi needs update due to resolution change) -> CONFIG_BLOB_ADDED
+     * Check and detect if the histogram channel config blob needs change due to RRS. Send the
+     * config blob commit by setHistogramChannelConfigBlob.
      *
-     * For the histogram channel needed to be disabled, call clearDisplayHistogramChannelSetting to
-     * disable.
-     * ChannelStatus_t:
-     *     DISABLE_PENDING -> DISABLE_BLOB_ADDED
+     * Case RRS detected:
+     *        CONFIG_COMMITTED / CONFIG_PENDING -> CONFIG_BLOB_ADDED
+     * Case RRS not detected:
+     *        CONFIG_COMMITTED -> CONFIG_COMMITTED
+     *        CONFIG_PENDING -> CONFIG_BLOB_ADDED
      *
      * @drmReq drm atomic request object
      * @channelId histogram channel id
      * @moduleDisplayInterface display drm interface pointer
-     * @isResolutionChanged true if the resolution change is detected, false otherwise.
-     * @return NO_ERROR on success, else otherwise
+     * @displayActiveH current display active horizontal size (in pixel)
+     * @displayActiveV current display active vertical size (in pixel)
+     * @configInfo is the reference to the shared_ptr of ConfigInfo that will be updated depends on
+     * histogramConfig.
      */
-    int prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq, uint8_t channelId,
-                             ExynosDisplayDrmInterface* moduleDisplayInterface,
-                             bool isResolutionChanged);
+    void setChannelConfigBlob(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
+                              const uint8_t channelId,
+                              ExynosDisplayDrmInterface* const moduleDisplayInterface,
+                              const int displayActiveH, const int displayActiveV,
+                              const std::shared_ptr<ConfigInfo>& configInfo)
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
-     * createHistogramDrmConfigLocked
+     * clearChannelConfigBlob
      *
-     * Allocate and initialize the histogram config for the drm driver. Composer would trigger
-     * setDisplayHistogramChannelSetting and create the property blob with this config. The
-     * allcoated config should be deleted via deleteHistogramDrmConfig after the property blob
-     * is created. This function should be called with channelInfoMutex hold.
+     * Call clearHistogramChannelConfigBlob to disable the histogram channel.
+     *     Case #1: success, channel status: DISABLE_PENDING -> DISABLE_BLOB_ADDED.
+     *     Case #2: failed, channel status: DISABLE_PENDING -> DISABLE_ERROR.
      *
-     * @channel histogram channel.
-     * @configPtr shared pointer to the allocated histogram config struct.
-     * @length size of the histogram config.
-     * @return NO_ERROR on success, else otherwise
+     * @drmReq drm atomic request object
+     * @channelId histogram channel id
+     * @moduleDisplayInterface display drm interface pointer
      */
-    int createHistogramDrmConfigLocked(const ChannelInfo& channel, std::shared_ptr<void>& configPtr,
-                                       size_t& length) const REQUIRES(channel.channelInfoMutex);
+    void clearChannelConfigBlob(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
+                                const uint8_t channelId,
+                                ExynosDisplayDrmInterface* const moduleDisplayInterface)
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     /**
-     * convertRoiLocked
+     * getMatchBlobId
+     *
+     * Traverse the blobsList to find any BlobInfo matched the active size
+     * (displayActiveHxdisplayActiveV). Once found, move the BlobInfo to the front of the list which
+     * means the active blob.
+     *
+     * @blobsList contains the BlobInfo list to be searched from.
+     * @displayActiveH current display active horizontal size (in pixel)
+     * @displayActiveV current display active vertical size (in pixel)
+     * @return the blob id if found, 0 otherwise.
+     */
+    uint32_t getMatchBlobId(std::list<const BlobInfo>& blobsList, const int displayActiveH,
+                            const int displayActiveV, bool& isPositionChanged) const
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+
+    /**
+     * createDrmConfig
+     *
+     * Allocate and initialize the histogram config for the drm driver. PropertyBlob class will use
+     * this config to createPropertyBlob.
+     *
+     * @histogramConfig HistogramConfig that is requested from the client
+     * @displayActiveH current display active horizontal size (in pixel)
+     * @displayActiveV current display active vertical size (in pixel)
+     * @drmConfig shared pointer to the allocated histogram config struct.
+     * @drmConfigLength size of the histogram config.
+     * @return NO_ERROR on success, else otherwise
+     */
+    int createDrmConfig(const HistogramConfig& histogramConfig, const int displayActiveH,
+                        const int displayActiveV, std::shared_ptr<void>& drmConfig,
+                        size_t& drmConfigLength) const
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+
+    /**
+     * createDrmConfigBlob
+     *
+     * Create the drmConfigBlob for the requeste histogramConfig.
+     *
+     * @histogramConfig HistogramConfig that is requested from the client
+     * @displayActiveH current display active horizontal size (in pixel)
+     * @displayActiveV current display active vertical size (in pixel)
+     * @drmConfigBlob shared pointer to the created drmConfigBlob.
+     */
+    int createDrmConfigBlob(const HistogramConfig& histogramConfig, const int displayActiveH,
+                            const int displayActiveV,
+                            std::shared_ptr<PropertyBlob>& drmConfigBlob) const
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
+
+    std::pair<int, int> snapDisplayActiveSize() const
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
+     * convertRoi
      *
      * Linear transform the requested roi (based on panel full resolution) into the working roi
      * (active resolution).
@@ -518,8 +582,9 @@ private:
      * @workingRoi converted roi from the requested roi
      * @return NO_ERROR on success, else otherwise
      */
-    int convertRoiLocked(ExynosDisplayDrmInterface* moduleDisplayInterface,
-                         const HistogramRoiRect& requestedRoi, HistogramRoiRect& workingRoi) const;
+    int convertRoi(const HistogramRoiRect& requestedRoi, HistogramRoiRect& workingRoi,
+                   const int displayActiveH, const int displayActiveV, const char* roiType) const
+            EXCLUDES(mInitDrmDoneMutex, mBlobIdDataMutex);
 
     void dumpHistogramCapability(String8& result) const;
 
@@ -533,7 +598,8 @@ private:
     HistogramErrorCode validateHistogramBlockingRoi(
             const std::optional<HistogramRoiRect>& blockingRoi) const;
 
-    int calculateThreshold(const HistogramRoiRect& roi) const;
+    int calculateThreshold(const HistogramRoiRect& roi, const int displayActiveH,
+                           const int displayActiveV) const;
 
     static std::string toString(const ChannelStatus_t& status);
     static std::string toString(const HistogramRoiRect& roi);
