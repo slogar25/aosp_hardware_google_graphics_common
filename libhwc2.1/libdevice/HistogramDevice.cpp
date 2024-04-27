@@ -31,47 +31,23 @@
  * histogramOnBinderDied
  *
  * The binderdied callback function which is registered in registerHistogram and would trigger
- * unregisterHistogram to cleanup the channel.
+ * unregisterHistogram to cleanup the resources.
  *
  * @cookie pointer to the TokenInfo of the binder object.
  */
 static void histogramOnBinderDied(void* cookie) {
-    ATRACE_CALL();
     HistogramDevice::HistogramErrorCode histogramErrorCode;
     HistogramDevice::TokenInfo* tokenInfo = (HistogramDevice::TokenInfo*)cookie;
-    ALOGI("%s: histogram channel #%u: client with token(%p) is died", __func__,
-          tokenInfo->channelId, tokenInfo->token.get());
+    ATRACE_NAME(String8::format("%s pid=%d", __func__, tokenInfo->mPid).c_str());
+    ALOGI("%s: process %d with token(%p) is died", __func__, tokenInfo->mPid,
+          tokenInfo->mToken.get());
 
-    /* release the histogram channel */
-    tokenInfo->histogramDevice->unregisterHistogram(tokenInfo->token, &histogramErrorCode);
-
+    // release the histogram resources
+    tokenInfo->mHistogramDevice->unregisterHistogram(tokenInfo->mToken, &histogramErrorCode);
     if (histogramErrorCode != HistogramDevice::HistogramErrorCode::NONE) {
-        ALOGE("%s: histogram channel #%u: failed to unregisterHistogram: %s", __func__,
-              tokenInfo->channelId,
+        ALOGW("%s: failed to unregisterHistogram, error(%s)", __func__,
               aidl::com::google::hardware::pixel::display::toString(histogramErrorCode).c_str());
     }
-}
-
-HistogramDevice::ChannelInfo::ChannelInfo()
-      : status(ChannelStatus_t::DISABLED),
-        token(nullptr),
-        pid(-1),
-        requestedRoi(DISABLED_ROI),
-        requestedBlockingRoi(DISABLED_ROI),
-        workingConfig(),
-        threshold(0),
-        histDataCollecting(false) {}
-
-HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo& other) {
-    std::scoped_lock lock(other.channelInfoMutex);
-    status = other.status;
-    token = other.token;
-    pid = other.pid;
-    requestedRoi = other.requestedRoi;
-    requestedBlockingRoi = other.requestedBlockingRoi;
-    workingConfig = other.workingConfig;
-    threshold = other.threshold;
-    histDataCollecting = other.histDataCollecting;
 }
 
 HistogramDevice::HistogramDevice(ExynosDisplay* const display, const uint8_t channelCount,
@@ -151,7 +127,7 @@ ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& tok
     ATRACE_CALL();
 
     if (waitInitDrmDone() == false) {
-        ALOGE("%s: histogram initDrm is not completed yet", __func__);
+        HIST_LOG(E, "initDrm is not completed yet");
         // TODO: b/323158344 - add retry error in HistogramErrorCode and return here.
         return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
     }
@@ -159,19 +135,71 @@ ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& tok
     {
         std::shared_lock lock(mHistogramCapabilityMutex);
         if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-            ALOGE("%s: histogram interface is not supported", __func__);
+            HIST_LOG(E, "multi-channel interface is not supported");
             return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
         }
     }
 
-    return configHistogram(token, histogramConfig, histogramErrorCode, false);
+    ndk::ScopedAStatus binderStatus =
+            validateHistogramRequest(token, histogramConfig, histogramErrorCode);
+    if (!binderStatus.isOk() || *histogramErrorCode != HistogramErrorCode::NONE) {
+        HIST_LOG(E, "validateHistogramRequest failed");
+        return binderStatus;
+    }
+
+    bool needRefresh = false;
+
+    {
+        // Insert new client's token into mTokenInfoMap
+        SCOPED_HIST_LOCK(mHistogramMutex);
+        auto [it, emplaceResult] =
+                mTokenInfoMap.try_emplace(token.get(), this, token, AIBinder_getCallingPid());
+        if (!emplaceResult) {
+            HIST_LOG(E, "BAD_TOKEN, token(%p) is already registered", token.get());
+            *histogramErrorCode = HistogramErrorCode::BAD_TOKEN;
+            return ndk::ScopedAStatus::ok();
+        }
+        auto tokenInfo = &it->second;
+
+        /* In previous design, histogram client is attached to the histogram channel directly. Now
+         * we use struct ConfigInfo to maintain the config metadata. We can benefit from this
+         * design:
+         * 1. More elegantly to change the applied config of the histogram channels (basics of
+         *    virtualization).
+         * 2. We may be able to share the same struct ConfigInfo for different histogram clients
+         *    when the histogramConfigs via registerHistogram are the same. */
+        auto& configInfo = tokenInfo->mConfigInfo;
+        replaceConfigInfo(configInfo, &histogramConfig);
+
+        needRefresh = scheduler();
+
+        /* link the binder object (token) to the death recipient. When the binder object is
+         * destructed, the callback function histogramOnBinderDied can release the histogram
+         * resources automatically. */
+        binder_status_t status;
+        if ((status = AIBinder_linkToDeath(token.get(), mDeathRecipient, tokenInfo))) {
+            /* Not return error due to the AIBinder_linkToDeath because histogram function can
+             * still work */
+            HIST_CH_LOG(E, configInfo->mChannelId, "token(%p): AIBinder_linkToDeath error, ret(%d)",
+                        token.get(), status);
+        }
+    }
+
+    if (needRefresh) {
+        ATRACE_NAME("HistogramOnRefresh");
+        mDisplay->mDevice->onRefresh(mDisplay->mDisplayId);
+    }
+
+    HIST_LOG(D, "register client successfully");
+
+    return ndk::ScopedAStatus::ok();
 }
 #else
 ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& token,
                                                       const HistogramConfig& histogramConfig,
                                                       HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
-    ALOGE("%s: histogram interface is not supported", __func__);
+    HIST_LOG(E, "multi-channel interface is not supported");
     return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
 }
 #endif
@@ -252,12 +280,44 @@ ndk::ScopedAStatus HistogramDevice::reconfigHistogram(const ndk::SpAIBinder& tok
     {
         std::shared_lock lock(mHistogramCapabilityMutex);
         if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-            ALOGE("%s: histogram interface is not supported", __func__);
+            HIST_LOG(E, "multi-channel interface is not supported");
             return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
         }
     }
 
-    return configHistogram(token, histogramConfig, histogramErrorCode, true);
+    ndk::ScopedAStatus binderStatus =
+            validateHistogramRequest(token, histogramConfig, histogramErrorCode);
+    if (!binderStatus.isOk() || *histogramErrorCode != HistogramErrorCode::NONE) {
+        HIST_LOG(E, "validateHistogramRequest failed");
+        return binderStatus;
+    }
+
+    bool needRefresh = false;
+
+    {
+        // Search the registered tokenInfo
+        TokenInfo* tokenInfo = nullptr;
+        SCOPED_HIST_LOCK(mHistogramMutex);
+        if ((*histogramErrorCode = searchTokenInfo(token, tokenInfo)) != HistogramErrorCode::NONE) {
+            HIST_LOG(E, "searchTokenInfo failed, error(%s)",
+                     aidl::com::google::hardware::pixel::display::toString(*histogramErrorCode)
+                             .c_str());
+            return ndk::ScopedAStatus::ok();
+        }
+
+        // Change the histogram configInfo
+        auto& configInfo = tokenInfo->mConfigInfo;
+        replaceConfigInfo(configInfo, &histogramConfig);
+
+        if (configInfo->mStatus == ConfigInfo::Status_t::HAS_CHANNEL_ASSIGNED) needRefresh = true;
+    }
+
+    if (needRefresh) {
+        ATRACE_NAME("HistogramOnRefresh");
+        mDisplay->mDevice->onRefresh(mDisplay->mDisplayId);
+    }
+
+    return ndk::ScopedAStatus::ok();
 }
 
 ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder& token,
@@ -267,54 +327,63 @@ ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder& t
     {
         std::shared_lock lock(mHistogramCapabilityMutex);
         if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-            ALOGE("%s: histogram interface is not supported", __func__);
+            HIST_LOG(E, "multi-channel interface is not supported");
             return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
         }
     }
 
-    /* No need to validate the argument (token), if the token is not correct it cannot be converted
-     * to the channel id later. */
-
-    /* validate the argument (histogramErrorCode) */
+    // validate the argument (histogramErrorCode)
     if (!histogramErrorCode) {
-        ALOGE("%s: binder error, histogramErrorCode is nullptr", __func__);
+        HIST_LOG(E, "binder error, histogramErrorCode is nullptr");
         return ndk::ScopedAStatus::fromExceptionCode(EX_NULL_POINTER);
     }
 
-    /* default histogramErrorCode: no error */
+    // default histogramErrorCode: no error
     *histogramErrorCode = HistogramErrorCode::NONE;
 
-    ATRACE_BEGIN("getChannelId");
-    uint8_t channelId;
-    std::scoped_lock lock(mAllocatorMutex);
+    bool needRefresh = false;
 
-    if ((*histogramErrorCode = getChannelIdByTokenLocked(token, channelId)) !=
-        HistogramErrorCode::NONE) {
-        ATRACE_END();
-        return ndk::ScopedAStatus::ok();
-    }
-    ATRACE_END();
-
-    releaseChannelLocked(channelId);
-
-    /*
-     * If AIBinder is alive, the unregisterHistogram is triggered from the histogram client, and we
-     * need to unlink the binder object from death notification.
-     * If AIBinder is already dead, the unregisterHistogram is triggered from binderdied callback,
-     * no need to unlink here.
-     */
-    if (LIKELY(AIBinder_isAlive(token.get()))) {
-        binder_status_t status;
-        if ((status = AIBinder_unlinkToDeath(token.get(), mDeathRecipient,
-                                             &mTokenInfoMap[token.get()]))) {
-            /* Not return error due to the AIBinder_unlinkToDeath */
-            ALOGE("%s: histogram channel #%u: AIBinder_linkToDeath error %d", __func__, channelId,
-                  status);
+    {
+        // Search the registered tokenInfo
+        TokenInfo* tokenInfo = nullptr;
+        SCOPED_HIST_LOCK(mHistogramMutex);
+        if ((*histogramErrorCode = searchTokenInfo(token, tokenInfo)) != HistogramErrorCode::NONE) {
+            HIST_LOG(E, "searchTokenInfo failed, error(%s)",
+                     aidl::com::google::hardware::pixel::display::toString(*histogramErrorCode)
+                             .c_str());
+            return ndk::ScopedAStatus::ok();
         }
+
+        // Clear the histogram configInfo
+        replaceConfigInfo(tokenInfo->mConfigInfo, nullptr);
+
+        /*
+         * If AIBinder is alive, the unregisterHistogram is triggered from the histogram client, and
+         * we need to unlink the binder object from death notification. If AIBinder is already dead,
+         * the unregisterHistogram is triggered from binderdied callback, no need to unlink here.
+         */
+        if (LIKELY(AIBinder_isAlive(token.get()))) {
+            binder_status_t status;
+            if ((status = AIBinder_unlinkToDeath(token.get(), mDeathRecipient, tokenInfo))) {
+                // Not return error due to the AIBinder_unlinkToDeath
+                HIST_LOG(E, "AIBinder_unlinkToDeath error for token(%p), ret(%d)", token.get(),
+                         status);
+            }
+        }
+
+        // Delete the corresponding TokenInfo after the binder object is already unlinked.
+        mTokenInfoMap.erase(token.get());
+        tokenInfo = nullptr;
+
+        needRefresh = scheduler();
     }
 
-    /* Delete the corresponding TokenInfo after the binder object is already unlinked. */
-    mTokenInfoMap.erase(token.get());
+    if (needRefresh) {
+        ATRACE_NAME("HistogramOnRefresh");
+        mDisplay->mDevice->onRefresh(mDisplay->mDisplayId);
+    }
+
+    HIST_LOG(D, "unregister client successfully");
 
     return ndk::ScopedAStatus::ok();
 }
@@ -442,31 +511,37 @@ void HistogramDevice::dump(String8& result) const {
 
 void HistogramDevice::initChannels(const uint8_t channelCount,
                                    const std::vector<uint8_t>& reservedChannels) {
+    HIST_LOG(I, "init with %u channels", channelCount);
+
+    SCOPED_HIST_LOCK(mHistogramMutex);
     mChannels.resize(channelCount);
-    ALOGI("%s: init histogram with %d channels", __func__, channelCount);
 
     for (const uint8_t reservedChannelId : reservedChannels) {
         if (reservedChannelId < mChannels.size()) {
-            std::scoped_lock channelLock(mChannels[reservedChannelId].channelInfoMutex);
-            mChannels[reservedChannelId].status = ChannelStatus_t::RESERVED;
+            mChannels[reservedChannelId].mStatus = ChannelStatus_t::RESERVED;
+        } else {
+            HIST_CH_LOG(W, reservedChannelId,
+                        "invalid channel cannot be reserved (channelCount: %u)", channelCount);
         }
     }
 
-    std::scoped_lock lock(mAllocatorMutex);
     for (uint8_t channelId = 0; channelId < channelCount; ++channelId) {
-        std::scoped_lock channelLock(mChannels[channelId].channelInfoMutex);
-
-        if (mChannels[channelId].status == ChannelStatus_t::RESERVED) {
-            ALOGI("%s: histogram channel #%u: reserved for driver", __func__, (int)channelId);
+        if (mChannels[channelId].mStatus == ChannelStatus_t::RESERVED) {
+            HIST_CH_LOG(D, channelId, "channel reserved for driver");
             continue;
         }
 
-        mFreeChannels.push(channelId);
+        mFreeChannels.push_back(channelId);
     }
 }
 
 void HistogramDevice::initHistogramCapability(const bool supportMultiChannel) {
     ATRACE_CALL();
+    uint8_t channelCount = 0;
+    {
+        SCOPED_HIST_LOCK(mHistogramMutex);
+        channelCount = mChannels.size();
+    }
 
     ExynosDisplayDrmInterface* moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
@@ -482,86 +557,115 @@ void HistogramDevice::initHistogramCapability(const bool supportMultiChannel) {
         mHistogramCapability.fullResolutionHeight =
                 moduleDisplayInterface->getPanelFullResolutionVSize();
     }
-    mHistogramCapability.channelCount = mChannels.size();
+    mHistogramCapability.channelCount = channelCount;
     mHistogramCapability.supportMultiChannel = supportMultiChannel;
     mHistogramCapability.supportSamplePosList.push_back(HistogramSamplePos::POST_POSTPROC);
     mHistogramCapability.supportBlockingRoi = false;
     initPlatformHistogramCapability();
 }
 
-ndk::ScopedAStatus HistogramDevice::configHistogram(const ndk::SpAIBinder& token,
-                                                    const HistogramConfig& histogramConfig,
-                                                    HistogramErrorCode* histogramErrorCode,
-                                                    bool isReconfig) {
-    /* validate the argument (histogramErrorCode) */
-    if (!histogramErrorCode) {
-        ALOGE("%s: binder error, histogramErrorCode is nullptr", __func__);
-        return ndk::ScopedAStatus::fromExceptionCode(EX_NULL_POINTER);
-    }
+void HistogramDevice::replaceConfigInfo(std::shared_ptr<ConfigInfo>& configInfo,
+                                        const HistogramConfig* histogramConfig) {
+    ATRACE_CALL();
 
-    /* default histogramErrorCode: no error */
-    *histogramErrorCode = HistogramErrorCode::NONE;
+    // Capture the old ConfigInfo reference
+    std::shared_ptr<ConfigInfo> oldConfigInfo = configInfo;
 
-    /* validate the argument (token) */
-    if (token.get() == nullptr) {
-        ALOGE("%s: BAD_TOKEN, token is nullptr", __func__);
-        *histogramErrorCode = HistogramErrorCode::BAD_TOKEN;
-        return ndk::ScopedAStatus::ok();
-    }
+    // Populate the new ConfigInfo object based on the histogramConfig pointer
+    configInfo = (histogramConfig) ? std::make_shared<ConfigInfo>(*histogramConfig) : nullptr;
 
-    /* validate the argument (histogramConfig) */
-    if ((*histogramErrorCode = validateHistogramConfig(histogramConfig)) !=
-        HistogramErrorCode::NONE) {
-        return ndk::ScopedAStatus::ok();
-    }
-
-    {
-        ATRACE_BEGIN("getOrAcquireChannelId");
-        uint8_t channelId;
-        std::scoped_lock lock(mAllocatorMutex);
-
-        /* isReconfig is false: registerHistogram, need to allcoate the histogram channel
-         * isReconfig is true: reconfigHistogram, already registered, only need to get channel id
-         */
-        if (!isReconfig) {
-            if ((*histogramErrorCode = acquireChannelLocked(token, channelId)) !=
-                HistogramErrorCode::NONE) {
-                ATRACE_END();
-                return ndk::ScopedAStatus::ok();
-            }
+    if (!oldConfigInfo && !configInfo) {
+        return;
+    } else if (!oldConfigInfo && configInfo) { // Case #1: registerHistogram
+        addConfigToInactiveList(configInfo);
+    } else if (oldConfigInfo && configInfo) { // Case #2: reconfigHistogram
+        if (oldConfigInfo->mStatus == ConfigInfo::Status_t::HAS_CHANNEL_ASSIGNED) {
+            configInfo->mStatus = ConfigInfo::Status_t::HAS_CHANNEL_ASSIGNED;
+            configInfo->mChannelId = oldConfigInfo->mChannelId;
+            mChannels[configInfo->mChannelId].mStatus = ChannelStatus_t::CONFIG_PENDING;
+            mChannels[configInfo->mChannelId].mConfigInfo = configInfo;
+        } else if (oldConfigInfo->mStatus == ConfigInfo::Status_t::IN_INACTIVE_LIST) {
+            configInfo->mStatus = ConfigInfo::Status_t::IN_INACTIVE_LIST;
+            configInfo->mInactiveListIt = oldConfigInfo->mInactiveListIt;
+            *(configInfo->mInactiveListIt) = configInfo;
         } else {
-            if ((*histogramErrorCode = getChannelIdByTokenLocked(token, channelId)) !=
-                HistogramErrorCode::NONE) {
-                ATRACE_END();
-                return ndk::ScopedAStatus::ok();
-            }
+            addConfigToInactiveList(configInfo);
         }
-        ATRACE_END();
+    } else if (oldConfigInfo && !configInfo) { // Case #3: unregisterHistogram
+        if (oldConfigInfo->mStatus == ConfigInfo::Status_t::HAS_CHANNEL_ASSIGNED)
+            cleanupChannelInfo(oldConfigInfo->mChannelId);
+        else if (oldConfigInfo->mStatus == ConfigInfo::Status_t::IN_INACTIVE_LIST)
+            mInactiveConfigItList.erase(oldConfigInfo->mInactiveListIt);
 
-        /* store the histogram information, and mark the channel ready for atomic commit by setting
-         * the status to CONFIG_PENDING */
-        fillupChannelInfo(channelId, token, histogramConfig);
+        oldConfigInfo->mStatus = ConfigInfo::Status_t::INITIALIZED;
+    }
+}
 
-        if (!isReconfig) {
-            /* link the binder object (token) to the death recipient. When the binder object is
-             * destructed, the callback function histogramOnBinderDied can release the histogram
-             * resources automatically. */
-            binder_status_t status;
-            if ((status = AIBinder_linkToDeath(token.get(), mDeathRecipient,
-                                               &mTokenInfoMap[token.get()]))) {
-                /* Not return error due to the AIBinder_linkToDeath because histogram function can
-                 * still work */
-                ALOGE("%s: histogram channel #%u: AIBinder_linkToDeath error %d", __func__,
-                      channelId, status);
-            }
-        }
+HistogramDevice::HistogramErrorCode HistogramDevice::searchTokenInfo(const ndk::SpAIBinder& token,
+                                                                     TokenInfo*& tokenInfo) {
+    auto it = mTokenInfoMap.find(token.get());
+
+    if (it == mTokenInfoMap.end()) {
+        HIST_LOG(E, "BAD_TOKEN, token(%p) is not registered", token.get());
+        tokenInfo = nullptr;
+        return HistogramErrorCode::BAD_TOKEN;
     }
 
-    if (!mDisplay->isPowerModeOff()) {
-        mDisplay->mDevice->onRefresh(mDisplay->mDisplayId);
+    tokenInfo = &it->second;
+    return HistogramErrorCode::NONE;
+}
+
+std::list<std::weak_ptr<HistogramDevice::ConfigInfo>>::iterator HistogramDevice::swapInConfigInfo(
+        std::shared_ptr<ConfigInfo>& configInfo) {
+    // Acquire a free histogram channel, pdate used and free channels
+    const uint8_t channelId = mFreeChannels.front();
+    mFreeChannels.pop_front();
+    mUsedChannels.insert(channelId);
+
+    // update the ChannelInfo
+    ChannelInfo& channel = mChannels[channelId];
+    channel.mStatus = ChannelStatus_t::CONFIG_PENDING;
+    channel.mConfigInfo = configInfo;
+
+    // update the configInfo and the inactive list
+    configInfo->mStatus = ConfigInfo::Status_t::HAS_CHANNEL_ASSIGNED;
+    configInfo->mChannelId = channelId;
+    auto it = mInactiveConfigItList.erase(configInfo->mInactiveListIt);
+    configInfo->mInactiveListIt = mInactiveConfigItList.end();
+
+    return it;
+}
+
+void HistogramDevice::addConfigToInactiveList(const std::shared_ptr<ConfigInfo>& configInfo) {
+    configInfo->mChannelId = -1;
+    configInfo->mStatus = ConfigInfo::Status_t::IN_INACTIVE_LIST;
+    configInfo->mInactiveListIt =
+            mInactiveConfigItList.emplace(mInactiveConfigItList.end(), configInfo);
+}
+
+bool HistogramDevice::scheduler() {
+    ATRACE_CALL();
+
+    bool needRefresh = false;
+
+    for (auto it = mInactiveConfigItList.begin(); it != mInactiveConfigItList.end();) {
+        if (mFreeChannels.empty()) break;
+
+        auto configInfo = it->lock();
+        if (!configInfo) {
+            HIST_LOG(W, "find expired configInfo ptr in mInactiveConfigItList, review code!");
+            it = mInactiveConfigItList.erase(it);
+            continue;
+        }
+
+        // Requires an onRefresh call to apply the config change of the channel
+        needRefresh = true;
+
+        // Swap in the config
+        it = swapInConfigInfo(configInfo);
     }
 
-    return ndk::ScopedAStatus::ok();
+    return needRefresh;
 }
 
 void HistogramDevice::getHistogramData(uint8_t channelId, std::vector<char16_t>* histogramBuffer,
@@ -670,77 +774,11 @@ int HistogramDevice::parseDrmEvent(void* event, uint8_t& channelId, char16_t*& b
 }
 #endif
 
-HistogramDevice::HistogramErrorCode HistogramDevice::acquireChannelLocked(
-        const ndk::SpAIBinder& token, uint8_t& channelId) {
-    ATRACE_CALL();
-    if (mFreeChannels.size() == 0) {
-        ALOGE("%s: NO_CHANNEL_AVAILABLE, there is no histogram channel available", __func__);
-        return HistogramErrorCode::NO_CHANNEL_AVAILABLE;
-    }
-
-    if (mTokenInfoMap.find(token.get()) != mTokenInfoMap.end()) {
-        ALOGE("%s: BAD_TOKEN, token (%p) is already registered", __func__, token.get());
-        return HistogramErrorCode::BAD_TOKEN;
-    }
-
-    /* Acquire free channel id from the free list */
-    channelId = mFreeChannels.front();
-    mFreeChannels.pop();
-    mTokenInfoMap[token.get()] = {.channelId = channelId, .histogramDevice = this, .token = token};
-
-    return HistogramErrorCode::NONE;
-}
-
-void HistogramDevice::releaseChannelLocked(uint8_t channelId) {
-    /* Add the channel id back to the free list and cleanup the channel info with status set to
-     * DISABLE_PENDING */
-    mFreeChannels.push(channelId);
-    cleanupChannelInfo(channelId);
-}
-
-HistogramDevice::HistogramErrorCode HistogramDevice::getChannelIdByTokenLocked(
-        const ndk::SpAIBinder& token, uint8_t& channelId) {
-    if (mTokenInfoMap.find(token.get()) == mTokenInfoMap.end()) {
-        ALOGE("%s: BAD_TOKEN, token (%p) is not registered", __func__, token.get());
-        return HistogramErrorCode::BAD_TOKEN;
-    }
-
-    channelId = mTokenInfoMap[token.get()].channelId;
-
-    return HistogramErrorCode::NONE;
-}
-
-void HistogramDevice::cleanupChannelInfo(uint8_t channelId) {
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
-    ChannelInfo& channel = mChannels[channelId];
-    std::scoped_lock lock(channel.channelInfoMutex);
-    channel.status = ChannelStatus_t::DISABLE_PENDING;
-    channel.token = nullptr;
-    channel.pid = -1;
-    channel.requestedRoi = DISABLED_ROI;
-    channel.requestedBlockingRoi = DISABLED_ROI;
-    channel.workingConfig = {.roi = DISABLED_ROI,
-                             .weights.weightR = 0,
-                             .weights.weightG = 0,
-                             .weights.weightB = 0,
-                             .samplePos = HistogramSamplePos::POST_POSTPROC,
-                             .blockingRoi = DISABLED_ROI};
-    channel.threshold = 0;
-}
-
-void HistogramDevice::fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder& token,
-                                        const HistogramConfig& histogramConfig) {
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
-    ChannelInfo& channel = mChannels[channelId];
-    std::scoped_lock lock(channel.channelInfoMutex);
-    channel.status = ChannelStatus_t::CONFIG_PENDING;
-    channel.token = token;
-    channel.pid = AIBinder_getCallingPid();
-    channel.requestedRoi = histogramConfig.roi;
-    channel.requestedBlockingRoi = histogramConfig.blockingRoi.value_or(DISABLED_ROI);
-    channel.workingConfig = histogramConfig;
-    channel.workingConfig.roi = DISABLED_ROI;
-    channel.workingConfig.blockingRoi = DISABLED_ROI;
+std::set<const uint8_t>::iterator HistogramDevice::cleanupChannelInfo(const uint8_t channelId) {
+    mChannels[channelId].mStatus = ChannelStatus_t::DISABLE_PENDING;
+    mChannels[channelId].mConfigInfo.reset();
+    mFreeChannels.push_back(channelId);
+    return mUsedChannels.erase(mUsedChannels.find(channelId));
 }
 
 int HistogramDevice::prepareChannelCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq,
@@ -939,6 +977,34 @@ void HistogramDevice::dumpHistogramCapability(String8& result) const {
     result.appendFormat("\n");
 }
 
+ndk::ScopedAStatus HistogramDevice::validateHistogramRequest(
+        const ndk::SpAIBinder& token, const HistogramConfig& histogramConfig,
+        HistogramErrorCode* histogramErrorCode) const {
+    // validate the argument (histogramErrorCode)
+    if (!histogramErrorCode) {
+        HIST_LOG(E, "binder error, histogramErrorCode is nullptr");
+        return ndk::ScopedAStatus::fromExceptionCode(EX_NULL_POINTER);
+    }
+
+    // default histogramErrorCode: no error
+    *histogramErrorCode = HistogramErrorCode::NONE;
+
+    // validate the argument (token)
+    if (token.get() == nullptr) {
+        HIST_LOG(E, "BAD_TOKEN, token is nullptr");
+        *histogramErrorCode = HistogramErrorCode::BAD_TOKEN;
+        return ndk::ScopedAStatus::ok();
+    }
+
+    // validate the argument (histogramConfig)
+    if ((*histogramErrorCode = validateHistogramConfig(histogramConfig)) !=
+        HistogramErrorCode::NONE) {
+        return ndk::ScopedAStatus::ok();
+    }
+
+    return ndk::ScopedAStatus::ok();
+}
+
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramConfig(
         const HistogramConfig& histogramConfig) const {
     HistogramErrorCode ret;
@@ -963,9 +1029,9 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramRoi(
     if ((roi.left < 0) || (roi.top < 0) || (roi.right - roi.left <= 0) ||
         (roi.bottom - roi.top <= 0) || (roi.right > mHistogramCapability.fullResolutionWidth) ||
         (roi.bottom > mHistogramCapability.fullResolutionHeight)) {
-        ALOGE("%s: BAD_ROI, %sroi: %s, full screen roi: (0,0)x(%dx%d)", __func__, roiType,
-              toString(roi).c_str(), mHistogramCapability.fullResolutionWidth,
-              mHistogramCapability.fullResolutionHeight);
+        HIST_LOG(E, "BAD_ROI, %sroi: %s, full screen roi: (0,0)x(%dx%d)", roiType,
+                 toString(roi).c_str(), mHistogramCapability.fullResolutionWidth,
+                 mHistogramCapability.fullResolutionHeight);
         return HistogramErrorCode::BAD_ROI;
     }
 
@@ -975,8 +1041,7 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramRoi(
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramWeights(
         const HistogramWeights& weights) const {
     if ((weights.weightR + weights.weightG + weights.weightB) != WEIGHT_SUM) {
-        ALOGE("%s: BAD_WEIGHT, weights(%d,%d,%d)\n", __func__, weights.weightR, weights.weightG,
-              weights.weightB);
+        HIST_LOG(E, "BAD_WEIGHT, weights%s", toString(weights).c_str());
         return HistogramErrorCode::BAD_WEIGHT;
     }
 
@@ -991,23 +1056,24 @@ HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramSamplePos(
         }
     }
 
-    ALOGE("%s: BAD_POSITION, samplePos is %d", __func__, (int)samplePos);
+    HIST_LOG(E, "BAD_POSITION, samplePos is %s",
+             aidl::com::google::hardware::pixel::display::toString(samplePos).c_str());
     return HistogramErrorCode::BAD_POSITION;
 }
 
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramBlockingRoi(
         const std::optional<HistogramRoiRect>& blockingRoi) const {
-    /* If the platform doesn't support blockingRoi, client should not enable blockingRoi  */
+    // If the platform doesn't support blockingRoi, client should not enable blockingRoi
     if (mHistogramCapability.supportBlockingRoi == false) {
         if (blockingRoi.has_value() && blockingRoi.value() != DISABLED_ROI) {
-            ALOGE("%s: BAD_ROI, platform doesn't support blockingRoi, requested: %s", __func__,
-                  toString(blockingRoi.value()).c_str());
+            HIST_LOG(E, "BAD_ROI, platform doesn't support blockingRoi, requested: %s",
+                     toString(blockingRoi.value()).c_str());
             return HistogramErrorCode::BAD_ROI;
         }
         return HistogramErrorCode::NONE;
     }
 
-    /* For the platform that supports blockingRoi, use the same validate rule as roi */
+    // For the platform that supports blockingRoi, use the same validate rule as roi
     return validateHistogramRoi(blockingRoi.value_or(DISABLED_ROI), "blocking ");
 }
 

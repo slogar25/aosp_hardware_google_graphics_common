@@ -27,8 +27,9 @@
 #include <utils/String8.h>
 
 #include <condition_variable>
+#include <list>
+#include <memory>
 #include <mutex>
-#include <queue>
 #include <shared_mutex>
 #include <unordered_map>
 
@@ -80,6 +81,20 @@ public:
     /* Histogram weight constraint: weightR + weightG + weightB = WEIGHT_SUM */
     static constexpr size_t WEIGHT_SUM = 1024;
 
+    struct ConfigInfo {
+        enum class Status_t : uint8_t {
+            INITIALIZED, // Not in the inactive list and no channel assigned
+            IN_INACTIVE_LIST,
+            HAS_CHANNEL_ASSIGNED,
+        };
+
+        const HistogramConfig mRequestedConfig;
+        Status_t mStatus = Status_t::INITIALIZED;
+        int mChannelId = -1;
+        std::list<std::weak_ptr<ConfigInfo>>::iterator mInactiveListIt;
+        ConfigInfo(const HistogramConfig& histogramConfig) : mRequestedConfig(histogramConfig) {}
+    };
+
     /* Histogram channel status */
     enum class ChannelStatus_t : uint32_t {
         /* occupied by the driver for specific usage such as LHBM */
@@ -111,56 +126,31 @@ public:
     };
 
     struct ChannelInfo {
-        /* protect the channel info fields */
-        mutable std::mutex channelInfoMutex;
-
-        /* protect histDataCollecting variable */
-        mutable std::mutex histDataCollectingMutex;
-
         /* track the channel status */
-        ChannelStatus_t status GUARDED_BY(channelInfoMutex);
+        ChannelStatus_t mStatus;
+        std::weak_ptr<ConfigInfo> mConfigInfo;
 
-        /* token passed in by the histogram client */
-        ndk::SpAIBinder token GUARDED_BY(channelInfoMutex);
-
-        /* histogram client process id */
-        pid_t pid GUARDED_BY(channelInfoMutex);
-
-        /* requested roi from the client by registerHistogram or reconfigHistogram */
-        HistogramRoiRect requestedRoi GUARDED_BY(channelInfoMutex);
-
-        /* requested blocking roi from the client by registerHistogram or reconfigHistogram */
-        HistogramRoiRect requestedBlockingRoi GUARDED_BY(channelInfoMutex);
-
-        /* histogram config that would be applied to hardware, the requestedRoi may be different
-         * from the roi described in workingConfig due to RRS (Runtime Resolution Switch) */
-        HistogramConfig workingConfig GUARDED_BY(channelInfoMutex);
-
-        /* histogram threshold that would be applied to the hardware which is used to prevent the
-         * histogram data (16 bits) overflow */
-        int threshold GUARDED_BY(channelInfoMutex);
-
-        /* histogram data would be stored as part of the channel info */
-        uint16_t histData[HISTOGRAM_BIN_COUNT];
-        bool histDataCollecting; // GUARDED_BY(histDataCollectingMutex);
-        std::condition_variable histDataCollecting_cv;
-
-        ChannelInfo();
-        ChannelInfo(const ChannelInfo& other);
+        ChannelInfo() : mStatus(ChannelStatus_t::DISABLED) {}
+        ChannelInfo(const ChannelInfo& other) {}
     };
 
-    /* TokenInfo is not only used to stored the corresponding channel id but also passed to the
-     * binderdied callback */
     struct TokenInfo {
-        /* corresponding channel id of the token */
-        uint8_t channelId;
+        /* The binderdied callback would call unregisterHistogram (member function of this object)
+         * to release resource. */
+        HistogramDevice* const mHistogramDevice;
 
-        /* pointer to the HistogramDevice, binderdied callback would use this pointer to cleanup the
-         * channel in HistogramDevice by the member function unregisterHistogram */
-        HistogramDevice* histogramDevice;
+        /* The binderdied callback would call unregisterHistogram with this token to release
+         * resource. */
+        const ndk::SpAIBinder mToken;
 
-        /* binderdied callback would call unregisterHistogram with this token */
-        ndk::SpAIBinder token;
+        /* The process id of the client that calls registerHistogram. */
+        const pid_t mPid;
+
+        /* The shared pointer to the ConfigInfo. */
+        std::shared_ptr<ConfigInfo> mConfigInfo;
+
+        TokenInfo(HistogramDevice* histogramDevice, const ndk::SpAIBinder& token, pid_t pid)
+              : mHistogramDevice(histogramDevice), mToken(token), mPid(pid) {}
     };
 
     /**
@@ -192,7 +182,8 @@ public:
      * @device drm device object which will be used to create the config blob.
      * @crtc drm crtc object which would contain histogram related information.
      */
-    void initDrm(DrmDevice& device, const DrmCrtc& crtc) EXCLUDES(mInitDrmDoneMutex);
+    void initDrm(DrmDevice& device, const DrmCrtc& crtc)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
 
     /**
      * getHistogramCapability
@@ -203,15 +194,15 @@ public:
      * @return ok() when the interface is supported and arguments are valid, else otherwise.
      */
     ndk::ScopedAStatus getHistogramCapability(HistogramCapability* histogramCapability) const
-            EXCLUDES(mInitDrmDoneMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
 
     /**
      * registerHistogram
      *
-     * Register the histogram sampling config, and allocate a histogram channel if available.
-     * If the display is not turned on, just store the histogram config. Otherwise, trigger the
-     * onRefresh call to force the config take effect, and then the DPU hardware will continuously
-     * sample the histogram data.
+     * Register the histogram sampling config, and queue into the mInactiveConfigItList. Scheduler
+     * will help to apply the config if possible. If the display is not turned on, just store the
+     * histogram config. Otherwise, trigger the onRefresh call to force the config take effect, and
+     * then the DPU hardware will continuously sample the histogram data.
      *
      * @token binder object created by the client whose lifetime should be equal to the client. When
      * the binder object is destructed, the unregisterHistogram would be called automatically. Token
@@ -223,7 +214,8 @@ public:
      */
     ndk::ScopedAStatus registerHistogram(const ndk::SpAIBinder& token,
                                          const HistogramConfig& histogramConfig,
-                                         HistogramErrorCode* histogramErrorCode);
+                                         HistogramErrorCode* histogramErrorCode)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
 
     /**
      * queryHistogram
@@ -258,7 +250,8 @@ public:
      */
     ndk::ScopedAStatus reconfigHistogram(const ndk::SpAIBinder& token,
                                          const HistogramConfig& histogramConfig,
-                                         HistogramErrorCode* histogramErrorCode);
+                                         HistogramErrorCode* histogramErrorCode)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
 
     /**
      * unregisterHistogram
@@ -273,7 +266,8 @@ public:
      * is not supported yet.
      */
     ndk::ScopedAStatus unregisterHistogram(const ndk::SpAIBinder& token,
-                                           HistogramErrorCode* histogramErrorCode);
+                                           HistogramErrorCode* histogramErrorCode)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
 
     /**
      * handleDrmEvent
@@ -321,10 +315,12 @@ private:
     ExynosDisplay* const mDisplay;
     DrmDevice* mDrmDevice = nullptr;
 
-    mutable std::mutex mAllocatorMutex;
-    std::queue<uint8_t> mFreeChannels GUARDED_BY(mAllocatorMutex); // free channel list
-    std::unordered_map<AIBinder*, TokenInfo> mTokenInfoMap GUARDED_BY(mAllocatorMutex);
-    std::vector<ChannelInfo> mChannels;
+    mutable std::mutex mHistogramMutex;
+    std::unordered_map<AIBinder*, TokenInfo> mTokenInfoMap GUARDED_BY(mHistogramMutex);
+    std::list<const uint8_t> mFreeChannels GUARDED_BY(mHistogramMutex); // free channel list
+    std::set<const uint8_t> mUsedChannels GUARDED_BY(mHistogramMutex);  // all - free - reserved
+    std::vector<ChannelInfo> mChannels GUARDED_BY(mHistogramMutex);
+    std::list<std::weak_ptr<ConfigInfo>> mInactiveConfigItList GUARDED_BY(mHistogramMutex);
     int32_t mDisplayActiveH = 0;
     int32_t mDisplayActiveV = 0;
 
@@ -344,7 +340,7 @@ private:
      * @reservedChannels a list of channel id that are reserved by the driver.
      */
     void initChannels(const uint8_t channelCount, const std::vector<uint8_t>& reservedChannels)
-            EXCLUDES(mInitDrmDoneMutex);
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
 
     /**
      * initHistogramCapability
@@ -354,7 +350,7 @@ private:
      *
      * @supportMultiChannel true if the kernel support multi channel property, false otherwise.
      */
-    void initHistogramCapability(const bool supportMultiChannel);
+    void initHistogramCapability(const bool supportMultiChannel) EXCLUDES(mHistogramMutex);
 
     /**
      * initPlatformHistogramCapability
@@ -370,22 +366,66 @@ private:
      *
      * @return true if initDrm is finished, or false when the timeout expires.
      */
-    bool waitInitDrmDone() EXCLUDES(mInitDrmDoneMutex);
+    bool waitInitDrmDone() EXCLUDES(mInitDrmDoneMutex, mHistogramMutex);
 
     /**
-     * configHistogram
+     * replaceConfigInfo
      *
-     * Implementation of the registerHistogram and reconfigHistogram.
+     * If histogramConfig is not nullptr, the configInfo pointer will point to the generated
+     * ConfigInfo of the histogramConfig. Otherwise, histogramConfig is reset to the nullptr.
+     * For the original ConfigInfo, every created blob will be released.
      *
-     * @token binder object created by the client.
-     * @histogramConfig histogram config requested by the client.
-     * @histogramErrorCode::NONE when success, or else otherwise.
-     * @isReconfig is true if it is not the register request, only need to change the config.
-     * @return ok() when the interface is supported, or else otherwise.
+     * @configInfo is the reference to the shared_ptr of ConfigInfo that will be updated depends on
+     * histogramConfig.
+     * @histogramConfig is the new requested config or nullptr to clear the configInfo ptr.
      */
-    ndk::ScopedAStatus configHistogram(const ndk::SpAIBinder& token,
-                                       const HistogramConfig& histogramConfig,
-                                       HistogramErrorCode* histogramErrorCode, bool isReconfig);
+    void replaceConfigInfo(std::shared_ptr<ConfigInfo>& configInfo,
+                           const HistogramConfig* histogramConfig) REQUIRES(mHistogramMutex)
+            EXCLUDES(mInitDrmDoneMutex);
+
+    /**
+     * searchTokenInfo
+     *
+     * Search the corresponding TokenInfo of the token object.
+     *
+     * @token is the key to be searched.
+     * @tokenInfo is the result pointer to the corresponding TokenInfo.
+     */
+    HistogramErrorCode searchTokenInfo(const ndk::SpAIBinder& token, TokenInfo*& tokenInfo)
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
+
+    /**
+     * swapInConfigInfo
+     *
+     * Move the configInfo from the mInactiveConfigItList to the first free channel. Caller should
+     * ensure mFreeChannels is not empty.
+     *
+     * @configInfo is the config to be moved from inactive list to the histogram channel.
+     * @return is the iterator of the next object in the mInactiveConfigItList after deletion.
+     */
+    std::list<std::weak_ptr<ConfigInfo>>::iterator swapInConfigInfo(
+            std::shared_ptr<ConfigInfo>& configInfo) REQUIRES(mHistogramMutex)
+            EXCLUDES(mInitDrmDoneMutex);
+
+    /**
+     * addConfigToInactiveList
+     *
+     * Add the configInfo (status is NOT_READY) into mInactiveConfigItList.
+     *
+     * @configInfo operated configino
+     */
+    void addConfigToInactiveList(const std::shared_ptr<ConfigInfo>& configInfo)
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
+
+    /**
+     * scheduler
+     *
+     * Move every configInfo from the mInactiveConfigItList to the idle histogram channel until no
+     * idle channel exists.
+     *
+     * @return true if there is any configInfo moved to histogram channel, false otherwise.
+     */
+    bool scheduler() REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
 
     /**
      * getHistogramData
@@ -415,62 +455,16 @@ private:
     int parseDrmEvent(void* event, uint8_t& channelId, char16_t*& buffer) const;
 
     /**
-     * acquireChannelLocked
-     *
-     * Acquire an available channel from the mFreeChannels, and record the token to channel id
-     * mapping info. Should be called with mAllocatorMutex held.
-     *
-     * @token binder object created by the client.
-     * @channelId store the acquired channel id.
-     * @return HistogramErrorCode::NONE when success, or else otherwise.
-     */
-    HistogramErrorCode acquireChannelLocked(const ndk::SpAIBinder& token, uint8_t& channelId)
-            REQUIRES(mAllocatorMutex);
-
-    /**
-     * releaseChannelLocked
-     *
-     * Find the corresponding channel id of the token and release the channel. Add the channel id to
-     * the mFreeChannels and cleanup the channel. Should be called with mAllocatorMutex held.
-     *
-     * @channelId the channel id to be cleanup.
-     */
-    void releaseChannelLocked(uint8_t channelId) REQUIRES(mAllocatorMutex);
-
-    /**
-     * getChannelIdByTokenLocked
-     *
-     * Convert the token to the channel id. Should be called with mAllocatorMutex held.
-     *
-     * @token binder object created by the client.
-     * @return HistogramErrorCode::NONE when success, or else otherwise.
-     */
-    HistogramErrorCode getChannelIdByTokenLocked(const ndk::SpAIBinder& token, uint8_t& channelId)
-            REQUIRES(mAllocatorMutex);
-
-    /**
      * cleanupChannelInfo
      *
      * Cleanup the channel info and set status to DISABLE_PENDING which means need to wait
      * for the atomic commit to release the kernel and hardware channel resources.
      *
      * @channelId the channel id to be cleanup.
+     * @return next iterator of mUsedChannels after deletion.
      */
-    void cleanupChannelInfo(uint8_t channelId);
-
-    /**
-     * fillupChannelInfo
-     *
-     * Fillup the channel info with the histogramConfig from the client, and set status to
-     * CONFIG_PENDING which means need to wait for the atomic commit to configure the
-     * channel.
-     *
-     * @channelId the channel id to be configured.
-     * @token binder object created by the client.
-     * @histogramConfig histogram config requested by the client.
-     */
-    void fillupChannelInfo(uint8_t channelId, const ndk::SpAIBinder& token,
-                           const HistogramConfig& histogramConfig);
+    std::set<const uint8_t>::iterator cleanupChannelInfo(const uint8_t channelId)
+            REQUIRES(mHistogramMutex) EXCLUDES(mInitDrmDoneMutex);
 
     /**
      * prepareChannelCommit
@@ -529,6 +523,9 @@ private:
 
     void dumpHistogramCapability(String8& result) const;
 
+    ndk::ScopedAStatus validateHistogramRequest(const ndk::SpAIBinder& token,
+                                                const HistogramConfig& histogramConfig,
+                                                HistogramErrorCode* histogramErrorCode) const;
     HistogramErrorCode validateHistogramConfig(const HistogramConfig& histogramConfig) const;
     HistogramErrorCode validateHistogramRoi(const HistogramRoiRect& roi, const char* roiType) const;
     HistogramErrorCode validateHistogramWeights(const HistogramWeights& weights) const;
