@@ -290,6 +290,7 @@ void VariableRefreshRateController::preSetPowerMode(int32_t powerMode) {
                 if (!mFileNode->WriteUint32(kRefreshControlNodeName, command)) {
                     LOG(ERROR) << "VrrController: write file node error, command = " << command;
                 }
+                dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
                 return;
             }
             case HWC_POWER_MODE_OFF:
@@ -866,7 +867,8 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
 bool VariableRefreshRateController::shouldHandleVendorRenderingTimeout() const {
     return (mPresentTimeoutController == PresentTimeoutControllerType::kSoftware) &&
             ((!mVendorPresentTimeoutOverride) ||
-             (mVendorPresentTimeoutOverride.value().mSchedule.size() > 0));
+             (mVendorPresentTimeoutOverride.value().mSchedule.size() > 0)) &&
+            (mPowerMode == HWC_POWER_MODE_NORMAL);
 }
 
 void VariableRefreshRateController::threadBody() {
