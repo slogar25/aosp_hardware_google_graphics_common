@@ -189,7 +189,6 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
         return v1.first < v2.first;
     };
 
-    size_t maxStringLength = 0;
     // Convert candidate DisplayConfigProfiles into a string.
     std::set<std::pair<std::string, PowerStatsPresentProfile>, decltype(comp)> States;
     for (const auto& powerStatsPresentProfile : powerStatsPresentProfileCandidates) {
@@ -197,8 +196,7 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
         mPowerStatsPresentProfileTokenGenerator.setPowerStatsPresentProfile(
                 &powerStatsPresentProfile);
         for (const auto& pattern : mDisplayStateResidencyPattern) {
-            const auto& token =
-                    mPowerStatsPresentProfileTokenGenerator.generateToken(pattern.first);
+            const auto token = mPowerStatsPresentProfileTokenGenerator.generateToken(pattern.first);
             if (token.has_value()) {
                 stateName += token.value();
                 // Handle special case when mode is 'OFF'.
@@ -212,7 +210,6 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
             }
             stateName += pattern.second;
         }
-        maxStringLength = std::max(maxStringLength, stateName.length());
         States.insert(std::make_pair(stateName, powerStatsPresentProfile));
     }
 
@@ -221,21 +218,16 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
     int id = 0;
     int index = 0;
     for (const auto& state : States) {
-        // Perform alignment for improved visualization.
-        std::string stateName;
-        if (maxStringLength > state.first.length()) {
-            stateName.append(maxStringLength - state.first.length(), ' ');
-        }
-        stateName += state.first;
-        mStates.push_back({id, stateName});
+        mStates.push_back({id, state.first});
         mPowerStatsPresentProfileToIdMap[state.second] = id;
         mStateResidency[index++].id = id;
         ++id;
     }
+
 #ifdef DEBUG_VRR_POWERSTATS
     for (const auto& state : mStates) {
-        ALOGI("DisplayStateResidencyProvider state id = %d, content = %s", state.id,
-              state.name.c_str());
+        ALOGI("DisplayStateResidencyProvider state id = %d, content = %s, len = %ld", state.id,
+              state.name.c_str(), state.name.length());
     }
 #endif
 }
