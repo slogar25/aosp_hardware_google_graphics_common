@@ -125,11 +125,6 @@ public:
     virtual std::vector<TimedEvent> getHandleEvents() = 0;
 
     virtual std::function<int()> getHandleFunction() = 0;
-
-    // TODO(315887105): We shouldn't ideally place this API here, but for the sake of quickly
-    // implementing the HW/SW present timeout handling switch solution, it's temporarily placed here
-    // for now,
-    virtual void enablePanelAutoFrameInsertionMode(bool enabled) = 0;
 };
 
 } // namespace android::hardware::graphics::composer
