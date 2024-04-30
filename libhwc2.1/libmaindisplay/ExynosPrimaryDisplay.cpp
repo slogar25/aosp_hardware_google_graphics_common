@@ -1318,7 +1318,6 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
             maxMinIdleFps = mRrThrottleFps[i];
         }
     }
-    if (maxMinIdleFps == mMinIdleRefreshRate) return NO_ERROR;
 
     {
         std::lock_guard<std::mutex> lock(mPowerModeMutex);
@@ -1337,6 +1336,8 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
                   proximityActive ? "active" : "inactive", targetFps, dozeMode);
             mDisplayTe2Manager->updateTe2OptionForProximity(proximityActive, targetFps, dozeMode);
         }
+
+        if (maxMinIdleFps == mMinIdleRefreshRate) return NO_ERROR;
 
         if (mVariableRefreshRateController) {
             if (dozeMode && maxMinIdleFps != kMinIdleRefreshRateForDozeMode) {
