@@ -28,6 +28,7 @@
 #include "../libdevice/ExynosLayer.h"
 #include "EventQueue.h"
 #include "ExternalEventHandlerLoader.h"
+#include "FileNode.h"
 #include "Power/DisplayStateResidencyWatcher.h"
 #include "RefreshRateCalculator/RefreshRateCalculator.h"
 #include "RingBuffer.h"
@@ -71,7 +72,10 @@ public:
 
     void setEnable(bool isEnabled);
 
-    void setPowerMode(int32_t mode);
+    // |preSetPowerMode| is called before the power mode is configured.
+    void preSetPowerMode(int32_t mode);
+    //|postSetPowerMode| is called after the setting to new power mode has been done.
+    void postSetPowerMode(int32_t mode);
 
     void setVrrConfigurations(std::unordered_map<hwc2_config_t, VrrConfig_t> configs);
 
@@ -215,6 +219,8 @@ private:
 
     std::string dumpEventQueueLocked();
 
+    uint32_t getCurrentRefreshControlStateLocked() const;
+
     int64_t getLastFenceSignalTimeUnlocked(int fd);
 
     int64_t getNextEventTimeLocked() const;
@@ -283,7 +289,7 @@ private:
     std::unordered_map<hwc2_config_t, VrrConfig_t> mVrrConfigs;
     std::optional<int> mLastPresentFence;
 
-    std::unique_ptr<FileNode> mFileNode;
+    std::shared_ptr<FileNode> mFileNode;
 
     DisplayContextProviderInterface mDisplayContextProviderInterface;
     std::unique_ptr<ExternalEventHandlerLoader> mPresentTimeoutEventHandlerLoader;
@@ -313,7 +319,6 @@ private:
     // only when |mMinimumRefreshRate| is greater than 1.
     uint64_t mMaximumRefreshRateTimeoutNs = 0;
     std::optional<TimedEvent> mMinimumRefreshRateTimeoutEvent;
-    // bool mAtPeakRefreshRate = false;
     MinimumRefreshRatePresentStates mMinimumRefreshRatePresentStates = kMinRefreshRateUnset;
 
     std::vector<std::shared_ptr<RefreshRateChangeListener>> mRefreshRateChangeListeners;

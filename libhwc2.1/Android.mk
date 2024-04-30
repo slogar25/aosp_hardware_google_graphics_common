@@ -146,13 +146,12 @@ LOCAL_SRC_FILES := \
 	libdisplayinterface/ExynosDisplayInterface.cpp \
 	libdisplayinterface/ExynosDeviceDrmInterface.cpp \
 	libdisplayinterface/ExynosDisplayDrmInterface.cpp \
-	libvrr/VariableRefreshRateController.cpp \
-	libvrr/VariableRefreshRateVersion.cpp \
 	libvrr/display/common/CommonDisplayContextProvider.cpp \
 	libvrr/display/exynos/ExynosDisplayContextProvider.cpp \
 	libvrr/Power/PowerStatsPresentProfileTokenGenerator.cpp \
 	libvrr/Power/DisplayStateResidencyProvider.cpp \
 	libvrr/Power/DisplayStateResidencyWatcher.cpp \
+	libvrr/FileNode.cpp \
 	libvrr/RefreshRateCalculator/InstantRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/PeriodRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/CombinedRefreshRateCalculator.cpp \
@@ -160,6 +159,8 @@ LOCAL_SRC_FILES := \
 	libvrr/RefreshRateCalculator/VideoFrameRateCalculator.cpp \
 	libvrr/Statistics/VariableRefreshRateStatistic.cpp \
 	libvrr/Utils.cpp \
+	libvrr/VariableRefreshRateController.cpp \
+	libvrr/VariableRefreshRateVersion.cpp \
 	pixel-display.cpp \
 	pixelstats-display.cpp \
 	histogram_mediator.cpp

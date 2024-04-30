@@ -27,6 +27,7 @@
 #include <chrono>
 #include <fstream>
 
+#include "../libvrr/FileNode.h"
 #include "../libvrr/VariableRefreshRateVersion.h"
 #include "../libvrr/interface/Panel_def.h"
 #include "BrightnessController.h"
@@ -47,8 +48,9 @@ using namespace SOC_VERSION;
 namespace {
 
 using android::hardware::graphics::composer::kPanelRefreshCtrlFrameInsertionAutoMode;
-using android::hardware::graphics::composer::kPanelRefreshCtrlIdleEnabled;
-using android::hardware::graphics::composer::kPanelRefreshCtrlTeTypeChangeable;
+using android::hardware::graphics::composer::kPanelRefreshCtrlFrameInsertionAutoModeOffset;
+using android::hardware::graphics::composer::kPanelRefreshCtrlMrrV1OverV2;
+using android::hardware::graphics::composer::kPanelRefreshCtrlMrrV1OverV2Offset;
 using android::hardware::graphics::composer::kRefreshControlNodeEnabled;
 using android::hardware::graphics::composer::kRefreshControlNodeName;
 
@@ -203,6 +205,7 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
         ALOGI("%s() xRR version = %d.%d", __func__, mXrrSettings.versionInfo.majorVersion,
               mXrrSettings.versionInfo.minorVersion);
 
+        uint32_t refreshControlCommand = 0;
         if (mXrrSettings.versionInfo.needVrrParameters()) {
             char pathBuffer[PROP_VALUE_MAX] = {0};
             sprintf(pathBuffer, "ro.vendor.%s.vrr.expected_present.headsup_ns",
@@ -216,26 +219,29 @@ ExynosPrimaryDisplay::ExynosPrimaryDisplay(uint32_t index, ExynosDevice* device,
             mXrrSettings.configChangeCallback =
                     std::bind(&ExynosPrimaryDisplay::onConfigChange, this, std::placeholders::_1);
         } else {
-            std::string displayFileNodePath = getPanelSysfsPath();
-            if (displayFileNodePath.empty()) {
-                ALOGE("%s(): cannot find file node %s of display %s", __func__,
-                      displayFileNodePath.c_str(), mDisplayName.c_str());
-            } else {
-                FileNode fileNode(displayFileNodePath);
-                auto content = fileNode.read(kRefreshControlNodeName);
-                if (content.has_value() &&
-                    !(content.value().compare(0, kRefreshControlNodeEnabled.length(),
-                                              kRefreshControlNodeEnabled))) {
-                    uint32_t cmd = kPanelRefreshCtrlFrameInsertionAutoMode |
-                            kPanelRefreshCtrlIdleEnabled | kPanelRefreshCtrlTeTypeChangeable;
-                    bool ret = fileNode.WriteCommandString(kRefreshControlNodeName, cmd);
-                    if (!ret) {
-                        ALOGE("%s(): write command to file node %s%s failed.", __func__,
-                              displayFileNodePath.c_str(), kRefreshControlNodeName.c_str());
-                    }
-                } else {
-                    ALOGI("%s(): refresh control is not supported", __func__);
+            setBit(refreshControlCommand, kPanelRefreshCtrlMrrV1OverV2Offset);
+            setBit(refreshControlCommand, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
+        }
+
+        std::string displayFileNodePath = getPanelSysfsPath();
+        if (displayFileNodePath.empty()) {
+            ALOGE("%s(): cannot find file node %s of display %s", __func__,
+                  displayFileNodePath.c_str(), mDisplayName.c_str());
+        } else {
+            auto& fileNodeManager =
+                    android::hardware::graphics::composer::FileNodeManager::getInstance();
+            auto fileNode = fileNodeManager.getFileNode(displayFileNodePath);
+            auto content = fileNode->readString(kRefreshControlNodeName);
+            if (content.has_value() &&
+                !(content.value().compare(0, kRefreshControlNodeEnabled.length(),
+                                          kRefreshControlNodeEnabled))) {
+                bool ret = fileNode->WriteUint32(kRefreshControlNodeName, refreshControlCommand);
+                if (!ret) {
+                    ALOGE("%s(): write command to file node %s%s failed.", __func__,
+                          displayFileNodePath.c_str(), kRefreshControlNodeName.c_str());
                 }
+            } else {
+                ALOGI("%s(): refresh control is not supported", __func__);
             }
         }
     }
@@ -588,6 +594,10 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
                 mOperationRateManager->getTargetOperationRate());
     }
 
+    if (mVariableRefreshRateController) {
+        mVariableRefreshRateController->preSetPowerMode(mode);
+    }
+
     int32_t res = HWC2_ERROR_BAD_PARAMETER;
     switch (mode) {
         case HWC2_POWER_MODE_DOZE:
@@ -614,7 +624,7 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
 
     ExynosDisplay::updateRefreshRateHint();
     if (mVariableRefreshRateController) {
-        mVariableRefreshRateController->setPowerMode(mode);
+        mVariableRefreshRateController->postSetPowerMode(mode);
         if (mode != HWC2_POWER_MODE_OFF) {
             if (mode != HWC2_POWER_MODE_ON) {
                 mVariableRefreshRateController
@@ -1308,7 +1318,6 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
             maxMinIdleFps = mRrThrottleFps[i];
         }
     }
-    if (maxMinIdleFps == mMinIdleRefreshRate) return NO_ERROR;
 
     {
         std::lock_guard<std::mutex> lock(mPowerModeMutex);
@@ -1327,6 +1336,8 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
                   proximityActive ? "active" : "inactive", targetFps, dozeMode);
             mDisplayTe2Manager->updateTe2OptionForProximity(proximityActive, targetFps, dozeMode);
         }
+
+        if (maxMinIdleFps == mMinIdleRefreshRate) return NO_ERROR;
 
         if (mVariableRefreshRateController) {
             if (dozeMode && maxMinIdleFps != kMinIdleRefreshRateForDozeMode) {
