@@ -595,6 +595,10 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     }
 
     if (mVariableRefreshRateController) {
+        if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND)) {
+            mVariableRefreshRateController->setFixedRefreshRateRange(kMinIdleRefreshRateForDozeMode,
+                                                                     0);
+        }
         mVariableRefreshRateController->preSetPowerMode(mode);
     }
 
@@ -625,15 +629,10 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     ExynosDisplay::updateRefreshRateHint();
     if (mVariableRefreshRateController) {
         mVariableRefreshRateController->postSetPowerMode(mode);
-        if (mode != HWC2_POWER_MODE_OFF) {
-            if (mode != HWC2_POWER_MODE_ON) {
-                mVariableRefreshRateController
-                        ->setFixedRefreshRateRange(kMinIdleRefreshRateForDozeMode, 0);
-            } else {
-                std::lock_guard<std::mutex> lock(mMinIdleRefreshRateMutex);
-                mVariableRefreshRateController->setFixedRefreshRateRange(mMinIdleRefreshRate,
-                                                                         mRefreshRateDelayNanos);
-            }
+        if (mode == HWC2_POWER_MODE_ON) {
+            std::lock_guard<std::mutex> lock(mMinIdleRefreshRateMutex);
+            mVariableRefreshRateController->setFixedRefreshRateRange(mMinIdleRefreshRate,
+                                                                     mRefreshRateDelayNanos);
         }
     }
     return res;
