@@ -81,14 +81,14 @@ void DisplayStateResidencyWatcher::registerWithPowerStats() {
         static const int64_t kMaxWaitServiceTimeMs =
                 100 * std::milli::den; // Default timeout is 100 seconds.
 
-        int64_t startMs = getNowMs();
+        int64_t startMs = getSteadyClockTimeMs();
         while (mRunning.load()) {
             ndk::SpAIBinder binder(AServiceManager_waitForService(kInstance.c_str()));
             mProvider = IPixelStateResidencyProvider::fromBinder(binder);
             if (mProvider) {
                 break;
             } else {
-                int64_t nowMs = getNowMs();
+                int64_t nowMs = getSteadyClockTimeMs();
                 if ((nowMs - startMs) > kMaxWaitServiceTimeMs) {
                     LOG(ERROR) << "Cannot get PowerStats service";
                     break;

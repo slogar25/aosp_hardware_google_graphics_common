@@ -24,6 +24,8 @@
 #include "../Statistics/VariableRefreshRateStatistic.h"
 #include "PowerStatsPresentProfileTokenGenerator.h"
 
+// #define DEBUG_VRR_POWERSTATS 1
+
 namespace android::hardware::graphics::composer {
 
 using aidl::android::hardware::power::stats::State;
@@ -88,8 +90,10 @@ private:
     std::vector<State> mStates;
     std::map<PowerStatsPresentProfile, int> mPowerStatsPresentProfileToIdMap;
 
-    int64_t mLastGetStatesTimeNs = -1;
+#ifdef DEBUG_VRR_POWERSTATS
+    int64_t mLastGetStateResidencyTimeNs = -1;
     int64_t mLastPowerStatsTotalTimeNs = -1;
+#endif
 
     uint64_t mStartStatisticTimeNs;
 
