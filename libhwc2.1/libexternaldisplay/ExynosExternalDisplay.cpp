@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-#include <hardware/hwcomposer_defs.h>
 #include "ExynosExternalDisplay.h"
-#include "ExynosDevice.h"
 #include <errno.h>
-#include "ExynosLayer.h"
-#include "ExynosHWCHelper.h"
-#include "ExynosHWCDebug.h"
+#include <hardware/hwcomposer_defs.h>
+#include <linux/fb.h>
+#include "ExynosDevice.h"
 #include "ExynosDisplayDrmInterface.h"
 #include "ExynosDisplayDrmInterfaceModule.h"
-#include <linux/fb.h>
+#include "ExynosHWCDebug.h"
+#include "ExynosHWCHelper.h"
+#include "ExynosLayer.h"
+#include "pixelstats-display.h"
 
 #define SKIP_FRAME_COUNT 3
 extern struct exynos_hwc_control exynosHWCControl;
@@ -153,7 +154,12 @@ int ExynosExternalDisplay::getDisplayConfigs(uint32_t* outNumConfigs, hwc2_confi
         if (err == HWC2_ERROR_NONE) {
             mActiveConfig = config;
         } else {
-            mActiveConfig = outConfigs[0];
+            err = lookupDisplayConfigsRelaxed(1920, 1080, 60, &config);
+            if (err == HWC2_ERROR_NONE) {
+                mActiveConfig = config;
+            } else {
+                mActiveConfig = outConfigs[0];
+            }
         }
 
         displayConfigs_t displayConfig = mDisplayConfigs[mActiveConfig];
@@ -178,7 +184,10 @@ int32_t ExynosExternalDisplay::getActiveConfig(hwc2_config_t* outConfig) {
     DISPLAY_LOGD(eDebugExternalDisplay, "");
 
     if (!mHpdStatus)
-        return -1;
+        return HWC2_ERROR_BAD_DISPLAY;
+
+    if (mActiveConfig == UINT_MAX)
+        return HWC2_ERROR_BAD_CONFIG;
 
     *outConfig = mActiveConfig;
 
@@ -443,6 +452,8 @@ int ExynosExternalDisplay::enable()
     mEnabled = true;
     mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_NORMAL;
 
+    reportUsage(true);
+
     ALOGI("[ExternalDisplay] %s -", __func__);
 
     return HWC2_ERROR_NONE;
@@ -475,6 +486,8 @@ int ExynosExternalDisplay::disable()
         DISPLAY_LOGE("set powermode ioctl failed errno : %d", errno);
         return HWC2_ERROR_UNSUPPORTED;
     }
+
+    if (mEnabled) reportUsage(false);
 
     mEnabled = false;
     mPowerModeState = (hwc2_power_mode_t)HWC_POWER_MODE_OFF;
@@ -556,8 +569,6 @@ bool ExynosExternalDisplay::getHDRException(ExynosLayer* __unused layer)
 
 void ExynosExternalDisplay::handleHotplugEvent(bool hpdStatus)
 {
-    Mutex::Autolock lock(mDisplayMutex);
-
     mHpdStatus = hpdStatus;
     if (mHpdStatus) {
         if (openExternalDisplay() < 0) {
@@ -584,4 +595,13 @@ void ExynosExternalDisplay::initDisplayInterface(uint32_t interfaceType)
         LOG_ALWAYS_FATAL("%s::Unknown interface type(%d)",
                 __func__, interfaceType);
     mDisplayInterface->init(this);
+}
+
+void ExynosExternalDisplay::reportUsage(bool enabled) {
+    auto refreshRate = nanoSec2Hz(mVsyncPeriod);
+    auto manufacturerInfo = mDisplayInterface->getManufacturerInfo();
+    auto productId = mDisplayInterface->getProductId();
+
+    ATRACE_NAME("report ext usage");
+    reportDisplayPortUsage(mXres, mYres, refreshRate, manufacturerInfo, productId, enabled);
 }

@@ -63,6 +63,14 @@ enum class MetadataType : int64_t {
     // So the client should not attempt to close these fds.
     // Returns: std::vector<int>
     PLANE_DMA_BUFS,
+
+    // This is a experimental feature
+    VIDEO_GMV,
+};
+
+struct VideoGMV {
+    int x;
+    int y;
 };
 
 #undef MapMetadataType

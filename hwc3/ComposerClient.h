@@ -50,8 +50,10 @@ public:
           void onVsyncIdle(int64_t display) override;
           void onSeamlessPossible(int64_t display) override;
           void onRefreshRateChangedDebug(const RefreshRateChangedDebugData& data) override;
+          void onHotplugEvent(int64_t display, common::DisplayHotplugEvent event) override;
 
       private:
+        void processDisplayResources(int64_t display, bool connected);
         void cleanDisplayResources(int64_t display);
 
         IComposerHal* mHal;

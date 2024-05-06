@@ -44,7 +44,7 @@ public:
     virtual int sendWFDCommand(int32_t cmd, int32_t ext1, int32_t ext2) = 0;
     virtual int setSecureVDSMode(unsigned int mode) = 0;
     virtual int setWFDOutputResolution(unsigned int width, unsigned int height) = 0;
-    virtual void getWFDOutputResolution(unsigned int *width, unsigned int *height) = 0;
+    virtual int getWFDOutputResolution(unsigned int* width, unsigned int* height) = 0;
     virtual void setPresentationMode(bool use) = 0;
     virtual int getPresentationMode(void) = 0;
     virtual int setVDSGlesFormat(int format) = 0;
@@ -80,6 +80,11 @@ public:
     virtual int32_t setDisplayMultiThreadedPresent(const int32_t& displayId,
                                                    const bool& enable) = 0;
     virtual int32_t triggerRefreshRateIndicatorUpdate(uint32_t displayId, uint32_t refreshRate) = 0;
+    virtual int32_t dumpBuffers(uint32_t displayId, int32_t count) = 0;
+    virtual int32_t setPresentTimeoutController(uint32_t displayId, uint32_t controllerType) = 0;
+    virtual int32_t setPresentTimeoutParameters(
+            uint32_t displayId, int timeoutNs,
+            const std::vector<std::pair<uint32_t, uint32_t>>& settings) = 0;
 };
 
 /* Native Interface */

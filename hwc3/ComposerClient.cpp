@@ -467,20 +467,7 @@ void ComposerClient::HalEventCallback::onRefreshRateChangedDebug(
 
 void ComposerClient::HalEventCallback::onHotplug(int64_t display, bool connected) {
     DEBUG_DISPLAY_FUNC(display);
-    if (connected) {
-        if (mResources->hasDisplay(display)) {
-            // This is a subsequent hotplug "connected" for a display. This signals a
-            // display change and thus the framework may want to reallocate buffers. We
-            // need to free all cached handles, since they are holding a strong reference
-            // to the underlying buffers.
-            cleanDisplayResources(display);
-            mResources->removeDisplay(display);
-        }
-        mResources->addPhysicalDisplay(display);
-    } else {
-        mResources->removeDisplay(display);
-    }
-
+    processDisplayResources(display, connected);
     auto ret = mCallback->onHotplug(display, connected);
     if (!ret.isOk()) {
         LOG(ERROR) << "failed to send onHotplug:" << ret.getDescription();
@@ -527,6 +514,32 @@ void ComposerClient::HalEventCallback::onSeamlessPossible(int64_t display) {
     auto ret = mCallback->onSeamlessPossible(display);
     if (!ret.isOk()) {
         LOG(ERROR) << "failed to send onSealmessPossible:" << ret.getDescription();
+    }
+}
+
+void ComposerClient::HalEventCallback::onHotplugEvent(int64_t display,
+                                                      common::DisplayHotplugEvent event) {
+    DEBUG_DISPLAY_FUNC(display);
+    processDisplayResources(display, event == common::DisplayHotplugEvent::CONNECTED);
+    auto ret = mCallback->onHotplugEvent(display, event);
+    if (!ret.isOk()) {
+        LOG(ERROR) << "failed to send onHotplugEvent:" << ret.getDescription();
+    }
+}
+
+void ComposerClient::HalEventCallback::processDisplayResources(int64_t display, bool connected) {
+    if (connected) {
+        if (mResources->hasDisplay(display)) {
+            // This is a subsequent hotplug "connected" for a display. This signals a
+            // display change and thus the framework may want to reallocate buffers. We
+            // need to free all cached handles, since they are holding a strong reference
+            // to the underlying buffers.
+            cleanDisplayResources(display);
+            mResources->removeDisplay(display);
+        }
+        mResources->addPhysicalDisplay(display);
+    } else {
+        mResources->removeDisplay(display);
     }
 }
 

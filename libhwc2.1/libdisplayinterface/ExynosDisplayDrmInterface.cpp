@@ -18,6 +18,7 @@
 
 #include "ExynosDisplayDrmInterface.h"
 
+#include <aidl/android/hardware/drm/HdcpLevels.h>
 #include <cutils/properties.h>
 #include <drm.h>
 #include <drm/drm_fourcc.h>
@@ -34,6 +35,8 @@
 #include "ExynosPrimaryDisplay.h"
 #include "HistogramController.h"
 
+using ::aidl::android::hardware::drm::HdcpLevel;
+using ::aidl::android::hardware::drm::HdcpLevels;
 using namespace std::chrono_literals;
 using namespace SOC_VERSION;
 
@@ -981,42 +984,51 @@ int32_t ExynosDisplayDrmInterface::choosePreferredConfig() {
     if (err != HWC2_ERROR_NONE || !num_configs)
         return err;
 
-    int32_t config = -1;
-    char modeStr[PROPERTY_VALUE_MAX] = "\0";
-    int32_t width = 0, height = 0, fps = 0;
-    // only legacy products use this property, kernel preferred mode will be used going forward
-    if (property_get("vendor.display.preferred_mode", modeStr, "") > 0 &&
-        sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
-        err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, fps, &config);
-    } else {
-        err = HWC2_ERROR_BAD_CONFIG;
+    int32_t id = -1, fps = 0, vsyncRate = 0, width = 0, height = 0;
+    err = HWC2_ERROR_BAD_CONFIG;
+    if ((mExynosDisplay->mType == HWC_DISPLAY_PRIMARY) && (mExynosDisplay->mIndex == 0)) {
+        char modeStr[PROPERTY_VALUE_MAX];
+        // kernel preferred mode should be aligned to bootloader setting, use this property
+        // to specify default user space preferred mode to override kernel's setting.
+        if (property_get("vendor.display.preferred_mode", modeStr, "") > 0 &&
+            sscanf(modeStr, "%dx%d@%d", &width, &height, &fps) == 3) {
+            err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, fps, &id);
+        } else if (property_get("ro.vendor.primarydisplay.preferred_mode", modeStr, "") > 0 &&
+                   sscanf(modeStr, "%dx%d@%d:%d", &width, &height, &fps, &vsyncRate) == 4) {
+            err = mExynosDisplay->lookupDisplayConfigs(width, height, fps, vsyncRate, &id);
+        }
     }
 
-    const int32_t drmPreferredConfig = mDrmConnector->get_preferred_mode_id();
+    const int32_t drmPreferredId = mDrmConnector->get_preferred_mode_id();
     if (err != HWC2_ERROR_NONE) {
-        config = drmPreferredConfig;
+        id = drmPreferredId;
     }
-    ALOGI("Preferred mode id: %d(%s), state: %d", config, modeStr, mDrmConnector->state());
 
-    auto &configs = mExynosDisplay->mDisplayConfigs;
-    if (config != drmPreferredConfig &&
-        (configs[config].width != configs[drmPreferredConfig].width ||
-         configs[config].height != configs[drmPreferredConfig].height)) {
+    auto& configs = mExynosDisplay->mDisplayConfigs;
+    auto& config = configs[id];
+    width = config.width;
+    height = config.height;
+    fps = config.refreshRate;
+    vsyncRate = nanoSec2Hz(config.vsyncPeriod);
+    ALOGI("Preferred mode: configs[%d]=%dx%d@%d:%d, state: %d", id, width, height, fps, vsyncRate,
+          mDrmConnector->state());
+    if (id != drmPreferredId &&
+        (width != configs[drmPreferredId].width || height != configs[drmPreferredId].height)) {
         // HWC cannot send a resolution change commit here until 1st frame update because of
         // some panels requirement. Therefore, it calls setActiveConfigWithConstraints() help
         // set mDesiredModeState correctly, and then trigger modeset in the 1s frame update.
-        if ((err = setActiveConfigWithConstraints(config)) < 0) {
+        if ((err = setActiveConfigWithConstraints(id)) < 0) {
             ALOGE("failed to setActiveConfigWithConstraints(), err %d", err);
             return err;
         }
     } else {
-        if ((err = setActiveConfig(config)) < 0) {
+        if ((err = setActiveConfig(id)) < 0) {
             ALOGE("failed to set default config, err %d", err);
             return err;
         }
     }
 
-    return mExynosDisplay->updateInternalDisplayConfigVariables(config);
+    return mExynosDisplay->updateInternalDisplayConfigVariables(id);
 }
 
 int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
@@ -1033,7 +1045,9 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
         bool useVrrConfigs = isFullVrrSupported();
         int ret = mDrmConnector->UpdateModes(useVrrConfigs);
         if (ret < 0) {
-            ALOGE("Failed to update display modes %d", ret);
+            ALOGE("%s: failed to update display modes (%d)",
+                  mExynosDisplay->mDisplayName.c_str(), ret);
+            *outNumConfigs = 0;
             return HWC2_ERROR_BAD_DISPLAY;
         }
         if (ret == 0) {
@@ -1051,6 +1065,15 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
              */
             if (mExynosDisplay->mType == HWC_DISPLAY_EXTERNAL)
                 mDrmConnector->UpdateEdidProperty();
+
+            if (mDrmConnector->modes().size() == 0) {
+                ALOGE("%s: DRM_MODE_CONNECTED, but no modes available",
+                      mExynosDisplay->mDisplayName.c_str());
+                mExynosDisplay->mDisplayConfigs.clear();
+                mExynosDisplay->mPlugState = false;
+                *outNumConfigs = 0;
+                return HWC2_ERROR_BAD_DISPLAY;
+            }
 
             mExynosDisplay->mPlugState = true;
         } else
@@ -1084,29 +1107,43 @@ int32_t ExynosDisplayDrmInterface::getDisplayConfigs(
             // Dots per 1000 inches
             configs.Ydpi = mm_height ? (mode.v_display() * kUmPerInch) / mm_height : -1;
             // find peak rr
-            if (rr > peakRr)
-                  peakRr = rr;
+            if (rr > peakRr) {
+                peakRr = rr;
+            }
             // Configure VRR if it's turned on.
-            if (mode.is_vrr_mode()) {
+            if (mIsVrrModeSupported) {
                 VrrConfig_t vrrConfig;
                 vrrConfig.minFrameIntervalNs = static_cast<int>(std::nano::den / rr);
-                // TODO(b/290843234): FrameIntervalPowerHint is currently optional and omitted.
-                // Supply initial values for notifyExpectedPresentConfig; potential changes may come
-                // later.
-                vrrConfig.notifyExpectedPresentConfig.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs;
-                vrrConfig.notifyExpectedPresentConfig.TimeoutNs = mNotifyExpectedPresentTimeoutNs;
+                vrrConfig.isNsMode = mode.is_ns_mode();
+                vrrConfig.vsyncPeriodNs = configs.vsyncPeriod;
                 configs.vrrConfig = std::make_optional(vrrConfig);
-                configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height,
-                                                              vrrConfig.minFrameIntervalNs,
-                                                              configs.vsyncPeriod);
-            } else {
+                if (mode.is_vrr_mode()) {
+                    if (!isFullVrrSupported()) {
+                        return HWC2_ERROR_BAD_DISPLAY;
+                    }
+                    configs.vrrConfig->isFullySupported = true;
+                    // TODO(b/290843234): FrameIntervalPowerHint is currently optional and omitted.
+                    // Supply initial values for notifyExpectedPresentConfig; potential changes may
+                    // come later.
+                    NotifyExpectedPresentConfig_t notifyExpectedPresentConfig =
+                            {.HeadsUpNs = mNotifyExpectedPresentHeadsUpNs,
+                             .TimeoutNs = mNotifyExpectedPresentTimeoutNs};
+                    configs.vrrConfig->notifyExpectedPresentConfig =
+                            std::make_optional(notifyExpectedPresentConfig);
+                    configs.groupId =
+                            groupIdGenerator.getGroupId(configs.width, configs.height,
+                                                        configs.vrrConfig->minFrameIntervalNs,
+                                                        configs.vsyncPeriod);
+                }
+            }
+            if (!mode.is_vrr_mode()) {
                 configs.groupId = groupIdGenerator.getGroupId(configs.width, configs.height);
             }
             mExynosDisplay->mDisplayConfigs.insert(std::make_pair(mode.id(), configs));
-            ALOGD("%s: config group(%d), w(%d), h(%d), rr(%f), TE(%d), xdpi(%d), ydpi(%d), "
-                  "vrr mode(%s), NS mode(%s)",
-                  mExynosDisplay->mDisplayName.c_str(),
-                  configs.groupId, configs.width, configs.height, rr, configs.vsyncPeriod,
+            ALOGD("%s: config group(%d), id(%d), w(%d), h(%d), rr(%f), vsync(%d), "
+                  "xdpi(%d), ydpi(%d), vrr(%s), ns(%s)",
+                  mExynosDisplay->mDisplayName.c_str(), configs.groupId, mode.id(),
+                  configs.width, configs.height, rr, configs.vsyncPeriod,
                   configs.Xdpi, configs.Ydpi, mode.is_vrr_mode() ? "true" : "false",
                   mode.is_ns_mode() ? "true" : "false");
         }
@@ -1117,7 +1154,7 @@ no_mode_changes:
     uint32_t num_modes = static_cast<uint32_t>(mDrmConnector->modes().size());
     if (!outConfigs) {
         *outNumConfigs = num_modes;
-        return HWC2_ERROR_NONE;
+        return (*outNumConfigs > 0) ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_DISPLAY;
     }
 
     uint32_t idx = 0;
@@ -1129,7 +1166,7 @@ no_mode_changes:
     }
     *outNumConfigs = idx;
 
-    return 0;
+    return (*outNumConfigs > 0) ? HWC2_ERROR_NONE : HWC2_ERROR_BAD_DISPLAY;
 }
 
 void ExynosDisplayDrmInterface::dumpDisplayConfigs()
@@ -1317,6 +1354,10 @@ int32_t ExynosDisplayDrmInterface::setActiveConfigWithConstraints(
 
     if (!test) {
         if (modeBlob) { /* only replace desired mode if it has changed */
+            if (mDesiredModeState.isFullModeSwitch(*mode)) {
+                mIsResolutionSwitchInProgress = true;
+                mExynosDisplay->mDevice->setVBlankOffDelay(0);
+            }
             mDesiredModeState.setMode(*mode, modeBlob, drmReq);
             if (mExynosDisplay->mOperationRateManager) {
                 mExynosDisplay->mOperationRateManager->onConfig(config);
@@ -2482,6 +2523,12 @@ int ExynosDisplayDrmInterface::DrmModeAtomicReq::commit(uint32_t flags, bool log
         }
     }
 
+    if (mDrmDisplayInterface->mIsResolutionSwitchInProgress &&
+        !mDrmDisplayInterface->mDesiredModeState.needsModeSet()) {
+        mDrmDisplayInterface->mIsResolutionSwitchInProgress = false;
+        mDrmDisplayInterface->mExynosDisplay->mDevice->setVBlankOffDelay(1);
+    }
+
     return ret;
 }
 
@@ -2762,6 +2809,8 @@ int32_t ExynosDisplayDrmInterface::getDisplayIdentificationData(
     if (outData) {
         *outDataSize = std::min(*outDataSize, blob->length);
         memcpy(outData, blob->data, *outDataSize);
+        setManufacturerInfo(outData[kEDIDManufacturerIDByte1], outData[kEDIDManufacturerIDByte2]);
+        setProductId(outData[kEDIDProductIDByte1], outData[kEDIDProductIDByte2]);
     } else {
         *outDataSize = blob->length;
     }
@@ -2789,10 +2838,10 @@ bool ExynosDisplayDrmInterface::readHotplugStatus() {
         return false;
     }
 
-    uint32_t numConfigs;
-    getDisplayConfigs(&numConfigs, NULL);
+    uint32_t numConfigs = 0;
+    int32_t err = getDisplayConfigs(&numConfigs, NULL);
 
-    return (mDrmConnector->state() == DRM_MODE_CONNECTED);
+    return (err == HWC2_ERROR_NONE && numConfigs > 0 && mExynosDisplay->mPlugState);
 }
 
 void ExynosDisplayDrmInterface::retrievePanelFullResolution() {
@@ -2867,11 +2916,35 @@ int32_t ExynosDisplayDrmInterface::clearDisplayHistogramChannelSetting(
     return ret;
 }
 
+// TODO: b/295990513 - Remove the if defined after kernel prebuilts are merged.
+#if defined(EXYNOS_HISTOGRAM_CHANNEL_REQUEST)
+int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoctl_t control,
+                                                             uint8_t channelId) const {
+    struct exynos_drm_histogram_channel_request histogramRequest;
+
+    histogramRequest.crtc_id = mDrmCrtc->id();
+    histogramRequest.hist_id = channelId;
+
+    if (control == HistogramChannelIoctl_t::REQUEST) {
+        ATRACE_NAME(String8::format("requestIoctl #%u", channelId).c_str());
+        return mDrmDevice->CallVendorIoctl(DRM_IOCTL_EXYNOS_HISTOGRAM_CHANNEL_REQUEST,
+                                           (void*)&histogramRequest);
+    } else if (control == HistogramChannelIoctl_t::CANCEL) {
+        ATRACE_NAME(String8::format("cancelIoctl #%u", channelId).c_str());
+        return mDrmDevice->CallVendorIoctl(DRM_IOCTL_EXYNOS_HISTOGRAM_CHANNEL_CANCEL,
+                                           (void*)&histogramRequest);
+    } else {
+        ALOGE("%s: unknown control %d", __func__, (int)control);
+        return BAD_VALUE;
+    }
+}
+#else
 int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoctl_t control,
                                                              uint8_t channelId) const {
     ALOGE("%s: kernel doesn't support multi channel histogram ioctl", __func__);
     return INVALID_OPERATION;
 }
+#endif
 
 static constexpr auto kDpHotplugErrorCodeSysfsPath =
         "/sys/devices/platform/110f0000.drmdp/drm-displayport/dp_hotplug_error_code";
@@ -2888,4 +2961,36 @@ void ExynosDisplayDrmInterface::resetHotplugErrorCode() {
     if (mExynosDisplay->mType != HWC_DISPLAY_EXTERNAL) return;
     std::ofstream ofs(kDpHotplugErrorCodeSysfsPath);
     if (ofs.is_open()) ofs << "0";
+}
+
+void ExynosDisplayDrmInterface::handleDrmPropertyUpdate(uint32_t connector_id, uint32_t prop_id) {
+    if (!mDrmConnector || mDrmConnector->id() != connector_id) return;
+    auto& conn_props = mDrmConnector->properties();
+    auto prop = std::find_if(conn_props.begin(), conn_props.end(),
+                             [prop_id](const DrmProperty* prop) { return prop->id() == prop_id; });
+    if (prop == conn_props.end()) {
+        ALOGD("%s: Unknown property prop_id=%u", __func__, prop_id);
+        return;
+    }
+    mDrmDevice->UpdateConnectorProperty(*mDrmConnector, *prop);
+    if ((*prop)->id() == mDrmConnector->content_protection().id()) {
+        auto [ret, content_protection_value] = mDrmConnector->content_protection().value();
+        if (ret < 0) {
+            ALOGW("%s: failed to get DRM content_protection property value ret=%d", __func__, ret);
+            return;
+        }
+        bool protectionEnabled = (content_protection_value == DRM_MODE_CONTENT_PROTECTION_ENABLED);
+        HdcpLevels hdcpLevels;
+        hdcpLevels.connectedLevel = protectionEnabled ? HdcpLevel::HDCP_V1 : HdcpLevel::HDCP_NONE;
+        hdcpLevels.maxLevel = HdcpLevel::HDCP_V1;
+        mExynosDisplay->contentProtectionUpdated(hdcpLevels);
+    }
+}
+
+void ExynosDisplayDrmInterface::setManufacturerInfo(uint8_t edid8, uint8_t edid9) {
+    mManufacturerInfo = edid9 << 8 | edid8;
+}
+
+void ExynosDisplayDrmInterface::setProductId(uint8_t edid10, uint8_t edid11) {
+    mProductId = edid11 << 8 | edid10;
 }

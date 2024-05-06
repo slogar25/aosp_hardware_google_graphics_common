@@ -68,10 +68,11 @@ class ExynosExternalDisplay : public ExynosDisplay {
 
         int mSkipFrameCount;
         int mSkipStartFrame;
+
     protected:
-        int getDVTimingsIndex(int preset);
         virtual bool getHDRException(ExynosLayer *layer);
     private:
+        void reportUsage(bool enabled);
 };
 
 #endif

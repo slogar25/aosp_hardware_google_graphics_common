@@ -38,12 +38,12 @@ protected:
     ::ndk::SpAIBinder createBinder() override;
 
 private:
-    bool waitForClientDestroyedLocked(std::unique_lock<std::mutex>& lock);
+    bool waitForClientDestroyedLocked(std::unique_lock<std::mutex>& lock) REQUIRES(mClientMutex);
     void onClientDestroyed();
 
     std::unique_ptr<IComposerHal> mHal;
     std::mutex mClientMutex;
-    bool mClientAlive = false; // GUARDED_BY(mClientMutex)
+    bool mClientAlive GUARDED_BY(mClientMutex) = false;
     std::condition_variable mClientDestroyedCondition;
 };
 

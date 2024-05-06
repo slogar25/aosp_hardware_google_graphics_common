@@ -261,7 +261,7 @@ ExynosMPP::ExynosMPP(ExynosResourceManager* resourceManager,
 
     for (uint32_t i = 0; i < DISPLAY_MODE_NUM; i++)
     {
-        mPreAssignDisplayList[i] = (preAssignInfo >> (DISPLAY_MODE_MASK_LEN * i)) & DISPLAY_MODE_MASK_BIT;
+        mPreAssignDisplayList[i] = 0;
     }
 }
 

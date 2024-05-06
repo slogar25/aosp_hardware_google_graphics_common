@@ -17,6 +17,7 @@
 #ifndef _EXYNOSDISPLAY_H
 #define _EXYNOSDISPLAY_H
 
+#include <aidl/android/hardware/drm/HdcpLevels.h>
 #include <android/hardware/graphics/composer/2.4/types.h>
 #include <hardware/hwcomposer2.h>
 #include <system/graphics.h>
@@ -43,6 +44,7 @@
 
 #define LOW_FPS_THRESHOLD     5
 
+using ::aidl::android::hardware::drm::HdcpLevels;
 using ::android::hardware::graphics::composer::V2_4::VsyncPeriodNanos;
 using namespace std::chrono_literals;
 
@@ -361,9 +363,12 @@ typedef struct NotifyExpectedPresentConfig {
 } NotifyExpectedPresentConfig_t;
 
 typedef struct VrrConfig {
+    bool isFullySupported = false;
+    bool isNsMode = false;
+    int vsyncPeriodNs = 0;
     int minFrameIntervalNs = 0;
-    std::vector<FrameIntervalPowerHint_t> frameIntervalPowerHint;
-    NotifyExpectedPresentConfig_t notifyExpectedPresentConfig;
+    std::optional<std::vector<FrameIntervalPowerHint_t>> frameIntervalPowerHint;
+    std::optional<NotifyExpectedPresentConfig_t> notifyExpectedPresentConfig;
 } VrrConfig_t;
 
 typedef struct VrrSettings {
@@ -573,6 +578,8 @@ class ExynosDisplay {
 
         /* For debugging */
         hwc_display_contents_1_t *mHWC1LayerList;
+        int mBufferDumpCount = 0;
+        int mBufferDumpNum = 0;
 
         /* Support Multi-resolution scheme */
         int mOldScalerMode;
@@ -588,6 +595,10 @@ class ExynosDisplay {
 
         // Skip present frame if there was no validate after power on
         bool mSkipFrame;
+        // Drop frame during resolution switch because the merged display frame
+        // is not equal to the full-resolution yet.
+        // TODO(b/310656340): remove this if it has been fixed from SF.
+        bool mDropFrameDuringResSwitch = false;
 
         hwc_vsync_period_change_constraints_t mVsyncPeriodChangeConstraints;
         hwc_vsync_period_change_timeline_t mVsyncAppliedTimeLine;
@@ -1176,7 +1187,7 @@ class ExynosDisplay {
          * HWC3
          *
          * Retrieve the vrrConfig for the corresponding display configuration.
-         * If the configuration doesn't exist, return a nullptr.
+         * If the configuration doesn't exist, return a nullopt.
          *
          */
         std::optional<VrrConfig_t> getVrrConfigs(hwc2_config_t config);
@@ -1214,6 +1225,8 @@ class ExynosDisplay {
         int32_t setReadbackBufferAcqFence(int32_t acqFence);
 
         virtual void dump(String8& result);
+        void dumpLocked(String8& result) REQUIRES(mDisplayMutex);
+        void dumpAllBuffers() REQUIRES(mDisplayMutex);
 
         virtual int32_t startPostProcessing();
 
@@ -1248,6 +1261,8 @@ class ExynosDisplay {
         void setGeometryChanged(uint64_t changedBit);
         void clearGeometryChanged();
 
+        virtual const std::string& getPanelName() { return mPanelName; };
+
         virtual void setDDIScalerEnable(int width, int height);
         virtual int getDDIScalerMode(int width, int height);
         void increaseMPPDstBufIndex();
@@ -1256,7 +1271,6 @@ class ExynosDisplay {
         virtual int32_t resetColorMappingInfo(ExynosMPPSource* /*mppSrc*/) { return NO_ERROR; }
         virtual int32_t updatePresentColorConversionInfo() { return NO_ERROR; };
         virtual bool checkRrCompensationEnabled() { return false; };
-        virtual bool isColorCalibratedByDevice() { return false; };
         virtual int32_t getColorAdjustedDbv(uint32_t &) { return NO_ERROR; }
 
         virtual int32_t SetCurrentPanelGammaSource(const displaycolor::DisplayType /* type */,
@@ -1298,7 +1312,7 @@ class ExynosDisplay {
 
         /* getDisplayPreAssignBit support mIndex up to 1.
            It supports only dual LCD and 2 external displays */
-        inline uint32_t getDisplayPreAssignBit() {
+        inline uint32_t getDisplayPreAssignBit() const {
             uint32_t type = SECOND_DISPLAY_START_BIT * mIndex + mType;
             return 1 << type;
         }
@@ -1327,6 +1341,16 @@ class ExynosDisplay {
             return HWC2_ERROR_UNSUPPORTED;
         };
 
+        virtual int32_t setPresentTimeoutController(uint32_t __unused controllerType) {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+
+        virtual int32_t setPresentTimeoutParameters(
+                int __unused timeoutNs,
+                const std::vector<std::pair<uint32_t, uint32_t>>& __unused settings) {
+            return HWC2_ERROR_UNSUPPORTED;
+        }
+
     protected:
         virtual bool getHDRException(ExynosLayer *layer);
         virtual int32_t getActiveConfigInternal(hwc2_config_t* outConfig);
@@ -1334,6 +1358,8 @@ class ExynosDisplay {
 
         void updateRefreshRateHint();
         bool isFullScreenComposition();
+
+        std::string mPanelName;
 
     public:
         /**
@@ -1344,12 +1370,12 @@ class ExynosDisplay {
         std::unique_ptr<ExynosDisplayInterface> mDisplayInterface;
         void requestLhbm(bool on);
 
-        virtual int setMinIdleRefreshRate(const int __unused fps,
-                                          const RrThrottleRequester __unused requester) {
+        virtual int32_t setMinIdleRefreshRate(const int __unused fps,
+                                              const RrThrottleRequester __unused requester) {
             return NO_ERROR;
         }
-        virtual int setRefreshRateThrottleNanos(const int64_t __unused delayNanos,
-                                                const RrThrottleRequester __unused requester) {
+        virtual int32_t setRefreshRateThrottleNanos(const int64_t __unused delayNanos,
+                                                    const RrThrottleRequester __unused requester) {
             return NO_ERROR;
         }
 
@@ -1376,6 +1402,10 @@ class ExynosDisplay {
                                  const int32_t& fps,
                                  const int32_t& vsyncRate,
                                  int32_t* outConfig);
+        int lookupDisplayConfigsRelaxed(const int32_t& width,
+                                        const int32_t& height,
+                                        const int32_t& fps,
+                                        int32_t* outConfig);
 
     private:
         bool skipStaticLayerChanged(ExynosCompositionInfo& compositionInfo);
@@ -1600,7 +1630,7 @@ class ExynosDisplay {
             return static_cast<uint32_t>(vsync_period);
         }
         inline int32_t getDisplayFrameScanoutPeriodFromConfig(hwc2_config_t config);
-        virtual void calculateTimeline(
+        virtual void calculateTimelineLocked(
                 hwc2_config_t config,
                 hwc_vsync_period_change_constraints_t* vsyncPeriodChangeConstraints,
                 hwc_vsync_period_change_timeline_t* outTimeline);
@@ -1685,6 +1715,8 @@ class ExynosDisplay {
         virtual void handleHotplugEvent(bool hpdStatus);
         virtual void hotplug();
 
+        void contentProtectionUpdated(HdcpLevels hdcpLevels);
+
         class RefreshRateIndicator {
         public:
             virtual ~RefreshRateIndicator() = default;
@@ -1712,6 +1744,7 @@ class ExynosDisplay {
 
         private:
             void updateRefreshRateLocked(int refreshRate) REQUIRES(mMutex);
+            void setAllowWakeup(bool enabled);
 
             ExynosDisplay* mDisplay;
             int mLastRefreshRate GUARDED_BY(mMutex);
@@ -1723,6 +1756,8 @@ class ExynosDisplay {
 
             static constexpr auto kRefreshRateStatePathFormat =
                     "/sys/class/backlight/panel%d-backlight/state";
+            static constexpr auto kRefreshRateAllowWakeupStateChangePathFormat =
+                    "/sys/class/backlight/panel%d-backlight/allow_wakeup_by_state_change";
         };
 
         class ActiveConfigBasedRRIHandler : public RefreshRateIndicator {

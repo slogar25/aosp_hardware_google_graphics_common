@@ -296,6 +296,10 @@ private:
     int32_t mDisplayActiveV = 0;
     ExynosDisplay* mDisplay = nullptr;
 
+    mutable std::mutex mInitDrmDoneMutex;
+    bool mInitDrmDone GUARDED_BY(mInitDrmDoneMutex) = false;
+    std::condition_variable mInitDrmDone_cv;
+
     /* Death recipient for the binderdied callback, would be deleted in the destructor */
     AIBinder_DeathRecipient* mDeathRecipient = nullptr;
 
@@ -325,6 +329,15 @@ private:
      * Initialize platform specific histogram capability.
      */
     virtual void initPlatformHistogramCapability() {}
+
+    /**
+     * waitInitDrmDone
+     *
+     * Wait until the initDrm is finished, or when the timeout expires.
+     *
+     * @return true if initDrm is finished, or false when the timeout expires.
+     */
+    bool waitInitDrmDone();
 
     /**
      * configHistogram
@@ -358,16 +371,15 @@ private:
     /**
      * parseDrmEvent
      *
-     * Parse the histogram drm event (struct may vary between different platform), need to be
-     * overrided in the derived HistogramController class if needed. This function should get the
-     * histogram channel id and the histogram buffer address from the event struct.
+     * Parse the histogram drm event. This function should get the histogram channel id
+     * and the histogram buffer address from the event struct.
      *
      * @event histogram drm event struct.
      * @channelId stores the extracted channel id from the event.
      * @buffer stores the extracted buffer address from the event.
      * @return NO_ERROR on success, else otherwise.
      */
-    virtual int parseDrmEvent(void* event, uint8_t& channelId, char16_t*& buffer) const;
+    int parseDrmEvent(void* event, uint8_t& channelId, char16_t*& buffer) const;
 
     /**
      * acquireChannelLocked
@@ -465,10 +477,8 @@ private:
      * @length size of the histogram config.
      * @return NO_ERROR on success, else otherwise
      */
-    virtual int createHistogramDrmConfigLocked(const ChannelInfo& channel,
-                                               std::shared_ptr<void>& configPtr,
-                                               size_t& length) const
-            REQUIRES(channel.channelInfoMutex);
+    int createHistogramDrmConfigLocked(const ChannelInfo& channel, std::shared_ptr<void>& configPtr,
+                                       size_t& length) const REQUIRES(channel.channelInfoMutex);
 
     /**
      * convertRoiLocked

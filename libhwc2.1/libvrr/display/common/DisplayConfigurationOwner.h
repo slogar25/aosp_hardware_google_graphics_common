@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 The Android Open Source Project
+ * Copyright (C) 2024 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,15 @@
 
 #pragma once
 
+#include "../libdevice/ExynosDisplay.h"
+
 namespace android::hardware::graphics::composer {
 
-class PresentListener {
+class DisplayConfigurationsOwner {
 public:
-    virtual ~PresentListener() = default;
+    virtual ~DisplayConfigurationsOwner() = default;
 
-    virtual void setExpectedPresentTime(int64_t timestampNanos, int frameIntervalNs) = 0;
-
-    virtual void onPresent(int32_t fence) = 0;
-};
-
-class VsyncListener {
-public:
-    virtual ~VsyncListener() = default;
-
-    virtual void onVsync(int64_t timestamp, int32_t vsyncPeriodNanos) = 0;
+    virtual const VrrConfig_t* getCurrentDisplayConfiguration() const = 0;
 };
 
 } // namespace android::hardware::graphics::composer

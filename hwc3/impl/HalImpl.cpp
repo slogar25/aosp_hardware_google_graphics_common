@@ -106,7 +106,8 @@ void seamlessPossible(hwc2_callback_data_t callbackData, hwc2_display_t hwcDispl
 }
 
 void refreshRateChangedDebug(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
-                             hwc2_vsync_period_t hwcVsyncPeriodNanos) {
+                             hwc2_vsync_period_t hwcVsyncPeriodNanos,
+                             int32_t hwcRefreshPeriodNanos) {
     auto hal = static_cast<HalImpl*>(callbackData);
     int64_t display;
     int32_t vsyncPeriodNanos;
@@ -117,8 +118,17 @@ void refreshRateChangedDebug(hwc2_callback_data_t callbackData, hwc2_display_t h
     hal->getEventCallback()->onRefreshRateChangedDebug(RefreshRateChangedDebugData{
             .display = display,
             .vsyncPeriodNanos = vsyncPeriodNanos,
-            .refreshPeriodNanos = vsyncPeriodNanos,
+            .refreshPeriodNanos = hwcRefreshPeriodNanos,
     });
+}
+
+void hotplugEvent(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
+                  common::DisplayHotplugEvent hotplugEvent) {
+    auto hal = static_cast<HalImpl*>(callbackData);
+    int64_t display;
+
+    h2a::translate(hwcDisplay, display);
+    hal->getEventCallback()->onHotplugEvent(display, hotplugEvent);
 }
 
 } // nampesapce hook
@@ -219,6 +229,9 @@ void HalImpl::registerEventCallback(EventCallback* callback) {
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug, this,
                                   reinterpret_cast<hwc2_function_pointer_t>(
                                           hook::refreshRateChangedDebug));
+    // Don't register onHotplugEvent until it's available in nextfood (b/323291596)
+    // mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this,
+    //                             reinterpret_cast<hwc2_function_pointer_t>(hook::hotplugEvent));
 }
 
 void HalImpl::unregisterEventCallback() {
@@ -232,6 +245,8 @@ void HalImpl::unregisterEventCallback() {
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onVsyncIdle, this, nullptr);
     mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onRefreshRateChangedDebug, this,
                                   nullptr);
+    // Don't register onHotplugEvent until it's available in nextfood (b/323291596)
+    // mDevice->registerHwc3Callback(IComposerCallback::TRANSACTION_onHotplugEvent, this, nullptr);
 
     mEventCallback = nullptr;
 }
@@ -412,17 +427,19 @@ int32_t HalImpl::getDisplayConfigurations(int64_t display, int32_t,
         hwc2_config_t hwcConfigId;
         a2h::translate(configId, hwcConfigId);
         std::optional<VrrConfig_t> vrrConfig = halDisplay->getVrrConfigs(hwcConfigId);
-        if (vrrConfig.has_value()) {
+        if (vrrConfig.has_value() && vrrConfig->isFullySupported) {
             // TODO(b/290843234): complete the remaining values within vrrConfig.
             VrrConfig hwc3VrrConfig;
             VrrConfig::NotifyExpectedPresentConfig notifyExpectedPresentConfig;
             hwc3VrrConfig.minFrameIntervalNs = vrrConfig->minFrameIntervalNs;
-            notifyExpectedPresentConfig.notifyExpectedPresentHeadsUpNs =
-                    vrrConfig->notifyExpectedPresentConfig.HeadsUpNs;
-            notifyExpectedPresentConfig.notifyExpectedPresentTimeoutNs =
-                    vrrConfig->notifyExpectedPresentConfig.TimeoutNs;
-            hwc3VrrConfig.notifyExpectedPresentConfig =
-                    std::make_optional(notifyExpectedPresentConfig);
+            if (vrrConfig->notifyExpectedPresentConfig.has_value()) {
+                notifyExpectedPresentConfig.headsUpNs =
+                        vrrConfig->notifyExpectedPresentConfig->HeadsUpNs;
+                notifyExpectedPresentConfig.timeoutNs =
+                        vrrConfig->notifyExpectedPresentConfig->TimeoutNs;
+                hwc3VrrConfig.notifyExpectedPresentConfig =
+                        std::make_optional(notifyExpectedPresentConfig);
+            }
             config.vrrConfig = std::make_optional(hwc3VrrConfig);
         }
         outConfigs->push_back(config);

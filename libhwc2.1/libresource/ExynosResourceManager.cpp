@@ -1941,6 +1941,70 @@ int32_t ExynosResourceManager::resetResources()
     return NO_ERROR;
 }
 
+std::pair<ExynosDisplay*, ExynosDisplay*> ExynosResourceManager::decideMainAndMinorDisplay(
+        const int32_t willOnDispId) const {
+    ExynosDisplay *mainDisp = nullptr, *minorDisp = nullptr;
+
+    auto rule = [](const ExynosDisplay* left, const ExynosDisplay* right) {
+        if (left->mType == right->mType) return left->mIndex < right->mIndex;
+        return left->mType > right->mType;
+    };
+
+    std::set<ExynosDisplay*, decltype(rule)> availableDisps(rule);
+    for (auto& [disp_id, disp] : mDisplayMap) {
+        if (disp == nullptr || !disp->mPlugState || !disp->mPowerModeState.has_value() ||
+            (disp->mDisplayId != willOnDispId &&
+             disp->mPowerModeState.value() == (hwc2_power_mode_t)HWC_POWER_MODE_OFF))
+            continue;
+        availableDisps.insert(disp);
+        HDEBUGLOGD(eDebugResourceManager, "%s: available display id: %d ", __func__,
+                   disp->mDisplayId);
+    }
+    if (availableDisps.size() == 1) {
+        mainDisp = *availableDisps.begin();
+        HDEBUGLOGD(eDebugResourceManager, "%s: main display:%d ", __func__, mainDisp->mDisplayId);
+    } else if (availableDisps.size() == 2) {
+        mainDisp = *availableDisps.begin();
+        minorDisp = *availableDisps.rbegin();
+        HDEBUGLOGD(eDebugResourceManager, "%s: main display:%d minor display:%d ", __func__,
+                   mainDisp->mDisplayId, minorDisp->mDisplayId);
+    } else {
+        ALOGE("%s(): wrong available display size:%zu", __func__, availableDisps.size());
+    }
+
+    return {mainDisp, minorDisp};
+}
+
+void ExynosResourceManager::updatePreAssignDisplayList(const ExynosDisplay* mainDisp,
+                                                       const ExynosDisplay* minorDisp) {
+    auto updatePreAssignDisplay = [=](ExynosMPP* mpp, const ExynosDisplay* mainDisp,
+                                      const ExynosDisplay* minorDisp) {
+        if (mpp->mPreAssignDisplayInfo == HWC_RESERVE_DISPLAY_MAIN_BIT) {
+            if (mainDisp != NULL)
+                mpp->mPreAssignDisplayList[DISPLAY_MODE_PRIMARY_MAIN] =
+                        mainDisp->getDisplayPreAssignBit();
+            else
+                ALOGE("Main display does not exist!");
+        } else if (mpp->mPreAssignDisplayInfo == HWC_RESERVE_DISPLAY_MINOR_BIT) {
+            if (minorDisp != NULL)
+                mpp->mPreAssignDisplayList[DISPLAY_MODE_PRIMARY_MAIN] =
+                        minorDisp->getDisplayPreAssignBit();
+            else if (mainDisp != NULL)
+                mpp->mPreAssignDisplayList[DISPLAY_MODE_PRIMARY_MAIN] =
+                        mainDisp->getDisplayPreAssignBit();
+            else
+                ALOGE("Main & minor display don't exist!");
+        }
+    };
+
+    for (auto& mpp : mOtfMPPs) {
+        updatePreAssignDisplay(mpp, mainDisp, minorDisp);
+    }
+    for (auto& mpp : mM2mMPPs) {
+        updatePreAssignDisplay(mpp, mainDisp, minorDisp);
+    }
+}
+
 int32_t ExynosResourceManager::preAssignResources()
 {
     HDEBUGLOGD(eDebugResourceManager, "%s+++++++++", __func__);
@@ -2050,14 +2114,6 @@ void ExynosResourceManager::preAssignWindows(ExynosDisplay *display) {
     }
 
     primaryDisplay->usePreDefinedWindow(false);
-
-    for (size_t i = 1; i < mDevice->mDisplays.size(); i++) {
-        ExynosDisplay *disp = mDevice->mDisplays[i];
-        if ((disp == NULL) || (display->mType != HWC_DISPLAY_EXTERNAL)) continue;
-        if (disp->mPlugState == true) {
-            primaryDisplay->usePreDefinedWindow(true);
-        }
-    }
 }
 
 int32_t ExynosResourceManager::preProcessLayer(ExynosDisplay * display)
@@ -2349,8 +2405,7 @@ void ExynosResourceManager::setScaleDownRatio(uint32_t physicalType,
     }
 }
 
-int32_t ExynosResourceManager::prepareResources()
-{
+int32_t ExynosResourceManager::prepareResources(const int32_t willOnDispId) {
     int ret = NO_ERROR;
     HDEBUGLOGD(eDebugResourceManager, "This is first validate");
     if ((ret = resetResources()) != NO_ERROR) {
@@ -2358,13 +2413,21 @@ int32_t ExynosResourceManager::prepareResources()
                 __func__, ret);
         return ret;
     }
+    auto [mainDisp, minorDisp] = decideMainAndMinorDisplay(willOnDispId);
+
+    if ((mDevice->mGeometryChanged & GEOMETRY_DISPLAY_POWER_ON) ||
+        (mDevice->mGeometryChanged & GEOMETRY_DISPLAY_POWER_OFF) ||
+        (mDevice->mGeometryChanged & GEOMETRY_DEVICE_DISPLAY_ADDED) ||
+        (mDevice->mGeometryChanged & GEOMETRY_DEVICE_DISPLAY_REMOVED) || willOnDispId != -1)
+        updatePreAssignDisplayList(mainDisp, minorDisp);
+
     if ((ret = preAssignResources()) != NO_ERROR) {
         HWC_LOGE(NULL,"%s:: preAssignResources() error (%d)",
                 __func__, ret);
         return ret;
     }
 
-    setDisplaysTDMInfo();
+    setDisplaysTDMInfo(mainDisp, minorDisp);
 
     return ret;
 }
@@ -2578,34 +2641,16 @@ void ExynosResourceManager::updateRestrictions() {
         }
     }
 
-    ExynosDisplay *display = NULL;
-    bool isExistSecondaryDisplay = false;
-
-    for (size_t i = 1; i < mDevice->mDisplays.size(); i++) {
-        display = mDevice->mDisplays[i];
-        if ((display->mType == HWC_DISPLAY_PRIMARY) && (display->mIndex == 1))
-            isExistSecondaryDisplay = true;
-    }
-
     for (uint32_t i = 0; i < mOtfMPPs.size(); i++) {
         // mAttr should be updated with updated feature_table
         mOtfMPPs[i]->updateAttr();
         mOtfMPPs[i]->setupRestriction();
-        if (!isExistSecondaryDisplay) {
-            /*
-             * If there is no Secondary Display, the pre-assigned resources for Secondary Display
-             * are pre-assigned to Primary Display.
-             */
-            mOtfMPPs[i]->updatePreassignedDisplay(HWC_DISPLAY_SECONDARY_BIT, HWC_DISPLAY_PRIMARY_BIT);
-        }
     }
 
     for (uint32_t i = 0; i < mM2mMPPs.size(); i++) {
         // mAttr should be updated with updated feature_table
         mM2mMPPs[i]->updateAttr();
         mM2mMPPs[i]->setupRestriction();
-        if (!isExistSecondaryDisplay)
-            mM2mMPPs[i]->updatePreassignedDisplay(HWC_DISPLAY_SECONDARY_BIT, HWC_DISPLAY_PRIMARY_BIT);
     }
 }
 
@@ -2660,6 +2705,14 @@ void ExynosResourceManager::dump(String8 &result) const {
 
     result.appendFormat("[YUV Restrictions]\n");
     dump(RESTRICTION_YUV, result);
+
+    result.appendFormat("[MPP Dump]\n");
+    for (auto mpp : mOtfMPPs) {
+        mpp->dump(result);
+    }
+    for (auto mpp : mM2mMPPs) {
+        mpp->dump(result);
+    }
 }
 
 void ExynosResourceManager::dump(const restriction_classification_t classification,

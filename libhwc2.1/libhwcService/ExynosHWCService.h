@@ -45,7 +45,7 @@ public:
     virtual int sendWFDCommand(int32_t cmd, int32_t ext1, int32_t ext2);
     virtual int setSecureVDSMode(unsigned int mode);
     virtual int setWFDOutputResolution(unsigned int width, unsigned int height);
-    virtual void getWFDOutputResolution(unsigned int *width, unsigned int *height);
+    virtual int getWFDOutputResolution(unsigned int* width, unsigned int* height);
     virtual void setPresentationMode(bool use);
     virtual int getPresentationMode(void);
     virtual int setVDSGlesFormat(int format);
@@ -86,6 +86,13 @@ public:
                                                    const bool& enable) override;
     virtual int32_t triggerRefreshRateIndicatorUpdate(uint32_t displayId,
                                                       uint32_t refreshRate) override;
+    virtual int32_t dumpBuffers(uint32_t displayId, int32_t count) override;
+
+    int32_t setPresentTimeoutController(uint32_t displayId, uint32_t controllerType) override;
+
+    int32_t setPresentTimeoutParameters(uint32_t displayId, int __unused timeoutNs,
+                                        const std::vector<std::pair<uint32_t, uint32_t>>& __unused
+                                                settings) override;
 
 private:
     friend class Singleton<ExynosHWCService>;

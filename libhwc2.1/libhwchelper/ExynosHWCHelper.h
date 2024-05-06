@@ -471,7 +471,7 @@ bool hasHdrInfo(android_dataspace dataSpace);
 bool hasHdr10Plus(exynos_image &img);
 
 void dumpExynosImage(uint32_t type, exynos_image &img);
-void dumpExynosImage(String8& result, exynos_image &img);
+void dumpExynosImage(String8& result, const exynos_image& img);
 void dumpHandle(uint32_t type, buffer_handle_t h);
 void printExynosLayer(const ExynosLayer *layer);
 String8 getFormatStr(int format, uint32_t compressType);
@@ -682,6 +682,17 @@ public:
         }
     }
 
+    std::optional<std::string> read(const std::string& nodeName) {
+        std::string fullPath = mNodePath + nodeName;
+        std::ifstream ifs(fullPath);
+        if (ifs) {
+            std::ostringstream os;
+            os << ifs.rdbuf(); // reading data
+            return os.str();
+        }
+        return std::nullopt;
+    }
+
     template <typename T>
     bool WriteCommandString(const std::string& nodeName, T cmd) {
         // ref: https://elixir.bootlin.com/linux/latest/source/include/linux/kstrtox.h
@@ -728,4 +739,5 @@ std::optional<std::string> waitForPropertyValue(const std::string &property, int
 uint32_t rectSize(const hwc_rect_t &rect);
 void assign(decon_win_rect &win_rect, uint32_t left, uint32_t right, uint32_t width,
             uint32_t height);
+uint32_t nanoSec2Hz(uint64_t ns);
 #endif

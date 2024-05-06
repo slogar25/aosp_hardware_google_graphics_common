@@ -401,7 +401,7 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
             return HWC2_ERROR_BAD_LAYER;
     }
 
-    VendorGraphicBufferMeta gmeta(mLayerBuffer);
+    VendorGraphicBufferMeta gmeta(buffer);
     internal_format = gmeta.format;
 
     if ((mLayerBuffer == NULL) || (buffer == NULL))
@@ -411,9 +411,9 @@ int32_t ExynosLayer::setLayerBuffer(buffer_handle_t buffer, int32_t acquireFence
             setGeometryChanged(GEOMETRY_LAYER_DRM_CHANGED);
         if (VendorGraphicBufferMeta::get_format(mLayerBuffer) != gmeta.format)
             setGeometryChanged(GEOMETRY_LAYER_FORMAT_CHANGED);
-        if ((VendorGraphicBufferMeta::get_usage(buffer) &
+        if ((VendorGraphicBufferMeta::get_usage(mLayerBuffer) &
                     toUnderlying(AidlBufferUsage::FRONT_BUFFER)) !=
-                (VendorGraphicBufferMeta::get_usage(mLayerBuffer) &
+                (VendorGraphicBufferMeta::get_usage(buffer) &
                     toUnderlying(AidlBufferUsage::FRONT_BUFFER)))
             setGeometryChanged(GEOMETRY_LAYER_FRONT_BUFFER_USAGE_CHANGED);
     }

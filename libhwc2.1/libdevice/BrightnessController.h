@@ -142,6 +142,24 @@ public:
         return mBrightnessLevel.get();
     }
 
+    std::optional<std::tuple<float, BrightnessMode>> getBrightnessNitsAndMode() {
+        std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
+        BrightnessMode brightnessMode;
+        if (mBrightnessTable == nullptr) {
+            return std::nullopt;
+        }
+
+        auto brightness = mBrightnessTable->DbvToBrightness(mBrightnessLevel.get());
+        if (brightness == std::nullopt) {
+            return std::nullopt;
+        }
+        auto nits = mBrightnessTable->BrightnessToNits(brightness.value(), brightnessMode);
+        if (nits == std::nullopt) {
+            return std::nullopt;
+        }
+        return std::make_tuple(nits.value(), brightnessMode);
+    }
+
     bool isDimSdr() {
         std::lock_guard<std::recursive_mutex> lock(mBrightnessMutex);
         return mInstantHbmReq.get();
