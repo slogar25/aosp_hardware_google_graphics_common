@@ -846,6 +846,15 @@ int32_t ExynosPrimaryDisplay::setPresentTimeoutController(uint32_t controllerTyp
     return HWC2_ERROR_UNSUPPORTED;
 }
 
+int32_t ExynosPrimaryDisplay::setRefreshRateChangedCallbackDebugEnabled(bool enabled) {
+    if (mVariableRefreshRateController) {
+        mVariableRefreshRateController->enableRefreshRateCalculator(enabled);
+    } else {
+        ExynosDisplay::setRefreshRateChangedCallbackDebugEnabled(enabled);
+    }
+    return NO_ERROR;
+}
+
 int32_t ExynosPrimaryDisplay::setLhbmDisplayConfigLocked(uint32_t peakRate) {
     auto hwConfig = mDisplayInterface->getActiveModeId();
     auto config = getConfigId(peakRate, mDisplayConfigs[hwConfig].width,

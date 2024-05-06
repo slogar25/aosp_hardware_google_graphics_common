@@ -93,6 +93,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         int32_t registerRefreshRateChangeListener(
                 std::shared_ptr<RefreshRateChangeListener> listener) override;
 
+        virtual int32_t setRefreshRateChangedCallbackDebugEnabled(bool enabled) final;
+
     protected:
         /* setPowerMode(int32_t mode)
          * Descriptor: HWC2_FUNCTION_SET_POWER_MODE
