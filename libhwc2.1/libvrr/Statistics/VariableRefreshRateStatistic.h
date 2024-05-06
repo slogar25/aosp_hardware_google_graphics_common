@@ -138,11 +138,9 @@ class StatisticsProvider {
 public:
     virtual ~StatisticsProvider() = default;
 
-    virtual uint64_t getPowerOffDurationNs() const = 0;
-
     virtual uint64_t getStartStatisticTimeNs() const = 0;
 
-    virtual DisplayPresentStatistics getStatistics() const = 0;
+    virtual DisplayPresentStatistics getStatistics() = 0;
 
     virtual DisplayPresentStatistics getUpdatedStatistics() = 0;
 };
@@ -155,11 +153,11 @@ public:
                                  EventQueue* eventQueue, int maxFrameRate, int maxTeFrequency,
                                  int64_t updatePeriodNs);
 
-    uint64_t getPowerOffDurationNs() const override;
+    uint64_t getPowerOffDurationNs() const;
 
     uint64_t getStartStatisticTimeNs() const override;
 
-    DisplayPresentStatistics getStatistics() const override;
+    DisplayPresentStatistics getStatistics() override;
 
     DisplayPresentStatistics getUpdatedStatistics() override;
 
@@ -182,9 +180,9 @@ private:
 
     bool isPowerModeOffNowLocked() const;
 
-    int onPresentTimeout();
-
     void updateCurrentDisplayStatus();
+
+    void updateIdleStats();
 
     int updateStatistic();
 
@@ -203,7 +201,6 @@ private:
     int64_t mLastPresentTimeNs = kDefaultInvalidPresentTimeNs;
 
     DisplayPresentStatistics mStatistics;
-    VrrControllerEvent mTimeoutEvent;
     VrrControllerEvent mUpdateEvent;
 
     DisplayPresentProfile mDisplayPresentProfile;

@@ -47,7 +47,6 @@ enum class VrrControllerEventType {
     kVideoFrameRateCalculatorUpdate,
     kCombinedRefreshRateCalculatorUpdate,
     kAodRefreshRateCalculatorUpdate,
-    kStatisticPresentTimeout,
     kStaticticUpdate,
     kMinLockTimeForPeakRefreshRate,
     kCallbackEventMax = 0x2FF,
@@ -93,8 +92,6 @@ struct VrrControllerEvent {
                 return "kCombinedRefreshRateCalculatorUpdate";
             case VrrControllerEventType::kAodRefreshRateCalculatorUpdate:
                 return "kAodRefreshRateCalculatorUpdate";
-            case VrrControllerEventType::kStatisticPresentTimeout:
-                return "kStatisticPresentTimeout";
             case VrrControllerEventType::kStaticticUpdate:
                 return "kStaticticUpdate";
             case VrrControllerEventType::kMinLockTimeForPeakRefreshRate:
