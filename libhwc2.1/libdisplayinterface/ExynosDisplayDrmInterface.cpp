@@ -2893,18 +2893,18 @@ int32_t ExynosDisplayDrmInterface::clearDisplayHistogramChannelSetting(
 // TODO: b/295990513 - Remove the if defined after kernel prebuilts are merged.
 #if defined(EXYNOS_HISTOGRAM_CHANNEL_REQUEST)
 int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoctl_t control,
-                                                             uint8_t channelId) const {
+                                                             uint32_t blobId) const {
     struct exynos_drm_histogram_channel_request histogramRequest;
 
     histogramRequest.crtc_id = mDrmCrtc->id();
-    histogramRequest.hist_id = channelId;
+    histogramRequest.hist_id = blobId;
 
     if (control == HistogramChannelIoctl_t::REQUEST) {
-        ATRACE_NAME(String8::format("requestIoctl #%u", channelId).c_str());
+        ATRACE_NAME(String8::format("requestIoctl(blob#%u)", blobId).c_str());
         return mDrmDevice->CallVendorIoctl(DRM_IOCTL_EXYNOS_HISTOGRAM_CHANNEL_REQUEST,
                                            (void*)&histogramRequest);
     } else if (control == HistogramChannelIoctl_t::CANCEL) {
-        ATRACE_NAME(String8::format("cancelIoctl #%u", channelId).c_str());
+        ATRACE_NAME(String8::format("cancelIoctl(blob#%u)", blobId).c_str());
         return mDrmDevice->CallVendorIoctl(DRM_IOCTL_EXYNOS_HISTOGRAM_CHANNEL_CANCEL,
                                            (void*)&histogramRequest);
     } else {
@@ -2914,7 +2914,7 @@ int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoc
 }
 #else
 int32_t ExynosDisplayDrmInterface::sendHistogramChannelIoctl(HistogramChannelIoctl_t control,
-                                                             uint8_t channelId) const {
+                                                             uint32_t blobId) const {
     ALOGE("%s: kernel doesn't support multi channel histogram ioctl", __func__);
     return INVALID_OPERATION;
 }

@@ -1803,7 +1803,7 @@ class ExynosDisplay {
         };
 
         std::shared_ptr<RefreshRateIndicator> mRefreshRateIndicatorHandler;
-        int32_t setRefreshRateChangedCallbackDebugEnabled(bool enabled);
+        virtual int32_t setRefreshRateChangedCallbackDebugEnabled(bool enabled);
         nsecs_t getLastLayerUpdateTime();
         bool needUpdateRRIndicator();
         virtual void checkPreblendingRequirement(){};

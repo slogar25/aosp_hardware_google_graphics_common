@@ -852,15 +852,18 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
     for (const auto& listener : mRefreshRateChangeListeners) {
         if (listener) listener->onRefreshRateChange(refreshRate);
     }
-    if (!mDisplay->mDevice->isVrrApiSupported()) {
-        // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,
-        // refreshPeriodNanos is disregarded.
-        mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
-                                                     freqToDurationNs(refreshRate), -1);
-    } else {
-        mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
-                                                     mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
-                                                     freqToDurationNs(refreshRate));
+    if (mRefreshRateCalculatorEnabled) {
+        if (!mDisplay->mDevice->isVrrApiSupported()) {
+            // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,
+            // refreshPeriodNanos is disregarded.
+            mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
+                                                         freqToDurationNs(refreshRate), -1);
+        } else {
+            mDisplay->mDevice
+                    ->onRefreshRateChangedDebug(mDisplay->mDisplayId,
+                                                mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
+                                                freqToDurationNs(refreshRate));
+        }
     }
 }
 

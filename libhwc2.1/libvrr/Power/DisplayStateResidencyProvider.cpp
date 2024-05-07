@@ -22,8 +22,14 @@
 
 namespace android::hardware::graphics::composer {
 
-const std::unordered_set<int> DisplayStateResidencyProvider::kFpsMappingTable = {1,  2,  10, 24, 30,
-                                                                                 48, 60, 80, 120};
+// Currently, the FPS ranges from [1, |kMaxFrameRate| = 120], and the maximum TE
+// frequency(|kMaxTefrequency|) = 240. We express fps by dividing the number of vsync by the maximum
+// TE. Here, the denominator is set to |kMaxTefrequency|, fraction reduction is not needed here.
+const std::set<std::pair<int, int>, RatioComparator>
+        DisplayStateResidencyProvider::kFpsMappingTable = {{240, 240}, {120, 240}, {24, 240},
+                                                           {10, 240},  {8, 240},   {7, 240},
+                                                           {6, 240},   {5, 240},   {4, 240},
+                                                           {3, 240},   {2, 240}};
 
 const std::unordered_set<int> DisplayStateResidencyProvider::kFpsLowPowerModeMappingTable = {1, 30};
 
@@ -107,10 +113,9 @@ void DisplayStateResidencyProvider::mapStatistics() {
         powerStatsPresentProfile.mBrightnessMode =
                 displayPresentProfile.mCurrentDisplayConfig.mBrightnessMode;
         auto teFrequency = mDisplayContextProvider->getTeFrequency(configId);
-        auto residule = teFrequency % displayPresentProfile.mNumVsync;
-        auto fps = teFrequency / displayPresentProfile.mNumVsync;
-        if ((residule == 0) && (kFpsMappingTable.count(fps) > 0)) {
-            powerStatsPresentProfile.mFps = fps;
+        if ((kFpsMappingTable.count({displayPresentProfile.mNumVsync, teFrequency}) > 0)) {
+            powerStatsPresentProfile.mFps =
+                    std::round(static_cast<float>(teFrequency) / displayPresentProfile.mNumVsync);
             mRemappedStatistics[powerStatsPresentProfile] += item.second;
             mRemappedStatistics[powerStatsPresentProfile].mUpdated = true;
         } else {
@@ -177,20 +182,21 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
                 powerStatsPresentProfile.mFps = 0;
                 powerStatsPresentProfileCandidates.insert(powerStatsPresentProfile);
                 for (auto fps : kFpsMappingTable) {
-                    powerStatsPresentProfile.mFps = fps;
+                    powerStatsPresentProfile.mFps =
+                            std::round(static_cast<float>(fps.second) / fps.first);
                     powerStatsPresentProfileCandidates.insert(powerStatsPresentProfile);
                 }
             }
         }
     }
 
-    auto comp = [](const std::pair<std::string, PowerStatsPresentProfile>& v1,
-                   const std::pair<std::string, PowerStatsPresentProfile>& v2) {
+    auto uniqueComp = [](const std::pair<std::string, PowerStatsPresentProfile>& v1,
+                         const std::pair<std::string, PowerStatsPresentProfile>& v2) {
         return v1.first < v2.first;
     };
 
-    // Convert candidate DisplayConfigProfiles into a string.
-    std::set<std::pair<std::string, PowerStatsPresentProfile>, decltype(comp)> States;
+    // Transform candidate DisplayConfigProfiles into a string and eliminate duplicates.
+    std::set<std::pair<std::string, PowerStatsPresentProfile>, decltype(uniqueComp)> uniqueStates;
     for (const auto& powerStatsPresentProfile : powerStatsPresentProfileCandidates) {
         std::string stateName;
         mPowerStatsPresentProfileTokenGenerator.setPowerStatsPresentProfile(
@@ -210,14 +216,25 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
             }
             stateName += pattern.second;
         }
-        States.insert(std::make_pair(stateName, powerStatsPresentProfile));
+        uniqueStates.insert(std::make_pair(stateName, powerStatsPresentProfile));
     }
 
-    // Sort and assign a unique identifier to each state string..
-    mStateResidency.resize(States.size());
+    auto sortComp = [](const std::pair<std::string, PowerStatsPresentProfile>& v1,
+                       const std::pair<std::string, PowerStatsPresentProfile>& v2) {
+        return v1.second < v2.second;
+    };
+    std::set<std::pair<std::string, PowerStatsPresentProfile>, decltype(sortComp)> sortedStates;
+    // Sort power stats according to a predefined order.
+    std::for_each(uniqueStates.begin(), uniqueStates.end(),
+                  [&](const std::pair<std::string, PowerStatsPresentProfile>& item) {
+                      sortedStates.insert(item);
+                  });
+
+    // Sort and assign a unique identifier to each state string.
+    mStateResidency.resize(sortedStates.size());
     int id = 0;
     int index = 0;
-    for (const auto& state : States) {
+    for (const auto& state : sortedStates) {
         mStates.push_back({id, state.first});
         mPowerStatsPresentProfileToIdMap[state.second] = id;
         mStateResidency[index++].id = id;

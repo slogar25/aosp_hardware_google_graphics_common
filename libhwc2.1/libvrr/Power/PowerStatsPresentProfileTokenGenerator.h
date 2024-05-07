@@ -48,14 +48,14 @@ typedef struct PowerStatsPresentProfile {
 
         if (mPowerMode != rhs.mPowerMode) {
             return (isOff() || (mPowerMode < rhs.mPowerMode));
+        } else if (mBrightnessMode != rhs.mBrightnessMode) {
+            return mBrightnessMode < rhs.mBrightnessMode;
         } else if (mWidth != rhs.mWidth) {
             return mWidth < rhs.mWidth;
         } else if (mHeight != rhs.mHeight) {
             return mHeight < rhs.mHeight;
-        } else if (mFps != rhs.mFps) {
-            return mFps < rhs.mFps;
         } else {
-            return mBrightnessMode < rhs.mBrightnessMode;
+            return mFps < rhs.mFps;
         }
     }
 

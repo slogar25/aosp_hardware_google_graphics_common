@@ -31,6 +31,13 @@ using aidl::android::hardware::power::stats::StateResidency;
 
 typedef std::vector<StateResidency> StateResidencies;
 
+struct RatioComparator {
+    bool operator()(const std::pair<int, int>& lhs, const std::pair<int, int>& rhs) const {
+        // Compare the ratios by converting them to double
+        return (lhs.second * rhs.first) < (rhs.second * lhs.first);
+    }
+};
+
 class DisplayStateResidencyProvider {
 public:
     DisplayStateResidencyProvider(
@@ -45,7 +52,7 @@ public:
     DisplayStateResidencyProvider& operator=(const DisplayStateResidencyProvider& other) = delete;
 
 private:
-    static const std::unordered_set<int> kFpsMappingTable;
+    static const std::set<std::pair<int, int>, RatioComparator> kFpsMappingTable;
     static const std::unordered_set<int> kFpsLowPowerModeMappingTable;
     static const std::unordered_set<int> kActivePowerModes;
 
