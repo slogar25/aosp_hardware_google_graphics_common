@@ -190,13 +190,13 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
         }
     }
 
-    auto comp = [](const std::pair<std::string, PowerStatsPresentProfile>& v1,
-                   const std::pair<std::string, PowerStatsPresentProfile>& v2) {
+    auto uniqueComp = [](const std::pair<std::string, PowerStatsPresentProfile>& v1,
+                         const std::pair<std::string, PowerStatsPresentProfile>& v2) {
         return v1.first < v2.first;
     };
 
-    // Convert candidate DisplayConfigProfiles into a string.
-    std::set<std::pair<std::string, PowerStatsPresentProfile>, decltype(comp)> States;
+    // Transform candidate DisplayConfigProfiles into a string and eliminate duplicates.
+    std::set<std::pair<std::string, PowerStatsPresentProfile>, decltype(uniqueComp)> uniqueStates;
     for (const auto& powerStatsPresentProfile : powerStatsPresentProfileCandidates) {
         std::string stateName;
         mPowerStatsPresentProfileTokenGenerator.setPowerStatsPresentProfile(
@@ -216,14 +216,25 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
             }
             stateName += pattern.second;
         }
-        States.insert(std::make_pair(stateName, powerStatsPresentProfile));
+        uniqueStates.insert(std::make_pair(stateName, powerStatsPresentProfile));
     }
 
-    // Sort and assign a unique identifier to each state string..
-    mStateResidency.resize(States.size());
+    auto sortComp = [](const std::pair<std::string, PowerStatsPresentProfile>& v1,
+                       const std::pair<std::string, PowerStatsPresentProfile>& v2) {
+        return v1.second < v2.second;
+    };
+    std::set<std::pair<std::string, PowerStatsPresentProfile>, decltype(sortComp)> sortedStates;
+    // Sort power stats according to a predefined order.
+    std::for_each(uniqueStates.begin(), uniqueStates.end(),
+                  [&](const std::pair<std::string, PowerStatsPresentProfile>& item) {
+                      sortedStates.insert(item);
+                  });
+
+    // Sort and assign a unique identifier to each state string.
+    mStateResidency.resize(sortedStates.size());
     int id = 0;
     int index = 0;
-    for (const auto& state : States) {
+    for (const auto& state : sortedStates) {
         mStates.push_back({id, state.first});
         mPowerStatsPresentProfileToIdMap[state.second] = id;
         mStateResidency[index++].id = id;
