@@ -419,14 +419,14 @@ ndk::ScopedAStatus Display::queryStats(DisplayStats::Tag tag,
             }
             break;
         case DisplayStats::opr:
-            // TODO: b/309897479 - Provide real OPR value. Use the fake one for telemetry testing
-            // now.
-            {
-                static int count = 0;
-                std::array<double, 3> oprs{count / (double)100, count / (double)100,
-                                           count / (double)100};
-                (*_aidl_return) = DisplayStats::make<DisplayStats::opr>(oprs);
-                count = (count + 1) % 101;
+            if (mDisplay->mHistogramController) {
+                std::array<double, HistogramController::kOPRConfigsCount> oprVals;
+                ndk::ScopedAStatus status = mDisplay->mHistogramController->queryOPR(oprVals);
+                if (!status.isOk()) return status;
+                (*_aidl_return) = DisplayStats::make<DisplayStats::opr>(oprVals);
+            } else {
+                ALOGW("%s: mHistogramController is null!", __func__);
+                return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
             }
             break;
         default:
