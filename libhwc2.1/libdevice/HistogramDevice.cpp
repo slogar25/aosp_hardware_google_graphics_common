@@ -74,14 +74,13 @@ HistogramDevice::ChannelInfo::ChannelInfo(const ChannelInfo& other) {
     histDataCollecting = other.histDataCollecting;
 }
 
-HistogramDevice::HistogramDevice(ExynosDisplay* display, uint8_t channelCount,
-                                 std::vector<uint8_t> reservedChannels) {
-    mDisplay = display;
-
+HistogramDevice::HistogramDevice(ExynosDisplay* const display, const uint8_t channelCount,
+                                 const std::vector<uint8_t> reservedChannels)
+      : mDisplay(display) {
     // TODO: b/295786065 - Get available channels from crtc property.
     initChannels(channelCount, reservedChannels);
 
-    /* Create the death recipient which will be deleted in the destructor */
+    // Create the death recipient which will be deleted in the destructor
     mDeathRecipient = AIBinder_DeathRecipient_new(histogramOnBinderDied);
 }
 
@@ -91,21 +90,30 @@ HistogramDevice::~HistogramDevice() {
     }
 }
 
-void HistogramDevice::initDrm(const DrmCrtc& crtc) {
+void HistogramDevice::initDrm(DrmDevice& device, const DrmCrtc& crtc) {
     // TODO: b/295786065 - Get available channels from crtc property.
+    ATRACE_NAME("HistogramDevice::initDrm");
 
-    // TODO: b/295786065 - Check if the multi channel property is supported.
-    initHistogramCapability(crtc.histogram_channel_property(0).id() != 0);
+    {
+        std::unique_lock<std::mutex> lock(mInitDrmDoneMutex);
+        ::android::base::ScopedLockAssertion lock_assertion(mInitDrmDoneMutex);
+        ATRACE_NAME("mInitDrmDoneMutex");
+        if (mInitDrmDone) {
+            HIST_LOG(W, "should be called only once, ignore!");
+            return;
+        }
 
-    /* print the histogram capability */
+        initHistogramCapability(crtc.histogram_channel_property(0).id() != 0);
+        mDrmDevice = &device;
+        mInitDrmDone = true;
+        mInitDrmDone_cv.notify_all();
+    }
+
+    // print the histogram capability
     String8 logString;
     dumpHistogramCapability(logString);
     ALOGI("%s", logString.c_str());
-
-    std::unique_lock<std::mutex> lock(mInitDrmDoneMutex);
-    ::android::base::ScopedLockAssertion lock_assertion(mInitDrmDoneMutex);
-    mInitDrmDone = true;
-    mInitDrmDone_cv.notify_all();
+    HIST_LOG(D, "successfully");
 }
 
 bool HistogramDevice::waitInitDrmDone() {
@@ -118,10 +126,6 @@ bool HistogramDevice::waitInitDrmDone() {
         return mInitDrmDone;
     });
 
-    if (!mInitDrmDone) {
-        ALOGW("%s: HistogramDevice::mInitDrmDone is still false", __func__);
-    }
-
     return mInitDrmDone;
 }
 
@@ -130,10 +134,11 @@ ndk::ScopedAStatus HistogramDevice::getHistogramCapability(
     ATRACE_CALL();
 
     if (!histogramCapability) {
-        ALOGE("%s: binder error, histogramCapability is nullptr", __func__);
+        HIST_LOG(E, "binder error, histogramCapability is nullptr");
         return ndk::ScopedAStatus::fromExceptionCode(EX_NULL_POINTER);
     }
 
+    std::shared_lock lock(mHistogramCapabilityMutex);
     *histogramCapability = mHistogramCapability;
 
     return ndk::ScopedAStatus::ok();
@@ -151,9 +156,12 @@ ndk::ScopedAStatus HistogramDevice::registerHistogram(const ndk::SpAIBinder& tok
         return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
     }
 
-    if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-        ALOGE("%s: histogram interface is not supported", __func__);
-        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    {
+        std::shared_lock lock(mHistogramCapabilityMutex);
+        if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
+            ALOGE("%s: histogram interface is not supported", __func__);
+            return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+        }
     }
 
     return configHistogram(token, histogramConfig, histogramErrorCode, false);
@@ -173,9 +181,12 @@ ndk::ScopedAStatus HistogramDevice::queryHistogram(const ndk::SpAIBinder& token,
                                                    HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
 
-    if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-        ALOGE("%s: histogram interface is not supported", __func__);
-        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    {
+        std::shared_lock lock(mHistogramCapabilityMutex);
+        if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
+            ALOGE("%s: histogram interface is not supported", __func__);
+            return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+        }
     }
 
     /* No need to validate the argument (token), if the token is not correct it cannot be converted
@@ -238,9 +249,12 @@ ndk::ScopedAStatus HistogramDevice::reconfigHistogram(const ndk::SpAIBinder& tok
                                                       HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
 
-    if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-        ALOGE("%s: histogram interface is not supported", __func__);
-        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    {
+        std::shared_lock lock(mHistogramCapabilityMutex);
+        if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
+            ALOGE("%s: histogram interface is not supported", __func__);
+            return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+        }
     }
 
     return configHistogram(token, histogramConfig, histogramErrorCode, true);
@@ -250,9 +264,12 @@ ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder& t
                                                         HistogramErrorCode* histogramErrorCode) {
     ATRACE_CALL();
 
-    if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
-        ALOGE("%s: histogram interface is not supported", __func__);
-        return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+    {
+        std::shared_lock lock(mHistogramCapabilityMutex);
+        if (UNLIKELY(!mHistogramCapability.supportMultiChannel)) {
+            ALOGE("%s: histogram interface is not supported", __func__);
+            return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
+        }
     }
 
     /* No need to validate the argument (token), if the token is not correct it cannot be converted
@@ -383,9 +400,12 @@ void HistogramDevice::postAtomicCommit() {
 }
 
 void HistogramDevice::dump(String8& result) const {
-    /* Do not dump the Histogram Device if it is not supported. */
-    if (!mHistogramCapability.supportMultiChannel) {
-        return;
+    {
+        std::shared_lock lock(mHistogramCapabilityMutex);
+        // Do not dump the Histogram Device if it is not supported.
+        if (!mHistogramCapability.supportMultiChannel) {
+            return;
+        }
     }
 
     /* print the histogram capability */
@@ -420,7 +440,7 @@ void HistogramDevice::dump(String8& result) const {
     result.appendFormat("\n");
 }
 
-void HistogramDevice::initChannels(uint8_t channelCount,
+void HistogramDevice::initChannels(const uint8_t channelCount,
                                    const std::vector<uint8_t>& reservedChannels) {
     mChannels.resize(channelCount);
     ALOGI("%s: init histogram with %d channels", __func__, channelCount);
@@ -445,14 +465,15 @@ void HistogramDevice::initChannels(uint8_t channelCount,
     }
 }
 
-void HistogramDevice::initHistogramCapability(bool supportMultiChannel) {
+void HistogramDevice::initHistogramCapability(const bool supportMultiChannel) {
+    ATRACE_CALL();
+
     ExynosDisplayDrmInterface* moduleDisplayInterface =
             static_cast<ExynosDisplayDrmInterface*>(mDisplay->mDisplayInterface.get());
 
+    SCOPED_HIST_LOCK(mHistogramCapabilityMutex);
     if (!moduleDisplayInterface) {
-        ALOGE("%s: failed to get ExynosDisplayDrmInterface (nullptr), cannot get panel full "
-              "resolution",
-              __func__);
+        HIST_LOG(E, "failed to get panel full resolution, moduleDisplayInterface is NULL");
         mHistogramCapability.fullResolutionWidth = 0;
         mHistogramCapability.fullResolutionHeight = 0;
     } else {
@@ -461,12 +482,10 @@ void HistogramDevice::initHistogramCapability(bool supportMultiChannel) {
         mHistogramCapability.fullResolutionHeight =
                 moduleDisplayInterface->getPanelFullResolutionVSize();
     }
-
     mHistogramCapability.channelCount = mChannels.size();
     mHistogramCapability.supportMultiChannel = supportMultiChannel;
     mHistogramCapability.supportSamplePosList.push_back(HistogramSamplePos::POST_POSTPROC);
     mHistogramCapability.supportBlockingRoi = false;
-
     initPlatformHistogramCapability();
 }
 
@@ -900,7 +919,8 @@ int HistogramDevice::convertRoiLocked(ExynosDisplayDrmInterface* moduleDisplayIn
 }
 
 void HistogramDevice::dumpHistogramCapability(String8& result) const {
-    /* Append the histogram capability info to the dump string */
+    std::shared_lock lock(mHistogramCapabilityMutex);
+    // Append the histogram capability info to the dump string
     result.appendFormat("Histogram capability:\n");
     result.appendFormat("\tsupportMultiChannel: %s\n",
                         mHistogramCapability.supportMultiChannel ? "true" : "false");
@@ -922,6 +942,8 @@ void HistogramDevice::dumpHistogramCapability(String8& result) const {
 HistogramDevice::HistogramErrorCode HistogramDevice::validateHistogramConfig(
         const HistogramConfig& histogramConfig) const {
     HistogramErrorCode ret;
+
+    std::shared_lock lock(mHistogramCapabilityMutex);
 
     if ((ret = validateHistogramRoi(histogramConfig.roi, "")) != HistogramErrorCode::NONE ||
         (ret = validateHistogramWeights(histogramConfig.weights)) != HistogramErrorCode::NONE ||

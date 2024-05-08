@@ -29,6 +29,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <queue>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include "ExynosDisplay.h"
@@ -54,6 +55,10 @@
     ALOG##LEVEL("[%s,pid=%d] HistogramDevice::%s: " msg,                  \
                 ((mDisplay) ? (mDisplay->mDisplayName.c_str()) : "NULL"), \
                 AIBinder_getCallingPid(), __func__, ##__VA_ARGS__)
+
+#define SCOPED_HIST_LOCK(mutex)   \
+    std::scoped_lock lock(mutex); \
+    ATRACE_NAME(String8::format("%s(%s)", #mutex, __func__));
 
 using namespace android;
 
@@ -165,8 +170,8 @@ public:
      * @channelCount number of the histogram channels in the system.
      * @reservedChannels a list of channel id that are reserved by the driver.
      */
-    explicit HistogramDevice(ExynosDisplay* display, uint8_t channelCount,
-                             std::vector<uint8_t> reservedChannels);
+    explicit HistogramDevice(ExynosDisplay* const display, const uint8_t channelCount,
+                             const std::vector<uint8_t> reservedChannels);
 
     /**
      * ~HistogramDevice
@@ -182,9 +187,10 @@ public:
      *     1. The available histogram channel bitmask.
      *     2. Determine kernel support multi channel property or not.
      *
+     * @device drm device object which will be used to create the config blob.
      * @crtc drm crtc object which would contain histogram related information.
      */
-    void initDrm(const DrmCrtc& crtc);
+    void initDrm(DrmDevice& device, const DrmCrtc& crtc) EXCLUDES(mInitDrmDoneMutex);
 
     /**
      * getHistogramCapability
@@ -194,7 +200,8 @@ public:
      * @histogramCapability: describe the histogram capability for the system.
      * @return ok() when the interface is supported and arguments are valid, else otherwise.
      */
-    ndk::ScopedAStatus getHistogramCapability(HistogramCapability* histogramCapability) const;
+    ndk::ScopedAStatus getHistogramCapability(HistogramCapability* histogramCapability) const
+            EXCLUDES(mInitDrmDoneMutex);
 
     /**
      * registerHistogram
@@ -305,20 +312,23 @@ public:
     void dump(String8& result) const;
 
 protected:
+    mutable std::shared_mutex mHistogramCapabilityMutex;
     HistogramCapability mHistogramCapability;
 
 private:
+    ExynosDisplay* const mDisplay;
+    DrmDevice* mDrmDevice = nullptr;
+
     mutable std::mutex mAllocatorMutex;
     std::queue<uint8_t> mFreeChannels GUARDED_BY(mAllocatorMutex); // free channel list
     std::unordered_map<AIBinder*, TokenInfo> mTokenInfoMap GUARDED_BY(mAllocatorMutex);
     std::vector<ChannelInfo> mChannels;
     int32_t mDisplayActiveH = 0;
     int32_t mDisplayActiveV = 0;
-    ExynosDisplay* mDisplay = nullptr;
 
     mutable std::mutex mInitDrmDoneMutex;
     bool mInitDrmDone GUARDED_BY(mInitDrmDoneMutex) = false;
-    std::condition_variable mInitDrmDone_cv;
+    std::condition_variable mInitDrmDone_cv GUARDED_BY(mInitDrmDoneMutex);
 
     /* Death recipient for the binderdied callback, would be deleted in the destructor */
     AIBinder_DeathRecipient* mDeathRecipient = nullptr;
@@ -331,7 +341,8 @@ private:
      * @channelCount number of channels in the system including the reserved channels.
      * @reservedChannels a list of channel id that are reserved by the driver.
      */
-    void initChannels(uint8_t channelCount, const std::vector<uint8_t>& reservedChannels);
+    void initChannels(const uint8_t channelCount, const std::vector<uint8_t>& reservedChannels)
+            EXCLUDES(mInitDrmDoneMutex);
 
     /**
      * initHistogramCapability
@@ -341,7 +352,7 @@ private:
      *
      * @supportMultiChannel true if the kernel support multi channel property, false otherwise.
      */
-    void initHistogramCapability(bool supportMultiChannel);
+    void initHistogramCapability(const bool supportMultiChannel);
 
     /**
      * initPlatformHistogramCapability
@@ -357,7 +368,7 @@ private:
      *
      * @return true if initDrm is finished, or false when the timeout expires.
      */
-    bool waitInitDrmDone();
+    bool waitInitDrmDone() EXCLUDES(mInitDrmDoneMutex);
 
     /**
      * configHistogram
