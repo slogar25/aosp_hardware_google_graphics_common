@@ -169,7 +169,8 @@ bool DrmCrtc::has_display(int display) const {
 }
 
 void DrmCrtc::set_display(int display) {
-  displays_.push_back(display);
+  if (!has_display(display))
+    displays_.push_back(display);
 }
 
 bool DrmCrtc::can_bind(int display) const {

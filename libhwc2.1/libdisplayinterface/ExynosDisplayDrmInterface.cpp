@@ -933,6 +933,34 @@ int32_t ExynosDisplayDrmInterface::setPowerMode(int32_t mode)
         HWC_LOGE(mExynosDisplay, "setPower mode ret (%d)", ret);
     }
 
+    if (mExynosDisplay->mDevice->mNumPrimaryDisplays >= 2 &&
+        mExynosDisplay->mType == HWC_DISPLAY_PRIMARY && mode == HWC_POWER_MODE_OFF) {
+        ExynosDisplay* external_display =
+                mExynosDisplay->mDevice->getDisplay(getDisplayId(HWC_DISPLAY_EXTERNAL, 0));
+        ExynosDisplayDrmInterface* external_display_intf = external_display
+                ? static_cast<ExynosDisplayDrmInterface*>(external_display->mDisplayInterface.get())
+                : nullptr;
+        if (external_display && external_display->mPowerModeState != HWC_POWER_MODE_OFF) {
+            ALOGI("setPowerMode: display %s power state changed, while external display is active",
+                  mExynosDisplay->mDisplayTraceName.c_str());
+            // Primary display has powered down, while external display doesn't have a borrowed
+            // decon, we can now reassign the powered off decon to the external displ.
+            // (Plug in during DCD mode case)
+            if (external_display_intf && external_display_intf->borrowedCrtcFrom() == nullptr) {
+                ALOGI("setPowerMode: DCD case - display %s powered off, reuse decon for external",
+                      mExynosDisplay->mDisplayTraceName.c_str());
+                hwc2_config_t activeConfig = 0;
+                external_display->getActiveConfig(&activeConfig);
+                external_display->clearDisplay(true);
+                external_display->setPowerMode(HWC2_POWER_MODE_OFF);
+                external_display_intf->swapCrtcs(mExynosDisplay);
+                external_display->mActiveConfig = 0;
+                external_display->setActiveConfig(activeConfig);
+                external_display->setPowerMode(HWC2_POWER_MODE_ON);
+            }
+        }
+    }
+
     if (mode == HWC_POWER_MODE_OFF) {
         mFBManager.destroyAllSecureBuffers();
     }
@@ -2967,4 +2995,69 @@ void ExynosDisplayDrmInterface::setManufacturerInfo(uint8_t edid8, uint8_t edid9
 
 void ExynosDisplayDrmInterface::setProductId(uint8_t edid10, uint8_t edid11) {
     mProductId = edid11 << 8 | edid10;
+}
+
+ExynosDisplay* ExynosDisplayDrmInterface::borrowedCrtcFrom() {
+    return mBorrowedCrtcFrom;
+}
+
+int32_t ExynosDisplayDrmInterface::swapCrtcs(ExynosDisplay* anotherDisplay) {
+    if (!anotherDisplay) {
+        HWC_LOGE(mExynosDisplay, "%s: failed, anotherDisplay is null", __func__);
+        return -EINVAL;
+    }
+    ExynosDisplayDrmInterface* anotherDisplayIntf =
+            static_cast<ExynosDisplayDrmInterface*>(anotherDisplay->mDisplayInterface.get());
+    if (!anotherDisplayIntf) {
+        HWC_LOGE(mExynosDisplay, "%s: failed to get ExynosDisplayDrmInterface of display %s",
+                 __func__, anotherDisplay->mDisplayTraceName.c_str());
+        return -EINVAL;
+    }
+
+    if (borrowedCrtcFrom() != nullptr && borrowedCrtcFrom() != anotherDisplay) {
+        HWC_LOGE(mExynosDisplay, "%s: display %s is already using decon borrowed from %s", __func__,
+                 mExynosDisplay->mDisplayTraceName.c_str(),
+                 borrowedCrtcFrom()->mDisplayTraceName.c_str());
+        return -EINVAL;
+    }
+
+    if (!mDrmCrtc || !mDrmConnector) {
+        HWC_LOGE(mExynosDisplay, "%s: failed to get crtc or connector of display %s", __func__,
+                 mExynosDisplay->mDisplayTraceName.c_str());
+        return -EINVAL;
+    }
+
+    DrmCrtc* anotherCrtc = anotherDisplayIntf->mDrmCrtc;
+    DrmConnector* anotherConnector = anotherDisplayIntf->mDrmConnector;
+    if (!anotherCrtc || !anotherConnector) {
+        HWC_LOGE(mExynosDisplay, "%s: failed to get crtc or connector of display %s", __func__,
+                 anotherDisplay->mDisplayTraceName.c_str());
+        return -EINVAL;
+    }
+
+    ALOGD("%s: switching %s (curr decon %u) <-> %s (curr decon %u)", __func__,
+          mExynosDisplay->mDisplayTraceName.c_str(), mDrmCrtc->pipe(),
+          anotherDisplay->mDisplayTraceName.c_str(), anotherCrtc->pipe());
+
+    anotherDisplayIntf->clearDisplay(true);
+
+    mDrmCrtc->set_display(anotherConnector->display());
+    anotherCrtc->set_display(mDrmConnector->display());
+
+    mDrmConnector->encoder()->set_crtc(anotherCrtc, anotherConnector->display());
+    anotherConnector->encoder()->set_crtc(mDrmCrtc, mDrmConnector->display());
+
+    int anotherConnDispl = anotherConnector->display();
+    anotherConnector->set_display(mDrmConnector->display());
+    mDrmConnector->set_display(anotherConnDispl);
+
+    anotherDisplayIntf->mDrmCrtc = mDrmCrtc;
+    mDrmCrtc = anotherCrtc;
+
+    if (mBorrowedCrtcFrom == anotherDisplay) {
+        mBorrowedCrtcFrom = nullptr;
+    } else {
+        mBorrowedCrtcFrom = anotherDisplay;
+    }
+    return 0;
 }

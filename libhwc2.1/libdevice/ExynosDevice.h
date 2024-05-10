@@ -160,6 +160,8 @@ class ExynosDevice {
 
         int mNumVirtualDisplay;
 
+        int mNumPrimaryDisplays;
+
         /**
          * Resource manager object that is used to manage HW resources and assign resources to each layers
          */
@@ -353,6 +355,13 @@ class ExynosDevice {
 
         bool isVrrApiSupported() const { return mVrrApiSupported; };
         void setVBlankOffDelay(const int vblankOffDelay);
+
+        // Find a primary display that is currently in a powered off state, or nullptr if there are
+        // no primary displays in powered off state. The optional |excludeDisplay| parameter, if
+        // not null, specifies that the given display should be ignored during search (it's useful
+        // when we know that a certain display is about to be powered on, but it's mPowerModeState
+        // is not updated yet).
+        ExynosDisplay* findPoweredOffPrimaryDisplay(ExynosDisplay* excludeDisplay);
 
     protected:
         void initDeviceInterface(uint32_t interfaceType);
