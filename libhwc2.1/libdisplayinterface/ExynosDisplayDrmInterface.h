@@ -417,6 +417,18 @@ class ExynosDisplayDrmInterface :
         virtual void setProductId(uint8_t edid10, uint8_t edid11) override;
         virtual uint32_t getProductId() override { return mProductId; }
 
+        // This function will swap crtc/decon assigned to this display, with the crtc/decon of
+        // the provided |anotherDisplay|. It is used on foldable devices, where decon0/1 support
+        // color management, but decon2 doesn't, to re-assign the decon0/1 of a powered off primary
+        // display for the external display. When the external display is disconnected, this
+        // function is called again with the same |anotherDisplay| parameter to restore the
+        // original crtc/decon assignment of the external and primary display.
+        // See b/329034082 for details.
+        virtual int32_t swapCrtcs(ExynosDisplay* anotherDisplay) override;
+        // After swapCrtcs has been successfully done, this function will return the display, whose
+        // crtc/decon this display is currently using.
+        virtual ExynosDisplay* borrowedCrtcFrom() override;
+
     protected:
         enum class HalMipiSyncType : uint32_t {
             HAL_MIPI_CMD_SYNC_REFRESH_RATE = 0,
@@ -572,6 +584,8 @@ class ExynosDisplayDrmInterface :
         BlockingRegionState mBlockState;
         /* Mapping plane id to ExynosMPP, key is plane id */
         std::unordered_map<uint32_t, ExynosMPP*> mExynosMPPsForPlane;
+
+        ExynosDisplay* mBorrowedCrtcFrom = nullptr;
 
         DrmEnumParser::MapHal2DrmEnum mBlendEnums;
         DrmEnumParser::MapHal2DrmEnum mStandardEnums;

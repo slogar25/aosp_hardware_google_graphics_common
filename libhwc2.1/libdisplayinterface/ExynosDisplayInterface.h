@@ -101,6 +101,9 @@ class ExynosDisplayInterface {
         virtual void setProductId(uint8_t __unused edid10, uint8_t __unused edid11){};
         virtual uint32_t getProductId() { return 0; }
 
+        virtual int32_t swapCrtcs(ExynosDisplay* anotherDisplay) { return HWC2_ERROR_UNSUPPORTED; }
+        virtual ExynosDisplay* borrowedCrtcFrom() { return nullptr; }
+
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };
