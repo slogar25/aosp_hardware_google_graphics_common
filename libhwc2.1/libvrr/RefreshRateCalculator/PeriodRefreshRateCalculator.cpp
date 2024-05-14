@@ -26,7 +26,7 @@ PeriodRefreshRateCalculator::PeriodRefreshRateCalculator(
     mName = "PeriodRefreshRateCalculator";
 
     mMeasureEvent.mEventType = VrrControllerEventType::kPeriodRefreshRateCalculatorUpdate;
-    mLastMeasureTimeNs = getNowNs() + params.mMeasurePeriodNs;
+    mLastMeasureTimeNs = getSteadyClockTimeNs() + params.mMeasurePeriodNs;
     mMeasureEvent.mWhenNs = mLastMeasureTimeNs;
     mMeasureEvent.mFunctor = std::move(std::bind(&PeriodRefreshRateCalculator::onMeasure, this));
     mEventQueue->mPriorityQueue.emplace(mMeasureEvent);
@@ -78,7 +78,7 @@ void PeriodRefreshRateCalculator::setEnabled(bool isEnabled) {
     if (!isEnabled) {
         mEventQueue->dropEvent(VrrControllerEventType::kPeriodRefreshRateCalculatorUpdate);
     } else {
-        mLastMeasureTimeNs = getNowNs() + mParams.mMeasurePeriodNs;
+        mLastMeasureTimeNs = getSteadyClockTimeNs() + mParams.mMeasurePeriodNs;
         mMeasureEvent.mWhenNs = mLastMeasureTimeNs;
         mMeasureEvent.mFunctor =
                 std::move(std::bind(&PeriodRefreshRateCalculator::onMeasure, this));

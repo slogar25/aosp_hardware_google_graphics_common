@@ -19,7 +19,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-
 #include "interface/Event.h"
 
 inline void clearBit(uint32_t& data, uint32_t bit) {
@@ -66,13 +65,41 @@ T freqToDurationNs(T freq) {
     return static_cast<T>(res);
 }
 
-int64_t getNowMs();
-int64_t getNowNs();
+int64_t getSteadyClockTimeMs();
+int64_t getSteadyClockTimeNs();
+
+int64_t getBootClockTimeMs();
+int64_t getBootClockTimeNs();
 
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target);
 
 bool isPowerModeOff(int powerMode);
 
 void setTimedEventWithAbsoluteTime(TimedEvent& event);
+
+class SystemClockTimeTranslator {
+public:
+    SystemClockTimeTranslator() { synchronize(); }
+
+    ~SystemClockTimeTranslator() = default;
+
+    int64_t steadyClockTimeToBootClockTimeNs(int64_t steadyClockTimeNs) const {
+        return steadyClockTimeNs + mDiff;
+    }
+    int64_t bootClockTimeToSteadyClockTimeNs(int64_t bootClockTimeNs) const {
+        return bootClockTimeNs - mDiff;
+    }
+
+    void synchronize() {
+        mBootClockTimeNs = getBootClockTimeNs();
+        mSteadyClockTimeNs = getSteadyClockTimeNs();
+        mDiff = mBootClockTimeNs - mSteadyClockTimeNs;
+    }
+
+private:
+    int64_t mBootClockTimeNs;
+    int64_t mSteadyClockTimeNs;
+    int64_t mDiff;
+};
 
 } // namespace android::hardware::graphics::composer

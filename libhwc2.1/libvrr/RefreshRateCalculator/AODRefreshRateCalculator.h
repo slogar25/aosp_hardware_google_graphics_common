@@ -43,7 +43,8 @@ public:
             if (mAodRefreshRateState != kAodActiveToIdleTransitionState) {
                 setNewRefreshRate(kActiveRefreshRate);
                 mEventQueue->dropEvent(VrrControllerEventType::kAodRefreshRateCalculatorUpdate);
-                mResetRefreshRateEvent.mWhenNs = getNowNs() + kActiveRefreshRateDurationNs;
+                mResetRefreshRateEvent.mWhenNs =
+                        getSteadyClockTimeNs() + kActiveRefreshRateDurationNs;
                 mEventQueue->mPriorityQueue.emplace(mResetRefreshRateEvent);
                 if (mAodRefreshRateState == kAodIdleRefreshRateState) {
                     changeRefreshRateDisplayState();
@@ -102,7 +103,8 @@ private:
         } else if (mAodRefreshRateState == kAodActiveRefreshRateState) {
             setNewRefreshRate(kIdleRefreshRate);
             mAodRefreshRateState = kAodActiveToIdleTransitionState;
-            mResetRefreshRateEvent.mWhenNs = getNowNs() + kActiveToIdleTransitionDurationNs;
+            mResetRefreshRateEvent.mWhenNs =
+                    getSteadyClockTimeNs() + kActiveToIdleTransitionDurationNs;
             mEventQueue->mPriorityQueue.emplace(mResetRefreshRateEvent);
         } else {
             mAodRefreshRateState = kAodIdleRefreshRateState;
