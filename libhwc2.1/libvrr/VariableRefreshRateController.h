@@ -271,6 +271,8 @@ private:
 
     void handlePresentTimeout(const VrrControllerEvent& event);
 
+    inline bool isMinimumRefreshRateActive() const { return (mMinimumRefreshRate > 1); }
+
     void onRefreshRateChanged(int refreshRate);
     void onRefreshRateChangedInternal(int refreshRate);
 
