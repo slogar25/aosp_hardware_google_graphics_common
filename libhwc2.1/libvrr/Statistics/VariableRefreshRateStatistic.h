@@ -185,7 +185,7 @@ private:
 
     void updateCurrentDisplayStatus();
 
-    void updateIdleStats();
+    void updateIdleStats(int64_t endTimeStampInBootClockNs = -1);
 
 #ifdef DEBUG_VRR_STATISTICS
     int updateStatistic();

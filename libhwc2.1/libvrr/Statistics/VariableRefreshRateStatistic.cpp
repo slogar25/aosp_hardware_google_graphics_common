@@ -128,7 +128,7 @@ void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
         // Ignore first present after resume
         return;
     }
-    updateIdleStats();
+    updateIdleStats(presentTimeInBootClockNs);
     int numVsync =
             roundDivide((presentTimeInBootClockNs - mLastPresentTimeInBootClockNs), mTeIntervalNs);
     numVsync = std::max(1, numVsync);
@@ -205,11 +205,13 @@ void VariableRefreshRateStatistic::updateCurrentDisplayStatus() {
     }
 }
 
-void VariableRefreshRateStatistic::updateIdleStats() {
+void VariableRefreshRateStatistic::updateIdleStats(int64_t endTimeStampInBootClockNs) {
     if (mDisplayPresentProfile.isOff()) return;
     if (mLastPresentTimeInBootClockNs == kDefaultInvalidPresentTimeNs) return;
+    endTimeStampInBootClockNs =
+            endTimeStampInBootClockNs < 0 ? getBootClockTimeNs() : endTimeStampInBootClockNs;
     int numVsync =
-            roundDivide((getBootClockTimeNs() - mLastPresentTimeInBootClockNs), mTeIntervalNs);
+            roundDivide((endTimeStampInBootClockNs - mLastPresentTimeInBootClockNs), mTeIntervalNs);
     mDisplayPresentProfile.mNumVsync =
             (mMinimumRefreshRate > 1 ? (mTeFrequency / mMinimumRefreshRate) : mTeFrequency);
     if (numVsync < mDisplayPresentProfile.mNumVsync) return;
