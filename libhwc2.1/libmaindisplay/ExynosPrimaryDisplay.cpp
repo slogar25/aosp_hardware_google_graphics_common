@@ -1344,6 +1344,15 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
                       "to %d",
                       __func__, std::get<0>(res.value()), it->second);
                 fps = std::max(fps, it->second);
+                if (mDisplayConfigs.count(mActiveConfig)) {
+                    if (fps > mDisplayConfigs[mActiveConfig].refreshRate) {
+                        ALOGI("%s() The brightness blocking zone votes for the FPS = %d, which is "
+                              "higher than the maximum refresh rate of the current configuration = "
+                              "%d",
+                              __func__, fps, mDisplayConfigs[mActiveConfig].refreshRate);
+                        fps = mDisplayConfigs[mActiveConfig].refreshRate;
+                    }
+                }
             }
         }
     }
