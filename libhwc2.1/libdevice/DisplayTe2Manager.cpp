@@ -98,7 +98,7 @@ int32_t DisplayTe2Manager::setChangeableTe2Rate(int targetTe2RateHz) {
     // should have the tolerance to receive only min (idle) and target (active) notifications of
     // refresh rate changes and ignore the intermediate values.
     if (targetTe2RateHz == mMinRefreshRateForFixedTe2 ||
-        targetTe2RateHz == mDisplay->mRefreshRate) {
+        targetTe2RateHz == mDisplay->getRefreshRate(mDisplay->mActiveConfig)) {
         return setTe2Rate(targetTe2RateHz);
     } else {
         return NO_ERROR;
