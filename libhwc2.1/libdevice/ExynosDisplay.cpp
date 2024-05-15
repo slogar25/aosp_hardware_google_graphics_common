@@ -6735,7 +6735,6 @@ void ExynosDisplay::SysfsBasedRRIHandler::updateRefreshRateLocked(int refreshRat
     }
     mLastRefreshRate = refreshRate;
     mLastCallbackTime = systemTime(CLOCK_MONOTONIC);
-    ATRACE_INT("Refresh rate indicator callback", mLastRefreshRate);
     mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId, s2ns(1) / mLastRefreshRate);
     mCanIgnoreIncreaseUpdate = true;
 }

@@ -16,6 +16,8 @@
 
 #pragma once
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "RefreshRateCalculator.h"
 
 #include "../Utils.h"
@@ -91,6 +93,7 @@ private:
     void setNewRefreshRate(int newRefreshRate) {
         if (newRefreshRate != mLastRefreshRate) {
             mLastRefreshRate = newRefreshRate;
+            ATRACE_INT(mName.c_str(), newRefreshRate);
             if (mRefreshRateChangeCallback) {
                 mRefreshRateChangeCallback(mLastRefreshRate);
             }

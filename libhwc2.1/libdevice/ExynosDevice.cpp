@@ -1361,6 +1361,9 @@ void ExynosDevice::onRefreshRateChangedDebug(hwc2_display_t displayId, uint32_t 
     const auto &callbackInfo = refreshRateCallback->second;
     if (callbackInfo.funcPointer == nullptr || callbackInfo.callbackData == nullptr) return;
 
+    ATRACE_INT("Refresh rate indicator callback",
+               static_cast<int>(std::nano::den / (refreshPeriod ?: vsyncPeriod)));
+
     auto callbackFunc =
             reinterpret_cast<void (*)(hwc2_callback_data_t callbackData, hwc2_display_t hwcDisplay,
                                       hwc2_vsync_period_t, int32_t)>(callbackInfo.funcPointer);
