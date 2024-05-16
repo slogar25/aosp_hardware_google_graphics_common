@@ -67,12 +67,12 @@ bool FileNode::WriteUint32(const std::string& nodeName, uint32_t value) {
         std::string cmdString = std::to_string(value);
         int ret = write(fd, cmdString.c_str(), std::strlen(cmdString.c_str()));
         if (ret < 0) {
-            ALOGE("Write to file node %s failed, ret = %d errno = %d", mNodePath.c_str(), ret,
-                  errno);
+            ALOGE("Write 0x%x to file node %s%s failed, ret = %d errno = %d", value,
+                  mNodePath.c_str(), nodeName.c_str(), ret, errno);
             return false;
         }
     } else {
-        ALOGE("Write to invalid file node %s", mNodePath.c_str());
+        ALOGE("Write to invalid file node %s%s", mNodePath.c_str(), nodeName.c_str());
         return false;
     }
     mLastWrittenValue[fd] = value;
@@ -86,7 +86,7 @@ int FileNode::getFileHandler(const std::string& nodeName) {
     std::string fullPath = mNodePath + nodeName;
     int fd = open(fullPath.c_str(), O_WRONLY, 0);
     if (fd < 0) {
-        ALOGE("Open file node failed, fd = %d", fd);
+        ALOGE("Open file node %s failed, fd = %d", fullPath.c_str(), fd);
         return fd;
     }
     mFds[nodeName] = fd;

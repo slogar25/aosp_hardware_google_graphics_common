@@ -18,19 +18,34 @@
 
 #include <hardware/hwcomposer2.h>
 #include <chrono>
+#include "android-base/chrono_utils.h"
 
 #include "interface/Panel_def.h"
 
 namespace android::hardware::graphics::composer {
 
-int64_t getNowMs() {
-    const auto t = std::chrono::high_resolution_clock::now();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
+int64_t getSteadyClockTimeMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+            .count();
 }
 
-int64_t getNowNs() {
-    const auto t = std::chrono::high_resolution_clock::now();
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+int64_t getSteadyClockTimeNs() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+}
+
+int64_t getBootClockTimeMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+                   ::android::base::boot_clock::now().time_since_epoch())
+            .count();
+}
+
+int64_t getBootClockTimeNs() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   ::android::base::boot_clock::now().time_since_epoch())
+            .count();
 }
 
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target) {
@@ -43,7 +58,7 @@ bool isPowerModeOff(int powerMode) {
 
 void setTimedEventWithAbsoluteTime(TimedEvent& event) {
     if (event.mIsRelativeTime) {
-        event.mWhenNs += getNowNs();
+        event.mWhenNs += getSteadyClockTimeNs();
         event.mIsRelativeTime = false;
     }
 }

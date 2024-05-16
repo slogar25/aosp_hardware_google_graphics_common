@@ -71,7 +71,7 @@ void InstantRefreshRateCalculator::setEnabled(bool isEnabled) {
     if (!isEnabled) {
         mEventQueue->dropEvent(VrrControllerEventType::kInstantRefreshRateCalculatorUpdate);
     } else {
-        mTimeoutEvent.mWhenNs = getNowNs() + mMaxValidTimeNs;
+        mTimeoutEvent.mWhenNs = getSteadyClockTimeNs() + mMaxValidTimeNs;
         mEventQueue->mPriorityQueue.emplace(mTimeoutEvent);
     }
 }
@@ -91,7 +91,7 @@ void InstantRefreshRateCalculator::setNewRefreshRate(int newRefreshRate) {
 }
 
 int InstantRefreshRateCalculator::updateRefreshRate() {
-    if (isOutdated(getNowNs())) {
+    if (isOutdated(getSteadyClockTimeNs())) {
         reset();
     }
     return NO_ERROR;

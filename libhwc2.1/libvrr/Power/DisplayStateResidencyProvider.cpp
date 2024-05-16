@@ -18,8 +18,6 @@
 
 #include "DisplayStateResidencyProvider.h"
 
-// #define DEBUG_VRR_POWERSTATS 1
-
 namespace android::hardware::graphics::composer {
 
 // Currently, the FPS ranges from [1, |kMaxFrameRate| = 120], and the maximum TE
@@ -57,24 +55,23 @@ void DisplayStateResidencyProvider::getStateResidency(std::vector<StateResidency
 
     int64_t powerStatsTotalTimeNs = aggregateStatistics();
 #ifdef DEBUG_VRR_POWERSTATS
-    uint64_t statisticDurationNs = getNowNs() - mStartStatisticTimeNs;
-    ALOGD("DisplayStateResidencyProvider: total power stats time = %ld ns, time lapse = %ld ns",
+    uint64_t statisticDurationNs = getBootClockTimeNs() - mStartStatisticTimeNs;
+    ALOGD("DisplayStateResidencyProvider: total power stats time = %ld ms, time lapse = %ld ms",
           powerStatsTotalTimeNs / MilliToNano, statisticDurationNs / MilliToNano);
-    if (mLastGetStatesTimeNs != -1) {
-        int64_t timePassedNs = (getNowNs() - mLastGetStatesTimeNs);
-        int64_t statisticTimeAccumulatedNs = (powerStatsTotalTimeNs - mLastPowerStatsTotalTimeNs);
+    if (mLastGetStateResidencyTimeNs != -1) {
+        int64_t timePassedNs = (getSteadyClockTimeNs() - mLastGetStateResidencyTimeNs);
+        int64_t statisticAccumulatedTimeNs = (powerStatsTotalTimeNs - mLastPowerStatsTotalTimeNs);
         ALOGD("DisplayStateResidencyProvider: The time interval between successive calls to "
               "getStateResidency() = %ld ms",
               (timePassedNs / MilliToNano));
         ALOGD("DisplayStateResidencyProvider: The accumulated statistic time interval between "
               "successive calls to "
               "getStateResidency() = %ld ms",
-              (statisticTimeAccumulatedNs / MilliToNano));
+              (statisticAccumulatedTimeNs / MilliToNano));
     }
-#endif
-    mLastGetStatesTimeNs = getNowNs();
+    mLastGetStateResidencyTimeNs = getSteadyClockTimeNs();
     mLastPowerStatsTotalTimeNs = powerStatsTotalTimeNs;
-
+#endif
     *stats = mStateResidency;
 }
 
@@ -126,8 +123,9 @@ void DisplayStateResidencyProvider::mapStatistics() {
             mRemappedStatistics[key].mUpdated = true;
             mRemappedStatistics[key].mCount += value.mCount;
             mRemappedStatistics[key].mAccumulatedTimeNs += value.mAccumulatedTimeNs;
-            mRemappedStatistics[key].mLastTimeStampNs =
-                    std::max(mRemappedStatistics[key].mLastTimeStampNs, value.mLastTimeStampNs);
+            mRemappedStatistics[key].mLastTimeStampInBootClockNs =
+                    std::max(mRemappedStatistics[key].mLastTimeStampInBootClockNs,
+                             value.mLastTimeStampInBootClockNs);
         }
     }
 }
@@ -139,12 +137,12 @@ uint64_t DisplayStateResidencyProvider::aggregateStatistics() {
             continue;
         }
         int id = mPowerStatsPresentProfileToIdMap[statistic.first];
-        const auto& powerStatsPresentProfile = statistic.first;
         const auto& displayPresentRecord = statistic.second;
 
         auto& stateResidency = mStateResidency[id];
         stateResidency.totalStateEntryCount = displayPresentRecord.mCount;
-        stateResidency.lastEntryTimestampMs = displayPresentRecord.mLastTimeStampNs / MilliToNano;
+        stateResidency.lastEntryTimestampMs =
+                displayPresentRecord.mLastTimeStampInBootClockNs / MilliToNano;
         stateResidency.totalTimeInStateMs = displayPresentRecord.mAccumulatedTimeNs / MilliToNano;
         statistic.second.mUpdated = false;
         totalTimeNs += displayPresentRecord.mAccumulatedTimeNs;

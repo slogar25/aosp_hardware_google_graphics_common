@@ -2866,54 +2866,44 @@ void ExynosDisplayDrmInterface::retrievePanelFullResolution() {
     }
 }
 
-int32_t ExynosDisplayDrmInterface::setDisplayHistogramChannelSetting(
-        ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId, void *blobData,
-        size_t blobLength) {
+int32_t ExynosDisplayDrmInterface::setHistogramChannelConfigBlob(
+        ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq, uint8_t channelId, uint32_t blobId) {
     int ret = NO_ERROR;
-    uint32_t blobId = 0;
 
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
+    ATRACE_NAME(String8::format("%s(chan#%u,blob#%u)", __func__, channelId, blobId).c_str());
 
-    const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
+    const DrmProperty& prop = mDrmCrtc->histogram_channel_property(channelId);
     if (!prop.id()) {
-        ALOGE("Unsupported multi-channel histrogram for channel:%d", channelId);
+        ALOGE("%s: Unsupported multi-channel histrogram for chan#%d", __func__, channelId);
         return -ENOTSUP;
     }
 
-    ret = mDrmDevice->CreatePropertyBlob(blobData, blobLength, &blobId);
-    if (ret) {
-        HWC_LOGE(mExynosDisplay, "Failed to create histogram channel(%d) blob %d", channelId, ret);
-        return ret;
-    }
-
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(), prop, blobId)) < 0) {
-        HWC_LOGE(mExynosDisplay, "%s: Failed to add property", __func__);
+        HWC_LOGE(mExynosDisplay, "%s: Failed to add property for chan#%d and blob#%d, ret(%d)",
+                 __func__, channelId, blobId, ret);
         return ret;
     }
-
-    // TODO: b/295794044 - Clear the old histogram channel blob
 
     return ret;
 }
 
-int32_t ExynosDisplayDrmInterface::clearDisplayHistogramChannelSetting(
-        ExynosDisplayDrmInterface::DrmModeAtomicReq &drmReq, uint8_t channelId) {
+int32_t ExynosDisplayDrmInterface::clearHistogramChannelConfigBlob(
+        ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq, uint8_t channelId) {
     int ret = NO_ERROR;
 
-    ATRACE_NAME(String8::format("%s #%u", __func__, channelId).c_str());
+    ATRACE_NAME(String8::format("%s(chan#%u)", __func__, channelId).c_str());
 
-    const DrmProperty &prop = mDrmCrtc->histogram_channel_property(channelId);
+    const DrmProperty& prop = mDrmCrtc->histogram_channel_property(channelId);
     if (!prop.id()) {
-        ALOGE("Unsupported multi-channel histrogram for channel:%d", channelId);
+        ALOGE("%s: Unsupported multi-channel histrogram for chan#%d", __func__, channelId);
         return -ENOTSUP;
     }
 
     if ((ret = drmReq.atomicAddProperty(mDrmCrtc->id(), prop, 0)) < 0) {
-        HWC_LOGE(mExynosDisplay, "%s: Failed to add property", __func__);
+        HWC_LOGE(mExynosDisplay, "%s: Failed to add property for chan#%d and blob#0, ret(%d)",
+                 __func__, channelId, ret);
         return ret;
     }
-
-    // TODO: b/295794044 - Clear the old histogram channel blob
 
     return ret;
 }
