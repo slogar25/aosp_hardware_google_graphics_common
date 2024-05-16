@@ -38,7 +38,7 @@ int InstantRefreshRateCalculator::getRefreshRate() const {
     return mLastRefreshRate;
 }
 
-void InstantRefreshRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
+void InstantRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
     }

@@ -40,7 +40,7 @@ struct TimedEvent;
 constexpr int64_t kMillisecondToNanoSecond = 1000000;
 
 enum PresentFrameFlag {
-    kHasRefreshRateIndicatorLayer = (1 << 0),
+    kUpdateRefreshRateIndicatorLayerOnly = (1 << 0),
     kIsYuv = (1 << 1),
     kPresentingWhenDoze = (1 << 2),
 };

@@ -59,7 +59,14 @@ public:
 
     virtual void onPowerStateChange(int __unused from, int to) override { mPowerMode = to; }
 
-    virtual void onPresent(int64_t presentTimeNs, int flag) = 0;
+    void onPresent(int64_t presentTimeNs, int flag) {
+        if (hasPresentFrameFlag(flag, PresentFrameFlag::kUpdateRefreshRateIndicatorLayerOnly)) {
+            return;
+        }
+        onPresentInternal(presentTimeNs, flag);
+    }
+
+    virtual void onPresentInternal(int64_t presentTimeNs, int flag) = 0;
 
     virtual void reset() = 0;
 

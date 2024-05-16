@@ -60,12 +60,12 @@ void VideoFrameRateCalculator::onPowerStateChange(int from, int to) {
     mPowerMode = to;
 }
 
-void VideoFrameRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
+void VideoFrameRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
     }
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kIsYuv)) {
-        mRefreshRateCalculator->onPresent(presentTimeNs, flag);
+        mRefreshRateCalculator->onPresentInternal(presentTimeNs, flag);
     } else {
         reset();
     }
