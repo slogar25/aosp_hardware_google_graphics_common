@@ -144,6 +144,10 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     Calculators.emplace_back(std::move(
             refreshRateCalculatorFactory
                     .BuildRefreshRateCalculator(&mEventQueue, RefreshRateCalculatorType::kAod)));
+    Calculators.emplace_back(
+            std::move(refreshRateCalculatorFactory
+                              .BuildRefreshRateCalculator(&mEventQueue,
+                                                          RefreshRateCalculatorType::kExitIdle)));
     Calculators.emplace_back(std::move(
             refreshRateCalculatorFactory
                     .BuildRefreshRateCalculator(&mEventQueue,

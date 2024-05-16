@@ -16,19 +16,24 @@
 
 #pragma once
 
-#include "../EventQueue.h"
 #include "RefreshRateCalculator.h"
+
+#include "../EventQueue.h"
+#include "../Utils.h"
 
 namespace android::hardware::graphics::composer {
 
-class CombinedRefreshRateCalculator : public RefreshRateCalculator {
-public:
-    CombinedRefreshRateCalculator(
-            std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators);
+struct ExitIdleRefreshRateCalculatorParameters {
+    int64_t mIdleCriteriaTimeNs = 1000000000; // 1 second
+    int64_t mMaxValidTimeNs = 250000000;      // 250 ms
+};
 
-    CombinedRefreshRateCalculator(
-            std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators,
-            int minValidRefreshRate, int maxValidRefreshRate);
+class ExitIdleRefreshRateCalculator : public RefreshRateCalculator {
+public:
+    ExitIdleRefreshRateCalculator(EventQueue* eventQueue);
+
+    ExitIdleRefreshRateCalculator(EventQueue* eventQueue,
+                                  const ExitIdleRefreshRateCalculatorParameters& params);
 
     int getRefreshRate() const override;
 
@@ -40,32 +45,21 @@ public:
 
     void setEnabled(bool isEnabled) final;
 
-    void setMinFrameInterval(int64_t minFrameIntervalNs) final;
-
 private:
-    static constexpr int kDefaultMinValidRefreshRate = 1;
-    static constexpr int kDefaultMaxValidRefreshRate = 120;
-
-    void onRefreshRateChanged(int refreshRate);
+    ExitIdleRefreshRateCalculator(const ExitIdleRefreshRateCalculator&) = delete;
+    ExitIdleRefreshRateCalculator& operator=(const ExitIdleRefreshRateCalculator&) = delete;
 
     void setNewRefreshRate(int newRefreshRate);
 
-    void updateRefreshRate();
+    int invalidateRefreshRate();
 
-    CombinedRefreshRateCalculator(const CombinedRefreshRateCalculator&) = delete;
-    CombinedRefreshRateCalculator& operator=(const CombinedRefreshRateCalculator&) = delete;
+    EventQueue* mEventQueue;
+    VrrControllerEvent mTimeoutEvent;
 
-    std::vector<std::unique_ptr<RefreshRateCalculator>> mRefreshRateCalculators;
+    const ExitIdleRefreshRateCalculatorParameters mParams;
 
-    VrrControllerEvent mMeasureEvent;
-
-    int mMinValidRefreshRate;
-    int mMaxValidRefreshRate;
-
+    int64_t mLastPresentTimeNs = kDefaultInvalidPresentTimeNs;
     int mLastRefreshRate = kDefaultInvalidRefreshRate;
-
-    bool mIsOnPresent = false;
-    int mHasRefreshRateChage = false;
 };
 
 } // namespace android::hardware::graphics::composer

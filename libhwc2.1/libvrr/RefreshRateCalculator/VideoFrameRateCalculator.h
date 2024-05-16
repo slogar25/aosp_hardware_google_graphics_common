@@ -62,6 +62,8 @@ public:
 
     void setEnabled(bool isEnabled) final;
 
+    void setMinFrameInterval(int64_t minFrameIntervalNs) final;
+
 private:
     int onReportRefreshRate(int);
 

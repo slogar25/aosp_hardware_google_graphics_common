@@ -57,7 +57,6 @@ void VideoFrameRateCalculator::onPowerStateChange(int from, int to) {
         }
         setEnabled(true);
     }
-    mPowerMode = to;
 }
 
 void VideoFrameRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
@@ -80,6 +79,13 @@ void VideoFrameRateCalculator::reset() {
 
 void VideoFrameRateCalculator::setEnabled(bool isEnabled) {
     mRefreshRateCalculator->setEnabled(isEnabled);
+}
+
+void VideoFrameRateCalculator::setMinFrameInterval(int64_t minFrameIntervalNs) {
+    mMinFrameIntervalNs = minFrameIntervalNs;
+    mMaxFrameRate = durationNsToFreq(mMinFrameIntervalNs);
+
+    mRefreshRateCalculator->setMinFrameInterval(minFrameIntervalNs);
 }
 
 int VideoFrameRateCalculator::onReportRefreshRate(int refreshRate) {
