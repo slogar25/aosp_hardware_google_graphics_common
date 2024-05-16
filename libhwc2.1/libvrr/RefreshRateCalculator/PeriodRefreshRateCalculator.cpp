@@ -31,7 +31,6 @@ PeriodRefreshRateCalculator::PeriodRefreshRateCalculator(
     mLastMeasureTimeNs = getSteadyClockTimeNs() + params.mMeasurePeriodNs;
     mMeasureEvent.mWhenNs = mLastMeasureTimeNs;
     mMeasureEvent.mFunctor = std::move(std::bind(&PeriodRefreshRateCalculator::onMeasure, this));
-    mEventQueue->mPriorityQueue.emplace(mMeasureEvent);
 
     mMeasurePeriodRatio = (static_cast<float>(mParams.mMeasurePeriodNs) / std::nano::den);
     mNumVsyncPerMeasure = static_cast<int>(mMaxFrameRate * mMeasurePeriodRatio);
