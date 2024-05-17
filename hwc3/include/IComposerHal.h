@@ -197,6 +197,8 @@ class IComposerHal {
     virtual int32_t setLayerBlendMode(int64_t display, int64_t layer, common::BlendMode mode) = 0;
     virtual int32_t setLayerBuffer(int64_t display, int64_t layer, buffer_handle_t buffer,
                                    const ndk::ScopedFileDescriptor& acquireFence) = 0;
+    virtual int32_t uncacheLayerBuffers(int64_t display, int64_t layer,
+                                        const std::vector<buffer_handle_t>& buffers) = 0;
     virtual int32_t setLayerColor(int64_t display, int64_t layer, Color color) = 0;
     virtual int32_t setLayerColorTransform(int64_t display, int64_t layer,
                                            const std::vector<float>& matrix) = 0;

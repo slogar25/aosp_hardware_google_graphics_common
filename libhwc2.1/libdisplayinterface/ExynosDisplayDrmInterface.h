@@ -89,6 +89,8 @@ class FramebufferManager {
 
         void cleanup(const ExynosLayer *layer);
         void destroyAllSecureBuffers();
+        int32_t uncacheLayerBuffers(const ExynosLayer* layer,
+                                    const std::vector<buffer_handle_t>& buffers);
 
         // The flip function is to help clean up the cached fbIds of destroyed
         // layers after the previous fdIds were update successfully on the
@@ -110,6 +112,15 @@ class FramebufferManager {
                 bool operator==(const Framebuffer::BufferDesc &rhs) const {
                     return (bufferId == rhs.bufferId && drmFormat == rhs.drmFormat &&
                             isSecure == rhs.isSecure);
+                }
+                bool operator<(const Framebuffer::BufferDesc& rhs) const {
+                    if (bufferId != rhs.bufferId) {
+                        return bufferId < rhs.bufferId;
+                    }
+                    if (drmFormat != rhs.drmFormat) {
+                        return drmFormat < rhs.drmFormat;
+                    }
+                    return isSecure < rhs.isSecure;
                 }
             };
             struct SolidColorDesc {
@@ -427,6 +438,9 @@ class ExynosDisplayDrmInterface :
         // After swapCrtcs has been successfully done, this function will return the display, whose
         // crtc/decon this display is currently using.
         virtual ExynosDisplay* borrowedCrtcFrom() override;
+
+        virtual int32_t uncacheLayerBuffers(const ExynosLayer* __unused layer,
+                                            const std::vector<buffer_handle_t>& buffers) override;
 
     protected:
         enum class HalMipiSyncType : uint32_t {
