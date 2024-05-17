@@ -31,7 +31,7 @@ public:
 
     int getRefreshRate() const override;
 
-    void onPresent(int64_t presentTimeNs, int flag) override;
+    void onPresentInternal(int64_t presentTimeNs, int flag) override;
 
     void reset() override;
 

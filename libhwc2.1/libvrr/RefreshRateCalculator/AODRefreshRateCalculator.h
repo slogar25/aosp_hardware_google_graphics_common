@@ -39,7 +39,7 @@ public:
         return mLastRefreshRate;
     }
 
-    void onPresent(int64_t presentTimeNs, int flag) override {
+    void onPresentInternal(int64_t presentTimeNs, int flag) override {
         if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
             mIsInDoze = true;
             if (mAodRefreshRateState != kAodActiveToIdleTransitionState) {

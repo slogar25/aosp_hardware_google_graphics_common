@@ -54,12 +54,12 @@ void CombinedRefreshRateCalculator::onPowerStateChange(int from, int to) {
     mPowerMode = to;
 }
 
-void CombinedRefreshRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
+void CombinedRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
     mHasRefreshRateChage = false;
 
     mIsOnPresent = true;
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
-        refreshRateCalculator->onPresent(presentTimeNs, flag);
+        refreshRateCalculator->onPresentInternal(presentTimeNs, flag);
     }
     mIsOnPresent = false;
 

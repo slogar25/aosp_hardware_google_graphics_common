@@ -55,7 +55,7 @@ void PeriodRefreshRateCalculator::onPowerStateChange(int from, int to) {
     mPowerMode = to;
 }
 
-void PeriodRefreshRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
+void PeriodRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
     }
