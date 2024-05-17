@@ -27,14 +27,14 @@ namespace android::hardware::graphics::composer {
 VideoFrameRateCalculator::VideoFrameRateCalculator(EventQueue* eventQueue,
                                                    const VideoFrameRateCalculatorParameters& params)
       : mEventQueue(eventQueue), mParams(params) {
-    mName = "VideoFrameRateCalculator";
+    mName = "RefreshRateCalculator-Video";
 
     mParams.mMaxInterestedFrameRate = std::min(mMaxFrameRate, mParams.mMaxInterestedFrameRate);
     mParams.mMinInterestedFrameRate = std::max(1, mParams.mMinInterestedFrameRate);
 
     mRefreshRateCalculator =
             std::make_unique<PeriodRefreshRateCalculator>(mEventQueue, params.mPeriodParams);
-    mRefreshRateCalculator->setName("PeriodRefreshRateCalculator-Worker");
+    mRefreshRateCalculator->setName("RefreshRateCalculator-Period-Worker");
     mRefreshRateCalculator->registerRefreshRateChangeCallback(
             std::bind(&VideoFrameRateCalculator::onReportRefreshRate, this, std::placeholders::_1));
 }
