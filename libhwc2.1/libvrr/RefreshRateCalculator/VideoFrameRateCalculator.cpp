@@ -64,7 +64,11 @@ void VideoFrameRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
     }
-    mRefreshRateCalculator->onPresent(presentTimeNs, flag);
+    if (hasPresentFrameFlag(flag, PresentFrameFlag::kIsYuv)) {
+        mRefreshRateCalculator->onPresent(presentTimeNs, flag);
+    } else {
+        reset();
+    }
 }
 
 void VideoFrameRateCalculator::reset() {
