@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "VideoFrameRateCalculator.h"
 
 #include <numeric>
@@ -104,6 +106,7 @@ int VideoFrameRateCalculator::onReportRefreshRate(int refreshRate) {
 void VideoFrameRateCalculator::setNewRefreshRate(int newRefreshRate) {
     if (newRefreshRate != mLastVideoFrameRate) {
         mLastVideoFrameRate = newRefreshRate;
+        ATRACE_INT(mName.c_str(), newRefreshRate);
         if (mRefreshRateChangeCallback) {
             if ((mLastVideoFrameRate >= mParams.mMinInterestedFrameRate) &&
                 (mLastVideoFrameRate <= mParams.mMaxInterestedFrameRate)) {

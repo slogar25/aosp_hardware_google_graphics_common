@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "PeriodRefreshRateCalculator.h"
 
 #include "../Utils.h"
@@ -126,6 +128,7 @@ int PeriodRefreshRateCalculator::onMeasure() {
 void PeriodRefreshRateCalculator::setNewRefreshRate(int newRefreshRate) {
     if ((newRefreshRate != mLastRefreshRate) || mParams.mAlwaysCallback) {
         mLastRefreshRate = newRefreshRate;
+        ATRACE_INT(mName.c_str(), newRefreshRate);
         if (mRefreshRateChangeCallback) {
             mRefreshRateChangeCallback(mLastRefreshRate);
         }

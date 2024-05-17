@@ -18,6 +18,7 @@
 
 #include <utils/Errors.h>
 #include <utils/Log.h>
+#include <utils/Trace.h>
 #include <chrono>
 #include <functional>
 #include <string>
