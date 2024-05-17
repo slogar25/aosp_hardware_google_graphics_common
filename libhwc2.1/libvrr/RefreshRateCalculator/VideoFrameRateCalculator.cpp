@@ -81,11 +81,11 @@ void VideoFrameRateCalculator::setEnabled(bool isEnabled) {
     mRefreshRateCalculator->setEnabled(isEnabled);
 }
 
-void VideoFrameRateCalculator::setMinFrameInterval(int64_t minFrameIntervalNs) {
-    mMinFrameIntervalNs = minFrameIntervalNs;
-    mMaxFrameRate = durationNsToFreq(mMinFrameIntervalNs);
+void VideoFrameRateCalculator::setVrrConfigAttributes(int64_t vsyncPeriodNs,
+                                                      int64_t minFrameIntervalNs) {
+    RefreshRateCalculator::setVrrConfigAttributes(vsyncPeriodNs, minFrameIntervalNs);
 
-    mRefreshRateCalculator->setMinFrameInterval(minFrameIntervalNs);
+    mRefreshRateCalculator->setVrrConfigAttributes(vsyncPeriodNs, minFrameIntervalNs);
 }
 
 int VideoFrameRateCalculator::onReportRefreshRate(int refreshRate) {
