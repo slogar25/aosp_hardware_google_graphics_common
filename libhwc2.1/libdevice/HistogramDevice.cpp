@@ -447,23 +447,27 @@ void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtom
 }
 
 void HistogramDevice::postAtomicCommit() {
-    SCOPED_HIST_LOCK(mHistogramMutex);
+    {
+        SCOPED_HIST_LOCK(mHistogramMutex);
 
-    // Atomic commit is success, loop through every channel and update the channel status
-    for (uint8_t channelId = 0; channelId < mChannels.size(); ++channelId) {
-        ChannelInfo& channel = mChannels[channelId];
+        // Atomic commit is success, loop through every channel and update the channel status
+        for (uint8_t channelId = 0; channelId < mChannels.size(); ++channelId) {
+            ChannelInfo& channel = mChannels[channelId];
 
-        switch (channel.mStatus) {
-            case ChannelStatus_t::CONFIG_BLOB_ADDED:
-                channel.mStatus = ChannelStatus_t::CONFIG_COMMITTED;
-                break;
-            case ChannelStatus_t::DISABLE_BLOB_ADDED:
-                channel.mStatus = ChannelStatus_t::DISABLED;
-                break;
-            default:
-                break;
+            switch (channel.mStatus) {
+                case ChannelStatus_t::CONFIG_BLOB_ADDED:
+                    channel.mStatus = ChannelStatus_t::CONFIG_COMMITTED;
+                    break;
+                case ChannelStatus_t::DISABLE_BLOB_ADDED:
+                    channel.mStatus = ChannelStatus_t::DISABLED;
+                    break;
+                default:
+                    break;
+            }
         }
     }
+
+    postAtomicCommitCleanup();
 }
 
 void HistogramDevice::dump(String8& result) const {
@@ -488,6 +492,7 @@ void HistogramDevice::dump(String8& result) const {
             tokenInfo.mConfigInfo->dump(result, "\t");
         }
     }
+    dumpInternalConfigs(result);
     result.append("\n");
 
     // print the histogram channel info
@@ -648,11 +653,37 @@ std::list<std::weak_ptr<HistogramDevice::ConfigInfo>>::iterator HistogramDevice:
     return it;
 }
 
-void HistogramDevice::addConfigToInactiveList(const std::shared_ptr<ConfigInfo>& configInfo) {
+void HistogramDevice::swapOutConfigInfo(uint8_t channelId) {
+    // Update used and free channels
+    mFreeChannels.push_back(channelId);
+    mUsedChannels.erase(channelId);
+
+    // update the ChannelInfo
+    ChannelInfo& channel = mChannels[channelId];
+    std::shared_ptr<ConfigInfo> configInfo = channel.mConfigInfo.lock();
+    channel.mStatus = ChannelStatus_t::DISABLE_PENDING;
+    channel.mConfigInfo.reset();
+
+    // update the configInfo and the inactive list
+    if (configInfo) {
+        uint32_t blobId = getActiveBlobId(configInfo->mBlobsList);
+        HIST_BLOB_CH_LOG(I, blobId, channelId, "configInfo(%p) is swapped out", configInfo.get());
+        addConfigToInactiveList(configInfo);
+    } else
+        HIST_CH_LOG(E, channelId, "expired configInfo, review code!");
+}
+
+void HistogramDevice::addConfigToInactiveList(const std::shared_ptr<ConfigInfo>& configInfo,
+                                              bool addToFront) {
     configInfo->mChannelId = -1;
     configInfo->mStatus = ConfigInfo::Status_t::IN_INACTIVE_LIST;
-    configInfo->mInactiveListIt =
-            mInactiveConfigItList.emplace(mInactiveConfigItList.end(), configInfo);
+    if (addToFront) {
+        configInfo->mInactiveListIt =
+                mInactiveConfigItList.emplace(mInactiveConfigItList.begin(), configInfo);
+    } else {
+        configInfo->mInactiveListIt =
+                mInactiveConfigItList.emplace(mInactiveConfigItList.end(), configInfo);
+    }
 }
 
 bool HistogramDevice::scheduler() {
@@ -1094,6 +1125,17 @@ int HistogramDevice::createDrmConfigBlob(const HistogramConfig& histogramConfig,
     drmConfigBlob = drmConfigBlobTmp;
 
     return NO_ERROR;
+}
+
+void HistogramDevice::resetConfigInfoStatus(std::shared_ptr<ConfigInfo>& configInfo) {
+    if (configInfo->mStatus == ConfigInfo::Status_t::HAS_CHANNEL_ASSIGNED)
+        cleanupChannelInfo(configInfo->mChannelId);
+    else if (configInfo->mStatus == ConfigInfo::Status_t::IN_INACTIVE_LIST) {
+        mInactiveConfigItList.erase(configInfo->mInactiveListIt);
+        configInfo->mInactiveListIt = mInactiveConfigItList.end();
+    }
+
+    configInfo->mStatus = ConfigInfo::Status_t::INITIALIZED;
 }
 
 std::pair<int, int> HistogramDevice::snapDisplayActiveSize() const {
