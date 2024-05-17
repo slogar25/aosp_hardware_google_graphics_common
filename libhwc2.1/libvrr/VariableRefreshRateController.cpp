@@ -233,6 +233,31 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
             LOG(ERROR) << "VrrController: Set an undefined active configuration";
             return;
         }
+        // If the minimum refresh rate is active and the maximum refresh rate timeout is set,
+        // also we are stay at the maximum refresh rate, any change in the active configuration
+        // needs to reconfigure the maximum refresh rate according to the newly activated
+        // configuration.
+        if (mMinimumRefreshRatePresentStates >= kAtMaximumRefreshRate) {
+            if (isMinimumRefreshRateActive() && (mMaximumRefreshRateTimeoutNs > 0)) {
+                uint32_t command = getCurrentRefreshControlStateLocked();
+                auto newMaxFrameRate = durationNsToFreq(mVrrConfigs[config].minFrameIntervalNs);
+                setBitField(command, newMaxFrameRate, kPanelRefreshCtrlMinimumRefreshRateOffset,
+                            kPanelRefreshCtrlMinimumRefreshRateMask);
+                if (!mFileNode->WriteUint32(composer::kRefreshControlNodeName, command)) {
+                    LOG(WARNING) << "VrrController: write file node error, command = " << command;
+                }
+                onRefreshRateChangedInternal(newMaxFrameRate);
+                const auto& oldMaxFrameRate =
+                        durationNsToFreq(mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
+                LOG(INFO) << "VrrController: update maximum refresh rate from " << oldMaxFrameRate
+                          << " to " << newMaxFrameRate;
+            } else {
+                LOG(ERROR) << "VrrController: MinimumRefreshRatePresentState cannot be "
+                           << mMinimumRefreshRatePresentStates
+                           << " when minimum refresh rate = " << mMinimumRefreshRate
+                           << " , mMaximumRefreshRateTimeoutNs = " << mMaximumRefreshRateTimeoutNs;
+            }
+        }
         mVrrActiveConfig = config;
         if (mVariableRefreshRateStatistic) {
             mVariableRefreshRateStatistic
@@ -463,7 +488,7 @@ int VariableRefreshRateController::setFixedRefreshRateRange(
     mMinimumRefreshRate = minimumRefreshRate;
     mMaximumRefreshRateTimeoutNs = minLockTimeForPeakRefreshRate;
     dropEventLocked(VrrControllerEventType::kMinLockTimeForPeakRefreshRate);
-    if (mMinimumRefreshRate > 1) {
+    if (isMinimumRefreshRateActive()) {
         dropEventLocked(VrrControllerEventType::kVendorRenderingTimeout);
         // Delegate timeout management to hardware.
         setBit(command, kPanelRefreshCtrlFrameInsertionAutoModeOffset);
@@ -622,8 +647,10 @@ void VariableRefreshRateController::onPresent(int fence) {
                     postEvent(VrrControllerEventType::kMinLockTimeForPeakRefreshRate,
                               mMinimumRefreshRateTimeoutEvent.value());
                 } else {
-                    LOG(ERROR) << "VrrController: wrong state when setting min refresh rate: "
-                               << mMinimumRefreshRatePresentStates;
+                    if (mMinimumRefreshRatePresentStates != kAtMaximumRefreshRate) {
+                        LOG(ERROR) << "VrrController: wrong state when setting min refresh rate: "
+                                   << mMinimumRefreshRatePresentStates;
+                    }
                 }
             }
             return;
