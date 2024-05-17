@@ -943,6 +943,18 @@ int32_t HalImpl::setLayerBuffer(int64_t display, int64_t layer, buffer_handle_t 
     return halLayer->setLayerBuffer(buffer, hwcFd);
 }
 
+int32_t HalImpl::uncacheLayerBuffers(int64_t display, int64_t layer,
+                                     const std::vector<buffer_handle_t>& buffers,
+                                     std::vector<buffer_handle_t>& outClearableBuffers) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    ExynosLayer* halLayer;
+    RET_IF_ERR(getHalLayer(display, layer, halLayer));
+
+    return halDisplay->uncacheLayerBuffers(halLayer, buffers, outClearableBuffers);
+}
+
 int32_t HalImpl::setLayerColor(int64_t display, int64_t layer, Color color) {
     ExynosLayer *halLayer;
     RET_IF_ERR(getHalLayer(display, layer, halLayer));

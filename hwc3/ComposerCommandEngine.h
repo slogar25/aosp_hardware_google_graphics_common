@@ -93,6 +93,8 @@ class ComposerCommandEngine {
               const std::vector<std::optional<PerFrameMetadataBlob>>& perFrameMetadataBlob);
       void executeSetLayerBrightness(int64_t display, int64_t layer,
                                      const LayerBrightness& brightness);
+      void executeSetLayerBufferSlotsToClear(int64_t display, int64_t layer,
+                                             const std::vector<int32_t>& bufferSlotsToClear);
 
       int32_t executeValidateDisplayInternal(int64_t display);
       void executeSetExpectedPresentTimeInternal(
