@@ -103,6 +103,7 @@ class ExynosDisplayInterface {
 
         virtual int32_t swapCrtcs(ExynosDisplay* anotherDisplay) { return HWC2_ERROR_UNSUPPORTED; }
         virtual ExynosDisplay* borrowedCrtcFrom() { return nullptr; }
+        virtual void clearOldCrtcBlobs() {}
 
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;

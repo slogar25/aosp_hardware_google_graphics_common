@@ -3044,6 +3044,9 @@ int32_t ExynosDisplayDrmInterface::swapCrtcs(ExynosDisplay* anotherDisplay) {
     anotherDisplayIntf->mDrmCrtc = mDrmCrtc;
     mDrmCrtc = anotherCrtc;
 
+    clearOldCrtcBlobs();
+    anotherDisplayIntf->clearOldCrtcBlobs();
+
     if (mBorrowedCrtcFrom == anotherDisplay) {
         mBorrowedCrtcFrom = nullptr;
     } else {
