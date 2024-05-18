@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "VideoFrameRateCalculator.h"
 
 #include <numeric>
@@ -58,11 +60,15 @@ void VideoFrameRateCalculator::onPowerStateChange(int from, int to) {
     mPowerMode = to;
 }
 
-void VideoFrameRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
+void VideoFrameRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
     }
-    mRefreshRateCalculator->onPresent(presentTimeNs, flag);
+    if (hasPresentFrameFlag(flag, PresentFrameFlag::kIsYuv)) {
+        mRefreshRateCalculator->onPresentInternal(presentTimeNs, flag);
+    } else {
+        reset();
+    }
 }
 
 void VideoFrameRateCalculator::reset() {
@@ -104,6 +110,7 @@ int VideoFrameRateCalculator::onReportRefreshRate(int refreshRate) {
 void VideoFrameRateCalculator::setNewRefreshRate(int newRefreshRate) {
     if (newRefreshRate != mLastVideoFrameRate) {
         mLastVideoFrameRate = newRefreshRate;
+        ATRACE_INT(mName.c_str(), newRefreshRate);
         if (mRefreshRateChangeCallback) {
             if ((mLastVideoFrameRate >= mParams.mMinInterestedFrameRate) &&
                 (mLastVideoFrameRate <= mParams.mMaxInterestedFrameRate)) {

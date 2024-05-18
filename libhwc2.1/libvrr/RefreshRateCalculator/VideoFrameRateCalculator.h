@@ -56,7 +56,7 @@ public:
 
     void onPowerStateChange(int from, int to) final;
 
-    void onPresent(int64_t presentTimeNs, int flag) override;
+    void onPresentInternal(int64_t presentTimeNs, int flag) override;
 
     void reset() override;
 

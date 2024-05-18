@@ -244,9 +244,9 @@ private:
             if (layer->isLayerFormatYuv()) {
                 flag |= static_cast<int>(PresentFrameFlag::kIsYuv);
             }
-            if (layer->mRequestedCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) {
-                flag |= static_cast<int>(PresentFrameFlag::kHasRefreshRateIndicatorLayer);
-            }
+        }
+        if (mDisplay->isUpdateRRIndicatorOnly()) {
+            flag |= static_cast<int>(PresentFrameFlag::kUpdateRefreshRateIndicatorLayerOnly);
         }
         // Present when doze.
         if ((mPowerMode == HWC_POWER_MODE_DOZE) || (mPowerMode == HWC_POWER_MODE_DOZE_SUSPEND)) {
@@ -270,6 +270,8 @@ private:
     }
 
     void handlePresentTimeout(const VrrControllerEvent& event);
+
+    inline bool isMinimumRefreshRateActive() const { return (mMinimumRefreshRate > 1); }
 
     void onRefreshRateChanged(int refreshRate);
     void onRefreshRateChangedInternal(int refreshRate);

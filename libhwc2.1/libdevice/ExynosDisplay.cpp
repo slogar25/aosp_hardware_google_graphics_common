@@ -3871,8 +3871,10 @@ int32_t ExynosDisplay::presentDisplay(int32_t* outRetireFence) {
         mPowerHalHint.signalNonIdle();
     }
 
-    if (mRefreshRateIndicatorHandler && needUpdateRRIndicator()) {
-        mRefreshRateIndicatorHandler->checkOnPresentDisplay();
+    if (!checkUpdateRRIndicatorOnly()) {
+        if (mRefreshRateIndicatorHandler) {
+            mRefreshRateIndicatorHandler->checkOnPresentDisplay();
+        }
     }
 
     handleWindowUpdate();
@@ -6737,7 +6739,6 @@ void ExynosDisplay::SysfsBasedRRIHandler::updateRefreshRateLocked(int refreshRat
     }
     mLastRefreshRate = refreshRate;
     mLastCallbackTime = systemTime(CLOCK_MONOTONIC);
-    ATRACE_INT("Refresh rate indicator callback", mLastRefreshRate);
     mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId, s2ns(1) / mLastRefreshRate);
     mCanIgnoreIncreaseUpdate = true;
 }
@@ -6856,9 +6857,32 @@ void ExynosDisplay::ActiveConfigBasedRRIHandler::checkOnSetActiveConfig(int refr
     updateRefreshRate(refreshRate);
 }
 
-bool ExynosDisplay::needUpdateRRIndicator() {
-    uint64_t exclude = GEOMETRY_LAYER_TYPE_CHANGED;
-    return (mGeometryChanged & ~exclude) > 0 || mBufferUpdates > 0;
+bool ExynosDisplay::checkUpdateRRIndicatorOnly() {
+    mUpdateRRIndicatorOnly = false;
+    // mGeometryChanged & mBufferUpdates have already excluded any changes from RR Indicator layer.
+    // GEOMETRY_LAYER_TYPE_CHANGED still needs to be excluded since SF sometimes could retry to use
+    // DEVICE composition type again if it falls back to CLIENT at previous frame.
+    if ((mGeometryChanged & ~GEOMETRY_LAYER_TYPE_CHANGED) > 0 || mBufferUpdates > 0) {
+        return false;
+    }
+    Mutex::Autolock lock(mDRMutex);
+    for (size_t i = 0; i < mLayers.size(); ++i) {
+        const auto& layer = mLayers[i];
+        if (layer->mRequestedCompositionType == HWC2_COMPOSITION_REFRESH_RATE_INDICATOR) {
+            // Sometimes, HWC could call onRefresh() so that SF would call another present without
+            // any changes on geometry or buffers. Thus, this function should return true if only
+            // there's any update on geometry or buffer of RR Indicator layer.
+            mUpdateRRIndicatorOnly =
+                    ((layer->mGeometryChanged) & ~GEOMETRY_LAYER_TYPE_CHANGED) > 0 ||
+                    (layer->mLastLayerBuffer != layer->mLayerBuffer);
+            return mUpdateRRIndicatorOnly;
+        }
+    }
+    return false;
+}
+
+bool ExynosDisplay::isUpdateRRIndicatorOnly() {
+    return mUpdateRRIndicatorOnly;
 }
 
 uint32_t ExynosDisplay::getPeakRefreshRate() {

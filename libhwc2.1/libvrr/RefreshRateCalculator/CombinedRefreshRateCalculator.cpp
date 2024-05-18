@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "CombinedRefreshRateCalculator.h"
 
 #include <algorithm>
@@ -52,12 +54,12 @@ void CombinedRefreshRateCalculator::onPowerStateChange(int from, int to) {
     mPowerMode = to;
 }
 
-void CombinedRefreshRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
+void CombinedRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
     mHasRefreshRateChage = false;
 
     mIsOnPresent = true;
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
-        refreshRateCalculator->onPresent(presentTimeNs, flag);
+        refreshRateCalculator->onPresentInternal(presentTimeNs, flag);
     }
     mIsOnPresent = false;
 
@@ -91,6 +93,7 @@ void CombinedRefreshRateCalculator::onRefreshRateChanged(int refreshRate) {
 void CombinedRefreshRateCalculator::setNewRefreshRate(int newRefreshRate) {
     if (newRefreshRate != mLastRefreshRate) {
         mLastRefreshRate = newRefreshRate;
+        ATRACE_INT(mName.c_str(), newRefreshRate);
         if (mRefreshRateChangeCallback) {
             mRefreshRateChangeCallback(newRefreshRate);
         }

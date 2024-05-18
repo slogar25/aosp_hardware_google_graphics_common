@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "PeriodRefreshRateCalculator.h"
 
 #include "../Utils.h"
@@ -29,7 +31,6 @@ PeriodRefreshRateCalculator::PeriodRefreshRateCalculator(
     mLastMeasureTimeNs = getSteadyClockTimeNs() + params.mMeasurePeriodNs;
     mMeasureEvent.mWhenNs = mLastMeasureTimeNs;
     mMeasureEvent.mFunctor = std::move(std::bind(&PeriodRefreshRateCalculator::onMeasure, this));
-    mEventQueue->mPriorityQueue.emplace(mMeasureEvent);
 
     mMeasurePeriodRatio = (static_cast<float>(mParams.mMeasurePeriodNs) / std::nano::den);
     mNumVsyncPerMeasure = static_cast<int>(mMaxFrameRate * mMeasurePeriodRatio);
@@ -54,7 +55,7 @@ void PeriodRefreshRateCalculator::onPowerStateChange(int from, int to) {
     mPowerMode = to;
 }
 
-void PeriodRefreshRateCalculator::onPresent(int64_t presentTimeNs, int flag) {
+void PeriodRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
     if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
         return;
     }
@@ -126,6 +127,7 @@ int PeriodRefreshRateCalculator::onMeasure() {
 void PeriodRefreshRateCalculator::setNewRefreshRate(int newRefreshRate) {
     if ((newRefreshRate != mLastRefreshRate) || mParams.mAlwaysCallback) {
         mLastRefreshRate = newRefreshRate;
+        ATRACE_INT(mName.c_str(), newRefreshRate);
         if (mRefreshRateChangeCallback) {
             mRefreshRateChangeCallback(mLastRefreshRate);
         }

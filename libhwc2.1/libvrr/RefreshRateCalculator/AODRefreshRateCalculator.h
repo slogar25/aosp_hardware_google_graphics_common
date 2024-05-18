@@ -16,6 +16,8 @@
 
 #pragma once
 
+#define ATRACE_TAG (ATRACE_TAG_GRAPHICS | ATRACE_TAG_HAL)
+
 #include "RefreshRateCalculator.h"
 
 #include "../Utils.h"
@@ -37,7 +39,7 @@ public:
         return mLastRefreshRate;
     }
 
-    void onPresent(int64_t presentTimeNs, int flag) override {
+    void onPresentInternal(int64_t presentTimeNs, int flag) override {
         if (hasPresentFrameFlag(flag, PresentFrameFlag::kPresentingWhenDoze)) {
             mIsInDoze = true;
             if (mAodRefreshRateState != kAodActiveToIdleTransitionState) {
@@ -91,6 +93,7 @@ private:
     void setNewRefreshRate(int newRefreshRate) {
         if (newRefreshRate != mLastRefreshRate) {
             mLastRefreshRate = newRefreshRate;
+            ATRACE_INT(mName.c_str(), newRefreshRate);
             if (mRefreshRateChangeCallback) {
                 mRefreshRateChangeCallback(mLastRefreshRate);
             }
