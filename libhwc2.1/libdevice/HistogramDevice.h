@@ -59,7 +59,7 @@
 
 #define SCOPED_HIST_LOCK(mutex)   \
     std::scoped_lock lock(mutex); \
-    ATRACE_NAME(String8::format("%s(%s)", #mutex, __func__));
+    ATRACE_NAME(#mutex);
 
 using namespace android;
 
