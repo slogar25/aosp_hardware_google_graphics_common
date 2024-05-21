@@ -405,6 +405,12 @@ void HistogramDevice::handleDrmEvent(void* event) {
 }
 
 void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq) {
+    {
+        std::shared_lock lock(mHistogramCapabilityMutex);
+        // Skip multi channel histogram commit if not supported.
+        if (!mHistogramCapability.supportMultiChannel) return;
+    }
+
     ATRACE_NAME("HistogramAtomicCommit");
 
     ExynosDisplayDrmInterface* moduleDisplayInterface =
@@ -448,6 +454,14 @@ void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtom
 
 void HistogramDevice::postAtomicCommit() {
     {
+        std::shared_lock lock(mHistogramCapabilityMutex);
+        // Skip multi channel histogram commit if not supported.
+        if (!mHistogramCapability.supportMultiChannel) return;
+    }
+
+    ATRACE_CALL();
+
+    {
         SCOPED_HIST_LOCK(mHistogramMutex);
 
         // Atomic commit is success, loop through every channel and update the channel status
@@ -478,6 +492,8 @@ void HistogramDevice::dump(String8& result) const {
             return;
         }
     }
+
+    ATRACE_NAME("HistogramDump");
 
     // print the histogram capability
     dumpHistogramCapability(result);
@@ -521,6 +537,7 @@ void HistogramDevice::dump(String8& result) const {
 
 void HistogramDevice::initChannels(const uint8_t channelCount,
                                    const std::vector<uint8_t>& reservedChannels) {
+    ATRACE_CALL();
     HIST_LOG(I, "init with %u channels", channelCount);
 
     SCOPED_HIST_LOCK(mHistogramMutex);
@@ -713,6 +730,7 @@ bool HistogramDevice::scheduler() {
 
 void HistogramDevice::searchOrCreateBlobIdData(uint32_t blobId, bool create,
                                                std::shared_ptr<BlobIdData>& blobIdData) {
+    ATRACE_CALL();
     blobIdData = nullptr;
     SCOPED_HIST_LOCK(mBlobIdDataMutex);
 
@@ -729,6 +747,7 @@ void HistogramDevice::searchOrCreateBlobIdData(uint32_t blobId, bool create,
 void HistogramDevice::getChanIdBlobId(const ndk::SpAIBinder& token,
                                       HistogramErrorCode* histogramErrorCode, int& channelId,
                                       uint32_t& blobId) {
+    ATRACE_CALL();
     TokenInfo* tokenInfo = nullptr;
     channelId = -1;
     blobId = 0;
