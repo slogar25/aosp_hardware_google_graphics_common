@@ -148,8 +148,7 @@ void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
     } else {
         int numVsync = roundDivide((presentTimeInBootClockNs - mLastPresentTimeInBootClockNs),
                                    mTeIntervalNs);
-        numVsync = std::max(1, numVsync);
-        numVsync = std::min(mTeFrequency, numVsync);
+        numVsync = std::max(1, std::min(mTeFrequency, numVsync));
         mDisplayPresentProfile.mNumVsync = numVsync;
         mLastPresentTimeInBootClockNs = presentTimeInBootClockNs;
     }
@@ -243,9 +242,11 @@ void VariableRefreshRateStatistic::updateIdleStats(int64_t endTimeStampInBootClo
         int numVsync = roundDivide(durationFromLastPresentNs, mTeIntervalNs);
         mDisplayPresentProfile.mNumVsync =
                 (mMinimumRefreshRate > 1 ? (mTeFrequency / mMinimumRefreshRate) : mTeFrequency);
-        if (numVsync < mDisplayPresentProfile.mNumVsync) return;
+        if (numVsync <= mDisplayPresentProfile.mNumVsync) return;
 
-        auto count = numVsync / mDisplayPresentProfile.mNumVsync;
+        // Ensure that the last vsync should not be included now, since it would be processed for
+        // next update or |onPresent|
+        auto count = (numVsync - 1) / mDisplayPresentProfile.mNumVsync;
         auto alignedDurationNs = mMaximumFrameIntervalNs * count;
         {
             std::scoped_lock lock(mMutex);
