@@ -584,9 +584,6 @@ void VariableRefreshRateController::onPresent(int fence) {
     ATRACE_CALL();
     {
         const std::lock_guard<std::mutex> lock(mMutex);
-        if (mState == VrrControllerState::kDisable) {
-            return;
-        }
         if (!mRecord.mPendingCurrentPresentTime.has_value()) {
             LOG(WARNING) << "VrrController: VrrController: Present without expected present time "
                             "information";
@@ -603,7 +600,9 @@ void VariableRefreshRateController::onPresent(int fence) {
             }
             mRecord.mPresentHistory.next() = mRecord.mPendingCurrentPresentTime.value();
         }
-        if (mState == VrrControllerState::kHibernate) {
+        if (mState == VrrControllerState::kDisable) {
+            return;
+        } else if (mState == VrrControllerState::kHibernate) {
             LOG(WARNING) << "VrrController: Present during hibernation without prior notification "
                             "via notifyExpectedPresent.";
             mState = VrrControllerState::kRendering;

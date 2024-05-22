@@ -226,13 +226,11 @@ typedef enum {
 #ifndef DEFAULT_MPP_DST_FORMAT
 #define DEFAULT_MPP_DST_FORMAT HAL_PIXEL_FORMAT_RGBA_8888
 #endif
-
-/* TODO: Switch back to single-fd format, tracked in b/261356480 */
 #ifndef DEFAULT_MPP_DST_YUV_FORMAT
-#define DEFAULT_MPP_DST_YUV_FORMAT HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M
+#define DEFAULT_MPP_DST_YUV_FORMAT HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN
 #endif
 #ifndef DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT
-#define DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SP_M
+#define DEFAULT_MPP_DST_UNCOMP_YUV_FORMAT HAL_PIXEL_FORMAT_EXYNOS_YCbCr_420_SPN
 #endif
 
 typedef struct exynos_mpp_img_info {
@@ -710,8 +708,10 @@ protected:
     uint32_t getBufferType(const buffer_handle_t handle);
     uint64_t getBufferUsage(uint64_t usage);
     bool needCompressDstBuf() const;
+    uint32_t getAlignedDstFullWidth(struct exynos_image& dst);
     bool needDstBufRealloc(struct exynos_image &dst, uint32_t index);
     bool canUsePrevFrame();
+    uint32_t getDstStrideAlignment(int format);
     int32_t setupDst(exynos_mpp_img_info *dstImgInfo);
     virtual int32_t doPostProcessingInternal();
     virtual int32_t setupLayer(exynos_mpp_img_info *srcImgInfo,
