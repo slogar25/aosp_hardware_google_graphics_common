@@ -1812,6 +1812,8 @@ class ExynosDisplay {
 
         void resetColorMappingInfoForClientComp();
         void storePrevValidateCompositionType();
+
+        virtual bool isVrrSupported() const { return false; }
 };
 
 #endif //_EXYNOSDISPLAY_H

@@ -117,6 +117,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         }
         std::string getPanelSysfsPath(const displaycolor::DisplayType& type) const;
 
+        virtual bool isVrrSupported() const override { return mXrrSettings.versionInfo.isVrr(); }
+
         uint32_t mRcdId = -1;
 
     private:
