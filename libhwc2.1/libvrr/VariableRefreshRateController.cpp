@@ -654,7 +654,6 @@ void VariableRefreshRateController::onPresent(int fence) {
             }
             return;
         }
-        mRecord.mPendingCurrentPresentTime = std::nullopt;
     }
 
     // Prior to pushing the most recent fence update, verify the release timestamps of all preceding
@@ -684,12 +683,16 @@ void VariableRefreshRateController::onPresent(int fence) {
         }
         if (shouldHandleVendorRenderingTimeout()) {
             // Post next frame insertion event.
-            auto vendorPresentTimeoutNs = getSteadyClockTimeNs() +
+            auto vendorPresentTimeoutNs = mRecord.mPendingCurrentPresentTime.value().mTime +
                     (mVendorPresentTimeoutOverride
                              ? mVendorPresentTimeoutOverride.value().mTimeoutNs
-                             : kDefaultVendorPresentTimeoutNs);
+                             : std::max(static_cast<int64_t>(
+                                                mRecord.mPendingCurrentPresentTime.value()
+                                                        .mDuration),
+                                        kDefaultVendorPresentTimeoutNs));
             postEvent(VrrControllerEventType::kVendorRenderingTimeout, vendorPresentTimeoutNs);
         }
+        mRecord.mPendingCurrentPresentTime = std::nullopt;
     }
     mCondition.notify_all();
 }
