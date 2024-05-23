@@ -265,6 +265,7 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
                                                 durationNsToFreq(mVrrConfigs[mVrrActiveConfig]
                                                                          .vsyncPeriodNs));
         }
+        reportRefreshRateIndicator();
         if (mState == VrrControllerState::kDisable) {
             return;
         }
@@ -882,17 +883,22 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
     for (const auto& listener : mRefreshRateChangeListeners) {
         if (listener) listener->onRefreshRateChange(refreshRate);
     }
+    mLastRefreshRate = refreshRate;
+    reportRefreshRateIndicator();
+}
+
+void VariableRefreshRateController::reportRefreshRateIndicator() {
     if (mRefreshRateCalculatorEnabled) {
         if (!mDisplay->mDevice->isVrrApiSupported()) {
             // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,
             // refreshPeriodNanos is disregarded.
             mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
-                                                         freqToDurationNs(refreshRate), -1);
+                                                         freqToDurationNs(mLastRefreshRate));
         } else {
             mDisplay->mDevice
                     ->onRefreshRateChangedDebug(mDisplay->mDisplayId,
                                                 mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
-                                                freqToDurationNs(refreshRate));
+                                                freqToDurationNs(mLastRefreshRate));
         }
     }
 }
