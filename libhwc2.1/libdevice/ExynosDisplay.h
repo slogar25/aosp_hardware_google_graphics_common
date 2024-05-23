@@ -1243,6 +1243,9 @@ class ExynosDisplay {
         /* This function is called by ExynosDisplayInterface class to set acquire fence*/
         int32_t setReadbackBufferAcqFence(int32_t acqFence);
 
+        int32_t uncacheLayerBuffers(const ExynosLayer* layer,
+                                    const std::vector<buffer_handle_t>& buffers);
+
         virtual void dump(String8& result);
         void dumpLocked(String8& result) REQUIRES(mDisplayMutex);
         void dumpAllBuffers() REQUIRES(mDisplayMutex);
@@ -1812,6 +1815,8 @@ class ExynosDisplay {
 
         void resetColorMappingInfoForClientComp();
         void storePrevValidateCompositionType();
+
+        virtual bool isVrrSupported() const { return false; }
 };
 
 #endif //_EXYNOSDISPLAY_H

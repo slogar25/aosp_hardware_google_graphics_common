@@ -67,7 +67,14 @@ public:
         if (mRefreshRateCalculator) {
             mRefreshRateCalculatorEnabled = enabled;
             if (mRefreshRateCalculatorEnabled) {
-                onRefreshRateChanged(mRefreshRateCalculator->getRefreshRate());
+                if (mDisplay->isVrrSupported()) {
+                    reportRefreshRateIndicator();
+                } else {
+                    // This is a VTS hack for MRRv2
+                    mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
+                                                                 freqToDurationNs(
+                                                                         mLastRefreshRate));
+                }
             }
         }
     };
@@ -275,6 +282,7 @@ private:
 
     void onRefreshRateChanged(int refreshRate);
     void onRefreshRateChangedInternal(int refreshRate);
+    void reportRefreshRateIndicator();
 
     void postEvent(VrrControllerEventType type, TimedEvent& timedEvent);
     void postEvent(VrrControllerEventType type, int64_t when);
@@ -314,6 +322,7 @@ private:
     // Refresh rate indicator.
     bool mRefreshRateCalculatorEnabled = false;
     std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
+    int mLastRefreshRate = kDefaultInvalidRefreshRate;
 
     // Power stats.
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;

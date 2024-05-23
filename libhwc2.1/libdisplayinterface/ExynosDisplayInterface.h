@@ -105,6 +105,11 @@ class ExynosDisplayInterface {
         virtual ExynosDisplay* borrowedCrtcFrom() { return nullptr; }
         virtual void clearOldCrtcBlobs() {}
 
+        virtual int32_t uncacheLayerBuffers(const ExynosLayer* layer,
+                                            const std::vector<buffer_handle_t>& buffers) {
+            return NO_ERROR;
+        }
+
     public:
         uint32_t mType = INTERFACE_TYPE_NONE;
 };

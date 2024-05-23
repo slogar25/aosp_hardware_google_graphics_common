@@ -265,6 +265,7 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
                                                 durationNsToFreq(mVrrConfigs[mVrrActiveConfig]
                                                                          .vsyncPeriodNs));
         }
+        reportRefreshRateIndicator();
         if (mState == VrrControllerState::kDisable) {
             return;
         }
@@ -654,7 +655,6 @@ void VariableRefreshRateController::onPresent(int fence) {
             }
             return;
         }
-        mRecord.mPendingCurrentPresentTime = std::nullopt;
     }
 
     // Prior to pushing the most recent fence update, verify the release timestamps of all preceding
@@ -684,12 +684,16 @@ void VariableRefreshRateController::onPresent(int fence) {
         }
         if (shouldHandleVendorRenderingTimeout()) {
             // Post next frame insertion event.
-            auto vendorPresentTimeoutNs = getSteadyClockTimeNs() +
+            auto vendorPresentTimeoutNs = mRecord.mPendingCurrentPresentTime.value().mTime +
                     (mVendorPresentTimeoutOverride
                              ? mVendorPresentTimeoutOverride.value().mTimeoutNs
-                             : kDefaultVendorPresentTimeoutNs);
+                             : std::max(static_cast<int64_t>(
+                                                mRecord.mPendingCurrentPresentTime.value()
+                                                        .mDuration),
+                                        kDefaultVendorPresentTimeoutNs));
             postEvent(VrrControllerEventType::kVendorRenderingTimeout, vendorPresentTimeoutNs);
         }
+        mRecord.mPendingCurrentPresentTime = std::nullopt;
     }
     mCondition.notify_all();
 }
@@ -879,17 +883,22 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
     for (const auto& listener : mRefreshRateChangeListeners) {
         if (listener) listener->onRefreshRateChange(refreshRate);
     }
+    mLastRefreshRate = refreshRate;
+    reportRefreshRateIndicator();
+}
+
+void VariableRefreshRateController::reportRefreshRateIndicator() {
     if (mRefreshRateCalculatorEnabled) {
         if (!mDisplay->mDevice->isVrrApiSupported()) {
             // For legacy API, vsyncPeriodNanos is utilized to denote the refresh rate,
             // refreshPeriodNanos is disregarded.
             mDisplay->mDevice->onRefreshRateChangedDebug(mDisplay->mDisplayId,
-                                                         freqToDurationNs(refreshRate), -1);
+                                                         freqToDurationNs(mLastRefreshRate));
         } else {
             mDisplay->mDevice
                     ->onRefreshRateChangedDebug(mDisplay->mDisplayId,
                                                 mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
-                                                freqToDurationNs(refreshRate));
+                                                freqToDurationNs(mLastRefreshRate));
         }
     }
 }
