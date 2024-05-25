@@ -1194,21 +1194,30 @@ int32_t HalImpl::validateDisplay(int64_t display, std::vector<int64_t>* outChang
     outRequestMasks->resize(reqsCount);
     RET_IF_ERR(halDisplay->getDisplayRequests(&displayReqs, &reqsCount,
                                               hwcRequestedLayers.data(), outRequestMasks->data()));
-    std::vector<int64_t> sfLayers(typesCount);
+    std::vector<int64_t> sfChangedLayers(typesCount);
 
     for (int i = 0; i < typesCount; i++) {
         auto iter = mHalLayerToSfLayerMap.find(hwcChangedLayers[i]);
         if (iter != mHalLayerToSfLayerMap.end()) {
-            sfLayers[i] = iter->second;
+            sfChangedLayers[i] = iter->second;
         } else {
             LOG(ERROR) << "HalImpl::validateDisplay incorrect hal mapping. ";
         }
     }
-    h2a::translate(sfLayers, *outChangedLayers);
+    h2a::translate(sfChangedLayers, *outChangedLayers);
     h2a::translate(hwcCompositionTypes, *outCompositionTypes);
     *outDisplayRequestMask = displayReqs;
-    h2a::translate(hwcRequestedLayers, *outRequestedLayers);
+    std::vector<int64_t> sfRequestedLayers(reqsCount);
 
+    for (int i = 0; i < reqsCount; i++) {
+        auto iter = mHalLayerToSfLayerMap.find(hwcRequestedLayers[i]);
+        if (iter != mHalLayerToSfLayerMap.end()) {
+            sfRequestedLayers[i] = iter->second;
+        } else {
+            LOG(ERROR) << "HalImpl::validateDisplay incorrect hal mapping. ";
+        }
+    }
+    h2a::translate(sfRequestedLayers, *outRequestedLayers);
     hwc_client_target_property hwcProperty;
     HwcDimmingStage hwcDimmingStage;
     if (!halDisplay->getClientTargetProperty(&hwcProperty, &hwcDimmingStage)) {
