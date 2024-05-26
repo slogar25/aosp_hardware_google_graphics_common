@@ -139,7 +139,7 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
 
     // Flow to build refresh rate calculator.
     RefreshRateCalculatorFactory refreshRateCalculatorFactory;
-    std::vector<std::unique_ptr<RefreshRateCalculator>> Calculators;
+    std::vector<std::shared_ptr<RefreshRateCalculator>> Calculators;
 
     Calculators.emplace_back(std::move(
             refreshRateCalculatorFactory
@@ -148,17 +148,20 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
             std::move(refreshRateCalculatorFactory
                               .BuildRefreshRateCalculator(&mEventQueue,
                                                           RefreshRateCalculatorType::kExitIdle)));
-    Calculators.emplace_back(std::move(
+    // videoFrameRateCalculator will be shared with display context provider.
+    auto videoFrameRateCalculator =
             refreshRateCalculatorFactory
                     .BuildRefreshRateCalculator(&mEventQueue,
-                                                RefreshRateCalculatorType::kVideoPlayback)));
+                                                RefreshRateCalculatorType::kVideoPlayback);
+    Calculators.emplace_back(videoFrameRateCalculator);
 
     PeriodRefreshRateCalculatorParameters peridParams;
     peridParams.mConfidencePercentage = 0;
     Calculators.emplace_back(std::move(
             refreshRateCalculatorFactory.BuildRefreshRateCalculator(&mEventQueue, peridParams)));
 
-    mRefreshRateCalculator = refreshRateCalculatorFactory.BuildRefreshRateCalculator(Calculators);
+    mRefreshRateCalculator =
+            refreshRateCalculatorFactory.BuildRefreshRateCalculator(std::move(Calculators));
     mRefreshRateCalculator->registerRefreshRateChangeCallback(
             std::bind(&VariableRefreshRateController::onRefreshRateChanged, this,
                       std::placeholders::_1));
@@ -166,8 +169,10 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     mPowerModeListeners.push_back(mRefreshRateCalculator.get());
 
     DisplayContextProviderFactory displayContextProviderFactory(mDisplay, this, &mEventQueue);
-    mDisplayContextProvider = displayContextProviderFactory.buildDisplayContextProvider(
-            DisplayContextProviderType::kExynos);
+    mDisplayContextProvider =
+            displayContextProviderFactory
+                    .buildDisplayContextProvider(DisplayContextProviderType::kExynos,
+                                                 std::move(videoFrameRateCalculator));
 
     mPresentTimeoutEventHandlerLoader.reset(
             new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),

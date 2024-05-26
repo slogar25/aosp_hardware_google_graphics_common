@@ -25,7 +25,7 @@ namespace android::hardware::graphics::composer {
 class CommonDisplayContextProvider : public DisplayContextProvider {
 public:
     CommonDisplayContextProvider(DisplayConfigurationsOwner* displayConfigurationOwner,
-                                 std::unique_ptr<RefreshRateCalculator> videoFrameRateCalculator)
+                                 std::shared_ptr<RefreshRateCalculator> videoFrameRateCalculator)
           : mDisplayConfigurationOwner(displayConfigurationOwner),
             mVideoFrameRateCalculator(std::move(videoFrameRateCalculator)){};
 
@@ -62,7 +62,7 @@ public:
 private:
     DisplayConfigurationsOwner* mDisplayConfigurationOwner;
 
-    std::unique_ptr<RefreshRateCalculator> mVideoFrameRateCalculator;
+    std::shared_ptr<RefreshRateCalculator> mVideoFrameRateCalculator;
 };
 
 } // namespace android::hardware::graphics::composer

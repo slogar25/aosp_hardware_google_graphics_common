@@ -19,9 +19,9 @@
 namespace android::hardware::graphics::composer {
 
 // Build InstantRefreshRateCalculator.
-std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
+std::shared_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
         EventQueue* eventQueue, int64_t maxValidPeriodNs) {
-    return std::make_unique<InstantRefreshRateCalculator>(eventQueue, maxValidPeriodNs);
+    return std::make_shared<InstantRefreshRateCalculator>(eventQueue, maxValidPeriodNs);
 }
 
 // Build ExitIdleRefreshRateCalculator.
@@ -31,54 +31,54 @@ std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefres
 }
 
 // Build VideoFrameRateCalculator
-std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
+std::shared_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
         EventQueue* eventQueue, const VideoFrameRateCalculatorParameters& params) {
-    return std::make_unique<VideoFrameRateCalculator>(eventQueue, params);
+    return std::make_shared<VideoFrameRateCalculator>(eventQueue, params);
 }
 
 // Build PeriodRefreshRateCalculator.
-std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
+std::shared_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
         EventQueue* eventQueue, const PeriodRefreshRateCalculatorParameters& params) {
-    return std::make_unique<PeriodRefreshRateCalculator>(eventQueue, params);
+    return std::make_shared<PeriodRefreshRateCalculator>(eventQueue, params);
 }
 
 // Build CombinedRefreshRateCalculator.
-std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
+std::shared_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
         EventQueue* eventQueue, const std::vector<RefreshRateCalculatorType>& types) {
-    std::vector<std::unique_ptr<RefreshRateCalculator>> refreshRateCalculators;
+    std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators;
     for (const auto& type : types) {
         refreshRateCalculators.emplace_back(BuildRefreshRateCalculator(eventQueue, type));
     }
-    return std::make_unique<CombinedRefreshRateCalculator>(refreshRateCalculators);
+    return std::make_shared<CombinedRefreshRateCalculator>(std::move(refreshRateCalculators));
 }
 
 // Build CombinedRefreshRateCalculator.
-std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
-        std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators,
+std::shared_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
+        std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators,
         int minValidRefreshRate, int maxValidRefreshRate) {
-    return std::make_unique<CombinedRefreshRateCalculator>(refreshRateCalculators,
+    return std::make_shared<CombinedRefreshRateCalculator>(std::move(refreshRateCalculators),
                                                            minValidRefreshRate,
                                                            maxValidRefreshRate);
 }
 
 // Build various RefreshRateCalculator with default settings.
-std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
+std::shared_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
         EventQueue* eventQueue, RefreshRateCalculatorType type) {
     switch (type) {
         case RefreshRateCalculatorType::kAod: {
-            return std::make_unique<AODRefreshRateCalculator>(eventQueue);
+            return std::make_shared<AODRefreshRateCalculator>(eventQueue);
         }
         case RefreshRateCalculatorType::kInstant: {
-            return std::make_unique<InstantRefreshRateCalculator>(eventQueue);
+            return std::make_shared<InstantRefreshRateCalculator>(eventQueue);
         }
         case RefreshRateCalculatorType::kExitIdle: {
             return std::make_unique<ExitIdleRefreshRateCalculator>(eventQueue);
         }
         case RefreshRateCalculatorType::kPeriodical: {
-            return std::make_unique<PeriodRefreshRateCalculator>(eventQueue);
+            return std::make_shared<PeriodRefreshRateCalculator>(eventQueue);
         }
         case RefreshRateCalculatorType::kVideoPlayback: {
-            return std::make_unique<VideoFrameRateCalculator>(eventQueue);
+            return std::make_shared<VideoFrameRateCalculator>(eventQueue);
         }
         case RefreshRateCalculatorType::kCombined: {
             std::vector<RefreshRateCalculatorType> types{RefreshRateCalculatorType::kVideoPlayback,

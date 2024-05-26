@@ -25,12 +25,12 @@
 namespace android::hardware::graphics::composer {
 
 CombinedRefreshRateCalculator::CombinedRefreshRateCalculator(
-        std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators)
-      : CombinedRefreshRateCalculator(refreshRateCalculators, kDefaultMinValidRefreshRate,
-                                      kDefaultMaxValidRefreshRate) {}
+        std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators)
+      : CombinedRefreshRateCalculator(std::move(refreshRateCalculators),
+                                      kDefaultMinValidRefreshRate, kDefaultMaxValidRefreshRate) {}
 
 CombinedRefreshRateCalculator::CombinedRefreshRateCalculator(
-        std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators,
+        std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators,
         int minValidRefreshRate, int maxValidRefreshRate)
       : mRefreshRateCalculators(std::move(refreshRateCalculators)),
         mMinValidRefreshRate(minValidRefreshRate),

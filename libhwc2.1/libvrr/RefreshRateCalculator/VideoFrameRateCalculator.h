@@ -69,7 +69,7 @@ private:
 
     void setNewRefreshRate(int newRefreshRate);
 
-    std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
+    std::shared_ptr<RefreshRateCalculator> mRefreshRateCalculator;
 
     EventQueue* mEventQueue;
     VideoFrameRateCalculatorParameters mParams;

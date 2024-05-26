@@ -27,7 +27,7 @@ class ExynosDisplayContextProvider : public CommonDisplayContextProvider {
 public:
     ExynosDisplayContextProvider(void* display,
                                  DisplayConfigurationsOwner* displayConfigurationOwner,
-                                 std::unique_ptr<RefreshRateCalculator> videoFrameRateCalculator)
+                                 std::shared_ptr<RefreshRateCalculator> videoFrameRateCalculator)
           : CommonDisplayContextProvider(displayConfigurationOwner,
                                          std::move(videoFrameRateCalculator)),
             mDisplay(static_cast<ExynosDisplay*>(display)),

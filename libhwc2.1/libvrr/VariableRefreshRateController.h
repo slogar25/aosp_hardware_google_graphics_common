@@ -323,7 +323,8 @@ private:
 
     // Refresh rate indicator.
     bool mRefreshRateCalculatorEnabled = false;
-    std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
+
+    std::shared_ptr<RefreshRateCalculator> mRefreshRateCalculator;
     int mLastRefreshRate = kDefaultInvalidRefreshRate;
     std::unordered_map<hwc2_config_t, std::vector<int>> mValidRefreshRates;
 
