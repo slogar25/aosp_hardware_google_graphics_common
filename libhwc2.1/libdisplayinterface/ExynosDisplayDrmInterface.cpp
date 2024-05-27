@@ -436,50 +436,6 @@ void FramebufferManager::destroyAllSecureBuffers() {
     }
 }
 
-int32_t FramebufferManager::uncacheLayerBuffers(const ExynosLayer* layer,
-                                                const std::vector<buffer_handle_t>& buffers) {
-    std::set<Framebuffer::BufferDesc> removedBufferDescs;
-    for (auto buffer : buffers) {
-        VendorGraphicBufferMeta gmeta(buffer);
-        removedBufferDescs.insert(
-                Framebuffer::BufferDesc{.bufferId = gmeta.unique_id,
-                                        .drmFormat =
-                                                halFormatToDrmFormat(gmeta.format,
-                                                                     getCompressionType(buffer)),
-                                        .isSecure =
-                                                (getDrmMode(gmeta.producer_usage) == SECURE_DRM)});
-    }
-    bool needCleanup = false;
-    {
-        Mutex::Autolock lock(mMutex);
-        auto destroyCachedBuffersLocked =
-                [&](std::map<const ExynosLayer*, FBList>& cachedLayerBuffers) REQUIRES(mMutex) {
-                    if (auto layerIter = cachedLayerBuffers.find(layer);
-                        layerIter != cachedLayerBuffers.end()) {
-                        auto& fbList = layerIter->second;
-                        for (auto it = fbList.begin(); it != fbList.end();) {
-                            auto bufferIter = it++;
-                            if (removedBufferDescs.count((*bufferIter)->bufferDesc)) {
-                                mCleanBuffers.splice(mCleanBuffers.end(), fbList, bufferIter);
-                                needCleanup = true;
-                            }
-                        }
-                    }
-                };
-        destroyCachedBuffersLocked(mCachedLayerBuffers);
-        destroyCachedBuffersLocked(mCachedSecureLayerBuffers);
-    }
-    if (needCleanup) {
-        mFlipDone.signal();
-    }
-    return NO_ERROR;
-}
-
-int32_t ExynosDisplayDrmInterface::uncacheLayerBuffers(
-        const ExynosLayer* layer, const std::vector<buffer_handle_t>& buffers) {
-    return mFBManager.uncacheLayerBuffers(layer, buffers);
-}
-
 void ExynosDisplayDrmInterface::destroyLayer(ExynosLayer *layer) {
     mFBManager.cleanup(layer);
 }

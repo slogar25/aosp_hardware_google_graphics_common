@@ -6274,11 +6274,6 @@ void ExynosDisplay::initDisplayInterface(uint32_t __unused interfaceType)
     mDisplayInterface->init(this);
 }
 
-int32_t ExynosDisplay::uncacheLayerBuffers(const ExynosLayer* layer,
-                                           const std::vector<buffer_handle_t>& buffers) {
-    return mDisplayInterface->uncacheLayerBuffers(layer, buffers);
-}
-
 void ExynosDisplay::traceLayerTypes() {
     size_t g2d_count = 0;
     size_t dpu_count = 0;

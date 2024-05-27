@@ -132,7 +132,6 @@ void ComposerCommandEngine::dispatchLayerCommand(int64_t display, const LayerCom
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadata, PerFrameMetadata);
     DISPATCH_LAYER_COMMAND(display, command, perFrameMetadataBlob, PerFrameMetadataBlobs);
     DISPATCH_LAYER_COMMAND_SIMPLE(display, command, blockingRegion, BlockingRegion);
-    DISPATCH_LAYER_COMMAND(display, command, bufferSlotsToClear, BufferSlotsToClear);
 }
 
 int32_t ComposerCommandEngine::executeValidateDisplayInternal(int64_t display) {
@@ -469,42 +468,6 @@ void ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(int64_t display
     if (err) {
         LOG(ERROR) << __func__ << ": err " << err;
         mWriter->setError(mCommandIndex, err);
-    }
-}
-
-void ComposerCommandEngine::executeSetLayerBufferSlotsToClear(
-        int64_t display, int64_t layer, const std::vector<int32_t>& bufferSlotsToClear) {
-    buffer_handle_t cachedBuffer = nullptr;
-    std::unique_ptr<IBufferReleaser> bufferReleaser = mResources->createReleaser(true);
-
-    // get all cached buffers
-    std::vector<buffer_handle_t> cachedBuffers;
-    for (int32_t slot : bufferSlotsToClear) {
-        auto err = mResources->getLayerBuffer(display, layer, slot, /*fromCache=*/true, nullptr,
-                                              cachedBuffer, bufferReleaser.get());
-        if (cachedBuffer) {
-            cachedBuffers.push_back(cachedBuffer);
-        } else {
-            LOG(ERROR) << __func__ << ": Buffer slot " << slot << " is null";
-        }
-        if (err) {
-            LOG(ERROR) << __func__ << ": failed to getLayerBuffer err " << err;
-            mWriter->setError(mCommandIndex, err);
-            return;
-        }
-    }
-
-    // clear any other cache in composer
-    mHal->uncacheLayerBuffers(display, layer, cachedBuffers);
-    for (int32_t slot : bufferSlotsToClear) {
-        // replace the slot with nullptr and release the buffer by bufferReleaser
-        auto err = mResources->getLayerBuffer(display, layer, slot, /*fromCache=*/false, nullptr,
-                                              cachedBuffer, bufferReleaser.get());
-        if (err) {
-            LOG(ERROR) << __func__ << ": failed to clear buffer cache err " << err;
-            mWriter->setError(mCommandIndex, err);
-            return;
-        }
     }
 }
 
