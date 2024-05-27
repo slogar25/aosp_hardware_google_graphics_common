@@ -1485,6 +1485,11 @@ int32_t ExynosResourceManager::assignLayer(ExynosDisplay *display, ExynosLayer *
                            mOtfMPPs[j]->mName.c_str(), layer->mSupportedMPPFlag,
                            (layer->mSupportedMPPFlag & mOtfMPPs[j]->mLogicalType),
                            isAssignableFlag);
+                // dim layer skip device composition if color native
+                if (display->mColorMode == HAL_COLOR_MODE_NATIVE && validateFlag == eDimLayer) {
+                    ALOGD("%s::DimLayer & color native", __func__);
+                    continue;
+                }
 
                 if ((layer->mSupportedMPPFlag & mOtfMPPs[j]->mLogicalType) && (isAssignableFlag)) {
                     isSupported = mOtfMPPs[j]->isSupported(*display, src_img, dst_img);
