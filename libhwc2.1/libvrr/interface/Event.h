@@ -47,6 +47,7 @@ enum class VrrControllerEventType {
     kVideoFrameRateCalculatorUpdate,
     kCombinedRefreshRateCalculatorUpdate,
     kAodRefreshRateCalculatorUpdate,
+    kExitIdleRefreshRateCalculatorUpdate,
     kStaticticUpdate,
     kMinLockTimeForPeakRefreshRate,
     kCallbackEventMax = 0x2FF,

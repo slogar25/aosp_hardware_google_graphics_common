@@ -153,6 +153,7 @@ LOCAL_SRC_FILES := \
 	libvrr/Power/DisplayStateResidencyWatcher.cpp \
 	libvrr/FileNode.cpp \
 	libvrr/RefreshRateCalculator/InstantRefreshRateCalculator.cpp \
+	libvrr/RefreshRateCalculator/ExitIdleRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/PeriodRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/CombinedRefreshRateCalculator.cpp \
 	libvrr/RefreshRateCalculator/RefreshRateCalculatorFactory.cpp \

@@ -34,6 +34,7 @@ enum class RefreshRateCalculatorType : int {
     kInvalid = -1,
     kAod = 0,
     kInstant,
+    kExitIdle,
     kPeriodical,
     kVideoPlayback,
     kCombined,
@@ -57,7 +58,7 @@ public:
 
     virtual int getRefreshRate() const = 0;
 
-    virtual void onPowerStateChange(int __unused from, int to) override { mPowerMode = to; }
+    virtual void onPowerStateChange(int __unused from, int __unused to) override {}
 
     void onPresent(int64_t presentTimeNs, int flag) {
         if (hasPresentFrameFlag(flag, PresentFrameFlag::kUpdateRefreshRateIndicatorLayerOnly)) {
@@ -77,9 +78,9 @@ public:
     virtual void setEnabled(bool __unused isEnabled){};
 
     // Should be invoked during the transition from HS to NS or vice versa.
-    void setMinFrameInterval(int64_t minFrameIntervalNs) {
+    virtual void setMinFrameInterval(int64_t minFrameIntervalNs) {
         mMinFrameIntervalNs = minFrameIntervalNs;
-        mMaxFrameRate = durationToVsync(mMinFrameIntervalNs);
+        mMaxFrameRate = durationNsToFreq(mMinFrameIntervalNs);
     }
 
     void setName(const std::string& name) { mName = name; }
@@ -98,7 +99,6 @@ protected:
     int64_t mMinFrameIntervalNs;
 
     std::string mName;
-    int32_t mPowerMode = -1;
 };
 
 } // namespace android::hardware::graphics::composer

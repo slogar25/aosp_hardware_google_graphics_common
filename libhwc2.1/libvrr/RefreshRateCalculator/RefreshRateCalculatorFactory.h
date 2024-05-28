@@ -19,6 +19,7 @@
 #include "../EventQueue.h"
 #include "AODRefreshRateCalculator.h"
 #include "CombinedRefreshRateCalculator.h"
+#include "ExitIdleRefreshRateCalculator.h"
 #include "InstantRefreshRateCalculator.h"
 #include "PeriodRefreshRateCalculator.h"
 #include "RefreshRateCalculator.h"
@@ -37,6 +38,10 @@ public:
     // Build InstantRefreshRateCalculator.
     std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(EventQueue* eventQueue,
                                                                       int64_t maxValidPeriodNs);
+
+    // Build ExitIdleRefreshRateCalculator.
+    std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
+            EventQueue* eventQueue, const ExitIdleRefreshRateCalculatorParameters& params);
 
     // Build VideoFrameRateCalculator
     std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(

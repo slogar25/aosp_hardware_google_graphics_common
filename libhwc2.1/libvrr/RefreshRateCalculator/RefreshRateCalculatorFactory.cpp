@@ -24,6 +24,12 @@ std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefres
     return std::make_unique<InstantRefreshRateCalculator>(eventQueue, maxValidPeriodNs);
 }
 
+// Build ExitIdleRefreshRateCalculator.
+std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
+        EventQueue* eventQueue, const ExitIdleRefreshRateCalculatorParameters& params) {
+    return std::make_unique<ExitIdleRefreshRateCalculator>(eventQueue, params);
+}
+
 // Build VideoFrameRateCalculator
 std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefreshRateCalculator(
         EventQueue* eventQueue, const VideoFrameRateCalculatorParameters& params) {
@@ -64,6 +70,9 @@ std::unique_ptr<RefreshRateCalculator> RefreshRateCalculatorFactory::BuildRefres
         }
         case RefreshRateCalculatorType::kInstant: {
             return std::make_unique<InstantRefreshRateCalculator>(eventQueue);
+        }
+        case RefreshRateCalculatorType::kExitIdle: {
+            return std::make_unique<ExitIdleRefreshRateCalculator>(eventQueue);
         }
         case RefreshRateCalculatorType::kPeriodical: {
             return std::make_unique<PeriodRefreshRateCalculator>(eventQueue);

@@ -52,7 +52,6 @@ void PeriodRefreshRateCalculator::onPowerStateChange(int from, int to) {
         }
         setEnabled(true);
     }
-    mPowerMode = to;
 }
 
 void PeriodRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
