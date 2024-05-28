@@ -51,7 +51,6 @@ void CombinedRefreshRateCalculator::onPowerStateChange(int from, int to) {
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
         refreshRateCalculator->onPowerStateChange(from, to);
     }
-    mPowerMode = to;
 }
 
 void CombinedRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int flag) {
@@ -79,6 +78,15 @@ void CombinedRefreshRateCalculator::reset() {
 void CombinedRefreshRateCalculator::setEnabled(bool isEnabled) {
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
         refreshRateCalculator->setEnabled(isEnabled);
+    }
+}
+
+void CombinedRefreshRateCalculator::setMinFrameInterval(int64_t minFrameIntervalNs) {
+    mMinFrameIntervalNs = minFrameIntervalNs;
+    mMaxFrameRate = durationNsToFreq(mMinFrameIntervalNs);
+
+    for (auto& refreshRateCalculator : mRefreshRateCalculators) {
+        refreshRateCalculator->setMinFrameInterval(minFrameIntervalNs);
     }
 }
 
