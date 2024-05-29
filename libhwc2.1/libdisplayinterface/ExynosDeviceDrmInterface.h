@@ -40,6 +40,7 @@ class ExynosDeviceDrmInterface : public ExynosDeviceInterface {
         class ExynosDrmEventHandler : public DrmEventHandler,
                                       public DrmHistogramEventHandler,
                                       public DrmHistogramChannelEventHandler,
+                                      public DrmContextHistogramEventHandler,
                                       public DrmTUIEventHandler,
                                       public DrmPanelIdleEventHandler,
                                       public DrmPropertyUpdateHandler {
@@ -47,6 +48,7 @@ class ExynosDeviceDrmInterface : public ExynosDeviceInterface {
             void handleEvent(uint64_t timestamp_us) override;
             void handleHistogramEvent(uint32_t crtc_id, void *bin) override;
             void handleHistogramChannelEvent(void *event) override;
+            void handleContextHistogramEvent(void* event) override;
             void handleTUIEvent() override;
             void handleIdleEnterEvent(char const *event) override;
             void handleDrmPropertyUpdate(unsigned connector_id, unsigned prop_id) override;

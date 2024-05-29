@@ -81,6 +81,8 @@ ExynosDeviceDrmInterface::~ExynosDeviceDrmInterface() {
             std::static_pointer_cast<DrmHistogramEventHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterHistogramChannelHandler(
             std::static_pointer_cast<DrmHistogramChannelEventHandler>(mExynosDrmEventHandler));
+    mDrmDevice->event_listener()->UnRegisterContextHistogramHandler(
+            std::static_pointer_cast<DrmContextHistogramEventHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterTUIHandler(
             std::static_pointer_cast<DrmTUIEventHandler>(mExynosDrmEventHandler));
     mDrmDevice->event_listener()->UnRegisterPanelIdleHandler(
@@ -104,6 +106,8 @@ void ExynosDeviceDrmInterface::init(ExynosDevice *exynosDevice) {
                 std::static_pointer_cast<DrmHistogramEventHandler>(mExynosDrmEventHandler));
         mDrmDevice->event_listener()->RegisterHistogramChannelHandler(
                 std::static_pointer_cast<DrmHistogramChannelEventHandler>(mExynosDrmEventHandler));
+        mDrmDevice->event_listener()->RegisterContextHistogramHandler(
+                std::static_pointer_cast<DrmContextHistogramEventHandler>(mExynosDrmEventHandler));
         mDrmDevice->event_listener()->RegisterTUIHandler(
                 std::static_pointer_cast<DrmTUIEventHandler>(mExynosDrmEventHandler));
         mDrmDevice->event_listener()->RegisterPanelIdleHandler(
@@ -281,6 +285,32 @@ void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleHistogramChannelEven
 }
 #else
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleHistogramChannelEvent(void *event) {}
+#endif
+
+#if defined(EXYNOS_DRM_CONTEXT_HISTOGRAM_EVENT)
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleContextHistogramEvent(void* event) {
+    struct exynos_drm_context_histogram_event* context_histogram_event =
+            (struct exynos_drm_context_histogram_event*)event;
+
+    for (auto display : mExynosDevice->mDisplays) {
+        ExynosDisplayDrmInterface* displayInterface =
+                static_cast<ExynosDisplayDrmInterface*>(display->mDisplayInterface.get());
+        if (context_histogram_event->crtc_id == displayInterface->getCrtcId()) {
+            if (display->mHistogramController) {
+                display->mHistogramController->handleContextDrmEvent(context_histogram_event);
+            } else {
+                ALOGE("%s: no valid mHistogramController for crtc_id (%u)", __func__,
+                      context_histogram_event->crtc_id);
+            }
+
+            return;
+        }
+    }
+
+    ALOGE("%s: no display with crtc_id (%u)", __func__, context_histogram_event->crtc_id);
+}
+#else
+void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleContextHistogramEvent(void* event) {}
 #endif
 
 void ExynosDeviceDrmInterface::ExynosDrmEventHandler::handleTUIEvent() {
