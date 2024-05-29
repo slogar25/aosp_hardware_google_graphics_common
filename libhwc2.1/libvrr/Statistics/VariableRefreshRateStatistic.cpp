@@ -98,7 +98,6 @@ void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
         ALOGE("%s Power mode mismatch between storing state(%d) and actual mode(%d)", __func__,
               mDisplayPresentProfile.mCurrentDisplayConfig.mPowerMode, from);
     }
-    mSystemClockTimeTranslator.synchronize();
     updateIdleStats();
     std::scoped_lock lock(mMutex);
     if (isPowerModeOff(to)) {
@@ -131,8 +130,7 @@ void VariableRefreshRateStatistic::onPowerStateChange(int from, int to) {
 }
 
 void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
-    int64_t presentTimeInBootClockNs =
-            mSystemClockTimeTranslator.steadyClockTimeToBootClockTimeNs(presentTimeNs);
+    int64_t presentTimeInBootClockNs = steadyClockTimeToBootClockTimeNs(presentTimeNs);
     if (mLastPresentTimeInBootClockNs == kDefaultInvalidPresentTimeNs) {
         mLastPresentTimeInBootClockNs = presentTimeInBootClockNs;
         updateCurrentDisplayStatus();

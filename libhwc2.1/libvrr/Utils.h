@@ -98,35 +98,12 @@ int64_t getSteadyClockTimeNs();
 int64_t getBootClockTimeMs();
 int64_t getBootClockTimeNs();
 
+int64_t steadyClockTimeToBootClockTimeNs(int64_t steadyClockTimeNs);
+
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target);
 
 bool isPowerModeOff(int powerMode);
 
 void setTimedEventWithAbsoluteTime(TimedEvent& event);
-
-class SystemClockTimeTranslator {
-public:
-    SystemClockTimeTranslator() { synchronize(); }
-
-    ~SystemClockTimeTranslator() = default;
-
-    int64_t steadyClockTimeToBootClockTimeNs(int64_t steadyClockTimeNs) const {
-        return steadyClockTimeNs + mDiff;
-    }
-    int64_t bootClockTimeToSteadyClockTimeNs(int64_t bootClockTimeNs) const {
-        return bootClockTimeNs - mDiff;
-    }
-
-    void synchronize() {
-        mBootClockTimeNs = getBootClockTimeNs();
-        mSteadyClockTimeNs = getSteadyClockTimeNs();
-        mDiff = mBootClockTimeNs - mSteadyClockTimeNs;
-    }
-
-private:
-    int64_t mBootClockTimeNs;
-    int64_t mSteadyClockTimeNs;
-    int64_t mDiff;
-};
 
 } // namespace android::hardware::graphics::composer
