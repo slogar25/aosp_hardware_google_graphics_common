@@ -372,16 +372,7 @@ ndk::ScopedAStatus HistogramDevice::unregisterHistogram(const ndk::SpAIBinder& t
     return ndk::ScopedAStatus::ok();
 }
 
-void HistogramDevice::handleDrmEvent(void* event) {
-    int ret = NO_ERROR;
-    uint32_t blobId = 0;
-    char16_t* buffer;
-
-    if ((ret = parseDrmEvent(event, blobId, buffer))) {
-        HIST_LOG(E, "parseDrmEvent failed, ret(%d)", ret);
-        return;
-    }
-
+void HistogramDevice::_handleDrmEvent(void* event, uint32_t blobId, char16_t* buffer) {
     ATRACE_NAME(String8::format("handleHistogramEvent(blob#%u)", blobId).c_str());
 
     std::shared_ptr<BlobIdData> blobIdData;
@@ -402,6 +393,36 @@ void HistogramDevice::handleDrmEvent(void* event) {
         blobIdData->mCollectStatus = CollectStatus_t::COLLECTED;
         blobIdData->mDataCollecting_cv.notify_all();
     }
+}
+
+void HistogramDevice::handleDrmEvent(void* event) {
+    int ret = NO_ERROR;
+    uint32_t blobId = 0, channelId = 0;
+    char16_t* buffer;
+
+    if ((ret = parseDrmEvent(event, channelId, buffer))) {
+        HIST_LOG(E, "parseDrmEvent failed, ret(%d)", ret);
+        return;
+    }
+
+    // For the old kernel without blob id query supports, fake the blobId with channelId.
+    // In this hack way can prevent some duplicate codes just for channel id as well.
+    // In the future, all kernel will support blob id query. And can remove the hack.
+    blobId = channelId;
+    _handleDrmEvent(event, blobId, buffer);
+}
+
+void HistogramDevice::handleContextDrmEvent(void* event) {
+    int ret = NO_ERROR;
+    uint32_t blobId = 0;
+    char16_t* buffer;
+
+    if ((ret = parseContextDrmEvent(event, blobId, buffer))) {
+        HIST_LOG(E, "parseContextDrmEvent failed, ret(%d)", ret);
+        return;
+    }
+
+    _handleDrmEvent(event, blobId, buffer);
 }
 
 void HistogramDevice::prepareAtomicCommit(ExynosDisplayDrmInterface::DrmModeAtomicReq& drmReq) {
@@ -959,7 +980,7 @@ void HistogramDevice::checkQueryResult(std::vector<char16_t>* histogramBuffer,
 
 // TODO: b/295990513 - Remove the if defined after kernel prebuilts are merged.
 #if defined(EXYNOS_HISTOGRAM_CHANNEL_REQUEST)
-int HistogramDevice::parseDrmEvent(const void* const event, uint32_t& blobId,
+int HistogramDevice::parseDrmEvent(const void* const event, uint32_t& channelId,
                                    char16_t*& buffer) const {
     ATRACE_NAME(String8::format("parseHistogramDrmEvent(%p)", event).c_str());
     if (!event) {
@@ -969,15 +990,41 @@ int HistogramDevice::parseDrmEvent(const void* const event, uint32_t& blobId,
 
     const struct exynos_drm_histogram_channel_event* const histogram_channel_event =
             (struct exynos_drm_histogram_channel_event*)event;
-    blobId = histogram_channel_event->hist_id;
+    channelId = histogram_channel_event->hist_id;
     buffer = (char16_t*)&histogram_channel_event->bins;
     return NO_ERROR;
 }
 #else
-int HistogramDevice::parseDrmEvent(const void* const event, uint32_t& blobId,
+int HistogramDevice::parseDrmEvent(const void* const event, uint32_t& channelId,
                                    char16_t*& buffer) const {
     HIST_LOG(E,
              "not supported by kernel, struct exynos_drm_histogram_channel_event is not defined");
+    channelId = 0;
+    buffer = nullptr;
+    return INVALID_OPERATION;
+}
+#endif
+
+#if defined(EXYNOS_CONTEXT_HISTOGRAM_EVENT_REQUEST)
+int HistogramDevice::parseContextDrmEvent(const void* const event, uint32_t& blobId,
+                                          char16_t*& buffer) const {
+    ATRACE_NAME(String8::format("parseHistogramDrmEvent(%p)", event).c_str());
+    if (!event) {
+        HIST_LOG(E, "event is NULL");
+        return BAD_VALUE;
+    }
+
+    const struct exynos_drm_context_histogram_event* const context_histogram_event =
+            (struct exynos_drm_context_histogram_event*)event;
+    blobId = context_histogram_event->user_handle;
+    buffer = (char16_t*)&context_histogram_event->bins;
+    return NO_ERROR;
+}
+#else
+int HistogramDevice::parseContextDrmEvent(const void* const event, uint32_t& blobId,
+                                          char16_t*& buffer) const {
+    HIST_LOG(E,
+             "not supported by kernel, struct exynos_drm_context_histogram_event is not defined");
     blobId = 0;
     buffer = nullptr;
     return INVALID_OPERATION;

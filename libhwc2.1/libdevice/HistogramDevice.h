@@ -326,6 +326,17 @@ public:
     void handleDrmEvent(void* event) EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
+     * handleContextDrmEvent
+     *
+     * Handle the histogram blob drm event (EXYNOS_DRM_CONTEXT_HISTOGRAM_EVENT) and copy the
+     * histogram data from event struct to blobIdData.
+     *
+     * @event context histogram event pointer (struct exynos_drm_context_histogram_event *)
+     */
+    void handleContextDrmEvent(void* event)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
      * prepareAtomicCommit
      *
      * Prepare the histogram atomic commit for each channel (see prepareChannelCommit).
@@ -604,9 +615,36 @@ protected:
             EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
+     * _handleDrmEvent
+     *
+     * Internal function to handle the drm event, notify all the threads that wait on the specific
+     * drm event with blob id.
+     *
+     * @event histogram event get from kernel
+     * @blobId blob id of the histogram event
+     * @buffer buffer that contains histogram data
+     */
+    void _handleDrmEvent(void* event, uint32_t blobId, char16_t* buffer)
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
      * parseDrmEvent
      *
-     * Parse the histogram drm event. This function should get the histogram blob id
+     * Parse the histogram drm event. This function should get the histogram channel id
+     * and the histogram buffer address from the event struct.
+     *
+     * @event histogram drm event struct.
+     * @channelId stores the extracted channel id from the event.
+     * @buffer stores the extracted buffer address from the event.
+     * @return NO_ERROR on success, else otherwise.
+     */
+    int parseDrmEvent(const void* const event, uint32_t& channelId, char16_t*& buffer) const
+            EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+
+    /**
+     * parseContextDrmEvent
+     *
+     * Parse the context histogram drm event. This function should get the histogram blob id
      * and the histogram buffer address from the event struct.
      *
      * @event histogram drm event struct.
@@ -614,7 +652,7 @@ protected:
      * @buffer stores the extracted buffer address from the event.
      * @return NO_ERROR on success, else otherwise.
      */
-    int parseDrmEvent(const void* const event, uint32_t& blobId, char16_t*& buffer) const
+    int parseContextDrmEvent(const void* const event, uint32_t& blobId, char16_t*& buffer) const
             EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
