@@ -43,16 +43,9 @@ public:
             mEventQueue(eventQueue) {}
 
     std::shared_ptr<CommonDisplayContextProvider> buildDisplayContextProvider(
-            DisplayContextProviderType type) {
+            DisplayContextProviderType type,
+            std::shared_ptr<RefreshRateCalculator> videoFrameRateCalculator) {
         RefreshRateCalculatorFactory refreshRateCalculatorFactory;
-        VideoFrameRateCalculatorParameters params;
-        // Present timeout handling is currently necessary only when the frame rate of the playing
-        // video is 30 frames per second or lower.
-        params.mMinInterestedFrameRate = 10;
-        params.mMaxInterestedFrameRate = 30;
-        auto videoFrameRateCalculator =
-                refreshRateCalculatorFactory.BuildRefreshRateCalculator(mEventQueue, params);
-
         if (type == DisplayContextProviderType::kExynos) {
             return std::make_shared<
                     ExynosDisplayContextProvider>(mDisplay, mDisplayConfigurationsOwner,

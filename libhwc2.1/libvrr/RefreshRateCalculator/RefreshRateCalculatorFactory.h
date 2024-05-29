@@ -36,7 +36,7 @@ public:
     RefreshRateCalculatorFactory& operator=(const RefreshRateCalculatorFactory&) = delete;
 
     // Build InstantRefreshRateCalculator.
-    std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(EventQueue* eventQueue,
+    std::shared_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(EventQueue* eventQueue,
                                                                       int64_t maxValidPeriodNs);
 
     // Build ExitIdleRefreshRateCalculator.
@@ -44,24 +44,24 @@ public:
             EventQueue* eventQueue, const ExitIdleRefreshRateCalculatorParameters& params);
 
     // Build VideoFrameRateCalculator
-    std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
+    std::shared_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
             EventQueue* eventQueue, const VideoFrameRateCalculatorParameters& params);
 
     // Build PeriodRefreshRateCalculator.
-    std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
+    std::shared_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
             EventQueue* eventQueue, const PeriodRefreshRateCalculatorParameters& params);
 
     // Build CombinedRefreshRateCalculator.
-    std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
+    std::shared_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
             EventQueue* eventQueue, const std::vector<RefreshRateCalculatorType>& types);
 
     // Build CombinedRefreshRateCalculator.
-    std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
-            std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators,
+    std::shared_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
+            std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators,
             int minValidRefreshRate = 1, int maxValidRefreshRate = 120);
 
     // Build various RefreshRateCalculator with default settings.
-    std::unique_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
+    std::shared_ptr<RefreshRateCalculator> BuildRefreshRateCalculator(
             EventQueue* eventQueue, RefreshRateCalculatorType type);
 };
 
