@@ -139,7 +139,7 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
 
     // Flow to build refresh rate calculator.
     RefreshRateCalculatorFactory refreshRateCalculatorFactory;
-    std::vector<std::unique_ptr<RefreshRateCalculator>> Calculators;
+    std::vector<std::shared_ptr<RefreshRateCalculator>> Calculators;
 
     Calculators.emplace_back(std::move(
             refreshRateCalculatorFactory
@@ -148,17 +148,20 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
             std::move(refreshRateCalculatorFactory
                               .BuildRefreshRateCalculator(&mEventQueue,
                                                           RefreshRateCalculatorType::kExitIdle)));
-    Calculators.emplace_back(std::move(
+    // videoFrameRateCalculator will be shared with display context provider.
+    auto videoFrameRateCalculator =
             refreshRateCalculatorFactory
                     .BuildRefreshRateCalculator(&mEventQueue,
-                                                RefreshRateCalculatorType::kVideoPlayback)));
+                                                RefreshRateCalculatorType::kVideoPlayback);
+    Calculators.emplace_back(videoFrameRateCalculator);
 
     PeriodRefreshRateCalculatorParameters peridParams;
     peridParams.mConfidencePercentage = 0;
     Calculators.emplace_back(std::move(
             refreshRateCalculatorFactory.BuildRefreshRateCalculator(&mEventQueue, peridParams)));
 
-    mRefreshRateCalculator = refreshRateCalculatorFactory.BuildRefreshRateCalculator(Calculators);
+    mRefreshRateCalculator =
+            refreshRateCalculatorFactory.BuildRefreshRateCalculator(std::move(Calculators));
     mRefreshRateCalculator->registerRefreshRateChangeCallback(
             std::bind(&VariableRefreshRateController::onRefreshRateChanged, this,
                       std::placeholders::_1));
@@ -166,8 +169,10 @@ VariableRefreshRateController::VariableRefreshRateController(ExynosDisplay* disp
     mPowerModeListeners.push_back(mRefreshRateCalculator.get());
 
     DisplayContextProviderFactory displayContextProviderFactory(mDisplay, this, &mEventQueue);
-    mDisplayContextProvider = displayContextProviderFactory.buildDisplayContextProvider(
-            DisplayContextProviderType::kExynos);
+    mDisplayContextProvider =
+            displayContextProviderFactory
+                    .buildDisplayContextProvider(DisplayContextProviderType::kExynos,
+                                                 std::move(videoFrameRateCalculator));
 
     mPresentTimeoutEventHandlerLoader.reset(
             new ExternalEventHandlerLoader(std::string(kVendorDisplayPanelLibrary).c_str(),
@@ -282,8 +287,9 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
                               mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
         }
         if (mRefreshRateCalculator) {
-            mRefreshRateCalculator->setMinFrameInterval(
-                    mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
+            mRefreshRateCalculator
+                    ->setVrrConfigAttributes(mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
+                                             mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
         }
     }
     mCondition.notify_all();
@@ -389,19 +395,22 @@ void VariableRefreshRateController::setVrrConfigurations(
         std::unordered_map<hwc2_config_t, VrrConfig_t> configs) {
     ATRACE_CALL();
 
-    for (const auto& it : configs) {
-        LOG(INFO) << "VrrController: set Vrr configuration id = " << it.first;
-        if (it.second.isFullySupported) {
-            if (!it.second.notifyExpectedPresentConfig.has_value()) {
+    std::unordered_map<hwc2_config_t, std::vector<int>> validRefreshRates;
+    for (const auto& [id, config] : configs) {
+        LOG(INFO) << "VrrController: set Vrr configuration id = " << id;
+        if (config.isFullySupported) {
+            if (!config.notifyExpectedPresentConfig.has_value()) {
                 LOG(ERROR) << "VrrController: full vrr config should have "
                               "notifyExpectedPresentConfig.";
                 return;
             }
         }
+        validRefreshRates[id] = generateValidRefreshRates(config);
     }
 
     const std::lock_guard<std::mutex> lock(mMutex);
     mVrrConfigs = std::move(configs);
+    mValidRefreshRates = std::move(validRefreshRates);
 }
 
 int VariableRefreshRateController::getAmbientLightSensorOutput() const {
@@ -884,10 +893,14 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
     }
     refreshRate =
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
+    refreshRate = convertToValidRefreshRate(refreshRate);
+    if (mLastRefreshRate == refreshRate) {
+        return;
+    }
+    mLastRefreshRate = refreshRate;
     for (const auto& listener : mRefreshRateChangeListeners) {
         if (listener) listener->onRefreshRateChange(refreshRate);
     }
-    mLastRefreshRate = refreshRate;
     reportRefreshRateIndicator();
 }
 
@@ -905,6 +918,29 @@ void VariableRefreshRateController::reportRefreshRateIndicator() {
                                                 freqToDurationNs(mLastRefreshRate));
         }
     }
+}
+
+std::vector<int> VariableRefreshRateController::generateValidRefreshRates(
+        const VrrConfig_t& config) const {
+    std::vector<int> refreshRates;
+    int teFrequency = durationNsToFreq(config.vsyncPeriodNs);
+    int minVsyncNum = roundDivide(config.minFrameIntervalNs, config.vsyncPeriodNs);
+    for (int vsyncNum = minVsyncNum; vsyncNum <= teFrequency; vsyncNum++) {
+        refreshRates.push_back(roundDivide(teFrequency, vsyncNum));
+    }
+    std::set<int> uniqueRefreshRates(refreshRates.begin(), refreshRates.end());
+    refreshRates.assign(uniqueRefreshRates.begin(), uniqueRefreshRates.end());
+    return refreshRates;
+}
+
+int VariableRefreshRateController::convertToValidRefreshRate(int refreshRate) {
+    const auto& validRefreshRates = mValidRefreshRates[mVrrActiveConfig];
+    auto it = std::lower_bound(validRefreshRates.begin(), validRefreshRates.end(), refreshRate);
+    if (it != validRefreshRates.end()) {
+        return *it;
+    }
+    LOG(ERROR) << "Could not match to any valid refresh rate: " << refreshRate;
+    return durationNsToFreq(mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
 }
 
 bool VariableRefreshRateController::shouldHandleVendorRenderingTimeout() const {

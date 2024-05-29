@@ -25,15 +25,14 @@ namespace android::hardware::graphics::composer {
 PeriodRefreshRateCalculator::PeriodRefreshRateCalculator(
         EventQueue* eventQueue, const PeriodRefreshRateCalculatorParameters& params)
       : mEventQueue(eventQueue), mParams(params) {
-    mName = "PeriodRefreshRateCalculator";
+    mName = "RefreshRateCalculator-Period";
 
     mMeasureEvent.mEventType = VrrControllerEventType::kPeriodRefreshRateCalculatorUpdate;
     mLastMeasureTimeNs = getSteadyClockTimeNs() + params.mMeasurePeriodNs;
     mMeasureEvent.mWhenNs = mLastMeasureTimeNs;
     mMeasureEvent.mFunctor = std::move(std::bind(&PeriodRefreshRateCalculator::onMeasure, this));
 
-    mMeasurePeriodRatio = (static_cast<float>(mParams.mMeasurePeriodNs) / std::nano::den);
-    mNumVsyncPerMeasure = static_cast<int>(mMaxFrameRate * mMeasurePeriodRatio);
+    mConfidenceThresholdTimeNs = mParams.mMeasurePeriodNs * mParams.mConfidencePercentage / 100;
 }
 
 int PeriodRefreshRateCalculator::getRefreshRate() const {
@@ -61,8 +60,9 @@ void PeriodRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int f
     if (mLastPresentTimeNs >= 0) {
         auto periodNs = presentTimeNs - mLastPresentTimeNs;
         if (periodNs <= std::nano::den) {
-            int numVsync = std::max(1, durationToVsync(periodNs));
-            ++mStatistics[numVsync];
+            int numVsync = std::max(mMinVsyncNum, durationToVsync(periodNs));
+            // current frame rate is |mVsyncRate/numVsync|
+            ++mStatistics[Fraction<int>(mVsyncRate, numVsync)];
         }
     }
     mLastPresentTimeNs = presentTimeNs;
@@ -89,26 +89,31 @@ void PeriodRefreshRateCalculator::setEnabled(bool isEnabled) {
 int PeriodRefreshRateCalculator::onMeasure() {
     int currentRefreshRate = kDefaultInvalidRefreshRate;
     int totalPresent = 0;
-    int totalVsync = 0;
+    int64_t totalDurationNs = 0;
     int maxOccurrence = 0;
-    int majorVsync = 0;
+    Fraction<int> majorRefreshRate;
 
-    for (const auto& it : mStatistics) {
-        totalPresent += it.second;
-        totalVsync += (it.first * it.second);
-        if (it.second > maxOccurrence) {
-            maxOccurrence = it.second;
-            majorVsync = it.first;
+    for (const auto& [rate, count] : mStatistics) {
+        totalPresent += count;
+        auto durationNs = freqToDurationNs(rate);
+        totalDurationNs += durationNs * count;
+        if (count > maxOccurrence) {
+            maxOccurrence = count;
+            majorRefreshRate = rate;
         }
     }
-
-    if (totalPresent > 0 &&
-        ((totalVsync * 100) > (mNumVsyncPerMeasure * mParams.mConfidencePercentage))) {
+    if (totalPresent > 0 && (totalDurationNs > mConfidenceThresholdTimeNs)) {
         if (mParams.mType == PeriodRefreshRateCalculatorType::kAverage) {
-            float averageVsync = (static_cast<float>(totalVsync) / totalPresent);
-            currentRefreshRate = std::round(mMaxFrameRate / averageVsync);
+            if (mParams.mMeasurePeriodNs > totalDurationNs * 2) {
+                // avoid sudden high jumping when it's actually idle since last present for more
+                // than half of the measure period.
+                totalDurationNs = mParams.mMeasurePeriodNs;
+                totalPresent++;
+            }
+            auto avgDurationNs = roundDivide(totalDurationNs, static_cast<int64_t>(totalPresent));
+            currentRefreshRate = durationNsToFreq(avgDurationNs);
         } else {
-            currentRefreshRate = roundDivide(mMaxFrameRate, majorVsync);
+            currentRefreshRate = majorRefreshRate.round();
         }
     }
     mStatistics.clear();

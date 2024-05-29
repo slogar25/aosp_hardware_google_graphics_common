@@ -28,7 +28,7 @@ InstantRefreshRateCalculator::InstantRefreshRateCalculator(EventQueue* eventQueu
 InstantRefreshRateCalculator::InstantRefreshRateCalculator(EventQueue* eventQueue,
                                                            int64_t maxValidTimeNs)
       : mEventQueue(eventQueue), mMaxValidTimeNs(maxValidTimeNs) {
-    mName = "InstantRefreshRateCalculator";
+    mName = "RefreshRateCalculator-Instant";
     mTimeoutEvent.mEventType = VrrControllerEventType::kInstantRefreshRateCalculatorUpdate;
     mTimeoutEvent.mFunctor =
             std::move(std::bind(&InstantRefreshRateCalculator::updateRefreshRate, this));
@@ -51,8 +51,8 @@ void InstantRefreshRateCalculator::onPresentInternal(int64_t presentTimeNs, int 
             reset();
         } else {
             auto numVsync = durationToVsync((presentTimeNs - mLastPresentTimeNs));
-            numVsync = std::max(1, std::min(mMaxFrameRate, numVsync));
-            auto currentRefreshRate = roundDivide(mMaxFrameRate, numVsync);
+            numVsync = std::max(mMinVsyncNum, std::min(mVsyncRate, numVsync));
+            auto currentRefreshRate = roundDivide(mVsyncRate, numVsync);
             currentRefreshRate = std::max(1, currentRefreshRate);
             setNewRefreshRate(currentRefreshRate);
         }

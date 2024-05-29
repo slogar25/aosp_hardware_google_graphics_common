@@ -21,13 +21,11 @@
 namespace android::hardware::graphics::composer {
 
 // Currently, the FPS ranges from [1, |kMaxFrameRate| = 120], and the maximum TE
-// frequency(|kMaxTefrequency|) = 240. We express fps by dividing the number of vsync by the maximum
-// TE. Here, the denominator is set to |kMaxTefrequency|, fraction reduction is not needed here.
-const std::set<std::pair<int, int>, RatioComparator>
-        DisplayStateResidencyProvider::kFpsMappingTable = {{240, 240}, {120, 240}, {24, 240},
-                                                           {10, 240},  {8, 240},   {7, 240},
-                                                           {6, 240},   {5, 240},   {4, 240},
-                                                           {3, 240},   {2, 240}};
+// frequency(|kMaxTefrequency|) = 240. We express fps by dividing the maximum TE by the number of
+// vsync. Here, the numerator is set to |kMaxTefrequency|, fraction reduction is not needed here.
+const std::set<Fraction<int>> DisplayStateResidencyProvider::kFpsMappingTable =
+        {{240, 240}, {240, 120}, {240, 24}, {240, 10}, {240, 8}, {240, 7},
+         {240, 6},   {240, 5},   {240, 4},  {240, 3},  {240, 2}};
 
 const std::unordered_set<int> DisplayStateResidencyProvider::kFpsLowPowerModeMappingTable = {1, 30};
 
@@ -110,9 +108,9 @@ void DisplayStateResidencyProvider::mapStatistics() {
         powerStatsPresentProfile.mBrightnessMode =
                 displayPresentProfile.mCurrentDisplayConfig.mBrightnessMode;
         auto teFrequency = mDisplayContextProvider->getTeFrequency(configId);
-        if ((kFpsMappingTable.count({displayPresentProfile.mNumVsync, teFrequency}) > 0)) {
-            powerStatsPresentProfile.mFps =
-                    std::round(static_cast<float>(teFrequency) / displayPresentProfile.mNumVsync);
+        Fraction fps(teFrequency, displayPresentProfile.mNumVsync);
+        if ((kFpsMappingTable.count(fps) > 0)) {
+            powerStatsPresentProfile.mFps = fps.round();
             mRemappedStatistics[powerStatsPresentProfile] += item.second;
             mRemappedStatistics[powerStatsPresentProfile].mUpdated = true;
         } else {
@@ -180,8 +178,7 @@ void DisplayStateResidencyProvider::generatePowerStatsStates() {
                 powerStatsPresentProfile.mFps = 0;
                 powerStatsPresentProfileCandidates.insert(powerStatsPresentProfile);
                 for (auto fps : kFpsMappingTable) {
-                    powerStatsPresentProfile.mFps =
-                            std::round(static_cast<float>(fps.second) / fps.first);
+                    powerStatsPresentProfile.mFps = fps.round();
                     powerStatsPresentProfileCandidates.insert(powerStatsPresentProfile);
                 }
             }

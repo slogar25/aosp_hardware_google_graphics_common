@@ -25,17 +25,17 @@
 namespace android::hardware::graphics::composer {
 
 CombinedRefreshRateCalculator::CombinedRefreshRateCalculator(
-        std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators)
-      : CombinedRefreshRateCalculator(refreshRateCalculators, kDefaultMinValidRefreshRate,
-                                      kDefaultMaxValidRefreshRate) {}
+        std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators)
+      : CombinedRefreshRateCalculator(std::move(refreshRateCalculators),
+                                      kDefaultMinValidRefreshRate, kDefaultMaxValidRefreshRate) {}
 
 CombinedRefreshRateCalculator::CombinedRefreshRateCalculator(
-        std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators,
+        std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators,
         int minValidRefreshRate, int maxValidRefreshRate)
       : mRefreshRateCalculators(std::move(refreshRateCalculators)),
         mMinValidRefreshRate(minValidRefreshRate),
         mMaxValidRefreshRate(maxValidRefreshRate) {
-    mName = "CombinedRefreshRateCalculator";
+    mName = "RefreshRateCalculator-Combined";
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
         refreshRateCalculator->registerRefreshRateChangeCallback(
                 std::bind(&CombinedRefreshRateCalculator::onRefreshRateChanged, this,
@@ -81,12 +81,12 @@ void CombinedRefreshRateCalculator::setEnabled(bool isEnabled) {
     }
 }
 
-void CombinedRefreshRateCalculator::setMinFrameInterval(int64_t minFrameIntervalNs) {
-    mMinFrameIntervalNs = minFrameIntervalNs;
-    mMaxFrameRate = durationNsToFreq(mMinFrameIntervalNs);
+void CombinedRefreshRateCalculator::setVrrConfigAttributes(int64_t vsyncPeriodNs,
+                                                           int64_t minFrameIntervalNs) {
+    RefreshRateCalculator::setVrrConfigAttributes(vsyncPeriodNs, minFrameIntervalNs);
 
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
-        refreshRateCalculator->setMinFrameInterval(minFrameIntervalNs);
+        refreshRateCalculator->setVrrConfigAttributes(vsyncPeriodNs, minFrameIntervalNs);
     }
 }
 

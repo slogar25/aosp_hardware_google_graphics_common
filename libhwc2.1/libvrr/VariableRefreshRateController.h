@@ -283,6 +283,8 @@ private:
     void onRefreshRateChanged(int refreshRate);
     void onRefreshRateChangedInternal(int refreshRate);
     void reportRefreshRateIndicator();
+    std::vector<int> generateValidRefreshRates(const VrrConfig_t& config) const;
+    int convertToValidRefreshRate(int refreshRate);
 
     void postEvent(VrrControllerEventType type, TimedEvent& timedEvent);
     void postEvent(VrrControllerEventType type, int64_t when);
@@ -321,8 +323,10 @@ private:
 
     // Refresh rate indicator.
     bool mRefreshRateCalculatorEnabled = false;
-    std::unique_ptr<RefreshRateCalculator> mRefreshRateCalculator;
+
+    std::shared_ptr<RefreshRateCalculator> mRefreshRateCalculator;
     int mLastRefreshRate = kDefaultInvalidRefreshRate;
+    std::unordered_map<hwc2_config_t, std::vector<int>> mValidRefreshRates;
 
     // Power stats.
     std::shared_ptr<DisplayStateResidencyWatcher> mResidencyWatcher;

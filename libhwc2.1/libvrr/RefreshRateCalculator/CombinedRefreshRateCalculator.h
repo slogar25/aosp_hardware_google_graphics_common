@@ -24,10 +24,10 @@ namespace android::hardware::graphics::composer {
 class CombinedRefreshRateCalculator : public RefreshRateCalculator {
 public:
     CombinedRefreshRateCalculator(
-            std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators);
+            std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators);
 
     CombinedRefreshRateCalculator(
-            std::vector<std::unique_ptr<RefreshRateCalculator>>& refreshRateCalculators,
+            std::vector<std::shared_ptr<RefreshRateCalculator>> refreshRateCalculators,
             int minValidRefreshRate, int maxValidRefreshRate);
 
     int getRefreshRate() const override;
@@ -40,7 +40,7 @@ public:
 
     void setEnabled(bool isEnabled) final;
 
-    void setMinFrameInterval(int64_t minFrameIntervalNs) final;
+    void setVrrConfigAttributes(int64_t vsyncPeriodNs, int64_t minFrameIntervalNs) final;
 
 private:
     static constexpr int kDefaultMinValidRefreshRate = 1;
@@ -55,7 +55,7 @@ private:
     CombinedRefreshRateCalculator(const CombinedRefreshRateCalculator&) = delete;
     CombinedRefreshRateCalculator& operator=(const CombinedRefreshRateCalculator&) = delete;
 
-    std::vector<std::unique_ptr<RefreshRateCalculator>> mRefreshRateCalculators;
+    std::vector<std::shared_ptr<RefreshRateCalculator>> mRefreshRateCalculators;
 
     VrrControllerEvent mMeasureEvent;
 
