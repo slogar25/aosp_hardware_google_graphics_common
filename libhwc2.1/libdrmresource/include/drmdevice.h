@@ -88,6 +88,10 @@ class DrmDevice {
       const std::shared_ptr<DrmHistogramChannelEventHandler> &handler) {
     event_listener_.RegisterHistogramChannelHandler(handler);
   }
+  void RegisterContextHistogramHandler(
+      const std::shared_ptr<DrmContextHistogramEventHandler> &handler) {
+    event_listener_.RegisterContextHistogramHandler(handler);
+  }
 
   int CallVendorIoctl(unsigned long request, void *arg);
 
