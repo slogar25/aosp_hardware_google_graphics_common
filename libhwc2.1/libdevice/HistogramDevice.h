@@ -71,6 +71,7 @@ public:
     using HistogramRoiRect = aidl::android::hardware::graphics::common::Rect;
     using HistogramSamplePos = aidl::com::google::hardware::pixel::display::HistogramSamplePos;
     using HistogramWeights = aidl::com::google::hardware::pixel::display::Weight;
+    using ContextHistogramIoctl_t = ExynosDisplayDrmInterface::ContextHistogramIoctl_t;
     using HistogramChannelIoctl_t = ExynosDisplayDrmInterface::HistogramChannelIoctl_t;
 
     class PropertyBlob;

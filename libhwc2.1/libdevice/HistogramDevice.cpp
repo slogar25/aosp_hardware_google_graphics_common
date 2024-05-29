@@ -766,7 +766,7 @@ void HistogramDevice::getChanIdBlobId(const ndk::SpAIBinder& token,
         channelId = configInfo->mChannelId;
     else
         channelId = -1;
-#if defined(HISTOGRAM_QUERY_USE_BLOBID)
+#if defined(EXYNOS_CONTEXT_HISTOGRAM_EVENT_REQUEST)
     blobId = getActiveBlobId(configInfo->mBlobsList);
 
     if (!blobId) {
@@ -775,6 +775,9 @@ void HistogramDevice::getChanIdBlobId(const ndk::SpAIBinder& token,
         return;
     }
 #else
+    // For the old kernel without blob id query supports, fake the blobId with channelId.
+    // In this hack way can prevent some duplicate codes just for channel id as well.
+    // In the future, all kernel will support blob id query. And can remove the hack.
     blobId = channelId;
     if (channelId < 0) {
         HIST_BLOB_CH_LOG(E, blobId, channelId, "CONFIG_HIST_ERROR, no channel executes config");
@@ -841,6 +844,19 @@ void HistogramDevice::requestBlobIdData(ExynosDisplayDrmInterface* const moduleD
     ATRACE_CALL();
     int ret;
 
+#if defined(EXYNOS_CONTEXT_HISTOGRAM_EVENT_REQUEST)
+    /* Send the ioctl request (histogram_event_request_ioctl) which increases the ref_cnt of the
+     * blobId request. The drm event is sent back with data when available. Must call
+     * sendContextHistogramIoctl(CANCEL) to decrease the ref_cnt after the request. */
+    if ((ret = moduleDisplayInterface->sendContextHistogramIoctl(ContextHistogramIoctl_t::REQUEST,
+                                                                 blobId)) != NO_ERROR) {
+        *histogramErrorCode = HistogramErrorCode::ENABLE_HIST_ERROR;
+        HIST_BLOB_CH_LOG(E, blobId, channelId,
+                         "ENABLE_HIST_ERROR, sendContextHistogramIoctl(REQUEST) failed, ret(%d)",
+                         ret);
+        return;
+    }
+#else
     /* Send the ioctl request (histogram_channel_request_ioctl) which increases the ref_cnt of the
      * blobId request. The drm event is sent back with data when available. Must call
      * sendHistogramChannelIoctl(CANCEL) to decrease the ref_cnt after the request. */
@@ -852,6 +868,7 @@ void HistogramDevice::requestBlobIdData(ExynosDisplayDrmInterface* const moduleD
                          ret);
         return;
     }
+#endif
     blobIdData->mCollectStatus = CollectStatus_t::COLLECTING;
 }
 
@@ -871,11 +888,19 @@ std::cv_status HistogramDevice::receiveBlobIdData(
 
     // Wait for the drm event is finished, decrease ref_cnt.
     int ret;
+#if defined(EXYNOS_CONTEXT_HISTOGRAM_EVENT_REQUEST)
+    if ((ret = moduleDisplayInterface->sendContextHistogramIoctl(ContextHistogramIoctl_t::CANCEL,
+                                                                 blobId)) != NO_ERROR) {
+        HIST_BLOB_CH_LOG(W, blobId, channelId, "sendContextHistogramIoctl(CANCEL) failed, ret(%d)",
+                         ret);
+    }
+#else
     if ((ret = moduleDisplayInterface->sendHistogramChannelIoctl(HistogramChannelIoctl_t::CANCEL,
                                                                  blobId)) != NO_ERROR) {
         HIST_BLOB_CH_LOG(W, blobId, channelId, "sendHistogramChannelIoctl(CANCEL) failed, ret(%d)",
                          ret);
     }
+#endif
 
     /*
      * Case #1: timeout occurs, status is not COLLECTED
