@@ -135,6 +135,7 @@ void VariableRefreshRateStatistic::onPresent(int64_t presentTimeNs, int flag) {
             mSystemClockTimeTranslator.steadyClockTimeToBootClockTimeNs(presentTimeNs);
     if (mLastPresentTimeInBootClockNs == kDefaultInvalidPresentTimeNs) {
         mLastPresentTimeInBootClockNs = presentTimeInBootClockNs;
+        updateCurrentDisplayStatus();
         // Ignore first present after resume
         return;
     }

@@ -134,7 +134,13 @@ uint64_t DisplayStateResidencyProvider::aggregateStatistics() {
         if (!statistic.second.mUpdated) {
             continue;
         }
-        int id = mPowerStatsPresentProfileToIdMap[statistic.first];
+        auto it = mPowerStatsPresentProfileToIdMap.find(statistic.first);
+        if (it == mPowerStatsPresentProfileToIdMap.end()) {
+            ALOGE("DisplayStateResidencyProvider %s(): unregistered powerstats state [%s]",
+                  __func__, statistic.first.toString().c_str());
+            continue;
+        }
+        int id = it->second;
         const auto& displayPresentRecord = statistic.second;
 
         auto& stateResidency = mStateResidency[id];
