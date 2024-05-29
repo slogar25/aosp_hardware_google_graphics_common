@@ -40,7 +40,7 @@ public:
 
     void setEnabled(bool isEnabled) final;
 
-    void setMinFrameInterval(int64_t minFrameIntervalNs) final;
+    void setVrrConfigAttributes(int64_t vsyncPeriodNs, int64_t minFrameIntervalNs) final;
 
 private:
     static constexpr int kDefaultMinValidRefreshRate = 1;

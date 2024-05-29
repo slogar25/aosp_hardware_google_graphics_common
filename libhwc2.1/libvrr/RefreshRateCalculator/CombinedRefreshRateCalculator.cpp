@@ -81,12 +81,12 @@ void CombinedRefreshRateCalculator::setEnabled(bool isEnabled) {
     }
 }
 
-void CombinedRefreshRateCalculator::setMinFrameInterval(int64_t minFrameIntervalNs) {
-    mMinFrameIntervalNs = minFrameIntervalNs;
-    mMaxFrameRate = durationNsToFreq(mMinFrameIntervalNs);
+void CombinedRefreshRateCalculator::setVrrConfigAttributes(int64_t vsyncPeriodNs,
+                                                           int64_t minFrameIntervalNs) {
+    RefreshRateCalculator::setVrrConfigAttributes(vsyncPeriodNs, minFrameIntervalNs);
 
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
-        refreshRateCalculator->setMinFrameInterval(minFrameIntervalNs);
+        refreshRateCalculator->setVrrConfigAttributes(vsyncPeriodNs, minFrameIntervalNs);
     }
 }
 
