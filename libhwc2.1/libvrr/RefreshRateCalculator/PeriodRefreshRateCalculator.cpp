@@ -25,7 +25,7 @@ namespace android::hardware::graphics::composer {
 PeriodRefreshRateCalculator::PeriodRefreshRateCalculator(
         EventQueue* eventQueue, const PeriodRefreshRateCalculatorParameters& params)
       : mEventQueue(eventQueue), mParams(params) {
-    mName = "PeriodRefreshRateCalculator";
+    mName = "RefreshRateCalculator-Period";
 
     mMeasureEvent.mEventType = VrrControllerEventType::kPeriodRefreshRateCalculatorUpdate;
     mLastMeasureTimeNs = getSteadyClockTimeNs() + params.mMeasurePeriodNs;

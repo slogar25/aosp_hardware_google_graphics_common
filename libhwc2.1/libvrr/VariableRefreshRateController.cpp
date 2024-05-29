@@ -390,19 +390,22 @@ void VariableRefreshRateController::setVrrConfigurations(
         std::unordered_map<hwc2_config_t, VrrConfig_t> configs) {
     ATRACE_CALL();
 
-    for (const auto& it : configs) {
-        LOG(INFO) << "VrrController: set Vrr configuration id = " << it.first;
-        if (it.second.isFullySupported) {
-            if (!it.second.notifyExpectedPresentConfig.has_value()) {
+    std::unordered_map<hwc2_config_t, std::vector<int>> validRefreshRates;
+    for (const auto& [id, config] : configs) {
+        LOG(INFO) << "VrrController: set Vrr configuration id = " << id;
+        if (config.isFullySupported) {
+            if (!config.notifyExpectedPresentConfig.has_value()) {
                 LOG(ERROR) << "VrrController: full vrr config should have "
                               "notifyExpectedPresentConfig.";
                 return;
             }
         }
+        validRefreshRates[id] = generateValidRefreshRates(config);
     }
 
     const std::lock_guard<std::mutex> lock(mMutex);
     mVrrConfigs = std::move(configs);
+    mValidRefreshRates = std::move(validRefreshRates);
 }
 
 int VariableRefreshRateController::getAmbientLightSensorOutput() const {
@@ -885,10 +888,14 @@ void VariableRefreshRateController::onRefreshRateChangedInternal(int refreshRate
     }
     refreshRate =
             refreshRate == kDefaultInvalidRefreshRate ? kDefaultMinimumRefreshRate : refreshRate;
+    refreshRate = convertToValidRefreshRate(refreshRate);
+    if (mLastRefreshRate == refreshRate) {
+        return;
+    }
+    mLastRefreshRate = refreshRate;
     for (const auto& listener : mRefreshRateChangeListeners) {
         if (listener) listener->onRefreshRateChange(refreshRate);
     }
-    mLastRefreshRate = refreshRate;
     reportRefreshRateIndicator();
 }
 
@@ -906,6 +913,29 @@ void VariableRefreshRateController::reportRefreshRateIndicator() {
                                                 freqToDurationNs(mLastRefreshRate));
         }
     }
+}
+
+std::vector<int> VariableRefreshRateController::generateValidRefreshRates(
+        const VrrConfig_t& config) const {
+    std::vector<int> refreshRates;
+    int teFrequency = durationNsToFreq(config.vsyncPeriodNs);
+    int minVsyncNum = roundDivide(config.minFrameIntervalNs, config.vsyncPeriodNs);
+    for (int vsyncNum = minVsyncNum; vsyncNum <= teFrequency; vsyncNum++) {
+        refreshRates.push_back(roundDivide(teFrequency, vsyncNum));
+    }
+    std::set<int> uniqueRefreshRates(refreshRates.begin(), refreshRates.end());
+    refreshRates.assign(uniqueRefreshRates.begin(), uniqueRefreshRates.end());
+    return refreshRates;
+}
+
+int VariableRefreshRateController::convertToValidRefreshRate(int refreshRate) {
+    const auto& validRefreshRates = mValidRefreshRates[mVrrActiveConfig];
+    auto it = std::lower_bound(validRefreshRates.begin(), validRefreshRates.end(), refreshRate);
+    if (it != validRefreshRates.end()) {
+        return *it;
+    }
+    LOG(ERROR) << "Could not match to any valid refresh rate: " << refreshRate;
+    return durationNsToFreq(mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
 }
 
 bool VariableRefreshRateController::shouldHandleVendorRenderingTimeout() const {

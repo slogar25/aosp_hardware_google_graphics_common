@@ -28,7 +28,7 @@ ExitIdleRefreshRateCalculator::ExitIdleRefreshRateCalculator(EventQueue* eventQu
 ExitIdleRefreshRateCalculator::ExitIdleRefreshRateCalculator(
         EventQueue* eventQueue, const ExitIdleRefreshRateCalculatorParameters& params)
       : mEventQueue(eventQueue), mParams(params) {
-    mName = "ExitIdleRefreshRateCalculator";
+    mName = "RefreshRateCalculator-ExitIdle";
     mTimeoutEvent.mEventType = VrrControllerEventType::kExitIdleRefreshRateCalculatorUpdate;
     mTimeoutEvent.mFunctor =
             std::move(std::bind(&ExitIdleRefreshRateCalculator::invalidateRefreshRate, this));

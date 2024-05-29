@@ -28,7 +28,7 @@ InstantRefreshRateCalculator::InstantRefreshRateCalculator(EventQueue* eventQueu
 InstantRefreshRateCalculator::InstantRefreshRateCalculator(EventQueue* eventQueue,
                                                            int64_t maxValidTimeNs)
       : mEventQueue(eventQueue), mMaxValidTimeNs(maxValidTimeNs) {
-    mName = "InstantRefreshRateCalculator";
+    mName = "RefreshRateCalculator-Instant";
     mTimeoutEvent.mEventType = VrrControllerEventType::kInstantRefreshRateCalculatorUpdate;
     mTimeoutEvent.mFunctor =
             std::move(std::bind(&InstantRefreshRateCalculator::updateRefreshRate, this));

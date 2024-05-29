@@ -27,6 +27,7 @@ namespace android::hardware::graphics::composer {
 class AODRefreshRateCalculator : public RefreshRateCalculator {
 public:
     AODRefreshRateCalculator(EventQueue* eventQueue) : mEventQueue(eventQueue) {
+        mName = "RefreshRateCalculator-AOD";
         mResetRefreshRateEvent.mEventType = VrrControllerEventType::kAodRefreshRateCalculatorUpdate;
         mResetRefreshRateEvent.mFunctor = std::move(
                 std::bind(&AODRefreshRateCalculator::changeRefreshRateDisplayState, this));

@@ -35,7 +35,7 @@ CombinedRefreshRateCalculator::CombinedRefreshRateCalculator(
       : mRefreshRateCalculators(std::move(refreshRateCalculators)),
         mMinValidRefreshRate(minValidRefreshRate),
         mMaxValidRefreshRate(maxValidRefreshRate) {
-    mName = "CombinedRefreshRateCalculator";
+    mName = "RefreshRateCalculator-Combined";
     for (auto& refreshRateCalculator : mRefreshRateCalculators) {
         refreshRateCalculator->registerRefreshRateChangeCallback(
                 std::bind(&CombinedRefreshRateCalculator::onRefreshRateChanged, this,
