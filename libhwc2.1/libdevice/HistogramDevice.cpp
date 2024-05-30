@@ -588,6 +588,7 @@ void HistogramDevice::initHistogramCapability(const bool supportMultiChannel) {
     mHistogramCapability.supportMultiChannel = supportMultiChannel;
     mHistogramCapability.supportSamplePosList.push_back(HistogramSamplePos::POST_POSTPROC);
     mHistogramCapability.supportBlockingRoi = false;
+    mHistogramCapability.supportQueryOpr = false;
     initPlatformHistogramCapability();
 }
 
@@ -1209,6 +1210,8 @@ void HistogramDevice::dumpHistogramCapability(String8& result) const {
                         mHistogramCapability.supportMultiChannel ? "true" : "false");
     result.appendFormat("supportBlockingRoi: %s, ",
                         mHistogramCapability.supportBlockingRoi ? "true" : "false");
+    result.appendFormat("supportQueryOpr: %s, ",
+                        mHistogramCapability.supportQueryOpr ? "true" : "false");
     result.appendFormat("supportSamplePosList:");
     for (HistogramSamplePos samplePos : mHistogramCapability.supportSamplePosList) {
         result.appendFormat(" %s",

@@ -83,6 +83,9 @@ public:
 
     static constexpr size_t HISTOGRAM_BINS_SIZE = 256;
 
+    /* OPR_R, OPR_G, OPR_B */
+    static constexpr int kOPRConfigsCount = 3;
+
     struct BlobInfo {
         const int mDisplayActiveH, mDisplayActiveV;
         const std::shared_ptr<PropertyBlob> mBlob;
@@ -306,7 +309,7 @@ public:
      *
      * @oprVals will store the [OPR_R, OPR_G, OPR_B], 0 <= OPR_R, OPR_G, OPR_B <= 1
      */
-    virtual ndk::ScopedAStatus queryOPR(std::vector<double>& oprVals)
+    virtual ndk::ScopedAStatus queryOPR(std::array<double, kOPRConfigsCount>& oprVals)
             EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex) {
         return ndk::ScopedAStatus::fromExceptionCode(EX_UNSUPPORTED_OPERATION);
     }
