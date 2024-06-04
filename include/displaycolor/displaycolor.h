@@ -346,7 +346,8 @@ struct DisplayScene {
                dbv == rhs.dbv &&
                refresh_rate == rhs.refresh_rate &&
                operation_rate == rhs.operation_rate &&
-               hdr_layer_state == rhs.hdr_layer_state;
+               hdr_layer_state == rhs.hdr_layer_state &&
+               temperature == rhs.temperature;
     }
     bool operator!=(const DisplayScene &rhs) const {
         return !(*this == rhs);
@@ -387,6 +388,9 @@ struct DisplayScene {
 
     /// operation rate to switch between hs/ns mode
     uint32_t operation_rate = 120;
+
+    /// display temperature in degrees Celsius
+    uint32_t temperature = UINT_MAX;
 
     /// hdr layer state on screen
     HdrLayerState hdr_layer_state = HdrLayerState::kHdrNone;

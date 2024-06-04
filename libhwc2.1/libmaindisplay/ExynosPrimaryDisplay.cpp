@@ -1337,6 +1337,11 @@ int32_t ExynosPrimaryDisplay::setFixedTe2Rate(const int targetTe2RateHz) {
     }
 }
 
+int32_t ExynosPrimaryDisplay::setDisplayTemperature(const int temperature) {
+    mDisplayTemperature = temperature;
+    return HWC2_ERROR_UNSUPPORTED;
+}
+
 int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
                                                     const RrThrottleRequester requester) {
     if (targetFps < 0) {

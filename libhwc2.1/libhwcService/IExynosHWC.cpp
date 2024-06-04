@@ -82,6 +82,7 @@ enum {
     SET_PRESENT_TIMEOUT_PARAMETERS = 1016,
     SET_PRESENT_TIMEOUT_CONTROLLER = 1017,
     SET_FIXED_TE2_RATE = 1018,
+    SET_DISPLAY_TEMPERATURE = 1019,
 };
 
 class BpExynosHWCService : public BpInterface<IExynosHWCService> {
@@ -584,6 +585,15 @@ public:
         if (result) ALOGE("SET_FIXED_TE2_RATE transact error(%d)", result);
         return result;
     }
+    virtual int32_t setDisplayTemperature(uint32_t displayId, int32_t temperature) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IExynosHWCService::getInterfaceDescriptor());
+        data.writeUint32(displayId);
+        data.writeInt32(temperature);
+        int result = remote()->transact(SET_DISPLAY_TEMPERATURE, data, &reply);
+        if (result) ALOGE("SET_DISPLAY_TEMPERATURE transact error(%d)", result);
+        return result;
+    }
 };
 
 IMPLEMENT_META_INTERFACE(ExynosHWCService, "android.hal.ExynosHWCService");
@@ -923,6 +933,13 @@ status_t BnExynosHWCService::onTransact(
             uint32_t displayId = data.readUint32();
             int32_t rateHz = data.readInt32();
             return setFixedTe2Rate(displayId, rateHz);
+        } break;
+
+        case SET_DISPLAY_TEMPERATURE: {
+            CHECK_INTERFACE(IExynosHWCService, data, reply);
+            uint32_t displayId = data.readUint32();
+            int32_t temperature = data.readInt32();
+            return setDisplayTemperature(displayId, temperature);
         } break;
 
         default:
