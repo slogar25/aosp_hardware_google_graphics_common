@@ -57,6 +57,14 @@ class DrmHistogramChannelEventHandler {
     virtual void handleHistogramChannelEvent(void *) = 0;
 };
 
+class DrmContextHistogramEventHandler {
+ public:
+  DrmContextHistogramEventHandler() {}
+  virtual ~DrmContextHistogramEventHandler() {}
+
+  virtual void handleContextHistogramEvent(void *) = 0;
+};
+
 class DrmTUIEventHandler {
  public:
   DrmTUIEventHandler() {
@@ -110,6 +118,10 @@ class DrmEventListener : public Worker {
       const std::shared_ptr<DrmHistogramChannelEventHandler> &handler);
   void UnRegisterHistogramChannelHandler(
       const std::shared_ptr<DrmHistogramChannelEventHandler> &handler);
+  void RegisterContextHistogramHandler(
+      const std::shared_ptr<DrmContextHistogramEventHandler> &handler);
+  void UnRegisterContextHistogramHandler(
+      const std::shared_ptr<DrmContextHistogramEventHandler> &handler);
   void RegisterTUIHandler(const std::shared_ptr<DrmTUIEventHandler> &handler);
   void UnRegisterTUIHandler(const std::shared_ptr<DrmTUIEventHandler> &handler);
   void RegisterPanelIdleHandler(const std::shared_ptr<DrmPanelIdleEventHandler> &handler);
@@ -141,6 +153,7 @@ class DrmEventListener : public Worker {
   std::shared_ptr<DrmEventHandler> hotplug_handler_;
   std::shared_ptr<DrmHistogramEventHandler> histogram_handler_;
   std::shared_ptr<DrmHistogramChannelEventHandler> histogram_channel_handler_;
+  std::shared_ptr<DrmContextHistogramEventHandler> context_histogram_handler_;
   std::shared_ptr<DrmTUIEventHandler> tui_handler_;
   std::shared_ptr<DrmPanelIdleEventHandler> panel_idle_handler_;
   std::shared_ptr<DrmPropertyUpdateHandler> drm_prop_update_handler_;

@@ -397,6 +397,14 @@ class ExynosDisplayDrmInterface :
         };
         int32_t sendHistogramChannelIoctl(HistogramChannelIoctl_t control, uint32_t blobId) const;
 
+        enum class ContextHistogramIoctl_t {
+            /* send the histogram event request by calling histogram_event_request_ioctl */
+            REQUEST = 0,
+            /* send the histogram event request by calling histogram_event_cancel_ioctl */
+            CANCEL,
+        };
+        int32_t sendContextHistogramIoctl(ContextHistogramIoctl_t control, uint32_t blobId) const;
+
         int32_t getFrameCount() { return mFrameCounter; }
         virtual void registerHistogramInfo(const std::shared_ptr<IDLHistogram> &info) { return; }
         virtual int32_t setHistogramControl(hidl_histogram_control_t enabled) { return NO_ERROR; }

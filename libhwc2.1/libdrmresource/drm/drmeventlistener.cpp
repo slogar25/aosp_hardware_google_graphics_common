@@ -146,6 +146,27 @@ void DrmEventListener::UnRegisterHistogramChannelHandler(
   }
 }
 
+void DrmEventListener::RegisterContextHistogramHandler(
+    const std::shared_ptr<DrmContextHistogramEventHandler> &handler) {
+  assert(!context_histogram_handler_);
+
+  if (handler) {
+    context_histogram_handler_ = handler;
+  } else {
+    ALOGE("%s: failed to register, handler is nullptr", __func__);
+  }
+}
+
+void DrmEventListener::UnRegisterContextHistogramHandler(
+    const std::shared_ptr<DrmContextHistogramEventHandler> &handler) {
+  if (handler.get() == context_histogram_handler_.get()) {
+    context_histogram_handler_ = NULL;
+  } else {
+    ALOGE("%s: failed to unregister, handler(%p), context_histogram_handler(%p)", __func__,
+          handler.get(), context_histogram_handler_.get());
+  }
+}
+
 void DrmEventListener::RegisterTUIHandler(const std::shared_ptr<DrmTUIEventHandler> &handler) {
   if (tui_handler_) {
     ALOGE("TUI handler was already registered");
@@ -337,6 +358,15 @@ void DrmEventListener::DRMEventHandler() {
                     histogram_channel_handler_->handleHistogramChannelEvent((void *)e);
                 } else {
                     ALOGE("%s: no valid histogram channel event handler", __func__);
+                }
+                break;
+#endif
+#if defined(EXYNOS_DRM_CONTEXT_HISTOGRAM_EVENT)
+            case EXYNOS_DRM_CONTEXT_HISTOGRAM_EVENT:
+                if (context_histogram_handler_) {
+                    context_histogram_handler_->handleContextHistogramEvent((void *)e);
+                } else {
+                    ALOGE("%s: no valid context histogram event handler", __func__);
                 }
                 break;
 #endif
