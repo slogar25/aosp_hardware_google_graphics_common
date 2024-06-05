@@ -864,6 +864,8 @@ class ExynosDisplay {
         virtual int32_t setPowerMode(
                 int32_t /*hwc2_power_mode_t*/ mode);
 
+        virtual std::optional<hwc2_power_mode_t> getPowerMode() { return mPowerModeState; }
+
         /* setVsyncEnabled(..., enabled)
          * Descriptor: HWC2_FUNCTION_SET_VSYNC_ENABLED
          * HWC2_PFN_SET_VSYNC_ENABLED
