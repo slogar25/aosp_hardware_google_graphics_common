@@ -1071,6 +1071,15 @@ int32_t HalImpl::setPowerMode(int64_t display, PowerMode mode) {
     return halDisplay->setPowerMode(hwcMode);
 }
 
+int32_t HalImpl::getPowerMode(int64_t display, std::optional<PowerMode>& outMode) {
+    ExynosDisplay* halDisplay;
+    RET_IF_ERR(getHalDisplay(display, halDisplay));
+
+    auto mode = halDisplay->getPowerMode();
+    h2a::translate(mode, outMode);
+    return HWC2_ERROR_NONE;
+}
+
 int32_t HalImpl::setReadbackBuffer(int64_t display, buffer_handle_t buffer,
                                    const ndk::ScopedFileDescriptor& releaseFence) {
     ExynosDisplay* halDisplay;

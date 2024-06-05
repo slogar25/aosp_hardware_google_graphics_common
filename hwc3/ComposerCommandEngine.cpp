@@ -475,6 +475,12 @@ void ComposerCommandEngine::executeSetLayerPerFrameMetadataBlobs(int64_t display
 
 void ComposerCommandEngine::executeSetLayerBufferSlotsToClear(
         int64_t display, int64_t layer, const std::vector<int32_t>& bufferSlotsToClear) {
+    std::optional<PowerMode> powerMode;
+    mHal->getPowerMode(display, powerMode);
+    if (!powerMode.has_value() || powerMode.value() != PowerMode::OFF) {
+        return;
+    }
+
     buffer_handle_t cachedBuffer = nullptr;
     std::unique_ptr<IBufferReleaser> bufferReleaser = mResources->createReleaser(true);
 
