@@ -20,6 +20,7 @@
 
 #include "../libdevice/ExynosDisplay.h"
 #include "../libvrr/VariableRefreshRateController.h"
+#include <cutils/properties.h>
 
 using android::hardware::graphics::composer::PresentListener;
 using android::hardware::graphics::composer::VariableRefreshRateController;
@@ -124,6 +125,8 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
     private:
         static constexpr const char* kDisplayCalFilePath = "/mnt/vendor/persist/display/";
         static constexpr const char* kPanelGammaCalFilePrefix = "gamma_calib_data";
+        static constexpr const char* kDisplayTempIntervalSec =
+                "ro.vendor.display.read_temp_interval";
         enum PanelGammaSource currentPanelGammaSource = PanelGammaSource::GAMMA_DEFAULT;
 
         bool checkLhbmMode(bool status, nsecs_t timoutNs);
@@ -147,6 +150,26 @@ class ExynosPrimaryDisplay : public ExynosDisplay {
         void initDisplayHandleIdleExit();
         int32_t setLhbmDisplayConfigLocked(uint32_t peakRate);
         void restoreLhbmDisplayConfigLocked();
+
+
+        // monitor display thermal temperature
+        int32_t getDisplayTemperature();
+        bool initDisplayTempMonitor(const std::string& display);
+        bool isTemperatureMonitorThreadRunning();
+        void checkTemperatureMonitorThread(bool shouldRun);
+        void temperatureMonitorThreadCreate();
+        void* temperatureMonitorThreadLoop();
+        bool mIsDisplayTempMonitorSupported = false;
+        volatile int32_t mTMThreadStatus;
+        std::atomic<bool> mTMLoopStatus;
+        std::condition_variable mTMCondition;
+        std::thread mTMThread;
+        std::mutex mThreadMutex;
+        int32_t mDisplayTempInterval;
+        String8 mDisplayTempSysfsNode;
+        std::string getPropertyDisplayTemperatureStr(const std::string& display) {
+            return "ro.vendor." + display + "." + getPanelName() + ".temperature_path";
+        }
 
         void onConfigChange(int configId);
 
