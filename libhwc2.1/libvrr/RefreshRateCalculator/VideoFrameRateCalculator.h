@@ -29,7 +29,7 @@ namespace android::hardware::graphics::composer {
 struct VideoFrameRateCalculatorParameters {
     VideoFrameRateCalculatorParameters() {
         mPeriodParams.mAlwaysCallback = true;
-        mPeriodParams.mConfidencePercentage = 95;
+        mPeriodParams.mConfidencePercentage = 50;
     }
 
     int mDelta = 5;
