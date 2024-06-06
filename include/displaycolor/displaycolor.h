@@ -142,12 +142,11 @@ class IBrightnessTable {
 
     virtual std::optional<std::reference_wrapper<const DisplayBrightnessRange>> GetBrightnessRange(
         BrightnessMode bm) const = 0;
-    virtual std::optional<uint32_t> BrightnessToDbv(float brightness) const = 0;
-    virtual std::optional<float> DbvToBrightness(uint32_t dbv) const = 0;
-    virtual std::optional<float> BrightnessToNits(float brightness, BrightnessMode& bm) const = 0;
-    virtual std::optional<float> NitsToBrightness(float nits) const = 0;
-    virtual std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const = 0;
+    virtual std::optional<float> BrightnessToNits(float brightness, BrightnessMode &bm) const = 0;
     virtual std::optional<uint32_t> NitsToDbv(BrightnessMode bm, float nits) const = 0;
+    virtual std::optional<float> DbvToNits(BrightnessMode bm, uint32_t dbv) const = 0;
+    virtual std::optional<float> NitsToBrightness(float nits) const = 0;
+    virtual std::optional<float> DbvToBrightness(uint32_t dbv) const = 0;
 };
 
 /**
