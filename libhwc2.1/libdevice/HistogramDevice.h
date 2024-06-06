@@ -149,7 +149,7 @@ public:
         std::weak_ptr<ConfigInfo> mConfigInfo;
 
         ChannelInfo() : mStatus(ChannelStatus_t::DISABLED) {}
-        ChannelInfo(const ChannelInfo& other) {}
+        ChannelInfo(const ChannelInfo& other) = default;
     };
 
     struct TokenInfo {
