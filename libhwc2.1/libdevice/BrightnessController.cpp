@@ -46,23 +46,6 @@ void BrightnessController::LinearBrightnessTable::Init(const struct brightness_c
     mIsValid = true;
 }
 
-std::optional<uint32_t> BrightnessController::LinearBrightnessTable::BrightnessToDbv(
-        float brightness) const {
-    BrightnessMode bm = GetBrightnessMode(brightness);
-    if (bm == BrightnessMode::BM_MAX) {
-        return std::nullopt;
-    }
-    const auto& range = mBrightnessRanges.at(bm);
-    float dbv = 0.0;
-
-    dbv = LinearInterpolation(brightness, range.brightness_min, range.brightness_max, range.dbv_min,
-                              range.dbv_max);
-    if (isnan(dbv) || dbv < 0) {
-        return std::nullopt;
-    }
-    return lround(dbv);
-}
-
 std::optional<float> BrightnessController::LinearBrightnessTable::NitsToBrightness(
         float nits) const {
     BrightnessMode mode = GetBrightnessModeForNits(nits);
