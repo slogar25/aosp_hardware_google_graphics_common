@@ -215,8 +215,6 @@ private:
 
     uint64_t mStartStatisticTimeNs;
 
-    SystemClockTimeTranslator mSystemClockTimeTranslator;
-
 #ifdef DEBUG_VRR_STATISTICS
     VrrControllerEvent mUpdateEvent;
 #endif

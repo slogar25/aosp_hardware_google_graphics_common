@@ -48,6 +48,10 @@ int64_t getBootClockTimeNs() {
             .count();
 }
 
+int64_t steadyClockTimeToBootClockTimeNs(int64_t steadyClockTimeNs) {
+    return steadyClockTimeNs + (getBootClockTimeNs() - getSteadyClockTimeNs());
+}
+
 bool hasPresentFrameFlag(int flag, PresentFrameFlag target) {
     return flag & static_cast<int>(target);
 }
