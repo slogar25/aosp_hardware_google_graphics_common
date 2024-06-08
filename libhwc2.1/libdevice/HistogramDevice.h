@@ -149,7 +149,7 @@ public:
         std::weak_ptr<ConfigInfo> mConfigInfo;
 
         ChannelInfo() : mStatus(ChannelStatus_t::DISABLED) {}
-        ChannelInfo(const ChannelInfo& other) {}
+        ChannelInfo(const ChannelInfo& other) = default;
     };
 
     struct TokenInfo {
@@ -396,7 +396,7 @@ protected:
 
     mutable std::mutex mInitDrmDoneMutex;
     bool mInitDrmDone GUARDED_BY(mInitDrmDoneMutex) = false;
-    std::condition_variable mInitDrmDone_cv GUARDED_BY(mInitDrmDoneMutex);
+    mutable std::condition_variable mInitDrmDone_cv GUARDED_BY(mInitDrmDoneMutex);
 
     /* Death recipient for the binderdied callback, would be deleted in the destructor */
     AIBinder_DeathRecipient* mDeathRecipient = nullptr;
@@ -437,7 +437,7 @@ protected:
      *
      * @return true if initDrm is finished, or false when the timeout expires.
      */
-    bool waitInitDrmDone() EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
+    bool waitInitDrmDone() const EXCLUDES(mInitDrmDoneMutex, mHistogramMutex, mBlobIdDataMutex);
 
     /**
      * replaceConfigInfo

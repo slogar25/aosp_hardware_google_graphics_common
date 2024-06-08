@@ -92,7 +92,7 @@ void HistogramDevice::initDrm(DrmDevice& device, const DrmCrtc& crtc) {
     HIST_LOG(D, "successfully");
 }
 
-bool HistogramDevice::waitInitDrmDone() {
+bool HistogramDevice::waitInitDrmDone() const {
     ATRACE_CALL();
     std::unique_lock<std::mutex> lock(mInitDrmDoneMutex);
     ::android::base::ScopedLockAssertion lock_assertion(mInitDrmDoneMutex);
@@ -112,6 +112,11 @@ ndk::ScopedAStatus HistogramDevice::getHistogramCapability(
     if (!histogramCapability) {
         HIST_LOG(E, "binder error, histogramCapability is nullptr");
         return ndk::ScopedAStatus::fromExceptionCode(EX_NULL_POINTER);
+    }
+
+    if (waitInitDrmDone() == false) {
+        HIST_LOG(E, "initDrm is not completed yet");
+        return errorToStatus(HistogramErrorCode::TRY_AGAIN);
     }
 
     std::shared_lock lock(mHistogramCapabilityMutex);
