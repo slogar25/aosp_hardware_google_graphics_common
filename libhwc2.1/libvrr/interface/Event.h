@@ -123,6 +123,8 @@ public:
     virtual std::vector<TimedEvent> getHandleEvents() = 0;
 
     virtual std::function<int()> getHandleFunction() = 0;
+
+    virtual int64_t getPresentTimeoutNs() = 0;
 };
 
 } // namespace android::hardware::graphics::composer

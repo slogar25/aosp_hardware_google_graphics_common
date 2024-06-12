@@ -230,6 +230,7 @@ class IComposerHal {
     virtual int32_t setOutputBuffer(int64_t display, buffer_handle_t buffer,
                                     const ndk::ScopedFileDescriptor& releaseFence) = 0;
     virtual int32_t setPowerMode(int64_t display, PowerMode mode) = 0;
+    virtual int32_t getPowerMode(int64_t display, std::optional<PowerMode>& outMode) = 0;
     virtual int32_t setReadbackBuffer(int64_t display, buffer_handle_t buffer,
                                       const ndk::ScopedFileDescriptor& releaseFence) = 0;
     virtual int32_t setVsyncEnabled(int64_t display, bool enabled) = 0;

@@ -35,6 +35,15 @@ inline void translate(const T& in, U& out) {
 }
 
 template <typename T, typename U>
+inline void translate(const std::optional<T>& in, std::optional<U>& out) {
+    if (in.has_value()) {
+        out = static_cast<U>(in.value());
+    } else {
+        out.reset();
+    }
+}
+
+template <typename T, typename U>
 inline void translate(const std::vector<T>& in, std::vector<U>& out) {
     out.clear();
     for (auto const &t : in) {
