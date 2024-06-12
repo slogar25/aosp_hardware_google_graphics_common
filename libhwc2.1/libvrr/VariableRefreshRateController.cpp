@@ -696,15 +696,16 @@ void VariableRefreshRateController::onPresent(int fence) {
                               mVrrConfigs[mVrrActiveConfig].notifyExpectedPresentConfig->TimeoutNs);
         }
         if (shouldHandleVendorRenderingTimeout()) {
-            // Post next frame insertion event.
-            auto vendorPresentTimeoutNs = mRecord.mPendingCurrentPresentTime.value().mTime +
-                    (mVendorPresentTimeoutOverride
-                             ? mVendorPresentTimeoutOverride.value().mTimeoutNs
-                             : std::max(static_cast<int64_t>(
-                                                mRecord.mPendingCurrentPresentTime.value()
-                                                        .mDuration),
-                                        kDefaultVendorPresentTimeoutNs));
-            postEvent(VrrControllerEventType::kVendorRenderingTimeout, vendorPresentTimeoutNs);
+            auto presentTimeoutNs = mVendorPresentTimeoutOverride
+                    ? mVendorPresentTimeoutOverride.value().mTimeoutNs
+                    : mPresentTimeoutEventHandler->getPresentTimeoutNs();
+            // If |presentTimeoutNs| == 0, we don't need to handle the present timeout. Otherwise,
+            // post the next frame insertion event
+            if (presentTimeoutNs) {
+                // Convert the relative time clock from now to the absolute steady time clock.
+                presentTimeoutNs = getSteadyClockTimeNs() + presentTimeoutNs;
+                postEvent(VrrControllerEventType::kVendorRenderingTimeout, presentTimeoutNs);
+            }
         }
         mRecord.mPendingCurrentPresentTime = std::nullopt;
     }
