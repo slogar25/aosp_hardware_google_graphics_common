@@ -2330,7 +2330,11 @@ int32_t ExynosDisplayDrmInterface::clearDisplay(bool needModeClear)
 {
     ExynosDevice *exynosDevice = mExynosDisplay->mDevice;
     const bool isAsyncOff = needModeClear && exynosDevice->isDispOffAsyncSupported() &&
-            !exynosDevice->hasOtherDisplayOn(mExynosDisplay);
+            !exynosDevice->hasOtherDisplayOn(mExynosDisplay) && !mIsFirstClean;
+    if (mIsFirstClean) {
+        mIsFirstClean = false;
+        ALOGI("%s: first clean == true",  __func__);
+    }
     int ret = NO_ERROR;
     DrmModeAtomicReq drmReq(this);
 
