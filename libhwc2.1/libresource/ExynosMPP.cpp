@@ -1082,12 +1082,18 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
         return true;
     }
 
-    int32_t assignedDisplay = -1;
+    int32_t assignedDisplayType = -1;
     if (mAssignedDisplay != NULL) {
-        assignedDisplay = mAssignedDisplay->mType;
+        assignedDisplayType = mAssignedDisplay->mType;
     } else {
         MPP_LOGE("%s:: mpp is not assigned", __func__);
         return false;
+    }
+
+    ExynosDisplay *prevAssignedDisplay = mDstImgs[index].assignedDisplay;
+    if(prevAssignedDisplay == NULL) {
+        MPP_LOGD(eDebugMPP|eDebugBuf, "\tDstImag[%d] prevAssignedDisplay is NULL", index);
+        return true;
     }
 
     VendorGraphicBufferMeta gmeta(dst_handle);
@@ -1097,11 +1103,12 @@ bool ExynosMPP::needDstBufRealloc(struct exynos_image &dst, uint32_t index)
     MPP_LOGD(eDebugMPP | eDebugBuf,
              "\tAssignedDisplay[%d, %d] format[0x%8x, 0x%8x], bufferType[%d, %d], "
              "usageFlags: 0x%" PRIx64 ", need comp_type 0x%x lossy %u",
-             mPrevAssignedDisplayType, assignedDisplay, gmeta.format, dst.format,
+             mPrevAssignedDisplayType, assignedDisplayType, gmeta.format, dst.format,
              mDstImgs[index].bufferType, getBufferType(dst.usageFlags), dst.usageFlags,
              dst.compressionInfo.type, isFormatLossy(dst.format));
 
-    bool realloc = (mPrevAssignedDisplayType != assignedDisplay) ||
+    bool realloc = (mPrevAssignedDisplayType != assignedDisplayType) ||
+            (prevAssignedDisplay != mAssignedDisplay) ||
             (formatToBpp(gmeta.format) < formatToBpp(dst.format)) ||
             ((gmeta.stride * gmeta.vstride) <
              (int)(getAlignedDstFullWidth(dst) * dst.fullHeight)) ||
@@ -1388,6 +1395,7 @@ int32_t ExynosMPP::setupDst(exynos_mpp_img_info *dstImgInfo)
     if (dstImgInfo->bufferType == MPP_BUFFER_SECURE_DRM)
         attribute |= AcrylicCanvas::ATTR_PROTECTED;
 
+    dstImgInfo->assignedDisplay = mAssignedDisplay;
     if (mAssignedDisplay != NULL) {
         mAcrylicHandle->setCanvasDimension(pixel_align(mAssignedDisplay->mXres,
                                                        getDstStrideAlignment(dstImgInfo->format)),
@@ -1953,6 +1961,7 @@ int32_t ExynosMPP::requestHWStateChange(uint32_t state)
                 } else {
                     mDstImgs[i].bufferHandle = freeDstBuf.bufferHandle;
                     mDstImgs[i].bufferType = freeDstBuf.bufferType;
+                    mDstImgs[i].assignedDisplay = freeDstBuf.assignedDisplay;
                 }
             }
         }
