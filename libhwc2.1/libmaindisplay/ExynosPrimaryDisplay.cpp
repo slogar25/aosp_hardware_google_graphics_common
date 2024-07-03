@@ -627,6 +627,7 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
                 mOperationRateManager->getTargetOperationRate());
     }
 
+    std::lock_guard<std::mutex> minIdleRefreshRateLock(mMinIdleRefreshRateMutex);
     if (mVariableRefreshRateController) {
         if ((mode == HWC2_POWER_MODE_DOZE) || (mode == HWC2_POWER_MODE_DOZE_SUSPEND)) {
             mVariableRefreshRateController->setFixedRefreshRateRange(kMinIdleRefreshRateForDozeMode,
@@ -663,7 +664,6 @@ int32_t ExynosPrimaryDisplay::setPowerMode(int32_t mode) {
     if (mVariableRefreshRateController) {
         mVariableRefreshRateController->postSetPowerMode(mode);
         if (mode == HWC2_POWER_MODE_ON) {
-            std::lock_guard<std::mutex> lock(mMinIdleRefreshRateMutex);
             mVariableRefreshRateController->setFixedRefreshRateRange(mMinIdleRefreshRate,
                                                                      mRefreshRateDelayNanos);
         }
@@ -1393,6 +1393,8 @@ int32_t ExynosPrimaryDisplay::setMinIdleRefreshRate(const int targetFps,
             if (dozeMode && maxMinIdleFps != kMinIdleRefreshRateForDozeMode) {
                 ALOGW("%s: setting %dhz in doze mode (expect %dhz)", __func__, maxMinIdleFps,
                       kMinIdleRefreshRateForDozeMode);
+                mMinIdleRefreshRate = maxMinIdleFps;
+                return NO_ERROR;
             }
 
             int ret = mVariableRefreshRateController

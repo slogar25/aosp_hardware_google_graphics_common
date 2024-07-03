@@ -111,8 +111,8 @@ void DisplayTe2Manager::updateTe2OptionForProximity(bool proximityActive, int mi
     bool isOptionFixed = (!proximityActive || (proximityActive && dozeMode));
     // update the min refresh rate for changeable TE2 usage
     if (minRefreshRate) mMinRefreshRateForFixedTe2 = minRefreshRate;
-    if (isOptionFixed == mIsOptionFixedTe2) return;
     if (proximityActive && dozeMode) mPendingOptionChangeableTe2 = true;
+    if (isOptionFixed == mIsOptionFixedTe2) return;
 
     setTe2Option(isOptionFixed);
 }
