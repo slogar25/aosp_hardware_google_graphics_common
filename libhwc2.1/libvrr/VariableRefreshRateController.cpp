@@ -306,6 +306,11 @@ void VariableRefreshRateController::setActiveVrrConfiguration(hwc2_config_t conf
                     ->setVrrConfigAttributes(mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
                                              mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
         }
+        if (mFrameRateReporter) {
+            mFrameRateReporter
+                    ->setVrrConfigAttributes(mVrrConfigs[mVrrActiveConfig].vsyncPeriodNs,
+                                             mVrrConfigs[mVrrActiveConfig].minFrameIntervalNs);
+        }
     }
     mCondition.notify_all();
 }
