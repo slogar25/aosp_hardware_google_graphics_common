@@ -19,7 +19,6 @@
 namespace android::hardware::graphics::composer {
 
 // Definition of panel refresh control.
-const std::string kFrameRateNodeName = "frame_rate";
 const std::string kRefreshControlNodeName = "refresh_ctrl";
 const std::string kRefreshControlNodeEnabled = "Enabled";
 
